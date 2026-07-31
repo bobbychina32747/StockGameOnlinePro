@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  backend:
+    ports:
+      - "8000:8000"
+      - "9229:9229"  # Node.js debugger
+    command: npm run start:dev
+
+  frontend:
+    ports:
+      - "3000:3000"
+    command: npm run dev

@@ -1,0 +1,180 @@
+stock-simulator-pro/
+├── backend/                          # 后端主服务（Node.js + TypeScript + NestJS/Express）
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── .env.example
+│   ├── docker/
+│   │   └── Dockerfile.backend
+│   ├── src/
+│   │   ├── main.ts                  # 应用入口
+│   │   ├── app.module.ts            # 根模块
+│   │   ├── core/                    # 核心业务引擎（不依赖HTTP）
+│   │   │   ├── trading-engine/      # 交易撮合、验证、持仓管理
+│   │   │   │   ├── matching.engine.ts
+│   │   │   │   ├── order.validator.ts
+│   │   │   │   ├── position.manager.ts
+│   │   │   │   └── interfaces/      # 相关类型定义
+│   │   │   ├── market-data/         # 行情生成、K线聚合、股票池
+│   │   │   │   ├── data.generator.ts
+│   │   │   │   ├── kline.aggregator.ts
+│   │   │   │   ├── stock.pool.ts
+│   │   │   │   └── models/          # OU、GARCH、黑天鹅等模型
+│   │   │   └── risk-manager/        # 风险控制、日终结算、VaR计算
+│   │   │       ├── margin.controller.ts
+│   │   │       ├── daily.settlement.ts
+│   │   │       └── var.calculator.ts
+│   │   ├── modules/                 # 功能模块（接入HTTP/WS层）
+│   │   │   ├── auth/                # 认证（JWT、Local、Refresh）
+│   │   │   │   ├── auth.controller.ts
+│   │   │   │   ├── auth.service.ts
+│   │   │   │   ├── auth.module.ts
+│   │   │   │   ├── dto/             # 登录、注册、刷新token的DTO
+│   │   │   │   ├── strategies/      # JWT、Local、Refresh策略
+│   │   │   │   └── guards/          # JWT和Local守卫
+│   │   │   ├── user/                # 用户信息管理
+│   │   │   │   ├── user.controller.ts
+│   │   │   │   ├── user.service.ts
+│   │   │   │   ├── user.module.ts
+│   │   │   │   ├── dto/             # 更新资料、修改密码的DTO
+│   │   │   │   ├── entities/        # User、UserSettings实体
+│   │   │   │   └── repositories/    # 数据访问层
+│   │   │   ├── account/             # 账户、持仓、杠杆管理
+│   │   │   │   ├── account.controller.ts
+│   │   │   │   ├── account.service.ts
+│   │   │   │   ├── account.module.ts
+│   │   │   │   ├── dto/             # 创建账户、调整杠杆DTO
+│   │   │   │   ├── entities/        # Account、Position实体
+│   │   │   │   └── repositories/
+│   │   │   ├── trading/             # 下单、撤单、交易记录
+│   │   │   │   ├── order.controller.ts
+│   │   │   │   ├── order.service.ts
+│   │   │   │   ├── trading.module.ts
+│   │   │   │   ├── dto/             # 创建订单、取消订单、批量订单DTO
+│   │   │   │   ├── entities/        # Order、Transaction实体
+│   │   │   │   └── repositories/
+│   │   │   ├── market/              # 行情查询（RESTful + WebSocket推送）
+│   │   │   │   ├── market.controller.ts
+│   │   │   │   ├── market.gateway.ts   # WebSocket网关
+│   │   │   │   ├── market.service.ts
+│   │   │   │   ├── market.module.ts
+│   │   │   │   ├── dto/             # K线请求、订阅DTO
+│   │   │   │   ├── cache/           # Redis缓存服务
+│   │   │   │   └── interfaces/      # 广播消息接口
+│   │   │   ├── fund/                # 基金产品（ETF、货币基金）
+│   │   │   │   ├── fund.controller.ts
+│   │   │   │   ├── fund.service.ts
+│   │   │   │   ├── fund.module.ts
+│   │   │   │   ├── dto/             # 申购、赎回DTO
+│   │   │   │   ├── entities/        # Fund、FundNAV、FundHolding
+│   │   │   │   └── repositories/
+│   │   │   ├── ranking/             # 排行榜系统
+│   │   │   │   ├── ranking.controller.ts
+│   │   │   │   ├── ranking.service.ts
+│   │   │   │   ├── ranking.module.ts
+│   │   │   │   ├── ranking.scheduler.ts  # 定时计算
+│   │   │   │   ├── dto/             # 排行查询DTO、排行条目DTO
+│   │   │   │   ├── entities/        # DailySnapshot实体
+│   │   │   │   └── repositories/
+│   │   │   └── admin/               # 管理后台（审计、作弊检测）
+│   │   │       ├── admin.controller.ts
+│   │   │       ├── admin.service.ts
+│   │   │       ├── admin.module.ts
+│   │   │       ├── dto/             # 审计查询DTO
+│   │   │       ├── entities/        # AuditLog、CheatRecord
+│   │   │       └── detectors/       # 作弊检测器、频率分析
+│   │   ├── common/                  # 通用组件
+│   │   │   ├── guards/              # Nonce守卫、角色守卫
+│   │   │   ├── interceptors/        # 日志、超时、转换拦截器
+│   │   │   ├── filters/             # HTTP和WS异常过滤器
+│   │   │   ├── constants/           # 错误码、交易时间、费率常量
+│   │   │   └── decorators/          # 获取用户、Nonce必需装饰器
+│   │   └── infrastructure/          # 外部依赖适配
+│   │       ├── database/            # 数据库模块、迁移、种子
+│   │       ├── redis/               # Redis服务、分布式锁
+│   │       ├── websocket/           # WebSocket适配器、认证中间件、房间管理
+│   │       └── queue/               # 消息队列（生产者和消费者）
+│   └── test/                        # 单元测试和E2E测试
+│       ├── unit/
+│       └── e2e/
+│
+├── frontend/                        # 前端主应用（React + TypeScript + Vite）
+│   ├── package.json
+│   ├── vite.config.ts
+│   ├── tsconfig.json
+│   ├── index.html
+│   ├── docker/
+│   │   └── Dockerfile.frontend
+│   ├── public/                      # 静态资源
+│   └── src/
+│       ├── main.tsx
+│       ├── App.tsx
+│       ├── routes.tsx
+│       ├── pages/                   # 页面级组件
+│       │   ├── Login/               # 登录/注册页
+│       │   ├── Dashboard/           # 主交易界面（含股票/基金标签页）
+│       │   │   ├── Dashboard.tsx
+│       │   │   └── components/
+│       │   │       ├── ChartArea/   # K线图、工具栏、指标选择、缩放助手
+│       │   │       ├── SidePanel/   # 账户总览、持仓、盘口、下单、T+1提示
+│       │   │       └── FundPanel/   # 基金列表、申购/赎回、基金持仓
+│       │   ├── Ranking/             # 排行榜页面
+│       │   └── Profile/             # 个人中心（修改密码、交易历史、绩效）
+│       ├── components/              # 公共UI组件
+│       │   ├── UI/                  # Button、Input、Modal、Notification、Spinner
+│       │   └── Layout/              # AppLayout、TopBar、BottomBar(新闻滚动)、Sidebar
+│       ├── services/                # 与后端交互的服务层
+│       │   ├── api.client.ts        # Axios封装
+│       │   ├── ws.client.ts         # Socket.IO客户端
+│       │   ├── interceptors/        # 认证拦截器、Nonce自动生成拦截器
+│       │   ├── endpoints/           # 各模块API（auth、trading、market、fund、ranking）
+│       │   └── types/               # 请求/响应类型定义
+│       ├── store/                   # 全局状态管理（Zustand）
+│       │   ├── index.ts
+│       │   └── slices/              # user、market、account、order、ui、ranking切片
+│       ├── hooks/                   # 自定义Hooks（useWebSocket、useChartResize、useDebounce等）
+│       ├── utils/                   # 工具函数（格式化、nonce生成、K线合并、配色方案、校验器）
+│       └── styles/                  # 全局样式、主题变量
+│
+├── data-generator/                  # 独立数据生成微服务
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── docker/
+│   │   └── Dockerfile.generator
+│   └── src/
+│       ├── index.ts
+│       ├── generator.ts             # 核心生成逻辑（OU、GARCH、黑天鹅）
+│       ├── models/                  # 随机过程模型
+│       ├── writers/                 # 写入Parquet、CSV、数据库
+│       ├── configs/                 # 生成配置、股票池配置
+│       └── jobs/                    # 定时任务（历史数据、每日tick、基金净值）
+│
+├── data/                            # 静态数据存储（生成后的文件/快照）
+│   ├── historical/                  # 按年份/股票/粒度存储的K线数据（Parquet格式）
+│   ├── fundamentals/                # 股票池、基金池、指数成分等基础信息（JSON）
+│   └── snapshots/                   # 每日用户账户快照（用于排行榜）
+│
+├── infra/                           # 基础设施（IaC）
+│   ├── docker-compose.yml           # 一键启动所有服务
+│   ├── docker-compose.override.yml  # 开发环境覆盖
+│   ├── nginx/                       # 反向代理配置（含SSL）
+│   ├── prometheus/                  # 监控告警配置
+│   ├── grafana/                     # 可视化仪表盘
+│   └── scripts/                     # 初始化数据库、部署、回滚、健康检查脚本
+│
+├── docs/                            # 项目文档
+│   ├── API_Reference/               # RESTful和WebSocket接口文档
+│   ├── Database_Schema/             # ER图和表说明
+│   ├── Algorithms/                  # 撮合、聚合、Nonce机制说明
+│   └── Deployment/                  # 本地开发和部署指南
+│
+├── tests/                           # 测试
+│   ├── load-testing/                # K6负载测试脚本
+│   ├── integration/                 # 集成测试
+│   └── e2e/                         # Playwright端到端测试
+│
+├── .env                             # 环境变量
+├── .gitignore
+├── .prettierrc
+├── .eslintrc.js
+├── README.md
+└── LICENSE

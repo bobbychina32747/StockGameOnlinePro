@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # ─── PostgreSQL 数据库 ───
+  postgres:
+    image: postgres:16-alpine
+    container_name: sgp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: stockgame
+      POSTGRES_PASSWORD: stockgame_dev_2024
+      POSTGRES_DB: stockgame
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stockgame"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis 缓存 ───
+  redis:
+    image: redis:7-alpine
+    container_name: sgp-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─── 后端服务 ───
+  backend:
+    build:
+      context: ../backend
+      dockerfile: docker/Dockerfile.backend
+    container_name: sgp-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ../.env
+    volumes:
+      - ../backend/src:/app/src
+
+  # ─── 前端服务 ───
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: docker/Dockerfile.frontend
+    container_name: sgp-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    volumes:
+      - ../infra/nginx/sites:/etc/nginx/conf.d
+    depends_on:
+      - backend
+
+  # ─── 数据生成器 ───
+  data-generator:
+    build:
+      context: ../data-generator
+      dockerfile: docker/Dockerfile.generator
+    container_name: sgp-data-generator
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ../.env
+    profiles:
+      - generator
+
+volumes:
+  pgdata:
+  redisdata:

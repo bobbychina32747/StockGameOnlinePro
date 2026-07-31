@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.db
+*.db-journal
+.env
+.DS_Store
+*.log
+data/
+
+# 备份目录
+*.bak/
+backend/data.bak/
