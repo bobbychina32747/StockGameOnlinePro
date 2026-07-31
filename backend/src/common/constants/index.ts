@@ -36,6 +36,15 @@ export const STOCK_POOL = [
     { symbol: 'R1', name: '金川有色', code: '601899', listDate: '2008-04-28', industry: '有色金属', initialPrice: 15, mu: 15, sigma: 0.022, theta: 0.12, description: '铜锂资源与稀有金属开采商，拥有亚洲最大铜矿之一，锂盐产能爬坡。' },
     { symbol: 'R2', name: '墨石能源', code: '601225', listDate: '2010-02-08', industry: '煤炭', initialPrice: 9, mu: 9, sigma: 0.020, theta: 0.14, description: '焦煤与清洁能源化工企业，长协价占比高，分红率稳定在 40% 以上。' },
     { symbol: 'P1', name: '广厦置业', code: '600048', listDate: '2002-07-09', industry: '房地产', initialPrice: 6, mu: 6, sigma: 0.024, theta: 0.12, description: '城市更新与长租公寓运营商，聚焦核心城市存量改造，轻资产输出提速。' },
+    // 文娱传媒（贴合玩家/创作者兴趣，高情绪敏感）
+    { symbol: 'G1', name: '星界游戏', code: '300999', listDate: '2017-11-16', industry: '游戏', initialPrice: 48, mu: 48, sigma: 0.033, theta: 0.08, description: '手游研发发行双轮驱动，旗舰射击手游全球月流水破十亿，海外市场高歌猛进。' },
+    { symbol: 'G2', name: '幻光互娱', code: '002777', listDate: '2015-06-08', industry: '影视传媒', initialPrice: 14, mu: 14, sigma: 0.027, theta: 0.11, description: '动画电影与短剧制作商，多部国漫票房口碑双收，虚拟偶像企划上线。' },
+    { symbol: 'G3', name: '云端电竞', code: '300233', listDate: '2019-03-21', industry: '电竞', initialPrice: 22, mu: 22, sigma: 0.031, theta: 0.09, description: '电竞赛事运营与俱乐部投资，承办多款主流游戏职业联赛，商业化全面提速。' },
+    { symbol: 'G4', name: '像素工坊', code: '688888', listDate: '2016-09-09', industry: '云游戏', initialPrice: 33, mu: 33, sigma: 0.030, theta: 0.09, description: '云游戏与沙盒创作平台，千万玩家共建虚拟世界，UGC 内容生态繁荣。' },
+    { symbol: 'G5', name: '天籁音乐', code: '300031', listDate: '2014-04-17', industry: '数字音乐', initialPrice: 12, mu: 12, sigma: 0.021, theta: 0.13, description: '数字音乐与直播平台，版权曲库超五千万，音频社交新业务快速增长。' },
+    { symbol: 'V1', name: '霓虹引擎', code: '301666', listDate: '2021-07-30', industry: '游戏引擎', initialPrice: 58, mu: 58, sigma: 0.036, theta: 0.07, description: '自研游戏引擎与 AI NPC 技术商，向独立开发者开放订阅，助力游戏工业化。' },
+    { symbol: 'V2', name: '次元文创', code: '600120', listDate: '2013-10-25', industry: '动漫IP', initialPrice: 9, mu: 9, sigma: 0.026, theta: 0.11, description: '动漫 IP 运营与衍生品制造，手握多个国民级动漫形象，谷子经济浪潮受益者。' },
+    { symbol: 'V3', name: '速鹰物流', code: '002120', listDate: '2012-05-18', industry: '物流', initialPrice: 7, mu: 7, sigma: 0.019, theta: 0.14, description: '综合物流与供应链服务商，无人机配送试点城市超五十座，时效承诺行业领先。' },
 ];
 
 // 行业对各宏观因子的敏感度（决定板块联动与分化）
@@ -60,6 +69,14 @@ export const INDUSTRY_SENSITIVITY: Record<string, Partial<Record<string, number>
     '有色金属': { '宏观经济': 1.6, '国际环境': 1.3 },
     '煤炭': { '宏观经济': 1.5, '政策风险': 1.1 },
     '房地产': { '宏观经济': 1.7, '政策风险': 1.6 },
+    '游戏': { '市场情绪': 1.8, '行业景气': 1.5, '政策风险': 1.2 },
+    '影视传媒': { '市场情绪': 1.6, '消费景气': 1.2 },
+    '电竞': { '市场情绪': 1.9, '行业景气': 1.4 },
+    '云游戏': { '行业景气': 1.7, '市场情绪': 1.6 },
+    '数字音乐': { '市场情绪': 1.5, '消费景气': 1.3 },
+    '游戏引擎': { '行业景气': 1.8, '市场情绪': 1.7 },
+    '动漫IP': { '消费景气': 1.6, '市场情绪': 1.4 },
+    '物流': { '宏观经济': 1.4, '消费景气': 1.2 },
 };
 
 export const US_FEES = {

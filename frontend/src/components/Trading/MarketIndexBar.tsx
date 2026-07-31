@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { marketApi } from '../../services/api.client';
 import { useMarketStore } from '../../store';
 
 const REGIME_LABEL: Record<string, string> = {
@@ -7,36 +9,35 @@ const REGIME_LABEL: Record<string, string> = {
   volatile: '剧烈波动',
 };
 
-// 顶部大盘指数条（上证/深证/创业板 模拟指数 + 市场状态）
+// 顶部大盘指数条（真实后端计算的上证/深证/创业板模拟指数 + 市场状态）
 export function MarketIndexBar() {
-  const stocks = useMarketStore((s) => s.stocks);
+  const [indices, setIndices] = useState<any[]>([]);
   const marketRegime = useMarketStore((s) => s.marketRegime);
   const gameDay = useMarketStore((s) => s.gameDay);
 
-  if (stocks.length === 0) return null;
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      marketApi.indices().then((list) => {
+        if (alive && Array.isArray(list)) setIndices(list);
+      }).catch(() => {});
+    };
+    load();
+    const timer = setInterval(load, 5000);
+    return () => { alive = false; clearInterval(timer); };
+  }, []);
 
-  const avgChange = (filter?: (s: any) => boolean) => {
-    const arr = stocks.filter(filter ?? (() => true));
-    if (!arr.length) return 0;
-    return arr.reduce((sum, s) => sum + (s.changePct ?? 0), 0) / arr.length;
-  };
-
-  const indices = [
-    { name: '上证指数', base: 3100, change: avgChange() },
-    { name: '深证成指', base: 10500, change: avgChange((s) => ['F', 'C', 'R', 'P'].includes(s.symbol[0])) },
-    { name: '创业板指', base: 2200, change: avgChange((s) => ['T', 'M', 'E'].includes(s.symbol[0])) },
-  ];
+  if (indices.length === 0) return null;
 
   return (
     <div className="market-index-bar">
       {indices.map((idx) => {
-        const val = idx.base * (1 + idx.change / 100);
-        const up = idx.change >= 0;
+        const up = idx.changePct >= 0;
         return (
-          <span key={idx.name} className={`index-item ${up ? 'up' : 'down'}`}>
+          <span key={idx.code} className={`index-item ${up ? 'up' : 'down'}`}>
             <b>{idx.name}</b>
-            <em>{val.toFixed(2)}</em>
-            <i>{up ? '+' : ''}{idx.change.toFixed(2)}%</i>
+            <em>{idx.value}</em>
+            <i>{up ? '+' : ''}{idx.changePct}%</i>
           </span>
         );
       })}

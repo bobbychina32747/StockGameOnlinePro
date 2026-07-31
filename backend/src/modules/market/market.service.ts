@@ -60,7 +60,7 @@ let MarketService = class MarketService {
                         this.engine.setDayOpen(prices);
                         await this.engine.resetBoughtToday();
                         const state = this.marketData.getState();
-                        const news = this.newsService.generateDailyNews(state.marketRegime);
+                        const news = this.newsService.generateDailyNews(state.marketRegime, this.marketData.gameDay);
                         if (news) {
                             this.logger.log(`📰 ${news.title}`);
                         }
@@ -111,6 +111,9 @@ let MarketService = class MarketService {
     }
     getStocks() {
         return this.marketData.getStockList();
+    }
+    getIndices() {
+        return this.marketData.getIndices();
     }
 };
 

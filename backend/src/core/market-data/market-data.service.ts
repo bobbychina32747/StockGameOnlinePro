@@ -38,6 +38,8 @@ let MarketDataService = class MarketDataService {
         this.factors = {} as Record<string, number>;
         this.isRunning = false;
         this.intervalHandle = null;
+        // 性能优化：股票池配置缓存（消除每 tick 的 find O(n)）
+        this.poolBySymbol = new Map<string, any>();
     }
     async init() {
         for (const f of constants_1.FACTOR_NAMES) {
@@ -96,6 +98,9 @@ let MarketDataService = class MarketDataService {
             stock.description = cfg.description || '';
             await this.stockRepo.save(stock);
             dbStocks.push(stock);
+        }
+        for (const cfg of constants_1.STOCK_POOL) {
+            this.poolBySymbol.set(cfg.symbol, cfg);
         }
         for (const s of dbStocks) {
             const price = Number(s.initialPrice);
@@ -194,7 +199,7 @@ let MarketDataService = class MarketDataService {
         let impact = 0;
         // 行业兜底：DB 无值时用股票池静态配置
         const industry = stock.industry
-            || constants_1.STOCK_POOL.find((c) => c.symbol === stock.symbol)?.industry
+            || this.poolBySymbol.get(stock.symbol)?.industry
             || '综合';
         const sens = constants_1.INDUSTRY_SENSITIVITY[industry] || {};
         for (const [name, val] of Object.entries(this.factors)) {
@@ -263,13 +268,15 @@ let MarketDataService = class MarketDataService {
         const stocksArr: any[] = [...this.stocks.values()];
         // 行业联动：同行业股票共享一部分随机冲击（板块同涨同跌、板块间分化）
         const industryShocks = {};
+        const cfgBySymbol = this.poolBySymbol;
         for (const stock of stocksArr) {
             if (industryShocks[stock.industry] === undefined) {
                 industryShocks[stock.industry] = this.randn() * 0.004;
             }
         }
         for (const stock of stocksArr) {
-            const mu = Number(constants_1.STOCK_POOL.find((s) => s.symbol === stock.symbol)?.mu ?? 100);
+            const cfg = cfgBySymbol.get(stock.symbol) || {};
+            const mu = Number(cfg.mu ?? 100);
             this.updateVolatility(stock);
             const shock = stock.volatility * params.volMult * this.randn() * Math.sqrt(dt) * 1.5 + industryShocks[stock.industry];
             const jump = this.calcJump(dt);
@@ -279,7 +286,7 @@ let MarketDataService = class MarketDataService {
             let meanReversion = 0;
             let momentumBoost = 0;
             if (!stock.isTrending) {
-                meanReversion = Number(constants_1.STOCK_POOL.find((s) => s.symbol === stock.symbol)?.theta ?? 0.15) * (mu - stock.price) * dt;
+                meanReversion = Number(cfg.theta ?? 0.15) * (mu - stock.price) * dt;
             } else {
                 momentumBoost = 0.2 * dt * 1.5;
             }
@@ -307,8 +314,57 @@ let MarketDataService = class MarketDataService {
                 timestamp: this.tickCount,
             });
         }
+        // 宏观反馈回路：个股表现 → 宏观因子（股票成为影响金融体系的真实嵌入体）
+        this.updateMacroFeedback();
         this.tickCount++;
         return results;
+    }
+    // ─── 宏观反馈：股票表现反向影响宏观因子（双向联动，缓慢平滑防自激震荡） ───
+    updateMacroFeedback() {
+        const arr = [...this.stocks.values()];
+        if (arr.length === 0)
+            return;
+        const upRatio = arr.filter((s) => (s.lastReturn ?? 0) > 0).length / arr.length;
+        const senti = (upRatio - 0.5) * 0.12;
+        const macroStocks = arr.filter((s) => ['银行', '券商', '保险', '有色金属', '煤炭', '房地产', '物流'].includes(s.industry));
+        const macroRet = macroStocks.length
+            ? macroStocks.reduce((a, s) => a + (s.lastReturn ?? 0), 0) / macroStocks.length
+            : 0;
+        const indRet = arr.reduce((a, s) => a + (s.lastReturn ?? 0), 0) / arr.length;
+        // 平滑更新（当前值 96% + 反馈 4%），并限制在合理区间
+        const setFactor = (name, target) => {
+            const cur = this.factors[name] ?? 0;
+            this.factors[name] = this.clamp(cur * 0.96 + target * 0.04, -0.5, 0.5);
+        };
+        setFactor('市场情绪', senti * 2);
+        setFactor('宏观经济', macroRet * 8);
+        setFactor('行业景气', indRet * 8);
+    }
+    // ─── 指数体系：按成分股实时计算（基准点位 × 成分平均涨跌） ───
+    getIndices() {
+        const defs = [
+            { code: '000001', name: '上证指数', base: 3100, filter: () => true },
+            { code: '399001', name: '深证成指', base: 10500, filter: (s) => /^(000|002|300)/.test(s.code || '') },
+            { code: '399006', name: '创业板指', base: 2200, filter: (s) => /^300/.test(s.code || '') },
+            { code: '000688', name: '科创50', base: 950, filter: (s) => /^688/.test(s.code || '') },
+            { code: '399999', name: '中证文娱', base: 1200, filter: (s) => /^(G|V)/.test(s.symbol) },
+        ];
+        return defs.map((d) => {
+            const members = [...this.stocks.values()].filter((st) => d.filter(st));
+            let total = 0;
+            for (const st of members) {
+                const prev = Number(st.prevClose) || Number(st.dayOpen) || 1;
+                total += (st.price - prev) / prev;
+            }
+            const change = members.length ? (total / members.length) * 100 : 0;
+            return {
+                code: d.code,
+                name: d.name,
+                value: Number((d.base * (1 + change / 100)).toFixed(2)),
+                changePct: Number(change.toFixed(2)),
+                members: members.length,
+            };
+        });
     }
     updateKlines(stock) {
         const minute = Math.floor(stock.minuteCounter / 60);
@@ -459,7 +515,7 @@ let MarketDataService = class MarketDataService {
                 listDate: state.listDate || '',
                 description: state.description || '',
                 industry: state.industry
-                    || constants_1.STOCK_POOL.find((c) => c.symbol === state.symbol)?.industry
+                    || this.poolBySymbol.get(state.symbol)?.industry
                     || '综合',
                 price: Number(state.price.toFixed(2)),
                 changePct: Number((((state.price - prevClose) / prevClose) * 100).toFixed(2)),
@@ -507,6 +563,26 @@ let MarketDataService = class MarketDataService {
         if (this.factors[factor] !== undefined) {
             this.factors[factor] += impact;
             this.factors[factor] = this.clamp(this.factors[factor], -0.2, 0.2);
+        }
+    }
+    // 随机取一只股票（新闻占位符填充用）
+    getRandomStock() {
+        const arr = [...this.stocks.values()];
+        return arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
+    }
+    // 新闻定向冲击：对指定个股/行业施加一次性价格波动（真实嵌入金融体系）
+    applyNewsImpact(news) {
+        const bullish = news.type !== 'bearish';
+        const strength = 0.5 + Math.random() * 0.6; // 0.5%~1.1%
+        for (const st of this.stocks.values()) {
+            if (news.targetedSymbol && st.symbol === news.targetedSymbol) {
+                st.price = Math.max(0.5, st.price * (1 + (bullish ? 1 : -1) * strength * 0.01));
+                st.lastReturn = (bullish ? 1 : -1) * strength * 0.01;
+            }
+            else if (news.targetedIndustry && st.industry === news.targetedIndustry) {
+                st.price = Math.max(0.5, st.price * (1 + (bullish ? 1 : -1) * strength * 0.004));
+                st.lastReturn = (bullish ? 1 : -1) * strength * 0.004;
+            }
         }
     }
 };
