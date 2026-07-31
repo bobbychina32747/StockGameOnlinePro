@@ -1,4 +1,5 @@
 import { useMarketStore, useUIStore } from '../../store';
+import { CollapsibleCard } from './CollapsibleCard';
 
 // 右侧盘口（买5/卖5，同花顺式）
 export function OrderBookPanel() {
@@ -10,8 +11,7 @@ export function OrderBookPanel() {
   const bids = ob.bids || [];
 
   return (
-    <div className="card">
-      <h3>📖 盘口深度 ({selectedSymbol})</h3>
+    <CollapsibleCard title={`📖 盘口深度 (${selectedSymbol})`}>
       <div className="orderbook-levels">
         <div style={{ marginBottom: 4 }}>
           {[...asks].reverse().map((a: any, i: number) => (
@@ -33,6 +33,6 @@ export function OrderBookPanel() {
           ))}
         </div>
       </div>
-    </div>
+    </CollapsibleCard>
   );
 }

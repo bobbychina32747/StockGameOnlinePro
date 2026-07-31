@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { accountApi } from '../../services/api.client';
 import { useAccountStore, useMarketStore, useUIStore } from '../../store';
+import { CollapsibleCard } from './CollapsibleCard';
 
 // 右侧账户面板：总览 + 模式切换 + 角色预设 + 持仓明细
 export function AccountPanel() {
@@ -39,8 +40,7 @@ export function AccountPanel() {
 
   return (
     <>
-      <div className="card">
-        <h3>💰 账户总览</h3>
+      <CollapsibleCard title="💰 账户总览">
         <div className="info-row">
           <span className="label">现金</span>
           <span className="value">{account ? Number(account.cash).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) : '---'}</span>
@@ -94,11 +94,10 @@ export function AccountPanel() {
             </button>
           ))}
         </div>
-      </div>
+    </CollapsibleCard>
 
       {/* 持仓明细 */}
-      <div className="card">
-        <h3>📊 持仓明细</h3>
+      <CollapsibleCard title="📊 持仓明细">
         {(positions as any[]).length === 0 ? (
           <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '8px 0' }}>暂无持仓</div>
         ) : (
@@ -137,7 +136,7 @@ export function AccountPanel() {
             );
           })
         )}
-      </div>
+    </CollapsibleCard>
     </>
   );
 }

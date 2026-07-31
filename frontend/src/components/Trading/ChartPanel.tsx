@@ -32,11 +32,12 @@ export function ChartPanel() {
 
   const chartOption = useMemo(() => {
     const closes = klineData.map((k) => k.close);
-    const calcMA = (period: number): (string | null)[] => {
-      const r: (string | null)[] = new Array(closes.length).fill(null);
+    // 注意：返回数字（字符串会导致 tooltip formatter 对字符串调 toFixed 崩溃）
+    const calcMA = (period: number): (number | null)[] => {
+      const r: (number | null)[] = new Array(closes.length).fill(null);
       for (let i = period - 1; i < closes.length; i++) {
         let s = 0; for (let j = 0; j < period; j++) s += closes[i - j];
-        r[i] = (s / period).toFixed(2);
+        r[i] = s / period;
       }
       return r;
     };
@@ -63,8 +64,8 @@ export function ChartPanel() {
       for (let i = period - 1; i < closes.length; i++) {
         let sq = 0; for (let j = 0; j < period; j++) sq += (closes[i - j] - Number(mid[i])) ** 2;
         const std = Math.sqrt(sq / period);
-        u[i] = (Number(mid[i]) + 2 * std).toFixed(2);
-        l[i] = (Number(mid[i]) - 2 * std).toFixed(2);
+        u[i] = Number(mid[i]) + 2 * std;
+        l[i] = Number(mid[i]) - 2 * std;
       }
       return { upper: u, mid, lower: l };
     };
@@ -109,6 +110,12 @@ export function ChartPanel() {
         backgroundColor: '#1e222d',
         borderColor: '#2e3240',
         textStyle: { color: '#d1d4dc', fontSize: 12 },
+        axisPointer: {
+          type: 'cross',
+          lineStyle: { color: '#556080', type: 'dashed' },
+          crossStyle: { color: '#8a93a8' },
+          label: { backgroundColor: '#3a3f4e' },
+        },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return '';
           const title = params[0].axisValue;
@@ -116,9 +123,11 @@ export function ChartPanel() {
             const val = p.value;
             let display: string;
             if (Array.isArray(val)) {
-              display = `O: ${val[0].toFixed(2)}  H: ${val[3].toFixed(2)}  L: ${val[2].toFixed(2)}  C: ${val[1].toFixed(2)}`;
-            } else if (val != null) {
+              display = `O: ${Number(val[0]).toFixed(2)}  H: ${Number(val[3]).toFixed(2)}  L: ${Number(val[2]).toFixed(2)}  C: ${Number(val[1]).toFixed(2)}`;
+            } else if (typeof val === 'number') {
               display = val.toFixed(2);
+            } else if (val != null) {
+              display = String(val);
             } else {
               display = '-';
             }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { tradingApi } from '../../services/api.client';
 import { useAccountStore, useMarketStore, useUIStore } from '../../store';
+import { CollapsibleCard } from './CollapsibleCard';
 
 interface OrderEntry {
   id?: string;
@@ -128,8 +129,7 @@ export function OrderPanel() {
 
   return (
     <>
-      <div className="card">
-        <h3>📝 下单 ({selectedSymbol})</h3>
+      <CollapsibleCard title={`📝 下单 (${selectedSymbol})`}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <select className="input" value={orderType} onChange={(e) => setOrderType(e.target.value)}>
             <option value="market">市价单</option>
@@ -176,11 +176,10 @@ export function OrderPanel() {
             <button className="btn btn-danger btn-sm" onClick={quickClear}>清仓</button>
           </div>
         </div>
-      </div>
+    </CollapsibleCard>
 
       {/* 挂单 */}
-      <div className="card">
-        <h3>📋 当前挂单</h3>
+      <CollapsibleCard title="📋 当前挂单">
         {pendingOrders.length === 0 ? (
           <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>无挂单</div>
         ) : (
@@ -191,11 +190,10 @@ export function OrderPanel() {
             </div>
           ))
         )}
-      </div>
+    </CollapsibleCard>
 
       {/* 交易历史 */}
-      <div className="card">
-        <h3>📋 最近交易</h3>
+      <CollapsibleCard title="📋 最近交易">
         {tradeHistory.length === 0 ? (
           <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>暂无交易</div>
         ) : (
@@ -213,7 +211,7 @@ export function OrderPanel() {
             </div>
           ))
         )}
-      </div>
+    </CollapsibleCard>
     </>
   );
 }

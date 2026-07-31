@@ -484,10 +484,57 @@ select.input {
   height: 100%;
 }
 
+/* 可拖拽面板 + 分割手柄 */
+.resizable-panel {
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  height: 100%;
+}
+
+.drag-handle {
+  width: 6px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  position: relative;
+  z-index: 5;
+  border-radius: 3px;
+  transition: background var(--transition-fast);
+}
+
+.drag-handle:hover,
+.drag-handle:active {
+  background: var(--color-brand);
+  opacity: 0.5;
+}
+
+.drag-handle::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 40px;
+  border-radius: 1px;
+  background: var(--border-default);
+}
+
+.drag-handle:hover::after {
+  background: var(--bg-primary);
+}
+
+.collapse-arrow {
+  color: var(--text-muted);
+  font-size: 11px;
+  transition: color var(--transition-fast);
+}
+
 /* 左：股票列表 */
 .stock-list-panel {
-  width: 230px;
-  flex-shrink: 0;
+  width: 100%;
+  flex: 1;
+  min-width: 0;
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -642,7 +689,9 @@ select.input {
 
 /* 右：盘口/账户/下单 */
 .side-panel {
-  width: 330px;
+  width: 100%;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
