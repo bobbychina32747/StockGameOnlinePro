@@ -1,10 +1,13 @@
 @echo off
-title StockSim Frontend - Port 3000
+title StockSim Frontend - :3000
 cd /d "%~dp0frontend"
-echo [Frontend] Starting StockSim Pro frontend...
-echo [Frontend] Press Ctrl+C to stop
+echo.
+echo  ================================================
+echo    StockSim Frontend  -  port 3000
+echo    Starting... press Ctrl+C to stop
+echo  ================================================
 echo.
 npx vite --host
 echo.
-echo [Frontend] Process exited.
+echo  Frontend process exited.
 pause

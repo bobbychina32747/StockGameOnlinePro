@@ -1,45 +1,210 @@
 @echo off
+setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
-title StockSim Pro - å¯åŠ¨æœåŠ¡
+title StockSim Pro - Ò»¼üÆô¶¯
 cd /d "%~dp0"
 
-echo ============================================
-echo   StockSim Pro - å¯åŠ¨æœåŠ¡
-echo   Stock Trading Simulator Platform
-echo ============================================
+:: È«¾ÖÖ÷ÌâÉ«£¨Windows ¿ØÖÆÌ¨±ê×¼É«£©
+color 0B
+
+:: ==========================================================
+echo.
+echo   ======================================================
+echo     StockSim Pro  -  ×¨Òµ³´¹ÉÄ£ÄâÆ½Ì¨
+echo     Stock Trading Simulator Platform
+echo   ======================================================
 echo.
 
-:: Quick pre-check before launching
+:: ---------------- 0. »·¾³¼ì²é ----------------
+echo   [1/6] »·¾³¼ì²é
 where node >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo [FAIL] Node.js æœªå®‰è£…ã€‚è¯·å…ˆè¿è¡Œ check.bat æŸ¥çœ‹è¯¦æƒ…
+if %errorlevel% neq 0 (
+    echo        [FAIL] Node.js Î´°²×°£¡Çë·ÃÎÊ https://nodejs.org °²×° v18+ ºóÖØÊÔ
     pause
     exit /b 1
 )
-
-:: Create data directory if not exists
-if not exist "backend\data" mkdir backend\data
-
-:: Start backend
-echo [1/2] Starting backend (port 8000)...
-start "StockSim-Backend" cmd /c run-backend.bat
-
-:: Wait for backend to initialize
-echo Waiting for backend (5 seconds)...
-ping -n 5 127.0.0.1 >nul
-
-:: Start frontend
-echo [2/2] Starting frontend (port 3000)...
-start "StockSim-Frontend" cmd /c run-frontend.bat
-
+for /f "tokens=1" %%v in ('node --version') do echo        [OK] Node.js  %%v
+where npm >nul 2>&1
+if %errorlevel% neq 0 (
+    echo        [FAIL] npm Î´ÕÒµ½
+    pause
+    exit /b 1
+)
+for /f "tokens=1" %%v in ('npm --version') do echo        [OK] npm  %%v
 echo.
-echo ============================================
-echo   æœåŠ¡å·²å¯åŠ¨ï¼
+
+:: ---------------- 1. ÒÀÀµ¼ì²é£¨È±Ê§×Ô¶¯°²×°£© ----------------
+echo   [2/6] ÒÀÀµ¼ì²é
+if not exist "backend\node_modules" (
+    echo        [WARN] ºó¶ËÒÀÀµÈ±Ê§£¬ÕýÔÚ×Ô¶¯°²×°£¬ÇëÉÔºò...
+    pushd "backend"
+    call npm install --no-fund --no-audit >nul 2>&1
+    if %errorlevel% neq 0 (
+        popd
+        echo        [FAIL] ºó¶ËÒÀÀµ°²×°Ê§°Ü£¬ÇëÊÖ¶¯Ö´ÐÐ: cd backend ^&^& npm install
+        pause
+        exit /b 1
+    )
+    popd
+    echo        [OK] ºó¶ËÒÀÀµ°²×°Íê³É
+) else (
+    echo        [OK] ºó¶ËÒÀÀµÒÑ¾ÍÐ÷
+)
+if not exist "frontend\node_modules" (
+    echo        [WARN] Ç°¶ËÒÀÀµÈ±Ê§£¬ÕýÔÚ×Ô¶¯°²×°£¬ÇëÉÔºò...
+    pushd "frontend"
+    call npm install --no-fund --no-audit >nul 2>&1
+    if %errorlevel% neq 0 (
+        popd
+        echo        [FAIL] Ç°¶ËÒÀÀµ°²×°Ê§°Ü£¬ÇëÊÖ¶¯Ö´ÐÐ: cd frontend ^&^& npm install
+        pause
+        exit /b 1
+    )
+    popd
+    echo        [OK] Ç°¶ËÒÀÀµ°²×°Íê³É
+) else (
+    echo        [OK] Ç°¶ËÒÀÀµÒÑ¾ÍÐ÷
+)
 echo.
-echo   Backend:  http://localhost:8000/api
-echo   Frontend: http://localhost:3000
-echo   WebSocket: ws://localhost:8000/market
-echo ============================================
+
+:: ---------------- 2. ¹¹½¨¼ì²é£¨Ô´Âë¸üÐÂ×Ô¶¯ÖØ½¨£© ----------------
+echo   [3/6] ¹¹½¨¼ì²é
+if not exist "backend\data" mkdir "backend\data"
+set "NEED_BUILD="
+for /f "delims=" %%r in ('node scripts\check-build.js') do set "NEED_BUILD=%%r"
+
+echo !NEED_BUILD! | findstr /c:"backend" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo        [WARN] ºó¶ËÔ´ÂëÓÐ¸üÐÂ£¬ÕýÔÚÖØÐÂ¹¹½¨...
+    pushd "backend"
+    call npm run build >nul 2>&1
+    if %errorlevel% neq 0 (
+        popd
+        echo        [FAIL] ºó¶Ë¹¹½¨Ê§°Ü£¬Çë¼ì²é TypeScript ±¨´í
+        pause
+        exit /b 1
+    )
+    popd
+    echo        [OK] ºó¶Ë¹¹½¨Íê³É
+) else (
+    echo        [OK] ºó¶Ë¹¹½¨²úÎïÎª×îÐÂ
+)
+
+echo !NEED_BUILD! | findstr /c:"frontend" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo        [WARN] Ç°¶ËÔ´ÂëÓÐ¸üÐÂ£¬ÕýÔÚÖØÐÂ¹¹½¨...
+    pushd "frontend"
+    call npm run build >nul 2>&1
+    if %errorlevel% neq 0 (
+        popd
+        echo        [FAIL] Ç°¶Ë¹¹½¨Ê§°Ü£¬Çë¼ì²é TypeScript ±¨´í
+        pause
+        exit /b 1
+    )
+    popd
+    echo        [OK] Ç°¶Ë¹¹½¨Íê³É
+) else (
+    echo        [OK] Ç°¶Ë¹¹½¨²úÎïÎª×îÐÂ
+)
 echo.
-echo æŒ‰ä»»æ„é”®å…³é—­æ­¤çª—å£ï¼ˆæœåŠ¡å°†æŒç»­åœ¨åŽå°è¿è¡Œï¼‰...
-pause >nul
+
+:: ---------------- 3. ¶Ë¿Ú¼ì²é ----------------
+echo   [4/6] ¶Ë¿Ú¼ì²é
+netstat -ano | findstr ":8000 " | findstr "LISTENING" >nul 2>&1
+if %errorlevel% equ 0 (
+    curl -s -o nul http://localhost:8000/api/market/prices 2>nul
+    if %errorlevel% equ 0 (
+        echo        [OK] ¶Ë¿Ú 8000 ÒÑÓÐ StockSim ºó¶ËÔÚÔËÐÐ£¨Ìø¹ýÆô¶¯£©
+        set "BACKEND_RUNNING=1"
+    ) else (
+        echo        [FAIL] ¶Ë¿Ú 8000 ±»ÆäËû³ÌÐòÕ¼ÓÃ£¬ÇëÏÈ¹Ø±ÕÕ¼ÓÃ½ø³ÌºóÖØÊÔ
+        pause
+        exit /b 1
+    )
+) else (
+    echo        [OK] ¶Ë¿Ú 8000 ¿ÉÓÃ
+)
+netstat -ano | findstr ":3000 " | findstr "LISTENING" >nul 2>&1
+if %errorlevel% equ 0 (
+    curl -s -o nul http://localhost:3000 2>nul
+    if %errorlevel% equ 0 (
+        echo        [OK] ¶Ë¿Ú 3000 ÒÑÓÐ StockSim Ç°¶ËÔÚÔËÐÐ£¨Ìø¹ýÆô¶¯£©
+        set "FRONTEND_RUNNING=1"
+    ) else (
+        echo        [FAIL] ¶Ë¿Ú 3000 ±»ÆäËû³ÌÐòÕ¼ÓÃ£¬ÇëÏÈ¹Ø±ÕÕ¼ÓÃ½ø³ÌºóÖØÊÔ
+        pause
+        exit /b 1
+    )
+) else (
+    echo        [OK] ¶Ë¿Ú 3000 ¿ÉÓÃ
+)
+echo.
+
+:: ---------------- 4. Æô¶¯ºó¶Ë + ½¡¿µ¼ì²é ----------------
+if not defined BACKEND_RUNNING (
+    echo   [5/6] Æô¶¯ºó¶Ë·þÎñ  http://localhost:8000/api
+    start "StockSim Backend - :8000" cmd /k "cd /d %~dp0backend && node dist\src\main.js"
+
+    set "BACKEND_OK="
+    for /l %%i in (1,1,30) do (
+        curl -s -o nul http://localhost:8000/api/market/prices 2>nul
+        if not errorlevel 1 (
+            set "BACKEND_OK=1"
+            goto backend_ready
+        )
+        ping -n 2 127.0.0.1 >nul
+    )
+    :backend_ready
+    if defined BACKEND_OK (
+        echo        [OK] ºó¶ËÒÑ¾ÍÐ÷£¨½¡¿µ¼ì²éÍ¨¹ý£©
+    ) else (
+        echo        [FAIL] ºó¶ËÆô¶¯³¬Ê±£¬Çë²é¿´ "StockSim Backend" ´°¿ÚµÄÈÕÖ¾
+        pause
+        exit /b 1
+    )
+)
+echo.
+
+:: ---------------- 5. Æô¶¯Ç°¶Ë + ½¡¿µ¼ì²é ----------------
+if not defined FRONTEND_RUNNING (
+    echo   [6/6] Æô¶¯Ç°¶Ë·þÎñ  http://localhost:3000
+    start "StockSim Frontend - :3000" cmd /k "cd /d %~dp0frontend && npx vite --host"
+
+    set "FRONTEND_OK="
+    for /l %%i in (1,1,30) do (
+        curl -s -o nul http://localhost:3000 2>nul
+        if not errorlevel 1 (
+            set "FRONTEND_OK=1"
+            goto frontend_ready
+        )
+        ping -n 2 127.0.0.1 >nul
+    )
+    :frontend_ready
+    if defined FRONTEND_OK (
+        echo        [OK] Ç°¶ËÒÑ¾ÍÐ÷£¨½¡¿µ¼ì²éÍ¨¹ý£©
+    ) else (
+        echo        [FAIL] Ç°¶ËÆô¶¯³¬Ê±£¬Çë²é¿´ "StockSim Frontend" ´°¿ÚµÄÈÕÖ¾
+        pause
+        exit /b 1
+    )
+)
+echo.
+
+:: ---------------- 6. ´ò¿ªä¯ÀÀÆ÷ ----------------
+echo   [DONE] ´ò¿ªä¯ÀÀÆ÷...
+start http://localhost:3000
+
+:: ---------------- Íê³ÉÃæ°å ----------------
+echo.
+echo   ======================================================
+echo     ·þÎñÒÑÈ«²¿¾ÍÐ÷£¡
+echo   ------------------------------------------------------
+echo     Ç°¶ËÒ³Ãæ    http://localhost:3000
+echo     API ½Ó¿Ú    http://localhost:8000/api
+echo     WebSocket   ws://localhost:8000/market
+echo   ------------------------------------------------------
+echo     Í£Ö¹·þÎñ£ºÖ±½Ó¹Ø±ÕÁ½¸ö·þÎñ´°¿Ú¼´¿É
+echo     ÖØÐÂÆô¶¯£ºÔÙ´ÎÔËÐÐ start.bat£¨×Ô¶¯Ìø¹ýÒÑÔËÐÐ·þÎñ£©
+echo   ======================================================
+echo.
+pause

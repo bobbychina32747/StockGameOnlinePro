@@ -1,10 +1,13 @@
 @echo off
-title StockSim Backend - Port 8000
+title StockSim Backend - :8000
 cd /d "%~dp0backend"
-echo [Backend] Starting StockSim Pro backend...
-echo [Backend] Press Ctrl+C to stop
 echo.
-node dist/src/main.js
+echo  ================================================
+echo    StockSim Backend  -  port 8000
+echo    Starting... press Ctrl+C to stop
+echo  ================================================
 echo.
-echo [Backend] Process exited.
+node dist\src\main.js
+echo.
+echo  Backend process exited.
 pause
