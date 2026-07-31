@@ -11,6 +11,7 @@ import typeorm_1 = require("@nestjs/typeorm");
 import account_entity_1 = require("../../infrastructure/database/entities/account.entity");
 
 import position_entity_1 = require("../../infrastructure/database/entities/position.entity");
+import transaction_entity_1 = require("../../infrastructure/database/entities/transaction.entity");
 
 import account_controller_1 = require("./account.controller");
 
@@ -25,7 +26,7 @@ export { AccountModule };
 AccountModule = __decorate(
 [
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([account_entity_1.Account, position_entity_1.Position])],
+        imports: [typeorm_1.TypeOrmModule.forFeature([account_entity_1.Account, position_entity_1.Position, transaction_entity_1.Transaction])],
         controllers: [account_controller_1.AccountController],
         providers: [account_service_1.AccountService],
         exports: [account_service_1.AccountService],
