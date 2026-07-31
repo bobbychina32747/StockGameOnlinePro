@@ -109,6 +109,9 @@ let MarketService = class MarketService {
     getPrices() {
         return this.marketData.getPrices();
     }
+    getStocks() {
+        return this.marketData.getStockList();
+    }
 };
 
 export { MarketService };

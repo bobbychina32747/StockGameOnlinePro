@@ -39,8 +39,10 @@ let TradingEngineService = class TradingEngineService {
         this.dayOpenPrices = new Map<string, any>();
         // F4 修复：成交结算串行队列，防止并发下单导致读-改-写竞态（超买/超卖）
         this.settlementQueue = Promise.resolve();
-        this.orderBooks.set('A', { bids: [], asks: [] });
-        this.orderBooks.set('B', { bids: [], asks: [] });
+        // 盘口按股票池动态初始化（支持多股票）
+        for (const cfg of constants_1.STOCK_POOL) {
+            this.orderBooks.set(cfg.symbol, { bids: [], asks: [] });
+        }
     }
     updatePrices(prices) {
         for (const [sym, price] of Object.entries(prices)) {
@@ -71,9 +73,12 @@ let TradingEngineService = class TradingEngineService {
         const levels = 5;
         const baseSpread = 0.001;
         const baseSize = 500;
-        const book = this.orderBooks.get(symbol);
-        if (!book)
-            return;
+        // 盘口不存在则动态创建（支持新增股票）
+        let book = this.orderBooks.get(symbol);
+        if (!book) {
+            book = { bids: [], asks: [] };
+            this.orderBooks.set(symbol, book);
+        }
         let liquidityMul = 1.0;
         const dayOpen = this.dayOpenPrices.get(symbol);
         if (dayOpen && dayOpen > 0) {

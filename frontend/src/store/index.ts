@@ -39,6 +39,8 @@ interface MarketState {
   orderBook: Record<string, any>;
   marketRegime: string;
   gameDay: number;
+  stocks: any[];
+  setStocks: (stocks: any[]) => void;
   setPrices: (prices: Record<string, number>) => void;
   addTick: (tick: TickData) => void;
   setKlines: (symbol: string, tf: string, data: any[]) => void;
@@ -52,6 +54,8 @@ export const useMarketStore = create<MarketState>((set) => ({
   orderBook: {},
   marketRegime: 'sideways',
   gameDay: 0,
+  stocks: [],
+  setStocks: (stocks) => set({ stocks }),
   setPrices: (prices) => set({ prices }),
   addTick: (tick) =>
     set((state) => ({
@@ -100,6 +104,8 @@ interface UIState {
   setSelectedSymbol: (s: string) => void;
   selectedTimeframe: string;
   setSelectedTimeframe: (tf: string) => void;
+  marketMode: string;
+  setMarketMode: (mode: string) => void;
   latestNews: string;
   setLatestNews: (news: string) => void;
   newsHistory: string[];
@@ -117,10 +123,12 @@ export const useUIStore = create<UIState>((set) => ({
   },
   removeNotification: (id) =>
     set((s) => ({ notifications: s.notifications.filter((n) => n.id !== id) })),
-  selectedSymbol: 'A',
+  selectedSymbol: 'T1',
   setSelectedSymbol: (s) => set({ selectedSymbol: s }),
   selectedTimeframe: '1min',
   setSelectedTimeframe: (tf) => set({ selectedTimeframe: tf }),
+  marketMode: 'US',
+  setMarketMode: (mode) => set({ marketMode: mode }),
   latestNews: '',
   setLatestNews: (news) => set({ latestNews: news }),
   newsHistory: [],

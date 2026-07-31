@@ -25,6 +25,10 @@ __decorate([
     __metadata("design:type", String)
 ], Stock.prototype, "name", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ length: 50, default: '综合' }),
+    __metadata("design:type", String)
+], Stock.prototype, "industry", void 0);
+__decorate([
     (0, typeorm_1.Column)('float'),
     __metadata("design:type", Number)
 ], Stock.prototype, "initialPrice", void 0);

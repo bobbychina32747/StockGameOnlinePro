@@ -22,6 +22,9 @@ let MarketController = class MarketController {
     getPrices() {
         return this.marketService.getPrices();
     }
+    getStocks() {
+        return this.marketService.getStocks();
+    }
     getKlines(symbol, timeframe) {
         return this.marketService.getKlines(symbol || 'A', timeframe || '1min');
     }
@@ -35,6 +38,12 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], MarketController.prototype, "getPrices", null);
+__decorate([
+    (0, common_1.Get)('stocks'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], MarketController.prototype, "getStocks", null);
 __decorate([
     (0, common_1.Get)('klines'),
     __param(0, (0, common_1.Query)('symbol')),

@@ -69,6 +69,7 @@ AppModule = __decorate(
                         location: config.get('SQLITE_PATH', './data/stockgame.db'),
                         autoLoadEntities: true,
                         synchronize: true,
+                        autoSave: true,
                         logging: false,
                     };
                 },

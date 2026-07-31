@@ -43,20 +43,48 @@ let MarketDataService = class MarketDataService {
         for (const f of constants_1.FACTOR_NAMES) {
             this.factors[f] = -0.02 + Math.random() * 0.04;
         }
-        let dbStocks = await this.stockRepo.find({ where: { isActive: true } });
-        if (dbStocks.length === 0) {
+        // 迁移：旧库补 industry 列（SQLite ALTER，幂等）
+        try {
+            await this.stockRepo.query('ALTER TABLE stocks ADD COLUMN industry varchar DEFAULT "综合"');
+        }
+        catch (e) {
+            // 列已存在时忽略
+        }
+        // 迁移：按股票池补齐已存在股票的行业
+        try {
             for (const cfg of constants_1.STOCK_POOL) {
-                const stock = this.stockRepo.create({
-                    symbol: cfg.symbol,
-                    name: cfg.name,
-                    initialPrice: cfg.initialPrice,
-                    mu: cfg.mu,
-                    sigma: cfg.sigma,
-                    theta: cfg.theta,
-                });
-                await this.stockRepo.save(stock);
-                dbStocks.push(stock);
+                await this.stockRepo.query(`UPDATE stocks SET industry='${cfg.industry}' WHERE symbol='${cfg.symbol}' AND (industry IS NULL OR industry='综合')`);
             }
+        }
+        catch (e) {
+            // 表尚未就绪时忽略
+        }
+        let dbStocks = await this.stockRepo.find({ where: { isActive: true } });
+        // 迁移：不在股票池的旧股票（如历史 A/B）标记停用
+        const poolSymbols = new Set(constants_1.STOCK_POOL.map((c) => c.symbol));
+        for (const s of dbStocks) {
+            if (!poolSymbols.has(s.symbol)) {
+                s.isActive = false;
+                await this.stockRepo.save(s);
+            }
+        }
+        dbStocks = dbStocks.filter((s) => poolSymbols.has(s.symbol));
+        // 增量补齐：按 symbol 缺失创建（兼容旧库升级）
+        const existingSymbols = new Set(dbStocks.map((s) => s.symbol));
+        for (const cfg of constants_1.STOCK_POOL) {
+            if (existingSymbols.has(cfg.symbol)) continue;
+            const stock = this.stockRepo.create({
+                symbol: cfg.symbol,
+                name: cfg.name,
+                initialPrice: cfg.initialPrice,
+                mu: cfg.mu,
+                sigma: cfg.sigma,
+                theta: cfg.theta,
+            });
+            // 直接赋值（避免 create 对实例属性的过滤问题）
+            stock.industry = cfg.industry;
+            await this.stockRepo.save(stock);
+            dbStocks.push(stock);
         }
         for (const s of dbStocks) {
             const price = Number(s.initialPrice);
@@ -64,6 +92,8 @@ let MarketDataService = class MarketDataService {
             const baseVol = Math.max(8000, Math.floor(price * 120));
             this.stocks.set(s.symbol, {
                 symbol: s.symbol,
+                name: s.name,
+                industry: s.industry || '综合',
                 price,
                 volatility: Number(s.sigma) * 0.5,
                 lastReturn: 0,
@@ -95,7 +125,7 @@ let MarketDataService = class MarketDataService {
             }
             await this.endOfDay();
         }
-        this.gameDay = 0;
+        // 注意：不重置 gameDay，历史 3 天用 0/1/2，实时从 3 开始，避免 K 线时间戳重叠
         this.logger.log(`市场数据已初始化: ${dbStocks.length} 只股票`);
     }
     start() {
@@ -148,12 +178,16 @@ let MarketDataService = class MarketDataService {
     // ─── 私有辅助函数：因子影响 ───
     calcFactorImpact(stock) {
         let impact = 0;
+        // 行业兜底：DB 无值时用股票池静态配置
+        const industry = stock.industry
+            || constants_1.STOCK_POOL.find((c) => c.symbol === stock.symbol)?.industry
+            || '综合';
+        const sens = constants_1.INDUSTRY_SENSITIVITY[industry] || {};
         for (const [name, val] of Object.entries(this.factors)) {
             let weight = 1.0;
             if (name === '市场情绪') weight = 1.3;
-            const symCode = stock.symbol.charCodeAt(0) || 65;
-            if (name === '行业景气' && symCode % 2 === 0) weight = 1.5;
-            if (name === '政策风险' && symCode % 2 === 1) weight = 1.5;
+            const industryWeight = sens[name];
+            if (industryWeight) weight = industryWeight;
             impact += (val as number) * weight;
         }
         return impact;
@@ -213,12 +247,17 @@ let MarketDataService = class MarketDataService {
         const params = constants_1.STATE_PARAMS[regimes];
         const dt = 1 / constants_1.MARKET.TICKS_PER_DAY;
         const stocksArr: any[] = [...this.stocks.values()];
-        const innovations = [];
+        // 行业联动：同行业股票共享一部分随机冲击（板块同涨同跌、板块间分化）
+        const industryShocks = {};
+        for (const stock of stocksArr) {
+            if (industryShocks[stock.industry] === undefined) {
+                industryShocks[stock.industry] = this.randn() * 0.004;
+            }
+        }
         for (const stock of stocksArr) {
             const mu = Number(constants_1.STOCK_POOL.find((s) => s.symbol === stock.symbol)?.mu ?? 100);
             this.updateVolatility(stock);
-            const shock = stock.volatility * params.volMult * this.randn() * Math.sqrt(dt) * 1.5;
-            innovations.push(shock);
+            const shock = stock.volatility * params.volMult * this.randn() * Math.sqrt(dt) * 1.5 + industryShocks[stock.industry];
             const jump = this.calcJump(dt);
             const factorImpact = this.calcFactorImpact(stock);
             const ofiImpact = this.calcOFIImpact(stock);
@@ -239,7 +278,7 @@ let MarketDataService = class MarketDataService {
             stock.price = newPrice;
             this.updateTrend(stock, priceChange);
             stock.lastReturn = priceChange;
-            stock.prevClose = stock.price;
+            // prevClose 保持"昨收"不变（涨跌幅基准），仅由 endOfDay 更新
             stock.lastVolume = this.calcVolume(stock, regimes);
             stock.avgVolume = stock.avgVolume * 0.92 + stock.lastVolume * 0.08;
             stock.dayHigh = Math.max(stock.dayHigh, stock.price);
@@ -254,13 +293,6 @@ let MarketDataService = class MarketDataService {
                 timestamp: this.tickCount,
             });
         }
-        if (results.length === 2 && regimes === 'bear') {
-            const correlation = 0.85;
-            const crossA = correlation * innovations[1] * 0.2 * stocksArr[0].price;
-            const crossB = correlation * innovations[0] * 0.2 * stocksArr[1].price;
-            stocksArr[0].price = Math.max(0.5, stocksArr[0].price + crossA);
-            stocksArr[1].price = Math.max(0.5, stocksArr[1].price + crossB);
-        }
         this.tickCount++;
         return results;
     }
@@ -268,14 +300,16 @@ let MarketDataService = class MarketDataService {
         const minute = Math.floor(stock.minuteCounter / 60);
         const price = stock.price;
         const volume = stock.lastVolume;
-        if (!stock.current1min || stock.current1min.time.getMinutes() !== (30 + minute) % 60) {
+        // 1min：用起始分钟索引判断（原实现用 getMinutes() 每小时回绕，产生重复时间戳）
+        if (!stock.current1min || stock.current1min.startMinute !== minute) {
             if (stock.current1min) {
                 stock.kline1min.push(stock.current1min);
                 if (stock.kline1min.length > 500)
                     stock.kline1min.shift();
             }
             stock.current1min = {
-                time: new Date(2024, 0, 1, 9, 30 + minute, 0),
+                startMinute: minute,
+                time: new Date(2024, 0, 1 + this.gameDay, 9, 30 + minute, 0),
                 open: price, high: price, low: price, close: price, volume: 0,
             };
         }
@@ -285,14 +319,16 @@ let MarketDataService = class MarketDataService {
         k1.close = price;
         k1.volume += volume;
         const fiveIdx = Math.floor(minute / 5);
-        if (!stock.current5min || Math.floor((stock.current5min.time.getMinutes() - 30) / 5) !== fiveIdx) {
+        // 5min：用起始五分钟索引判断（原实现用 getMinutes() 回绕，每个周期错误新建 bar）
+        if (!stock.current5min || stock.current5min.startFiveIdx !== fiveIdx) {
             if (stock.current5min) {
                 stock.kline5min.push(stock.current5min);
                 if (stock.kline5min.length > 500)
                     stock.kline5min.shift();
             }
             stock.current5min = {
-                time: new Date(2024, 0, 1, 9, 30 + fiveIdx * 5, 0),
+                startFiveIdx: fiveIdx,
+                time: new Date(2024, 0, 1 + this.gameDay, 9, 30 + fiveIdx * 5, 0),
                 open: price, high: price, low: price, close: price, volume: 0,
             };
         }
@@ -396,6 +432,27 @@ let MarketDataService = class MarketDataService {
             prices[sym] = state.price;
         }
         return prices;
+    }
+    // 股票列表：名称/行业/现价/涨跌幅/今开/高低/成交量（用于前端行情列表）
+    getStockList() {
+        const list = [];
+        for (const state of this.stocks.values()) {
+            const prevClose = Number(state.prevClose) || Number(state.dayOpen) || 1;
+            list.push({
+                symbol: state.symbol,
+                name: state.name || state.symbol,
+                industry: state.industry
+                    || constants_1.STOCK_POOL.find((c) => c.symbol === state.symbol)?.industry
+                    || '综合',
+                price: Number(state.price.toFixed(2)),
+                changePct: Number((((state.price - prevClose) / prevClose) * 100).toFixed(2)),
+                dayOpen: Number(state.dayOpen.toFixed(2)),
+                dayHigh: Number(state.dayHigh.toFixed(2)),
+                dayLow: Number(state.dayLow.toFixed(2)),
+                dayVolume: state.dayVolume,
+            });
+        }
+        return list;
     }
     getKlines(symbol, timeframe) {
         const stock = this.stocks.get(symbol);

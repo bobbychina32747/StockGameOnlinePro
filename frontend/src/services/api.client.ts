@@ -64,6 +64,7 @@ export const tradingApi = {
 // ─── Market ───
 export const marketApi = {
   prices: () => api.get('/market/prices').then((r) => r.data),
+  stocks: () => api.get('/market/stocks').then((r) => r.data),
   klines: (symbol: string, timeframe: string) =>
     api.get(`/market/klines?symbol=${symbol}&timeframe=${timeframe}`).then((r) => r.data),
   orderBook: (symbol: string) =>

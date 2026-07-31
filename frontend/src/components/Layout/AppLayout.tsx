@@ -33,11 +33,14 @@ export function AppLayout() {
         </div>
 
         <div className="status-center">
-          {prices['A'] && (
-            <span>股票A: <b>{prices['A'].toFixed(2)}</b></span>
+          {prices['T1'] && (
+            <span>芯片: <b>{prices['T1'].toFixed(2)}</b></span>
           )}
-          {prices['B'] && (
-            <span>股票B: <b>{prices['B'].toFixed(2)}</b></span>
+          {prices['C1'] && (
+            <span>白酒: <b>{prices['C1'].toFixed(2)}</b></span>
+          )}
+          {prices['E2'] && (
+            <span>锂电: <b>{prices['E2'].toFixed(2)}</b></span>
           )}
         </div>
 
