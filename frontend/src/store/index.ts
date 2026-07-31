@@ -112,6 +112,10 @@ interface UIState {
   setLatestNews: (news: string) => void;
   newsHistory: string[];
   addNews: (news: string) => void;
+  favoriteSymbols: string[];
+  toggleFavorite: (s: string) => void;
+  theme: 'dark' | 'light';
+  setTheme: (t: 'dark' | 'light') => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -125,17 +129,28 @@ export const useUIStore = create<UIState>((set) => ({
   },
   removeNotification: (id) =>
     set((s) => ({ notifications: s.notifications.filter((n) => n.id !== id) })),
-  selectedSymbol: 'T1',
-  setSelectedSymbol: (s) => set({ selectedSymbol: s }),
-  selectedTimeframe: '1min',
-  setSelectedTimeframe: (tf) => set({ selectedTimeframe: tf }),
-  marketMode: 'US',
-  setMarketMode: (mode) => set({ marketMode: mode }),
+  selectedSymbol: localStorage.getItem('ss.symbol') || 'T1',
+  setSelectedSymbol: (s) => { localStorage.setItem('ss.symbol', s); set({ selectedSymbol: s }); },
+  selectedTimeframe: localStorage.getItem('ss.tf') || '1min',
+  setSelectedTimeframe: (tf) => { localStorage.setItem('ss.tf', tf); set({ selectedTimeframe: tf }); },
+  marketMode: localStorage.getItem('ss.mode') || 'US',
+  setMarketMode: (mode) => { localStorage.setItem('ss.mode', mode); set({ marketMode: mode }); },
   detailSymbol: null,
   setDetailSymbol: (s) => set({ detailSymbol: s }),
   latestNews: '',
   setLatestNews: (news) => set({ latestNews: news }),
   newsHistory: [],
+  favoriteSymbols: (localStorage.getItem('ss.fav') || '').split(',').filter(Boolean),
+  toggleFavorite: (sym) =>
+    set((s) => {
+      const fav = s.favoriteSymbols.includes(sym)
+        ? s.favoriteSymbols.filter((x) => x !== sym)
+        : [...s.favoriteSymbols, sym];
+      localStorage.setItem('ss.fav', fav.join(','));
+      return { favoriteSymbols: fav };
+    }),
+  theme: (localStorage.getItem('ss.theme') as any) || 'dark',
+  setTheme: (t) => { localStorage.setItem('ss.theme', t); set({ theme: t }); },
   addNews: (news) =>
     set((s) => ({
       latestNews: news,

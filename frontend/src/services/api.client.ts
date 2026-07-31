@@ -74,7 +74,7 @@ export const marketApi = {
 
 // ─── Ranking ───
 export const rankingApi = {
-  get: (limit = 20) => api.get(`/ranking?limit=${limit}`).then((r) => r.data),
+  get: (limit = 20, sort?: string) => api.get(`/ranking?limit=${limit}&sort=${sort || 'totalReturn'}`).then((r) => r.data),
 };
 
 // ─── Fund ───

@@ -44,8 +44,10 @@ let RankingService = class RankingService {
         this.cache = entries;
         return entries;
     }
-    getRankings(limit = 20) {
-        return this.cache.slice(0, limit);
+    getRankings(limit = 20, sort = 'totalReturn') {
+        // sort: totalReturn(总收益) | dayReturn(今日) | equity(总资产)
+        const key = sort === 'dayReturn' ? 'dayReturn' : sort === 'equity' ? 'equity' : 'totalReturn';
+        return [...this.cache].sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0)).slice(0, limit);
     }
     getUserRank(userId) {
         return this.cache.find((e) => e.userId === userId);

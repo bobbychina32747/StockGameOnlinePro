@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore, useMarketStore, useUIStore } from '../../store';
 import { NotificationContainer } from '../UI/Notification';
@@ -8,6 +9,13 @@ export function AppLayout() {
   const prices = useMarketStore((s) => s.prices);
   const latestNews = useUIStore((s) => s.latestNews);
   const navigate = useNavigate();
+  const theme = useUIStore((s) => s.theme);
+  const setTheme = useUIStore((s) => s.setTheme);
+
+  // C3 主题应用
+  useEffect(() => {
+    document.body.classList.toggle('theme-light', theme === 'light');
+  }, [theme]);
 
   const handleLogout = () => {
     logout();
@@ -45,6 +53,9 @@ export function AppLayout() {
           )}
         </div>
 
+        <button className="theme-toggle-btn" title="切换主题" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
         <div className="user-info">
           <span className="username">{user?.username}</span>
           <button className="btn btn-ghost btn-sm" onClick={handleLogout}>

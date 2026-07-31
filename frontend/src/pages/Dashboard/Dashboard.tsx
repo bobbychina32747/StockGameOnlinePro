@@ -8,6 +8,7 @@ import { OrderBookPanel } from '../../components/Trading/OrderBookPanel';
 import { AccountPanel } from '../../components/Trading/AccountPanel';
 import { OrderPanel } from '../../components/Trading/OrderPanel';
 import { StockDetailModal } from '../../components/Trading/StockDetailModal';
+import { AIAssistant } from '../../components/Trading/AIAssistant';
 
 // 主交易页（同花顺式三栏布局：股票列表 | 图表 | 盘口/账户/下单，两侧可拖拽调宽）
 export default function Dashboard() {
@@ -19,6 +20,10 @@ export default function Dashboard() {
   const setKlines = useMarketStore((s) => s.setKlines);
   const setOrderBook = useMarketStore((s) => s.setOrderBook);
   const setStocks = useMarketStore((s) => s.setStocks);
+  const stocks = useMarketStore((s) => s.stocks);
+  const setDetailSymbol = useUIStore((s) => s.setDetailSymbol);
+  const setSelectedSymbol = useUIStore((s) => s.setSelectedSymbol);
+  const setSelectedTimeframe = useUIStore((s) => s.setSelectedTimeframe);
 
   // 初始：拉股票列表
   useEffect(() => {
@@ -60,9 +65,36 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [selectedSymbol, selectedTimeframe, setKlines]);
 
+  // ─── S5 快捷键：数字选股 / T 切周期 / 上下键换股 / Enter 详情 ───
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const sorted = [...stocks].sort((a: any, b: any) => (a.symbol < b.symbol ? -1 : 1));
+      if (e.key >= '1' && e.key <= '9') {
+        const idx = Number(e.key) - 1;
+        if (sorted[idx]) setSelectedSymbol(sorted[idx].symbol);
+      } else if (e.key === 't' || e.key === 'T') {
+        const tfs = ['intraday', '1min', '5min', '60min', 'daily', 'weekly', 'monthly'];
+        const cur = tfs.indexOf(selectedTimeframe);
+        setSelectedTimeframe(tfs[(cur + 1) % tfs.length]);
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const idx = sorted.findIndex((x: any) => x.symbol === selectedSymbol);
+        const next = sorted[idx + (e.key === 'ArrowUp' ? -1 : 1)];
+        if (next) setSelectedSymbol(next.symbol);
+      } else if (e.key === 'Enter') {
+        setDetailSymbol(selectedSymbol);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [stocks, selectedSymbol, selectedTimeframe, setSelectedSymbol, setSelectedTimeframe, setDetailSymbol]);
+
   // ─── 三栏宽度拖拽（左列表 / 右面板） ───
-  const [leftWidth, setLeftWidth] = useState(230);
-  const [rightWidth, setRightWidth] = useState(330);
+  // S4 布局持久化：宽度从 localStorage 恢复
+  const [leftWidth, setLeftWidth] = useState(() => Number(localStorage.getItem('ss.leftW')) || 230);
+  const [rightWidth, setRightWidth] = useState(() => Number(localStorage.getItem('ss.rightW')) || 330);
   const dragRef = useRef<{ side: 'left' | 'right'; startX: number; startW: number } | null>(null);
 
   const startDrag = (e: React.MouseEvent, side: 'left' | 'right') => {
@@ -84,6 +116,10 @@ export default function Dashboard() {
       }
     };
     const onUp = () => {
+      if (dragRef.current) {
+        const w = dragRef.current.side === 'left' ? leftWidth : rightWidth;
+        localStorage.setItem(dragRef.current.side === 'left' ? 'ss.leftW' : 'ss.rightW', String(w));
+      }
       dragRef.current = null;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
@@ -114,6 +150,7 @@ export default function Dashboard() {
           <OrderBookPanel />
           <AccountPanel />
           <OrderPanel />
+          <AIAssistant />
         </div>
       </div>
       <StockDetailModal />

@@ -20,6 +20,27 @@ export function StockDetailModal() {
   const shares = (parseInt(s.code || '0', 10) % 90 + 10) / 10; // 1.0 ~ 9.9 亿股
   const marketCap = price * shares * 1e8; // 元
 
+  // A5 模拟财报（由代码哈希稳定生成，不随行情变化）
+  const seed = (n: number) => { let x = parseInt(s.code || '600000', 10); for (let i = 0; i < n; i++) x = (x * 9301 + 49297) % 233280; return x / 233280; };
+  const revenue = (5 + seed(1) * 15).toFixed(1); // 亿
+  const netProfit = (0.5 + seed(2) * 4).toFixed(2); // 亿
+  const roe = (6 + seed(3) * 14).toFixed(1); // %
+  const pe = (12 + seed(4) * 35).toFixed(1); // 倍
+  const yoy = (seed(5) > 0.4 ? 1 : -1) * (5 + seed(6) * 30); // 营收同比
+
+  // A6 资金流向（模拟：主力净流入方向与当日涨跌一致）
+  const mainNet = changePct >= 0 ? 1 : -1;
+  const mainFlow = (mainNet * (0.5 + seed(7) * 0.9) * (price * (s.dayVolume || 0)) / 1e8).toFixed(2); // 亿
+  const retailFlow = (-mainNet * (0.2 + seed(8) * 0.5) * (price * (s.dayVolume || 0)) / 1e8).toFixed(2);
+
+  // A5 最新公告（确定性生成几条）
+  const notices = [
+    { d: '今日', t: changePct >= 0 ? '股价异动公告：不存在应披露而未披露事项' : '关于股价波动情况的说明公告' },
+    { d: '本周', t: '关于回购进展暨股份变动公告' },
+    { d: '本月', t: '与多家机构签订战略合作框架协议' },
+    { d: '上月', t: '关于股东减持计划实施完毕的公告' },
+  ];
+
   return (
     <div className="modal-overlay" onClick={() => setDetailSymbol(null)}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -72,6 +93,35 @@ export function StockDetailModal() {
             <span className="label">成交额(模拟)</span>
             <span className="value">{(price * (s.dayVolume || 0) / 1e4).toFixed(2)} 万</span>
           </div>
+        </div>
+
+        <div className="modal-section">
+          <h4>资金流向（模拟）</h4>
+          <div className="modal-stats" style={{ borderTop: 'none', paddingTop: 0 }}>
+            <div className="modal-stat"><span className="label">主力净流入</span><span className={`value ${mainNet >= 0 ? 'up' : 'down'}`}>{mainNet >= 0 ? '+' : ''}{mainFlow} 亿</span></div>
+            <div className="modal-stat"><span className="label">散户净流入</span><span className={`value ${mainNet >= 0 ? 'down' : 'up'}`}>{mainNet >= 0 ? '-' : '+'}{Math.abs(Number(retailFlow))} 亿</span></div>
+          </div>
+        </div>
+
+        <div className="modal-section">
+          <h4>业绩速览（模拟）</h4>
+          <div className="modal-stats" style={{ borderTop: 'none', paddingTop: 0 }}>
+            <div className="modal-stat"><span className="label">营业收入</span><span className="value">{revenue} 亿</span></div>
+            <div className="modal-stat"><span className="label">营收同比</span><span className={`value ${yoy >= 0 ? 'up' : 'down'}`}>{yoy >= 0 ? '+' : ''}{yoy.toFixed(1)}%</span></div>
+            <div className="modal-stat"><span className="label">净利润</span><span className="value">{netProfit} 亿</span></div>
+            <div className="modal-stat"><span className="label">ROE</span><span className="value">{roe}%</span></div>
+            <div className="modal-stat"><span className="label">市盈率(动)</span><span className="value">{pe} 倍</span></div>
+          </div>
+        </div>
+
+        <div className="modal-section">
+          <h4>最新公告</h4>
+          {notices.map((n, i) => (
+            <div key={i} style={{ fontSize: 12, padding: '3px 0', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              <span style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.t}</span>
+              <span style={{ color: 'var(--text-muted)', flexShrink: 0, fontSize: 11 }}>{n.d}</span>
+            </div>
+          ))}
         </div>
 
         <div className="modal-section">

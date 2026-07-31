@@ -1049,3 +1049,141 @@ select.input {
 .modal-stat .value { color: var(--text-primary); font-family: var(--font-mono); }
 .modal-section h4 { margin: 0 0 6px; font-size: 13px; color: var(--text-secondary); }
 .modal-desc { margin: 0; font-size: 13px; line-height: 1.7; color: var(--text-primary); }
+
+/* ═══ 新组件：股票列表 tabs/搜索/星标/板块 ═══ */
+.stock-list-tabs { display: flex; border-bottom: 1px solid var(--border-subtle); }
+.stock-list-tabs button {
+  flex: 1; padding: 7px 4px; border: none; background: transparent;
+  color: var(--text-muted); font-size: 12px; cursor: pointer; font-family: var(--font-sans);
+  border-bottom: 2px solid transparent; transition: all var(--transition-fast);
+}
+.stock-list-tabs button:hover { color: var(--text-secondary); }
+.stock-list-tabs button.active { color: var(--color-brand-light); border-bottom-color: var(--color-brand); }
+.stock-search {
+  width: 100%; border: none; border-bottom: 1px solid var(--border-subtle);
+  background: transparent; color: var(--text-primary); padding: 7px 10px; font-size: 12px;
+  font-family: var(--font-sans); outline: none;
+}
+.stock-fav-btn {
+  border: none; background: transparent; cursor: pointer; font-size: 11px;
+  color: var(--text-disabled); padding: 0 2px; margin-left: 4px; transition: color var(--transition-fast);
+}
+.stock-fav-btn.fav { color: #f5b301; }
+.board-row {
+  display: grid; grid-template-columns: 1fr 52px 64px 64px; gap: 4px;
+  padding: 8px 10px; font-size: 12px; cursor: pointer; align-items: center;
+  border-bottom: 1px solid var(--border-subtle); transition: background var(--transition-fast);
+}
+.board-row:hover { background: var(--bg-hover); }
+.board-name { font-weight: 600; color: var(--text-primary); }
+.board-count { color: var(--text-muted); font-size: 11px; }
+.board-change { text-align: right; }
+.board-leader { text-align: right; color: var(--text-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ═══ 指数条：涨跌家数 + 时段徽章 ═══ */
+.index-breadth { color: var(--text-muted); font-size: 12px; }
+.index-breadth b { font-family: var(--font-mono); }
+.index-breadth .sep { font-style: normal; margin: 0 3px; color: var(--text-disabled); }
+.index-session {
+  font-size: 11px; padding: 2px 8px; border-radius: 8px;
+  background: var(--bg-hover); color: var(--text-muted);
+}
+.index-session.open { background: var(--color-up-bg); color: var(--color-up); }
+
+/* ═══ 盘口深度条 + 我的挂单 ═══ */
+.ob-row { position: relative; display: flex; justify-content: space-between; padding: 2px 4px; font-size: 12px; overflow: hidden; }
+.ob-depth { position: absolute; top: 0; bottom: 0; left: 0; opacity: 0.35; }
+.ob-depth.bid { background: var(--color-down); }
+.ob-depth.ask { background: var(--color-up); }
+.ob-row.mine .ob-price { font-weight: 700; text-decoration: underline; }
+.ob-mine-tag {
+  font-style: normal; font-size: 9px; background: var(--color-warning-bg);
+  color: var(--color-warning); border-radius: 3px; padding: 0 3px; margin-left: 4px;
+}
+.ob-price { position: relative; z-index: 1; font-family: var(--font-mono); }
+.ob-size { position: relative; z-index: 1; font-family: var(--font-mono); color: var(--text-muted); }
+
+/* ═══ 排行榜：大赛横幅 + 排序 ═══ */
+.tournament-banner {
+  background: linear-gradient(135deg, var(--bg-elevated), var(--color-brand-subtle));
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  padding: 16px 18px; margin-bottom: 14px;
+}
+.tournament-title b { font-size: 16px; color: var(--text-primary); }
+.tournament-title span { display: block; font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.tournament-podium { display: flex; align-items: flex-end; justify-content: center; gap: 18px; margin-top: 14px; }
+.podium-item { text-align: center; min-width: 90px; }
+.podium-item span { font-size: 26px; display: block; }
+.podium-item b { display: block; font-size: 13px; color: var(--text-primary); margin: 2px 0; }
+.podium-item i { font-style: normal; font-size: 11px; font-family: var(--font-mono); }
+.podium-item.first { transform: scale(1.15); }
+.podium-item.first i { color: var(--color-up); }
+.ranking-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+.ranking-tabs button {
+  padding: 5px 16px; border: 1px solid var(--border-default); background: transparent;
+  color: var(--text-secondary); border-radius: var(--radius-sm); cursor: pointer; font-size: 12px;
+  font-family: var(--font-sans); transition: all var(--transition-fast);
+}
+.ranking-tabs button.active { background: var(--color-brand-subtle); color: var(--color-brand-light); border-color: var(--color-brand); }
+
+/* ═══ 成就 ═══ */
+.achievement-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.achievement-item {
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+  padding: 10px 6px; text-align: center; transition: all var(--transition-fast);
+}
+.achievement-item.unlocked { border-color: var(--color-brand); background: var(--color-brand-subtle); }
+.achievement-item.locked { opacity: 0.45; }
+.achievement-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+.achievement-item b { display: block; font-size: 12px; color: var(--text-primary); }
+.achievement-item i { font-style: normal; font-size: 10px; color: var(--text-muted); line-height: 1.4; display: block; margin-top: 2px; }
+
+/* ═══ AI 助手 ═══ */
+.ai-advice { display: flex; flex-direction: column; gap: 6px; }
+.ai-tip {
+  font-size: 12px; padding: 7px 9px; border-radius: var(--radius-sm);
+  background: var(--bg-hover); color: var(--text-secondary); line-height: 1.5;
+  border-left: 2px solid var(--color-brand);
+}
+
+/* ═══ C3 浅色主题 ═══ */
+body.theme-light {
+  --color-brand: #2563eb;
+  --color-brand-hover: #3b82f6;
+  --color-brand-light: #60a5fa;
+  --color-brand-subtle: rgba(37, 99, 235, 0.12);
+  --bg-primary: #f5f6f8;
+  --bg-secondary: #eef0f3;
+  --bg-elevated: #ffffff;
+  --bg-card: #f8f9fb;
+  --bg-hover: #e9edf2;
+  --bg-active: #e0e6ee;
+  --text-primary: #1c2333;
+  --text-secondary: #4a5568;
+  --text-muted: #8492a6;
+  --text-disabled: #b6c0ce;
+  --color-up: #e03131;
+  --color-down: #00a050;
+  --border-subtle: hsla(220, 20%, 45%, 0.12);
+  --border-default: hsla(220, 20%, 45%, 0.2);
+  --border-strong: hsla(220, 20%, 45%, 0.3);
+}
+.theme-toggle-btn { cursor: pointer; font-size: 14px; }
+
+/* ═══ B5 移动端适配 ═══ */
+@media (max-width: 1024px) {
+  .dashboard { flex-direction: column; height: auto; }
+  .dashboard > .resizable-panel, .dashboard > .resizable-panel .side-panel { width: 100% !important; height: auto; }
+  .dashboard > .resizable-panel { min-height: 0; }
+  .stock-list-panel { max-height: 260px; }
+  .side-panel { max-height: none; overflow: visible; }
+  .drag-handle { display: none; }
+  .chart-container { min-height: 280px; }
+  .market-index-bar { gap: 10px; }
+  .index-regime { display: none; }
+}
+@media (max-width: 600px) {
+  .achievement-grid { grid-template-columns: repeat(2, 1fr); }
+  .modal-stats { grid-template-columns: 1fr; }
+  .index-day { display: none; }
+}

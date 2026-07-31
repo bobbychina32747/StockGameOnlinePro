@@ -367,14 +367,15 @@ let MarketDataService = class MarketDataService {
         });
     }
     updateKlines(stock) {
-        const minute = Math.floor(stock.minuteCounter / 60);
+        // 每 tick 即 1 分钟（TICKS_PER_DAY=390=A股分钟数），minuteCounter 每天 0 起
+        const minute = stock.minuteCounter;
         const price = stock.price;
         const volume = stock.lastVolume;
         // 1min：用起始分钟索引判断（原实现用 getMinutes() 每小时回绕，产生重复时间戳）
         if (!stock.current1min || stock.current1min.startMinute !== minute) {
             if (stock.current1min) {
                 stock.kline1min.push(stock.current1min);
-                if (stock.kline1min.length > 500)
+                if (stock.kline1min.length > 2000)
                     stock.kline1min.shift();
             }
             stock.current1min = {
@@ -393,7 +394,7 @@ let MarketDataService = class MarketDataService {
         if (!stock.current5min || stock.current5min.startFiveIdx !== fiveIdx) {
             if (stock.current5min) {
                 stock.kline5min.push(stock.current5min);
-                if (stock.kline5min.length > 500)
+                if (stock.kline5min.length > 1000)
                     stock.kline5min.shift();
             }
             stock.current5min = {
@@ -531,6 +532,27 @@ let MarketDataService = class MarketDataService {
         const stock = this.stocks.get(symbol);
         if (!stock)
             return [];
+        const agg = (bars, group) => {
+            const out = [];
+            let cur = null;
+            for (const b of bars) {
+                const g = group(b.time);
+                if (!cur || cur.g !== g) {
+                    if (cur)
+                        out.push(cur.bar);
+                    cur = { g, bar: { time: b.time, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume } };
+                }
+                else {
+                    cur.bar.high = Math.max(cur.bar.high, b.high);
+                    cur.bar.low = Math.min(cur.bar.low, b.low);
+                    cur.bar.close = b.close;
+                    cur.bar.volume += b.volume;
+                }
+            }
+            if (cur)
+                out.push(cur.bar);
+            return out;
+        };
         let klines;
         let current;
         switch (timeframe) {
@@ -542,10 +564,36 @@ let MarketDataService = class MarketDataService {
                 klines = [...stock.kline5min];
                 current = stock.current5min;
                 break;
+            case '60min':
+                // 60 分钟：按小时聚合（09:30 起始，跨午休按自然小时）
+                {
+                    const src = [...stock.kline1min];
+                    if (stock.current1min)
+                        src.push(stock.current1min);
+                    const hourKey = (t) => { const d = new Date(t); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate() + '-' + d.getHours(); };
+                    return agg(src, hourKey);
+                }
             case 'daily':
                 klines = [...stock.klineDaily];
                 current = stock.currentDaily;
                 break;
+            case 'weekly':
+                // 周线：按 ISO 周聚合 daily
+                {
+                    const src = [...stock.klineDaily];
+                    if (stock.currentDaily)
+                        src.push(stock.currentDaily);
+                    const weekKey = (t) => { const d = new Date(t); const day = (d.getDay() + 6) % 7; const base = new Date(d); base.setDate(d.getDate() - day); return base.getFullYear() + '-' + (base.getMonth() + 1) + '-' + base.getDate(); };
+                    return agg(src, weekKey);
+                }
+            case 'monthly':
+                {
+                    const src = [...stock.klineDaily];
+                    if (stock.currentDaily)
+                        src.push(stock.currentDaily);
+                    const monthKey = (t) => { const d = new Date(t); return d.getFullYear() + '-' + (d.getMonth() + 1); };
+                    return agg(src, monthKey);
+                }
         }
         if (current)
             klines.push(current);

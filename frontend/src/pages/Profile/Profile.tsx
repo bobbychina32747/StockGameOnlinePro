@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { accountApi } from '../../services/api.client';
 import { useAuthStore } from '../../store';
+import { AchievementBoard } from '../../components/Trading/AchievementBoard';
 
 export default function Profile() {
   const user = useAuthStore((s) => s.user);
@@ -106,6 +107,9 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+      {/* B3 成就系统 */}
+      {perf && <AchievementBoard perf={perf} />}
     </div>
   );
 }

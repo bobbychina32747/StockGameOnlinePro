@@ -13,12 +13,16 @@ interface KlineData {
 }
 
 const TIMEFRAMES = [
+  { key: 'intraday', label: '分时' },
   { key: '1min', label: '1分' },
   { key: '5min', label: '5分' },
+  { key: '60min', label: '60分' },
   { key: 'daily', label: '日线' },
+  { key: 'weekly', label: '周线' },
+  { key: 'monthly', label: '月线' },
 ];
 
-// 中间图表区（标题栏 + 周期切换 + K线/指标 + 十字光标）
+// 中间图表区（标题栏 + 周期切换 + 分时/K线/指标 + 十字光标 + 历史回看）
 export function ChartPanel() {
   const klines = useMarketStore((s) => s.klines);
   const prices = useMarketStore((s) => s.prices);
@@ -29,6 +33,8 @@ export function ChartPanel() {
   const setDetailSymbol = useUIStore((s) => s.setDetailSymbol);
 
   const klineData: KlineData[] = (klines[selectedSymbol]?.[selectedTimeframe] || []) as KlineData[];
+  // 分时图数据源：1min K 线（S1）
+  const intradaySrc = (klines[selectedSymbol]?.['1min'] || []) as KlineData[];
   const stock = stocks.find((s: any) => s.symbol === selectedSymbol);
   const price = prices[selectedSymbol];
 
@@ -46,6 +52,54 @@ export function ChartPanel() {
   }, [selectedSymbol, selectedTimeframe]);
 
   const chartOption = useMemo(() => {
+    // ─── 分时图（S1）：1min close 连线 + 均价 + 成交量 + 昨收基准 ───
+    if (selectedTimeframe === 'intraday') {
+      if (intradaySrc.length === 0) return {};
+      const times = intradaySrc.map((k) => {
+        const d = new Date(k.time);
+        return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+      });
+      const closes = intradaySrc.map((k) => k.close);
+      const vols = intradaySrc.map((k) => k.volume);
+      const prevClose = intradaySrc[0]?.open || closes[0] || 0;
+      let cumVol = 0, cumAmt = 0;
+      const avgLine = closes.map((c, i) => { cumVol += vols[i]; cumAmt += c * vols[i]; return cumVol ? cumAmt / cumVol : c; });
+      const lastColor = closes[closes.length - 1] >= prevClose ? '#e03131' : '#00c853';
+      return {
+        animationDuration: 300, animationDurationUpdate: 300, backgroundColor: 'transparent',
+        grid: [
+          { left: '8%', right: '8%', top: 30, bottom: 90 },
+          { left: '8%', right: '8%', top: '74%', bottom: 20 },
+        ],
+        xAxis: [
+          { type: 'category', data: times, axisLine: { lineStyle: { color: '#2e3240' } }, axisLabel: { color: '#6a6d78', fontSize: 10 } },
+          { type: 'category', data: times, gridIndex: 1, axisLine: { lineStyle: { color: '#2e3240' } }, axisLabel: { show: false } },
+        ],
+        yAxis: [
+          { type: 'value', scale: true, splitLine: { lineStyle: { color: '#2e3240', type: 'dashed' } }, axisLabel: { color: '#6a6d78', fontSize: 10, formatter: (v: number) => v.toFixed(2) } },
+          { type: 'value', gridIndex: 1, splitLine: { show: false }, axisLabel: { show: false } },
+        ],
+        series: [
+          { type: 'line', data: closes, smooth: false, symbol: 'none', lineStyle: { width: 1.5, color: lastColor }, itemStyle: { color: lastColor }, areaStyle: { color: lastColor + '26' }, name: '价格', markLine: { silent: true, symbol: 'none', data: [{ yAxis: prevClose, lineStyle: { color: '#556080', type: 'dashed' } }], label: { show: false } } },
+          { type: 'line', data: avgLine, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#f59e0b', type: 'dashed' }, name: '均价' },
+          { type: 'bar', data: vols, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: (pp: any) => (closes[pp.dataIndex] >= prevClose ? 'rgba(224,49,49,0.5)' : 'rgba(0,200,83,0.5)') }, name: '成交量' },
+        ],
+        tooltip: {
+          trigger: 'axis', backgroundColor: '#1e222d', borderColor: '#2e3240', textStyle: { color: '#d1d4dc', fontSize: 12 },
+          axisPointer: { type: 'cross', lineStyle: { color: '#556080', type: 'dashed' }, label: { backgroundColor: '#3a3f4e' } },
+          formatter: (params: any[]) => {
+            if (!params || !params.length) return '';
+            const t = params[0].axisValue;
+            const line = params.find((x: any) => x.seriesName === '价格');
+            const avg = params.find((x: any) => x.seriesName === '均价');
+            const vol = params.find((x: any) => x.seriesName === '成交量');
+            return `${t}<br/>价格: ${line ? Number(line.value).toFixed(2) : '-'}<br/>均价: ${avg ? Number(avg.value).toFixed(2) : '-'}<br/>量: ${vol ? vol.value : '-'}`;
+          },
+        },
+      };
+    }
+
+    // ─── K线分支（含指标 + 历史回看 dataZoom） ───
     const closes = klineData.map((k) => k.close);
     // 注意：返回数字（字符串会导致 tooltip formatter 对字符串调 toFixed 崩溃）
     const calcMA = (period: number): (number | null)[] => {
@@ -89,7 +143,9 @@ export function ChartPanel() {
     const bb = calcBB(20);
     const klineTimes = klineData.map((k) => {
       const d = new Date(k.time);
-      return selectedTimeframe === 'daily' ? `${d.getMonth()+1}/${d.getDate()}` : `${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+      return selectedTimeframe === 'daily' || selectedTimeframe === 'weekly' || selectedTimeframe === 'monthly'
+        ? `${d.getMonth()+1}/${d.getDate()}`
+        : `${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
     });
     const candleData = klineData.map((k) => [k.open, k.close, k.low, k.high]);
 
@@ -153,8 +209,13 @@ export function ChartPanel() {
         },
       },
       legend: { data: ['MA5', 'MA10', 'MA20', 'BOLL中', 'RSI(14)'], top: 2, textStyle: { color: '#9fa3b0', fontSize: 10 } },
+      // 历史回看（B1）：滑动/缩放查看历史 K 线
+      dataZoom: [
+        { type: 'inside', start: 50, end: 100 },
+        { type: 'slider', height: 14, bottom: 4, start: 50, end: 100, borderColor: '#2e3240', backgroundColor: '#171922', fillerColor: 'rgba(47,111,237,0.15)', handleStyle: { color: '#2f6fed' }, textStyle: { color: '#6a6d78', fontSize: 9 } },
+      ],
     };
-  }, [klineData, selectedTimeframe]);
+  }, [klineData, selectedTimeframe, intradaySrc]);
 
   const prevClose = stock?.price ?? price ?? 0;
   const changePct = prevClose > 0 && price != null ? ((price - prevClose) / prevClose) * 100 : 0;
@@ -205,17 +266,27 @@ export function ChartPanel() {
         </div>
       </div>
       <div className="chart-indicators">
-        {maVals.map((v, i) => {
-          const cls = lastClose != null && v != null && v > lastClose ? 'down' : 'up';
-          return (
-            <span key={i} style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-              MA{i === 0 ? 5 : i === 1 ? 10 : 20}
-              <b className={cls} style={{ marginLeft: 4, fontFamily: 'var(--font-mono)' }}>
-                {v != null ? v.toFixed(2) : '-'}
-              </b>
-            </span>
-          );
-        })}
+        {selectedTimeframe === 'intraday' ? (
+          <>
+            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>昨收 <b className="up" style={{ marginLeft: 4, fontFamily: 'var(--font-mono)' }}>{intradaySrc[0] ? Number(intradaySrc[0].open).toFixed(2) : '-'}</b></span>
+            <span className="chart-listdate">黄色虚线为当日均价线</span>
+          </>
+        ) : (
+          <>
+            {maVals.map((v, i) => {
+              const cls = lastClose != null && v != null && v > lastClose ? 'down' : 'up';
+              return (
+                <span key={i} style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                  MA{i === 0 ? 5 : i === 1 ? 10 : 20}
+                  <b className={cls} style={{ marginLeft: 4, fontFamily: 'var(--font-mono)' }}>
+                    {v != null ? v.toFixed(2) : '-'}
+                  </b>
+                </span>
+              );
+            })}
+            <span className="chart-listdate">拖拽底部滑条回看历史</span>
+          </>
+        )}
         {stock?.code && <span className="chart-listdate">上市 {stock.listDate || '-'}</span>}
       </div>
       <div className="chart-container" ref={containerRef}>
