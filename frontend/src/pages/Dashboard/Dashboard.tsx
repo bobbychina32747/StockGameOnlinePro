@@ -7,6 +7,7 @@ import { ChartPanel } from '../../components/Trading/ChartPanel';
 import { OrderBookPanel } from '../../components/Trading/OrderBookPanel';
 import { AccountPanel } from '../../components/Trading/AccountPanel';
 import { OrderPanel } from '../../components/Trading/OrderPanel';
+import { StockDetailModal } from '../../components/Trading/StockDetailModal';
 
 // 主交易页（同花顺式三栏布局：股票列表 | 图表 | 盘口/账户/下单，两侧可拖拽调宽）
 export default function Dashboard() {
@@ -115,6 +116,7 @@ export default function Dashboard() {
           <OrderPanel />
         </div>
       </div>
+      <StockDetailModal />
     </div>
   );
 }

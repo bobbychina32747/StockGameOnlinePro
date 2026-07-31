@@ -29,6 +29,18 @@ __decorate([
     __metadata("design:type", String)
 ], Stock.prototype, "industry", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ length: 10, default: '' }),
+    __metadata("design:type", String)
+], Stock.prototype, "code", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ length: 20, default: '' }),
+    __metadata("design:type", String)
+], Stock.prototype, "listDate", void 0);
+__decorate([
+    (0, typeorm_1.Column)('text', { default: '' }),
+    __metadata("design:type", String)
+], Stock.prototype, "description", void 0);
+__decorate([
     (0, typeorm_1.Column)('float'),
     __metadata("design:type", Number)
 ], Stock.prototype, "initialPrice", void 0);

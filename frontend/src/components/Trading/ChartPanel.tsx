@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import ReactEChartsCore from 'echarts-for-react';
 import { useMarketStore, useUIStore } from '../../store';
+import { PriceText } from './PriceText';
 
 interface KlineData {
   time: Date;
@@ -17,7 +18,7 @@ const TIMEFRAMES = [
   { key: 'daily', label: '日线' },
 ];
 
-// 中间图表区（同花顺式：标题栏 + 周期切换 + K线/指标）
+// 中间图表区（标题栏 + 周期切换 + K线/指标 + 十字光标）
 export function ChartPanel() {
   const klines = useMarketStore((s) => s.klines);
   const prices = useMarketStore((s) => s.prices);
@@ -25,10 +26,24 @@ export function ChartPanel() {
   const selectedSymbol = useUIStore((s) => s.selectedSymbol);
   const selectedTimeframe = useUIStore((s) => s.selectedTimeframe);
   const setSelectedTimeframe = useUIStore((s) => s.setSelectedTimeframe);
+  const setDetailSymbol = useUIStore((s) => s.setDetailSymbol);
 
   const klineData: KlineData[] = (klines[selectedSymbol]?.[selectedTimeframe] || []) as KlineData[];
   const stock = stocks.find((s: any) => s.symbol === selectedSymbol);
   const price = prices[selectedSymbol];
+
+  // ─── 图表修复：切页重挂载后强制 resize + 监听容器尺寸变化 ───
+  const chartRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const t1 = setTimeout(() => chartRef.current?.getEchartsInstance()?.resize(), 120);
+    const t2 = setTimeout(() => chartRef.current?.getEchartsInstance()?.resize(), 400);
+    const ro = new ResizeObserver(() => chartRef.current?.getEchartsInstance()?.resize());
+    ro.observe(el);
+    return () => { clearTimeout(t1); clearTimeout(t2); ro.disconnect(); };
+  }, [selectedSymbol, selectedTimeframe]);
 
   const chartOption = useMemo(() => {
     const closes = klineData.map((k) => k.close);
@@ -96,14 +111,15 @@ export function ChartPanel() {
         { type: 'value', gridIndex: 1, splitLine: { show: false }, axisLabel: { color: '#6a6d78', fontSize: 9 }, min: 0, max: 100 },
       ],
       series: [
-        { type: 'candlestick', data: candleData, itemStyle: { color: '#00c853', color0: '#ff5252', borderColor: '#00c853', borderColor0: '#ff5252' }, name: 'K线' },
+        // A股：阳线红、阴线绿
+        { type: 'candlestick', data: candleData, itemStyle: { color: '#e03131', color0: '#00c853', borderColor: '#e03131', borderColor0: '#00c853' }, name: 'K线' },
         { type: 'line', data: bb.upper, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#9c27b0', opacity: 0.4 }, name: 'BOLL上' },
         { type: 'line', data: bb.mid, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#9c27b0' }, name: 'BOLL中' },
         { type: 'line', data: bb.lower, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#9c27b0', opacity: 0.4 }, areaStyle: { color: 'rgba(156,39,176,0.05)' }, name: 'BOLL下' },
         { type: 'line', data: ma5, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#ffa726' }, name: 'MA5' },
         { type: 'line', data: ma10, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#42a5f5' }, name: 'MA10' },
         { type: 'line', data: ma20, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#ef5350' }, name: 'MA20' },
-        { type: 'line', data: rsi, smooth: true, symbol: 'none', xAxisIndex: 1, yAxisIndex: 1, lineStyle: { width: 1, color: '#ab47bc' }, name: 'RSI(14)', markLine: { silent: true, data: [{ yAxis: 70, lineStyle: { color: '#ff5252', type: 'dashed' } }, { yAxis: 30, lineStyle: { color: '#00c853', type: 'dashed' } }] } },
+        { type: 'line', data: rsi, smooth: true, symbol: 'none', xAxisIndex: 1, yAxisIndex: 1, lineStyle: { width: 1, color: '#ab47bc' }, name: 'RSI(14)', markLine: { silent: true, data: [{ yAxis: 70, lineStyle: { color: '#e03131', type: 'dashed' } }, { yAxis: 30, lineStyle: { color: '#00c853', type: 'dashed' } }] } },
       ],
       tooltip: {
         trigger: 'axis',
@@ -144,16 +160,32 @@ export function ChartPanel() {
   const changePct = prevClose > 0 && price != null ? ((price - prevClose) / prevClose) * 100 : 0;
   const up = changePct >= 0;
 
+  // 最新 MA 值（标题下方专业行情条）
+  const lastMA = (period: number) => {
+    if (klineData.length < period) return null;
+    let s = 0;
+    for (let i = klineData.length - period; i < klineData.length; i++) s += klineData[i].close;
+    return s / period;
+  };
+  const maVals = [5, 10, 20].map((p) => lastMA(p));
+  const lastClose = klineData[klineData.length - 1]?.close;
+
   return (
     <div className="chart-area">
       <div className="chart-header">
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-          <span className="chart-symbol">{stock?.name || selectedSymbol}</span>
-          <span className="chart-code">{selectedSymbol}</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
+          <button
+            className="chart-symbol-btn"
+            title="查看公司资料"
+            onClick={() => setDetailSymbol(selectedSymbol)}
+          >
+            {stock?.name || selectedSymbol}
+          </button>
+          <span className="chart-code">{stock?.code || selectedSymbol}</span>
           {stock?.industry && <span className="chart-industry">{stock.industry}</span>}
           {price != null && (
             <span className={`chart-price ${up ? 'up' : 'down'}`}>
-              {Number(price).toFixed(2)}
+              <PriceText value={price} />
               <span style={{ marginLeft: 8, fontSize: 12 }}>
                 {up ? '+' : ''}{changePct.toFixed(2)}%
               </span>
@@ -172,8 +204,28 @@ export function ChartPanel() {
           ))}
         </div>
       </div>
-      <div className="chart-container">
-        <ReactEChartsCore option={chartOption} style={{ height: '100%', width: '100%' }} />
+      <div className="chart-indicators">
+        {maVals.map((v, i) => {
+          const cls = lastClose != null && v != null && v > lastClose ? 'down' : 'up';
+          return (
+            <span key={i} style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+              MA{i === 0 ? 5 : i === 1 ? 10 : 20}
+              <b className={cls} style={{ marginLeft: 4, fontFamily: 'var(--font-mono)' }}>
+                {v != null ? v.toFixed(2) : '-'}
+              </b>
+            </span>
+          );
+        })}
+        {stock?.code && <span className="chart-listdate">上市 {stock.listDate || '-'}</span>}
+      </div>
+      <div className="chart-container" ref={containerRef}>
+        <ReactEChartsCore
+          ref={chartRef}
+          key={`${selectedSymbol}-${selectedTimeframe}`}
+          option={chartOption}
+          opts={{ notMerge: true } as any}
+          style={{ height: '100%', width: '100%' }}
+        />
       </div>
     </div>
   );

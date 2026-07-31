@@ -1,14 +1,16 @@
 import { useEffect } from 'react';
 import { marketApi } from '../../services/api.client';
 import { useMarketStore, useUIStore } from '../../store';
+import { PriceText } from './PriceText';
 
-// 左侧股票列表（同花顺式：名称/现价/涨跌幅，点击切换）
+// 左侧股票列表（同花顺式：代码/名称/现价/涨跌幅，点击切换，ℹ 查看公司资料）
 export function StockListPanel() {
   const stocks = useMarketStore((s) => s.stocks);
   const setStocks = useMarketStore((s) => s.setStocks);
   const prices = useMarketStore((s) => s.prices);
   const selectedSymbol = useUIStore((s) => s.selectedSymbol);
   const setSelectedSymbol = useUIStore((s) => s.setSelectedSymbol);
+  const setDetailSymbol = useUIStore((s) => s.setDetailSymbol);
 
   // 行情列表定时刷新（涨跌幅/今开高低随价格更新）
   useEffect(() => {
@@ -46,10 +48,19 @@ export function StockListPanel() {
               className={`stock-list-row ${selectedSymbol === s.symbol ? 'active' : ''}`}
               onClick={() => setSelectedSymbol(s.symbol)}
             >
-              <span className="stock-symbol">{s.symbol}</span>
-              <span className="stock-name" title={s.industry}>{s.name}</span>
+              <span className="stock-symbol">{s.code || s.symbol}</span>
+              <span className="stock-name" title={s.industry}>
+                {s.name}
+                <button
+                  className="stock-info-btn"
+                  title="公司资料"
+                  onClick={(e) => { e.stopPropagation(); setDetailSymbol(s.symbol); }}
+                >
+                  ℹ
+                </button>
+              </span>
               <span className={`stock-price ${up ? 'up' : 'down'}`}>
-                {Number(price).toFixed(2)}
+                <PriceText value={price} />
               </span>
               <span className={`stock-change ${up ? 'up' : 'down'}`}>
                 {up ? '+' : ''}{changePct.toFixed(2)}%

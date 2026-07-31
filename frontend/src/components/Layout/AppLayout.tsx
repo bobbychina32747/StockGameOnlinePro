@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore, useMarketStore, useUIStore } from '../../store';
 import { NotificationContainer } from '../UI/Notification';
+import { MarketIndexBar } from '../Trading/MarketIndexBar';
 export function AppLayout() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -34,13 +35,13 @@ export function AppLayout() {
 
         <div className="status-center">
           {prices['T1'] && (
-            <span>芯片: <b>{prices['T1'].toFixed(2)}</b></span>
+            <span>688001 芯澜: <b>{prices['T1'].toFixed(2)}</b></span>
           )}
           {prices['C1'] && (
-            <span>白酒: <b>{prices['C1'].toFixed(2)}</b></span>
+            <span>600809 杏花: <b>{prices['C1'].toFixed(2)}</b></span>
           )}
           {prices['E2'] && (
-            <span>锂电: <b>{prices['E2'].toFixed(2)}</b></span>
+            <span>300450 电芯: <b>{prices['E2'].toFixed(2)}</b></span>
           )}
         </div>
 
@@ -51,6 +52,8 @@ export function AppLayout() {
           </button>
         </div>
       </header>
+
+      <MarketIndexBar />
 
       {/* 主内容区 */}
       <div className="app-content">

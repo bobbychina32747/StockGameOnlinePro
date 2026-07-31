@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { accountApi } from '../../services/api.client';
 import { useAccountStore, useMarketStore, useUIStore } from '../../store';
 import { CollapsibleCard } from './CollapsibleCard';
+import { PriceText } from './PriceText';
 
 // 右侧账户面板：总览 + 模式切换 + 角色预设 + 持仓明细
 export function AccountPanel() {
@@ -43,15 +44,15 @@ export function AccountPanel() {
       <CollapsibleCard title="💰 账户总览">
         <div className="info-row">
           <span className="label">现金</span>
-          <span className="value">{account ? Number(account.cash).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) : '---'}</span>
+          <span className="value">{account ? <PriceText value={Number(account.cash)} /> : '---'}</span>
         </div>
         <div className="info-row">
           <span className="label">持仓市值</span>
-          <span className="value">{holdValue.toFixed(2)}</span>
+          <span className="value"><PriceText value={holdValue} /></span>
         </div>
         <div className="info-row">
           <span className="label">总资产</span>
-          <span className="value">{totalEquity.toFixed(2)}</span>
+          <span className="value"><PriceText value={totalEquity} /></span>
         </div>
         <div className="info-row">
           <span className="label">杠杆</span>
@@ -60,13 +61,13 @@ export function AccountPanel() {
         <div className="info-row">
           <span className="label">今日盈亏</span>
           <span className={`value ${dailyPnl >= 0 ? 'up' : 'down'}`}>
-            {dailyPnl >= 0 ? '+' : ''}{dailyPnl.toFixed(2)}
+            {dailyPnl >= 0 ? '+' : ''}<PriceText value={dailyPnl} />
           </span>
         </div>
         <div className="info-row">
           <span className="label">总盈亏</span>
           <span className={`value ${totalPnl >= 0 ? 'up' : 'down'}`}>
-            {totalPnl >= 0 ? '+' : ''}{totalPnl.toFixed(2)}
+            {totalPnl >= 0 ? '+' : ''}<PriceText value={totalPnl} />
           </span>
         </div>
         <div className="info-row" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 6, marginTop: 4 }}>

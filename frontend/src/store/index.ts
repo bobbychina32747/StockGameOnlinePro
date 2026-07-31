@@ -106,6 +106,8 @@ interface UIState {
   setSelectedTimeframe: (tf: string) => void;
   marketMode: string;
   setMarketMode: (mode: string) => void;
+  detailSymbol: string | null;
+  setDetailSymbol: (s: string | null) => void;
   latestNews: string;
   setLatestNews: (news: string) => void;
   newsHistory: string[];
@@ -129,6 +131,8 @@ export const useUIStore = create<UIState>((set) => ({
   setSelectedTimeframe: (tf) => set({ selectedTimeframe: tf }),
   marketMode: 'US',
   setMarketMode: (mode) => set({ marketMode: mode }),
+  detailSymbol: null,
+  setDetailSymbol: (s) => set({ detailSymbol: s }),
   latestNews: '',
   setLatestNews: (news) => set({ latestNews: news }),
   newsHistory: [],

@@ -43,17 +43,25 @@ let MarketDataService = class MarketDataService {
         for (const f of constants_1.FACTOR_NAMES) {
             this.factors[f] = -0.02 + Math.random() * 0.04;
         }
-        // 迁移：旧库补 industry 列（SQLite ALTER，幂等）
-        try {
-            await this.stockRepo.query('ALTER TABLE stocks ADD COLUMN industry varchar DEFAULT "综合"');
+        // 迁移：旧库补 industry/code/listDate/description 列（SQLite ALTER，幂等）
+        const migrateCols = [
+            ['industry', 'varchar DEFAULT "综合"'],
+            ['code', 'varchar DEFAULT ""'],
+            ['listDate', 'varchar DEFAULT ""'],
+            ['description', 'text DEFAULT ""'],
+        ];
+        for (const [col, def] of migrateCols) {
+            try {
+                await this.stockRepo.query(`ALTER TABLE stocks ADD COLUMN ${col} ${def}`);
+            }
+            catch (e) {
+                // 列已存在时忽略
+            }
         }
-        catch (e) {
-            // 列已存在时忽略
-        }
-        // 迁移：按股票池补齐已存在股票的行业
+        // 迁移：按股票池补齐已存在股票的行业与 lore 字段
         try {
             for (const cfg of constants_1.STOCK_POOL) {
-                await this.stockRepo.query(`UPDATE stocks SET industry='${cfg.industry}' WHERE symbol='${cfg.symbol}' AND (industry IS NULL OR industry='综合')`);
+                await this.stockRepo.query(`UPDATE stocks SET industry='${cfg.industry}', code='${cfg.code}', listDate='${cfg.listDate}', description='${(cfg.description || '').replace(/'/g, "''")}' WHERE symbol='${cfg.symbol}'`);
             }
         }
         catch (e) {
@@ -83,6 +91,9 @@ let MarketDataService = class MarketDataService {
             });
             // 直接赋值（避免 create 对实例属性的过滤问题）
             stock.industry = cfg.industry;
+            stock.code = cfg.code;
+            stock.listDate = cfg.listDate;
+            stock.description = cfg.description || '';
             await this.stockRepo.save(stock);
             dbStocks.push(stock);
         }
@@ -94,6 +105,9 @@ let MarketDataService = class MarketDataService {
                 symbol: s.symbol,
                 name: s.name,
                 industry: s.industry || '综合',
+                code: s.code || '',
+                listDate: s.listDate || '',
+                description: s.description || '',
                 price,
                 volatility: Number(s.sigma) * 0.5,
                 lastReturn: 0,
@@ -441,6 +455,9 @@ let MarketDataService = class MarketDataService {
             list.push({
                 symbol: state.symbol,
                 name: state.name || state.symbol,
+                code: state.code || '',
+                listDate: state.listDate || '',
+                description: state.description || '',
                 industry: state.industry
                     || constants_1.STOCK_POOL.find((c) => c.symbol === state.symbol)?.industry
                     || '综合',
