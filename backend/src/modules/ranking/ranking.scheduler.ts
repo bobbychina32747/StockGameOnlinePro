@@ -20,7 +20,7 @@ let RankingScheduler = class RankingScheduler {
         this.handle = setInterval(async () => {
             await this.rankingService.calculateRankings();
             this.logger.log('排行榜已更新');
-        }, 60 * 60 * 1000);
+        }, 30 * 1000);
         setTimeout(() => this.rankingService.calculateRankings(), 10000);
     }
 };

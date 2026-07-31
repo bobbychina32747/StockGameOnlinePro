@@ -140,13 +140,14 @@ let MarketDataService = class MarketDataService {
                 isTrending: false,
             });
         }
-        for (let d = 0; d < 3; d++) {
+        // Q2 历史 30 天：让 daily/周线/月线与回测真正可用（1min 保留最近 2000 根）
+        for (let d = 0; d < 30; d++) {
             for (let t = 0; t < constants_1.MARKET.TICKS_PER_DAY; t++) {
                 this.generateTick();
             }
             await this.endOfDay();
         }
-        // 注意：不重置 gameDay，历史 3 天用 0/1/2，实时从 3 开始，避免 K 线时间戳重叠
+        // 注意：不重置 gameDay，历史 30 天用 0..29，实时从 30 开始，避免 K 线时间戳重叠
         this.logger.log(`市场数据已初始化: ${dbStocks.length} 只股票`);
     }
     start() {

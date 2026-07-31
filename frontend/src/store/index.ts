@@ -58,10 +58,34 @@ export const useMarketStore = create<MarketState>((set) => ({
   setStocks: (stocks) => set({ stocks }),
   setPrices: (prices) => set({ prices }),
   addTick: (tick) =>
-    set((state) => ({
-      prices: { ...state.prices, [tick.symbol]: tick.price },
-      ticks: [...state.ticks.slice(-100), tick],
-    })),
+    set((state) => {
+      const prices = { ...state.prices, [tick.symbol]: tick.price };
+      const ticks = [...state.ticks.slice(-100), tick];
+      // Q5：由 tick 实时维护 1min K 线（tick=1分钟，后端 bar 时间公式同步复现）
+      const gameDay = Math.floor(tick.timestamp / 390);
+      const dayTick = tick.timestamp % 390;
+      const time = new Date(2024, 0, 1 + gameDay, 9, 30 + dayTick).toISOString();
+      const klines = { ...state.klines };
+      const symKlines = { ...(klines[tick.symbol] || {}) };
+      const arr = (symKlines['1min'] || []).slice();
+      const last = arr[arr.length - 1];
+      if (last && new Date(last.time).getTime() === new Date(time).getTime()) {
+        // 同一分钟：更新 close/high/low，累加 volume
+        arr[arr.length - 1] = {
+          ...last,
+          close: tick.price,
+          high: Math.max(last.high, tick.price),
+          low: Math.min(last.low, tick.price),
+          volume: last.volume + tick.volume,
+        };
+      } else {
+        arr.push({ time, open: tick.price, high: tick.price, low: tick.price, close: tick.price, volume: tick.volume });
+        if (arr.length > 2000) arr.shift();
+      }
+      symKlines['1min'] = arr;
+      klines[tick.symbol] = symKlines;
+      return { prices, ticks, klines };
+    }),
   setKlines: (symbol, tf, data) =>
     set((state) => ({
       klines: {

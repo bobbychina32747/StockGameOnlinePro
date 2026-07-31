@@ -30,6 +30,24 @@ let RankingService = class RankingService {
     }
     async calculateRankings() {
         const accounts = await this.accountRepo.find({ relations: ['user'] });
+        // Q1：从每日快照计算今日盈亏 dayReturn（按账户取最近两条快照）
+        const snaps = await this.snapshotRepo.find({ order: { day: 'ASC' } });
+        const byUser = new Map();
+        for (const sn of snaps) {
+            const arr = byUser.get(sn.userId) || [];
+            arr.push(sn);
+            byUser.set(sn.userId, arr);
+        }
+        const dayReturnOf = (userId) => {
+            const arr = byUser.get(userId) || [];
+            if (arr.length === 0)
+                return 0;
+            const last = arr[arr.length - 1];
+            const prev = arr.length >= 2 ? arr[arr.length - 2] : null;
+            if (prev && Number(prev.equity) > 0)
+                return (Number(last.equity) - Number(prev.equity)) / Number(prev.equity);
+            return Number(last.dailyReturn) || 0;
+        };
         const entries = accounts
             .filter((a) => Number(a.initialEquity) > 0)
             .map((a) => ({
@@ -37,6 +55,7 @@ let RankingService = class RankingService {
             username: a.user?.username || '未知',
             totalEquity: Number(a.totalEquity),
             totalReturn: (Number(a.totalEquity) - Number(a.initialEquity)) / Number(a.initialEquity),
+            dayReturn: dayReturnOf(a.userId),
             rank: 0,
         }))
             .sort((a, b) => b.totalReturn - a.totalReturn)

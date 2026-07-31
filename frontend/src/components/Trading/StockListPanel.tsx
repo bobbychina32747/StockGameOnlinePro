@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { marketApi } from '../../services/api.client';
 import { useMarketStore, useUIStore } from '../../store';
 import { PriceText } from './PriceText';
+import { liveQuote } from '../../utils/quote';
 
 type ViewMode = 'all' | 'fav' | 'board';
 
@@ -57,9 +58,9 @@ export function StockListPanel() {
       map.set(s.industry, arr);
     }
     return [...map.entries()].map(([industry, arr]) => {
-      const avg = arr.reduce((sum, s) => sum + (s.changePct ?? 0), 0) / arr.length;
-      const upCount = arr.filter((s) => (s.changePct ?? 0) > 0).length;
-      const leader = [...arr].sort((a, b) => (b.changePct ?? 0) - (a.changePct ?? 0))[0];
+      const avg = arr.reduce((sum, s) => sum + liveQuote(sorted, prices, s.symbol).changePct, 0) / arr.length;
+      const upCount = arr.filter((s) => liveQuote(sorted, prices, s.symbol).changePct > 0).length;
+      const leader = [...arr].sort((a, b) => liveQuote(sorted, prices, b.symbol).changePct - liveQuote(sorted, prices, a.symbol).changePct)[0];
       return { industry, avg, upCount, total: arr.length, leader };
     }).sort((a, b) => b.avg - a.avg);
   }, [sorted]);
@@ -118,8 +119,9 @@ export function StockListPanel() {
               </div>
             )}
             {list.map((s) => {
-              const price = prices[s.symbol] ?? s.price;
-              const changePct = s.changePct ?? 0;
+              const q = liveQuote(stocks, prices, s.symbol);
+              const price = q.price;
+              const changePct = q.changePct;
               const up = changePct >= 0;
               const isFav = favoriteSymbols.includes(s.symbol);
               return (

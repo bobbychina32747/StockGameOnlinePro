@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { accountApi } from '../../services/api.client';
 import { useAuthStore } from '../../store';
 import { AchievementBoard } from '../../components/Trading/AchievementBoard';
+import { EquityCurve } from '../../components/Trading/EquityCurve';
 
 export default function Profile() {
   const user = useAuthStore((s) => s.user);
@@ -107,6 +108,9 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+      {/* Q4 历史净值曲线 */}
+      <EquityCurve />
 
       {/* B3 成就系统 */}
       {perf && <AchievementBoard perf={perf} />}

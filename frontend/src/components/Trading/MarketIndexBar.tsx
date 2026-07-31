@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { marketApi } from '../../services/api.client';
 import { useMarketStore } from '../../store';
+import { marketBreadth } from '../../utils/quote';
 
 const REGIME_LABEL: Record<string, string> = {
   sideways: '震荡整理',
@@ -44,10 +45,10 @@ export function MarketIndexBar() {
     return () => { alive = false; clearInterval(timer); };
   }, []);
 
-  // 涨跌家数（S3）
-  const upCount = stocks.filter((s) => (s.changePct ?? 0) > 0).length;
-  const downCount = stocks.filter((s) => (s.changePct ?? 0) < 0).length;
-  const flatCount = stocks.length - upCount - downCount;
+  // 涨跌家数（S3，Q3 实时）
+  const prices = useMarketStore((s) => s.prices);
+  const breadth = marketBreadth(stocks, prices);
+  const upCount = breadth.up, downCount = breadth.down, flatCount = breadth.flat;
 
   if (indices.length === 0) return null;
 

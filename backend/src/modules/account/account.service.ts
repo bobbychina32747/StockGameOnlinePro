@@ -55,6 +55,13 @@ let AccountService = class AccountService {
     async getPositions(accountId) {
         return this.positionRepo.find({ where: { accountId } });
     }
+    // Q4：账户历史净值曲线
+    getHistory(userId, mode) {
+        return this.accountRepo.find({ where: { userId, marketMode: mode } }).then((list) => {
+            const acct = list && list[0];
+            return acct ? this.riskManager.getEquityHistory(acct.id) : [];
+        });
+    }
     async getMetrics(userId, mode) {
         const account = await this.getAccount(userId, mode);
         const metrics = await this.riskManager.calculateMetrics(account);

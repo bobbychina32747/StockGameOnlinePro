@@ -87,6 +87,10 @@ let RiskManagerService = class RiskManagerService {
         }
         return settled;
     }
+    // Q4：账户历史净值（内存，最近 365 天）
+    getEquityHistory(accountId) {
+        return (this.equityHistory.get(accountId) || []).slice();
+    }
     async getPositionsValue(account) {
         const positions = await this.positionRepo.find({ where: { accountId: account.id } });
         let holdValue = 0;

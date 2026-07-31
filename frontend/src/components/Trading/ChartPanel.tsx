@@ -217,7 +217,7 @@ export function ChartPanel() {
     };
   }, [klineData, selectedTimeframe, intradaySrc]);
 
-  const prevClose = stock?.price ?? price ?? 0;
+  const prevClose = stock?.dayOpen != null ? Number(stock.dayOpen) : (stock?.price ?? price ?? 0);
   const changePct = prevClose > 0 && price != null ? ((price - prevClose) / prevClose) * 100 : 0;
   const up = changePct >= 0;
 

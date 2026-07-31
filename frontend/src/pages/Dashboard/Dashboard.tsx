@@ -33,6 +33,8 @@ export default function Dashboard() {
   }, [setStocks]);
 
   // 选中股票/周期变化时拉取 K 线与盘口
+  // Q5：1min/intraday 由 WS tick 实时维护，只首次拉一次历史；其他周期 15s 低频轮询
+  const realtimeTf = selectedTimeframe === '1min' || selectedTimeframe === 'intraday';
   useEffect(() => {
     const load = async () => {
       try {
@@ -47,7 +49,12 @@ export default function Dashboard() {
       }
     };
     load();
-  }, [selectedSymbol, selectedTimeframe, setKlines, setOrderBook]);
+    let timer: ReturnType<typeof setInterval> | null = null;
+    if (!realtimeTf) {
+      timer = setInterval(load, 15000);
+    }
+    return () => { if (timer) clearInterval(timer); };
+  }, [selectedSymbol, selectedTimeframe, realtimeTf, setKlines, setOrderBook]);
 
   // WS 断线时降级到 REST 轮询（每 5 秒）
   const [wsConnected, setWsConnected] = useState(true);
