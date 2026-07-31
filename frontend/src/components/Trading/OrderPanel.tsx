@@ -154,17 +154,23 @@ export function OrderPanel() {
             <option value="stop">止损单</option>
             <option value="stop-limit">止损限价单</option>
           </select>
+          <div style={{ display: 'flex', gap: 6 }}>
           <select className="input" value={orderSide} onChange={(e) => setOrderSide(e.target.value)}>
             <option value="buy">买入</option>
             <option value="sell">卖出</option>
             <option value="short" disabled={isCN}>{isCN ? '❌ 做空' : '做空'}</option>
             <option value="cover" disabled={isCN}>{isCN ? '❌ 平空' : '平空'}</option>
           </select>
+          <button className="btn btn-sm btn-ghost" title="买卖对切" onClick={() => setOrderSide(orderSide === 'buy' ? 'sell' : 'buy')}>⇄</button>
+          </div>
           {orderType !== 'market' && (
-            <input
-              className="input" type="number" placeholder="价格" value={orderPrice}
-              onChange={(e) => setOrderPrice(e.target.value)} step="0.01"
-            />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                className="input" type="number" placeholder="价格" value={orderPrice}
+                onChange={(e) => setOrderPrice(e.target.value)} step="0.01"
+              />
+              <button className="btn btn-sm btn-ghost" title="填入现价" onClick={() => prices[selectedSymbol] && setOrderPrice(String(prices[selectedSymbol].toFixed(2)))}>现价</button>
+            </div>
           )}
           {(orderType === 'stop' || orderType === 'stop-limit') && (
             <input
@@ -178,8 +184,10 @@ export function OrderPanel() {
               className="input" type="number" value={orderQty}
               onChange={(e) => setOrderQty(parseInt(e.target.value) || 0)} min={1} step={100}
             />
-            <button className="btn btn-sm btn-ghost" onClick={() => setOrderQty(orderQty + 100)}>+</button>
-            <button className="btn btn-sm btn-ghost" onClick={() => setOrderQty(Math.max(0, orderQty - 100))}>-</button>
+            <button className="btn btn-sm btn-ghost" onClick={() => setOrderQty(100)}>100</button>
+            <button className="btn btn-sm btn-ghost" onClick={() => setOrderQty(500)}>500</button>
+            <button className="btn btn-sm btn-ghost" onClick={() => setOrderQty(1000)}>1000</button>
+            <button className="btn btn-sm btn-ghost" onClick={() => { const p = prices[selectedSymbol] || 0; setOrderQty(p > 0 ? Math.floor((cash / p) / 100) * 100 : 0); }} title="按可用现金全仓">全仓</button>
           </div>
           {effPrice > 0 && orderQty > 0 && (
             <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.7 }}>

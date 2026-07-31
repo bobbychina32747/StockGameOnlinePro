@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore, useMarketStore, useUIStore } from '../../store';
 import { NotificationContainer } from '../UI/Notification';
 import { MarketIndexBar } from '../Trading/MarketIndexBar';
 import { NoticeCenter } from './NoticeCenter';
+import { SettingsModal } from './SettingsModal';
 export function AppLayout() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -12,6 +13,8 @@ export function AppLayout() {
   const navigate = useNavigate();
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // C3 主题应用
   useEffect(() => {
@@ -55,6 +58,8 @@ export function AppLayout() {
         </div>
 
         <NoticeCenter />
+        <button className="theme-toggle-btn" title="设置" onClick={() => setSettingsOpen(true)}>⚙️</button>
+        <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
         <button className="theme-toggle-btn" title="切换主题" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
           {theme === 'dark' ? '☀️' : '🌙'}
         </button>

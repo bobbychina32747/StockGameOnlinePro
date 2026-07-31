@@ -1226,3 +1226,23 @@ body.theme-light {
 /* ═══ Q7 流水页 ═══ */
 .transactions-page h2 { margin-bottom: 12px; }
 .transactions-page .table td { font-size: 12px; }
+
+/* ═══ Q12 设置面板 ═══ */
+.settings-body { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; }
+.setting-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 2px; border-bottom: 1px solid var(--border-subtle);
+}
+.setting-label { font-size: 13px; color: var(--text-primary); }
+.setting-control { display: flex; gap: 6px; }
+
+/* ═══ Q12 紧凑密度 ═══ */
+body.density-compact {
+  --font-size-base: 12px;
+  --font-size-sm: 11px;
+  --font-size-xs: 10px;
+}
+body.density-compact .card { padding: 10px; }
+body.density-compact .stock-list-row { padding: 3px 6px; }
+body.density-compact .ob-row { padding: 1px 3px; }
+body.density-compact .info-row { padding: 2px 0; }

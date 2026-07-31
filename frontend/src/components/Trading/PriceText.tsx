@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { useUIStore } from '../../store';
 
 // 价格文本组件：数字滚动动画 + 瞬时涨跌闪烁（A股红涨绿跌）
-// - 数字变化时从旧值平滑滚动到新值
-// - 每次 tick 变化时背景闪一下红（涨）或绿（跌）
-// - 颜色由外部 className 控制（up/down），flash 由内部管理
+// Q13：动画开关（设置面板）关闭时直接显示，零开销
 export function PriceText({
   value,
   decimals = 2,
@@ -19,16 +18,22 @@ export function PriceText({
   prefix?: string;
   suffix?: string;
 }) {
+  const animEnabled = useUIStore((s) => s.animEnabled);
   const [display, setDisplay] = useState(value);
   const [flash, setFlash] = useState<'up' | 'down' | null>(null);
   const fromRef = useRef(value);
   const prevRef = useRef(value);
 
-  // 数字滚动动画
+  // 数字滚动动画（开关关闭时直接跳到新值）
   useEffect(() => {
     const from = fromRef.current;
     const to = value;
     if (from === to) return;
+    if (!animEnabled) {
+      fromRef.current = to;
+      setDisplay(to);
+      return;
+    }
     fromRef.current = to;
     const start = performance.now();
     let raf = 0;
@@ -40,7 +45,7 @@ export function PriceText({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [value, duration]);
+  }, [value, duration, animEnabled]);
 
   // 涨跌闪烁
   useEffect(() => {

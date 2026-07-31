@@ -9,6 +9,7 @@ export function AccountPanel() {
   const { account, positions } = useAccountStore();
   const fetchAccount = useAccountStore((s) => s.fetchAccount);
   const prices = useMarketStore((s) => s.prices);
+  const stocks = useMarketStore((s) => s.stocks);
   const mode = useUIStore((s) => s.marketMode);
   const setMarketMode = useUIStore((s) => s.setMarketMode);
   const addNotification = useUIStore((s) => s.addNotification);
@@ -97,20 +98,39 @@ export function AccountPanel() {
         </div>
     </CollapsibleCard>
 
-      {/* 持仓明细 */}
+      {/* 持仓明细（Q10：当日盈亏 + 多空浮盈 + 盈亏排行） */}
       <CollapsibleCard title="📊 持仓明细">
         {(positions as any[]).length === 0 ? (
           <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '8px 0' }}>暂无持仓</div>
         ) : (
-          (positions as any[]).map((pos: any) => {
+          [...(positions as any[])]
+            .sort((a: any, b: any) => {
+              const pnlA = (prices[a.symbol] || 0) * a.longQty + (a.shortCost || 0) * a.shortQty - (a.longCost || 0) * a.longQty - (prices[a.symbol] || 0) * a.shortQty;
+              const pnlB = (prices[b.symbol] || 0) * b.longQty + (b.shortCost || 0) * b.shortQty - (b.longCost || 0) * b.longQty - (prices[b.symbol] || 0) * b.shortQty;
+              return pnlB - pnlA;
+            })
+            .map((pos: any) => {
             const price = prices[pos.symbol] || 0;
-            const pnl = price > 0 && pos.longQty > 0 ? (price - pos.longCost) * pos.longQty : 0;
+            const stock = stocks.find((x: any) => x.symbol === pos.symbol);
+            const dayOpen = stock?.dayOpen || price;
+            // 多空合计浮盈
+            const pnl = (price - (pos.longCost || 0)) * pos.longQty + ((pos.shortCost || 0) - price) * pos.shortQty;
+            const costBase = (pos.longCost || 0) * pos.longQty + (pos.shortCost || 0) * pos.shortQty;
+            const pnlPct = costBase > 0 ? (pnl / costBase) * 100 : 0;
+            // 当日盈亏（相对今开）
+            const dayPnl = (price - dayOpen) * pos.longQty + (dayOpen - price) * pos.shortQty;
             return (
               <div key={pos.symbol} style={{ marginBottom: 8, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 6 }}>
-                <div style={{ fontWeight: 600, marginBottom: 2, display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ fontWeight: 600, marginBottom: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                   <span>{pos.symbol}</span>
                   <span className={`value ${pnl >= 0 ? 'up' : 'down'}`} style={{ fontSize: 11 }}>
-                    浮盈亏 {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}
+                    浮盈 {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}（{pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%）
+                  </span>
+                </div>
+                <div className="info-row">
+                  <span className="label">当日盈亏</span>
+                  <span className={`value ${dayPnl >= 0 ? 'up' : 'down'}`} style={{ fontSize: 11 }}>
+                    {dayPnl >= 0 ? '+' : ''}{dayPnl.toFixed(2)}
                   </span>
                 </div>
                 <div className="info-row">
@@ -125,6 +145,12 @@ export function AccountPanel() {
                   <div className="info-row">
                     <span className="label">多仓成本</span>
                     <span className="value">{Number(pos.longCost).toFixed(2)}</span>
+                  </div>
+                )}
+                {pos.shortCost > 0 && (
+                  <div className="info-row">
+                    <span className="label">空仓成本</span>
+                    <span className="value">{Number(pos.shortCost).toFixed(2)}</span>
                   </div>
                 )}
                 {isCN && (

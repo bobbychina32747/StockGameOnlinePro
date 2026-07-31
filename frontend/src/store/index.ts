@@ -141,6 +141,10 @@ interface UIState {
   notices: any[];
   addNotice: (item: any) => void;
   markNoticesRead: () => void;
+  animEnabled: boolean;
+  setAnimEnabled: (v: boolean) => void;
+  density: 'standard' | 'compact';
+  setDensity: (d: 'standard' | 'compact') => void;
   theme: 'dark' | 'light';
   setTheme: (t: 'dark' | 'light') => void;
 }
@@ -192,6 +196,11 @@ export const useUIStore = create<UIState>((set) => ({
       localStorage.setItem('ss.notices', JSON.stringify(notices));
       return { notices };
     }),
+  // Q12 设置：动画开关 + 字体密度
+  animEnabled: localStorage.getItem('ss.anim') !== '0',
+  setAnimEnabled: (v) => { localStorage.setItem('ss.anim', v ? '1' : '0'); set({ animEnabled: v }); },
+  density: (localStorage.getItem('ss.density') as any) || 'standard',
+  setDensity: (d) => { localStorage.setItem('ss.density', d); set({ density: d }); },
   addNews: (news) =>
     set((s) => ({
       latestNews: news,
