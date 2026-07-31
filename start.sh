@@ -1,73 +1,119 @@
 #!/bin/bash
-# StockSim Pro — 一键启动脚本 (Git Bash / Linux / macOS)
-
+# StockSim Pro - one-click launcher (Git Bash / Linux / macOS)
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "═══════════════════════════════════════"
-echo "  StockSim Pro — 一键启动脚本"
-echo "  专业炒股模拟交易平台"
-echo "═══════════════════════════════════════"
+echo "================================================"
+echo "  StockSim Pro - Stock Trading Simulator"
+echo "================================================"
 echo ""
 
-# 检查 Node.js
+# ---- 1. Environment check ----
+echo "[1/5] Environment check"
 if ! command -v node &> /dev/null; then
-    echo "[错误] 未找到 Node.js，请先安装: https://nodejs.org/"
+    echo "  [FAIL] Node.js not found. Install from https://nodejs.org/ (v18+)"
     exit 1
 fi
-echo "[OK] Node.js: $(node --version)"
-
-# 检查 npm
+echo "  [OK] Node.js: $(node --version)"
 if ! command -v npm &> /dev/null; then
-    echo "[错误] 未找到 npm"
+    echo "  [FAIL] npm not found"
     exit 1
 fi
-echo "[OK] npm: $(npm --version)"
+echo "  [OK] npm: $(npm --version)"
 echo ""
 
-# 创建数据目录
+# ---- 2. Dependency check (auto install) ----
+echo "[2/5] Dependency check"
 mkdir -p backend/data
+if [ ! -d backend/node_modules ]; then
+    echo "  [WARN] Backend deps missing, installing..."
+    (cd backend && npm install --no-fund --no-audit)
+    echo "  [OK] Backend deps installed"
+else
+    echo "  [OK] Backend deps ready"
+fi
+if [ ! -d frontend/node_modules ]; then
+    echo "  [WARN] Frontend deps missing, installing..."
+    (cd frontend && npm install --no-fund --no-audit)
+    echo "  [OK] Frontend deps installed"
+else
+    echo "  [OK] Frontend deps ready"
+fi
+echo ""
 
-# 安装后端依赖
-echo "[1/4] 安装后端依赖..."
-(cd backend && npm install --loglevel=error)
-echo "[OK] 后端依赖已安装"
+# ---- 3. Build check (rebuild if source changed) ----
+echo "[3/5] Build check"
+NEED_BUILD="$(node scripts/check-build.js)"
+if echo "$NEED_BUILD" | grep -q "backend"; then
+    echo "  [WARN] Backend source changed, rebuilding..."
+    (cd backend && npm run build)
+    echo "  [OK] Backend build done"
+else
+    echo "  [OK] Backend build up-to-date"
+fi
+if echo "$NEED_BUILD" | grep -q "frontend"; then
+    echo "  [WARN] Frontend source changed, rebuilding..."
+    (cd frontend && npm run build)
+    echo "  [OK] Frontend build done"
+else
+    echo "  [OK] Frontend build up-to-date"
+fi
+echo ""
 
-# 安装前端依赖
-echo "[2/4] 安装前端依赖..."
-(cd frontend && npm install --loglevel=error)
-echo "[OK] 前端依赖已安装"
-
-# 启动后端
-echo "[3/4] 启动后端服务 (端口 8000)..."
-(cd backend && npx nest start --watch &)
+# ---- 4. Start backend + health check ----
+echo "[4/5] Start backend  http://localhost:8000/api"
+(cd backend && exec node dist/src/main.js) &
 BACKEND_PID=$!
-echo "[OK] 后端已启动 (PID: $BACKEND_PID)"
+BACKEND_OK=""
+for i in $(seq 1 30); do
+    if curl -s -o /dev/null http://localhost:8000/api/market/prices 2>/dev/null; then
+        BACKEND_OK=1
+        break
+    fi
+    sleep 1
+done
+if [ -n "$BACKEND_OK" ]; then
+    echo "  [OK] Backend ready (PID $BACKEND_PID)"
+else
+    echo "  [FAIL] Backend startup timeout"
+    kill $BACKEND_PID 2>/dev/null
+    exit 1
+fi
+echo ""
 
-# 等待后端初始化
-sleep 3
-
-# 启动前端
-echo "[4/4] 启动前端开发服务器 (端口 3000)..."
-(cd frontend && npx vite --host &)
+# ---- 5. Start frontend + health check ----
+echo "[5/5] Start frontend  http://localhost:3000"
+(cd frontend && exec npx vite --host) &
 FRONTEND_PID=$!
-echo "[OK] 前端已启动 (PID: $FRONTEND_PID)"
-
+FRONTEND_OK=""
+for i in $(seq 1 30); do
+    if curl -s -o /dev/null http://localhost:3000 2>/dev/null; then
+        FRONTEND_OK=1
+        break
+    fi
+    sleep 1
+done
+if [ -n "$FRONTEND_OK" ]; then
+    echo "  [OK] Frontend ready (PID $FRONTEND_PID)"
+else
+    echo "  [FAIL] Frontend startup timeout"
+    kill $BACKEND_PID $FRONTEND_PID 2>/dev/null
+    exit 1
+fi
 echo ""
-echo "═══════════════════════════════════════"
-echo "  启动完成！"
-echo ""
-echo "  后端: http://localhost:8000/api"
-echo "  前端: http://localhost:3000"
-echo "  行情WS: ws://localhost:8000/market"
-echo "═══════════════════════════════════════"
-echo ""
-echo "按 Ctrl+C 停止所有服务"
 
-# 捕捉退出信号
-trap "echo '正在停止服务...'; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit 0" SIGINT SIGTERM
+# ---- Done ----
+echo "================================================"
+echo "  All services ready!"
+echo ""
+echo "  Frontend:  http://localhost:3000"
+echo "  API:       http://localhost:8000/api"
+echo "  WebSocket: ws://localhost:8000/market"
+echo "================================================"
+echo ""
+echo "Press Ctrl+C to stop all services"
 
-# 等待子进程
+trap "echo 'Stopping services...'; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit 0" SIGINT SIGTERM
 wait
