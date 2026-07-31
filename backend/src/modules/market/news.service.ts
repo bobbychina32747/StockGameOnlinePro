@@ -50,13 +50,30 @@ let NewsService = class NewsService {
         ];
     }
     // 填充占位符
+    // Q9：{C} 按模板关键词分场景生成合理数值（降准/GDP/营收/派现/回购/订单/流动性等）
     fill(template) {
         const stock = this.marketData.getRandomStock();
         const company = stock?.name || '某公司';
         const code = stock?.code || '000000';
         const industry = stock?.industry || '某行业';
         const rnd = (n) => Math.floor(Math.random() * n);
-        const C = ((10 + rnd(40)) / 10).toFixed(1); // 1.0~4.9
+        const t = template.title;
+        const range = (min, max) => (min + Math.random() * (max - min)).toFixed(1);
+        let C = range(1, 5);
+        if (t.includes('降准'))
+            C = [0.25, 0.5][rnd(2)].toFixed(2); // 降准 0.25/0.5 个百分点
+        else if (t.includes('GDP'))
+            C = range(3, 8); // GDP 同比 3~8%
+        else if (t.includes('营收') || t.includes('业绩') || t.includes('净利') || t.includes('增长') || t.includes('评级') || t.includes('目标价'))
+            C = range(5, 40); // 营收/增速 5~40%
+        else if (t.includes('派现'))
+            C = range(1, 10); // 每10股派现 1~10 元
+        else if (t.includes('回购'))
+            C = range(1, 50); // 回购金额 1~50 亿
+        else if (t.includes('订单') || t.includes('合同') || t.includes('中标'))
+            C = range(0.5, 20); // 订单金额 0.5~20 亿
+        else if (t.includes('净流入') || t.includes('投放'))
+            C = range(200, 1000); // 流动性投放 200~1000 亿
         const N = String(2 + rnd(9)); // 2~10
         const sub = (s) => s
             .replace(/\{company\}/g, company)

@@ -15,10 +15,12 @@ export function useWebSocket() {
 
     socket.on('fill', (data: any) => {
       addNotification(`成交: ${data.symbol} ${data.side} ${data.filledQuantity}股 @ ${data.avgPrice}`, 'success');
+      useUIStore.getState().addNotice({ type: 'fill', title: '✅ 成交', desc: `${data.symbol} ${data.side === 'buy' ? '买入' : data.side === 'sell' ? '卖出' : data.side === 'short' ? '做空' : '平仓'} ${data.filledQuantity} 股 @ ${data.avgPrice}` });
     });
 
     socket.on('news', (data: any) => {
       addNotification(`📰 ${data.title}`, 'info');
+      useUIStore.getState().addNotice({ type: 'news', title: data.type === 'insider' ? '⚠️ 内幕消息' : data.type === 'night' ? '🌙 隔夜事件' : '📰 新闻', desc: data.title });
       if (data.title) {
         useUIStore.getState().addNews(
           data.type === 'insider' ? `⚠️ ${data.title}` :

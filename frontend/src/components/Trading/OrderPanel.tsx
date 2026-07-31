@@ -42,6 +42,8 @@ export function OrderPanel() {
   const [pendingOrders, setPendingOrders] = useState<OrderEntry[]>([]);
   const [tradeHistory, setTradeHistory] = useState<TradeEntry[]>([]);
   const [orderSubmitting, setOrderSubmitting] = useState(false);
+  const account = useAccountStore((s) => s.account);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
     try {
@@ -61,6 +63,21 @@ export function OrderPanel() {
     const timer = setInterval(loadOrders, 15000);
     return () => clearInterval(timer);
   }, [loadOrders]);
+
+  // ─── Q8 实时校验：资金预算 / 数量 / 价格 ───
+  const livePrice = prices[selectedSymbol] ?? 0;
+  const effPrice =
+    (orderType === 'limit' || orderType === 'stop-limit') && parseFloat(orderPrice)
+      ? parseFloat(orderPrice)
+      : livePrice;
+  const feeRate = 0.0008; // 综合费率估算（佣金+印花税）
+  const estimated = orderQty * effPrice;
+  const fee = estimated * feeRate;
+  const totalCost = estimated + fee;
+  const cash = Number(account?.cash ?? 0);
+  const overBudget = orderSide === 'buy' && totalCost > cash && estimated > 0;
+  const invalidQty = !orderQty || orderQty <= 0 || !Number.isInteger(Number(orderQty));
+  const canSubmit = !orderSubmitting && !invalidQty && !overBudget && effPrice > 0;
 
   // ─── 下单 ───
   const placeOrder = async () => {
@@ -164,13 +181,22 @@ export function OrderPanel() {
             <button className="btn btn-sm btn-ghost" onClick={() => setOrderQty(orderQty + 100)}>+</button>
             <button className="btn btn-sm btn-ghost" onClick={() => setOrderQty(Math.max(0, orderQty - 100))}>-</button>
           </div>
-          {prices[selectedSymbol] && orderQty > 0 && (
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              预估金额: {(prices[selectedSymbol] * orderQty).toFixed(2)}
+          {effPrice > 0 && orderQty > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+              <div>预估金额: {estimated.toFixed(2)}（手续费≈{fee.toFixed(2)}）</div>
+              <div>
+                可用现金: <b style={{ fontFamily: 'var(--font-mono)' }}>¥{cash.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</b>
+                {orderSide === 'buy' && (
+                  <span className={overBudget ? 'down' : 'up'} style={{ marginLeft: 6 }}>
+                    {overBudget ? '⚠️ 超出可用资金' : `余量 ¥${(cash - totalCost).toFixed(2)}`}
+                  </span>
+                )}
+              </div>
+              {invalidQty && <div className="down">数量需为正整数</div>}
             </div>
           )}
           <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={placeOrder} disabled={orderSubmitting}>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={placeOrder} disabled={!canSubmit}>
               {orderSubmitting ? '提交中...' : '确认下单'}
             </button>
             <button className="btn btn-danger btn-sm" onClick={quickClear}>清仓</button>
@@ -186,7 +212,11 @@ export function OrderPanel() {
           pendingOrders.map((o: any) => (
             <div key={o.id} className="pending-order">
               <span>{o.symbol} {o.side} {o.quantity}股 @ {o.price || '-'}</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => cancelOrder(o.id)}>撤单</button>
+              {confirmCancelId === o.id ? (
+                <button className="btn btn-danger btn-sm" onClick={() => { cancelOrder(o.id); setConfirmCancelId(null); }} onMouseLeave={() => setTimeout(() => setConfirmCancelId(null), 1500)}>确认撤单？</button>
+              ) : (
+                <button className="btn btn-ghost btn-sm" onClick={() => setConfirmCancelId(o.id)}>撤单</button>
+              )}
             </div>
           ))
         )}

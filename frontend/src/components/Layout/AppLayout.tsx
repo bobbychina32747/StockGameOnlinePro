@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore, useMarketStore, useUIStore } from '../../store';
 import { NotificationContainer } from '../UI/Notification';
 import { MarketIndexBar } from '../Trading/MarketIndexBar';
+import { NoticeCenter } from './NoticeCenter';
 export function AppLayout() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -53,6 +54,7 @@ export function AppLayout() {
           )}
         </div>
 
+        <NoticeCenter />
         <button className="theme-toggle-btn" title="切换主题" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
           {theme === 'dark' ? '☀️' : '🌙'}
         </button>

@@ -34,6 +34,9 @@ let AccountController = class AccountController {
     getHistory(user, mode = 'US') {
         return this.accountService.getHistory(user.id, mode);
     }
+    getTransactions(user, mode = 'US', limit) {
+        return this.accountService.getTransactions(user.id, mode, limit);
+    }
     async setLeverage(user, mode, leverage) {
         return this.accountService.setLeverage(user.id, mode || 'US', leverage);
     }
@@ -65,6 +68,15 @@ __decorate([
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
 ], AccountController.prototype, "getHistory", null);
+__decorate([
+    (0, common_1.Get)('transactions'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Query)('mode')),
+    __param(2, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, String]),
+    __metadata("design:returntype", void 0)
+], AccountController.prototype, "getTransactions", null);
 __decorate([
     (0, common_1.Post)('leverage'),
     __param(0, (0, jwt_auth_guard_1.CurrentUser)()),

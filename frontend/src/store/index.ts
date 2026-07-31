@@ -138,6 +138,9 @@ interface UIState {
   addNews: (news: string) => void;
   favoriteSymbols: string[];
   toggleFavorite: (s: string) => void;
+  notices: any[];
+  addNotice: (item: any) => void;
+  markNoticesRead: () => void;
   theme: 'dark' | 'light';
   setTheme: (t: 'dark' | 'light') => void;
 }
@@ -175,6 +178,20 @@ export const useUIStore = create<UIState>((set) => ({
     }),
   theme: (localStorage.getItem('ss.theme') as any) || 'dark',
   setTheme: (t) => { localStorage.setItem('ss.theme', t); set({ theme: t }); },
+  // Q6 通知中心（localStorage 持久化，cap 50）
+  notices: JSON.parse(localStorage.getItem('ss.notices') || '[]'),
+  addNotice: (item) =>
+    set((s) => {
+      const notices = [{ id: Date.now() + Math.random(), read: false, time: Date.now(), ...item }, ...s.notices].slice(0, 50);
+      localStorage.setItem('ss.notices', JSON.stringify(notices));
+      return { notices };
+    }),
+  markNoticesRead: () =>
+    set((s) => {
+      const notices = s.notices.map((n) => ({ ...n, read: true }));
+      localStorage.setItem('ss.notices', JSON.stringify(notices));
+      return { notices };
+    }),
   addNews: (news) =>
     set((s) => ({
       latestNews: news,

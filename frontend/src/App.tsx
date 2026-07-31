@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import Ranking from './pages/Ranking/Ranking';
 import Profile from './pages/Profile/Profile';
 import Backtest from './pages/Backtest/Backtest';
+import Transactions from './pages/Transactions/Transactions';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token);
@@ -30,6 +31,7 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="ranking" element={<Ranking />} />
         <Route path="backtest" element={<Backtest />} />
+        <Route path="transactions" element={<Transactions />} />
         <Route path="profile" element={<Profile />} />
       </Route>
     </Routes>

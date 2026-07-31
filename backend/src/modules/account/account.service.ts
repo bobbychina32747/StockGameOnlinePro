@@ -19,6 +19,7 @@ import typeorm_2 = require("typeorm");
 import account_entity_1 = require("../../infrastructure/database/entities/account.entity");
 
 import position_entity_1 = require("../../infrastructure/database/entities/position.entity");
+import transaction_entity_1 = require("../../infrastructure/database/entities/transaction.entity");
 
 import risk_manager_service_1 = require("../../core/risk-manager/risk-manager.service");
 
@@ -26,9 +27,10 @@ import constants_1 = require("../../common/constants");
 
 let AccountService = class AccountService {
     [key: string]: any;
-    constructor(accountRepo, positionRepo, riskManager) {
+    constructor(accountRepo, positionRepo, transactionRepo, riskManager) {
         this.accountRepo = accountRepo;
         this.positionRepo = positionRepo;
+        this.transactionRepo = transactionRepo;
         this.riskManager = riskManager;
     }
     async getAccount(userId, mode = 'US') {
@@ -54,6 +56,19 @@ let AccountService = class AccountService {
     }
     async getPositions(accountId) {
         return this.positionRepo.find({ where: { accountId } });
+    }
+    // Q7：交易流水（资金明细/交割单）
+    getTransactions(userId, mode, limit = 100) {
+        return this.accountRepo.find({ where: { userId, marketMode: mode } }).then((list) => {
+            const acct = list && list[0];
+            if (!acct)
+                return [];
+            return this.transactionRepo.find({
+                where: { accountId: acct.id },
+                order: { createdAt: 'DESC' },
+                take: Math.min(Number(limit) || 100, 300),
+            });
+        });
     }
     // Q4：账户历史净值曲线
     getHistory(userId, mode) {
@@ -119,7 +134,9 @@ AccountService = __decorate(
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(account_entity_1.Account)),
     __param(1, (0, typeorm_1.InjectRepository)(position_entity_1.Position)),
+    __param(2, (0, typeorm_1.InjectRepository)(transaction_entity_1.Transaction)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
         typeorm_2.Repository,
         risk_manager_service_1.RiskManagerService])
 ],

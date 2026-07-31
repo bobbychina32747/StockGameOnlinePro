@@ -1187,3 +1187,42 @@ body.theme-light {
   .modal-stats { grid-template-columns: 1fr; }
   .index-day { display: none; }
 }
+
+/* ═══ Q6 通知中心 ═══ */
+.notice-center { position: relative; }
+.notice-bell {
+  position: relative; background: transparent; border: none; font-size: 16px;
+  cursor: pointer; padding: 4px 6px; border-radius: var(--radius-sm); transition: background var(--transition-fast);
+}
+.notice-bell:hover { background: var(--bg-hover); }
+.notice-badge {
+  position: absolute; top: -2px; right: -4px; background: var(--color-up);
+  color: #fff; font-size: 9px; min-width: 15px; height: 15px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; font-style: normal; padding: 0 3px;
+}
+.notice-panel {
+  position: absolute; right: 0; top: 34px; width: 320px; max-height: 400px;
+  background: var(--bg-elevated); border: 1px solid var(--border-default);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 100; display: flex; flex-direction: column;
+}
+.notice-panel-header {
+  display: flex; justify-content: space-between; padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle); font-size: 13px; color: var(--text-primary);
+}
+.notice-panel-header span { font-size: 11px; color: var(--text-muted); }
+.notice-list { overflow-y: auto; }
+.notice-item {
+  display: flex; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--border-subtle);
+  align-items: flex-start; transition: background var(--transition-fast);
+}
+.notice-item:hover { background: var(--bg-hover); }
+.notice-item.unread { background: var(--color-brand-subtle); }
+.notice-icon { font-size: 15px; flex-shrink: 0; }
+.notice-body { flex: 1; min-width: 0; }
+.notice-body b { display: block; font-size: 12px; color: var(--text-primary); }
+.notice-body i { font-style: normal; font-size: 11px; color: var(--text-secondary); line-height: 1.5; display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notice-time { font-size: 10px; color: var(--text-disabled); flex-shrink: 0; }
+
+/* ═══ Q7 流水页 ═══ */
+.transactions-page h2 { margin-bottom: 12px; }
+.transactions-page .table td { font-size: 12px; }
