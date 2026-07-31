@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { marketApi } from '../../services/api.client';
 import { useMarketStore, useUIStore } from '../../store';
 import { PriceText } from './PriceText';
 
@@ -12,6 +14,17 @@ export function StockDetailModal() {
 
   const s = stocks.find((x: any) => x.symbol === detailSymbol);
   if (!s) return null;
+
+  // 真实财报（后端按财报季生成）
+  const [reports, setReports] = useState<any[]>([]);
+  useEffect(() => {
+    if (!detailSymbol) return;
+    let alive = true;
+    marketApi.reports(detailSymbol).then((list) => {
+      if (alive && Array.isArray(list)) setReports(list);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [detailSymbol]);
 
   const price = prices[s.symbol] ?? s.price;
   const changePct = s.changePct ?? 0;
@@ -104,14 +117,40 @@ export function StockDetailModal() {
         </div>
 
         <div className="modal-section">
-          <h4>业绩速览（模拟）</h4>
-          <div className="modal-stats" style={{ borderTop: 'none', paddingTop: 0 }}>
-            <div className="modal-stat"><span className="label">营业收入</span><span className="value">{revenue} 亿</span></div>
-            <div className="modal-stat"><span className="label">营收同比</span><span className={`value ${yoy >= 0 ? 'up' : 'down'}`}>{yoy >= 0 ? '+' : ''}{yoy.toFixed(1)}%</span></div>
-            <div className="modal-stat"><span className="label">净利润</span><span className="value">{netProfit} 亿</span></div>
-            <div className="modal-stat"><span className="label">ROE</span><span className="value">{roe}%</span></div>
-            <div className="modal-stat"><span className="label">市盈率(动)</span><span className="value">{pe} 倍</span></div>
-          </div>
+          <h4>业绩速览{reports.length > 0 ? `（${reports[0].quarter} · 真实财报）` : '（模拟）'}</h4>
+          {reports.length > 0 ? (
+            <>
+              <div className="modal-stats" style={{ borderTop: 'none', paddingTop: 0 }}>
+                <div className="modal-stat"><span className="label">营业收入</span><span className="value">{reports[0].revenue} 亿</span></div>
+                <div className="modal-stat"><span className="label">营收同比</span><span className={`value ${reports[0].revenueYoy >= 0 ? 'up' : 'down'}`}>{reports[0].revenueYoy >= 0 ? '+' : ''}{reports[0].revenueYoy}%</span></div>
+                <div className="modal-stat"><span className="label">净利润</span><span className="value">{reports[0].netProfit} 亿</span></div>
+                <div className="modal-stat"><span className="label">净利率</span><span className="value">{reports[0].netMargin}%</span></div>
+              </div>
+              <div style={{ fontSize: 11, marginTop: 6 }}>
+                <span className={reports[0].surprise === 1 ? 'up' : reports[0].surprise === -1 ? 'down' : ''}>
+                  {reports[0].surprise === 1 ? '✅ 业绩超预期（财报公布后股价上涨）' : reports[0].surprise === -1 ? '⚠️ 业绩不及预期（财报公布后股价承压）' : '➖ 业绩符合预期'}
+                </span>
+              </div>
+              {reports.length > 1 && (
+                <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                  财报历史：
+                  {reports.slice(0, 4).map((r, i) => (
+                    <span key={i} style={{ marginRight: 10, fontFamily: 'var(--font-mono)' }}>
+                      {r.quarter} {r.revenueYoy >= 0 ? '+' : ''}{r.revenueYoy}%
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="modal-stats" style={{ borderTop: 'none', paddingTop: 0 }}>
+              <div className="modal-stat"><span className="label">营业收入</span><span className="value">{revenue} 亿</span></div>
+              <div className="modal-stat"><span className="label">营收同比</span><span className={`value ${yoy >= 0 ? 'up' : 'down'}`}>{yoy >= 0 ? '+' : ''}{yoy.toFixed(1)}%</span></div>
+              <div className="modal-stat"><span className="label">净利润</span><span className="value">{netProfit} 亿</span></div>
+              <div className="modal-stat"><span className="label">ROE</span><span className="value">{roe}%</span></div>
+              <div className="modal-stat"><span className="label">市盈率(动)</span><span className="value">{pe} 倍</span></div>
+            </div>
+          )}
         </div>
 
         <div className="modal-section">

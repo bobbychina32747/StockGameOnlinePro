@@ -60,6 +60,12 @@ let MarketService = class MarketService {
                         this.engine.setDayOpen(prices);
                         await this.engine.resetBoughtToday();
                         const state = this.marketData.getState();
+                        // 财报季（每 20 个交易日）
+                        if (this.marketData.gameDay > 0 && this.marketData.gameDay % 20 === 0) {
+                            const n = this.marketData.generateReports();
+                            if (n > 0)
+                                this.logger.log(`📊 财报季: ${n} 家公司披露季度财报`);
+                        }
                         const news = this.newsService.generateDailyNews(state.marketRegime, this.marketData.gameDay);
                         if (news) {
                             this.logger.log(`📰 ${news.title}`);
@@ -114,6 +120,63 @@ let MarketService = class MarketService {
     }
     getIndices() {
         return this.marketData.getIndices();
+    }
+    getReports(symbol) {
+        return this.marketData.getReports(symbol);
+    }
+    // ─── B2 回测：MA 交叉策略（返回结果 + 收益曲线抽样 40 点） ───
+    backtest(symbol, fast = 5, slow = 20, timeframe = '1min') {
+        const klines = this.marketData.getKlines(symbol, timeframe);
+        const closes = klines.map((k) => Number(k.close));
+        const fastN = Number(fast) || 5;
+        const slowN = Number(slow) || 20;
+        if (closes.length < slowN + 5) {
+            return { error: '历史数据不足，请稍后再试' };
+        }
+        const sma = (closes, period) => {
+            const out = new Array(closes.length).fill(null);
+            let sum = 0;
+            for (let i = 0; i < closes.length; i++) {
+                sum += closes[i];
+                if (i >= period) sum -= closes[i - period];
+                if (i >= period - 1) out[i] = sum / period;
+            }
+            return out;
+        };
+        const maF = sma(closes, fastN);
+        const maS = sma(closes, slowN);
+        let cash = 100000, shares = 0, buyPrice = 0, trades = 0, wins = 0;
+        const equityCurve = [];
+        for (let i = slowN; i < closes.length; i++) {
+            const pf = maF[i - 1], ps = maS[i - 1], f = maF[i], sl = maS[i];
+            if (pf == null || ps == null) continue;
+            if (pf <= ps && f > sl && shares === 0) {
+                shares = Math.floor(cash / closes[i] / 100) * 100;
+                if (shares > 0) { cash -= shares * closes[i]; buyPrice = closes[i]; }
+            }
+            else if (pf >= ps && f < sl && shares > 0) {
+                if (closes[i] > buyPrice) wins++;
+                trades++;
+                cash += shares * closes[i];
+                shares = 0;
+            }
+            if (i % Math.max(1, Math.floor(closes.length / 40)) === 0) {
+                equityCurve.push(Number((cash + shares * closes[i]).toFixed(0)));
+            }
+        }
+        if (shares > 0) { cash += shares * closes[closes.length - 1]; trades++; }
+        const finalEquity = cash;
+        const totalReturn = (finalEquity - 100000) / 100000 * 100;
+        return {
+            symbol,
+            timeframe,
+            bars: closes.length,
+            finalEquity: Number(finalEquity.toFixed(2)),
+            totalReturn: Number(totalReturn.toFixed(2)),
+            trades,
+            winRate: trades ? Number((wins / trades * 100).toFixed(0)) : 0,
+            equityCurve,
+        };
     }
 };
 

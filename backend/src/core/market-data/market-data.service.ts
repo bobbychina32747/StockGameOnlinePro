@@ -34,6 +34,8 @@ let MarketDataService = class MarketDataService {
         this.stocks = new Map<string, any>();
         this.marketRegime = 'sideways';
         this.tickCount = 0;
+        // 财报事件（真实化：按财报季生成并影响股价）
+        this.reports = new Map<string, any[]>();
         this.gameDay = 0;
         this.factors = {} as Record<string, number>;
         this.isRunning = false;
@@ -612,6 +614,43 @@ let MarketDataService = class MarketDataService {
             this.factors[factor] += impact;
             this.factors[factor] = this.clamp(this.factors[factor], -0.2, 0.2);
         }
+    }
+    // ─── 财报真实化：每 20 个交易日一个财报季，随机 30% 股票披露 ───
+    generateReports() {
+        const arr = [...this.stocks.values()];
+        const due = arr.filter(() => Math.random() < 0.3);
+        for (const st of due) {
+            // 动量决定预期差：近期涨多的公司易超预期，跌多的易不及预期
+            const momentum = (st.lastReturn ?? 0) * 60 + (Math.random() - 0.5) * 0.1;
+            const surprise = momentum > 0.015 ? 1 : momentum < -0.015 ? -1 : 0;
+            const revBase = 5 + Math.random() * 15;
+            const revenue = revBase * 1e8;
+            const revGrowth = surprise === 1 ? 8 + Math.random() * 22 : surprise === -1 ? -15 + Math.random() * 20 : -3 + Math.random() * 12;
+            const netMargin = 0.04 + Math.random() * 0.12;
+            const report = {
+                day: this.gameDay,
+                symbol: st.symbol,
+                company: st.name,
+                code: st.code,
+                revenue: Number((revenue / 1e8).toFixed(1)),
+                revenueYoy: Number(revGrowth.toFixed(1)),
+                netProfit: Number((revenue * netMargin / 1e8).toFixed(2)),
+                netMargin: Number((netMargin * 100).toFixed(1)),
+                surprise,
+                quarter: 'Q' + (1 + Math.floor(Math.random() * 4)),
+            };
+            // 财报冲击股价：超预期 +2.5%，不及预期 -2.5%，符合 ±0.5%
+            const shock = surprise === 1 ? 0.025 : surprise === -1 ? -0.025 : (Math.random() > 0.5 ? 1 : -1) * 0.005;
+            st.price = Math.max(0.5, st.price * (1 + shock));
+            st.lastReturn = shock;
+            const list = this.reports.get(st.symbol) || [];
+            list.push(report);
+            this.reports.set(st.symbol, list);
+        }
+        return due.length;
+    }
+    getReports(symbol) {
+        return symbol ? (this.reports.get(symbol) || []) : [...this.reports.values()].flat();
     }
     // 随机取一只股票（新闻占位符填充用）
     getRandomStock() {

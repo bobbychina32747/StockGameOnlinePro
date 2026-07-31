@@ -43,6 +43,8 @@ let TradingEngineService = class TradingEngineService {
         for (const cfg of constants_1.STOCK_POOL) {
             this.orderBooks.set(cfg.symbol, { bids: [], asks: [] });
         }
+        // 用户限价挂单（真实盘口：进入 orderBooks 深度）
+        this.userOrders = new Map<string, any[]>();
     }
     updatePrices(prices) {
         for (const [sym, price] of Object.entries(prices)) {
@@ -67,6 +69,17 @@ let TradingEngineService = class TradingEngineService {
     refreshOrderBooks(prices) {
         for (const [sym, price] of Object.entries(prices)) {
             this.refreshOrderBook(sym, price);
+        }
+    }
+    addUserOrder(symbol, order) {
+        const arr = this.userOrders.get(symbol) || [];
+        arr.push(order);
+        this.userOrders.set(symbol, arr);
+    }
+    removeUserOrder(symbol, orderId) {
+        const arr = this.userOrders.get(symbol);
+        if (arr) {
+            this.userOrders.set(symbol, arr.filter((o) => o.orderId !== orderId));
         }
     }
     refreshOrderBook(symbol, midPrice) {
@@ -99,6 +112,30 @@ let TradingEngineService = class TradingEngineService {
         }
         book.asks = asks;
         book.bids = bids;
+        // 真实盘口：合并用户限价挂单（按价格插入，去重，最多 8 档）
+        const userOrders = this.userOrders.get(symbol) || [];
+        if (userOrders.length > 0) {
+            const merge = (levels, side) => {
+                const map = new Map();
+                for (const l of levels)
+                    map.set(l.price, l.size);
+                for (const o of userOrders) {
+                    const p = Number(o.price);
+                    if (p <= 0)
+                        continue;
+                    const isBid = o.side === 'buy' || o.side === 'cover';
+                    if ((side === 'bid') !== isBid)
+                        continue;
+                    map.set(p, (map.get(p) || 0) + o.quantity);
+                }
+                return [...map.entries()]
+                    .map(([price, size]) => ({ price: Number(price), size }))
+                    .sort((a, b) => (side === 'bid' ? b.price - a.price : a.price - b.price))
+                    .slice(0, 8);
+            };
+            book.bids = merge(book.bids, 'bid');
+            book.asks = merge(book.asks, 'ask');
+        }
     }
     getOrderBook(symbol) {
         const book = this.orderBooks.get(symbol);
@@ -168,6 +205,10 @@ let TradingEngineService = class TradingEngineService {
             status: order_entity_1.OrderStatus.PENDING,
         });
         const saved = await this.orderRepo.save(order);
+        // 真实盘口：用户限价挂单进入深度
+        if (orderData.price) {
+            this.addUserOrder(orderData.symbol, { price: Number(orderData.price), side: orderData.side, quantity: orderData.quantity, orderId: saved.id });
+        }
         return { success: true, order: saved };
     }
     async validateOrder(order, account) {
@@ -367,6 +408,7 @@ let TradingEngineService = class TradingEngineService {
                     order.status = order_entity_1.OrderStatus.CANCELLED;
                     order.rejectReason = recheck.error;
                     await this.orderRepo.save(order);
+                    this.removeUserOrder(order.symbol, order.id);
                     this.logger.warn(`挂单 ${order.id} 触发但校验失败已取消: ${recheck.error}`);
                     continue;
                 }
@@ -376,6 +418,7 @@ let TradingEngineService = class TradingEngineService {
                     order.filledQty = fill.filledQuantity;
                     order.avgFillPrice = fill.avgPrice;
                     await this.orderRepo.save(order);
+                    this.removeUserOrder(order.symbol, order.id);
                     fills.push({ ...fill, side: order.side, fees: settle.fees });
                     this.logger.log(`挂单成交: ${order.symbol} ${order.side} ${fill.filledQuantity}股 @ ${fill.avgPrice}`);
                 } else {
@@ -397,6 +440,7 @@ let TradingEngineService = class TradingEngineService {
             return false;
         order.status = order_entity_1.OrderStatus.CANCELLED;
         await this.orderRepo.save(order);
+        this.removeUserOrder(order.symbol, order.id);
         return true;
     }
     async getPendingOrders(accountId) {

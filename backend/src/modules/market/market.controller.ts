@@ -28,6 +28,12 @@ let MarketController = class MarketController {
     getIndices() {
         return this.marketService.getIndices();
     }
+    getReports(symbol) {
+        return this.marketService.getReports(symbol);
+    }
+    backtest(symbol, fast, slow, timeframe) {
+        return this.marketService.backtest(symbol, fast, slow, timeframe);
+    }
     getKlines(symbol, timeframe) {
         return this.marketService.getKlines(symbol || 'A', timeframe || '1min');
     }
@@ -53,6 +59,23 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], MarketController.prototype, "getIndices", null);
+__decorate([
+    (0, common_1.Get)('reports'),
+    __param(0, (0, common_1.Query)('symbol')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], MarketController.prototype, "getReports", null);
+__decorate([
+    (0, common_1.Get)('backtest'),
+    __param(0, (0, common_1.Query)('symbol')),
+    __param(1, (0, common_1.Query)('fast')),
+    __param(2, (0, common_1.Query)('slow')),
+    __param(3, (0, common_1.Query)('timeframe')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, String]),
+    __metadata("design:returntype", void 0)
+], MarketController.prototype, "backtest", null);
 __decorate([
     (0, common_1.Get)('klines'),
     __param(0, (0, common_1.Query)('symbol')),
