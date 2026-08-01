@@ -12,8 +12,8 @@ interface KlineData {
   volume: number;
 }
 
-const TIMEFRAMES = [
-  { key: 'intraday', label: '分时' },
+// QoL：分时独立 + 「K线」展开子项（一分线/五分线/...）
+const KLINE_TIMEFRAMES = [
   { key: '1min', label: '1分' },
   { key: '5min', label: '5分' },
   { key: '60min', label: '60分' },
@@ -22,7 +22,29 @@ const TIMEFRAMES = [
   { key: 'monthly', label: '月线' },
 ];
 
-// 中间图表区（标题栏 + 周期切换 + 分时/K线/指标 + 十字光标 + 历史回看）
+// ─── LoD 降采样：超过 MAX_POINTS 时按比例聚合（桶聚合），大幅减少绘制点 ───
+const MAX_POINTS = 400;
+
+// K线桶聚合：open=桶首、close=桶尾、high=max、low=min、volume=sum
+function bucketizeBars(bars: KlineData[]): KlineData[] {
+  if (bars.length <= MAX_POINTS) return bars;
+  const factor = Math.ceil(bars.length / MAX_POINTS);
+  const out: KlineData[] = [];
+  for (let i = 0; i < bars.length; i += factor) {
+    const chunk = bars.slice(i, i + factor);
+    let high = chunk[0].high, low = chunk[0].low, vol = 0;
+    for (const b of chunk) {
+      if (b.high > high) high = b.high;
+      if (b.low < low) low = b.low;
+      vol += b.volume;
+    }
+    out.push({ time: chunk[0].time, open: chunk[0].open, close: chunk[chunk.length - 1].close, high, low, volume: vol });
+  }
+  return out;
+}
+
+
+// 中间图表区（标题栏 + 分层周期切换 + 分时/K线 + LoD 降采样 + 增量更新）
 export function ChartPanel() {
   const klines = useMarketStore((s) => s.klines);
   const prices = useMarketStore((s) => s.prices);
@@ -37,6 +59,7 @@ export function ChartPanel() {
   const intradaySrc = (klines[selectedSymbol]?.['1min'] || []) as KlineData[];
   const stock = stocks.find((s: any) => s.symbol === selectedSymbol);
   const price = prices[selectedSymbol];
+  const isIntraday = selectedTimeframe === 'intraday';
 
   // ─── 图表修复：切页重挂载后强制 resize + 监听容器尺寸变化 ───
   const chartRef = useRef<any>(null);
@@ -53,23 +76,24 @@ export function ChartPanel() {
 
   const chartOption = useMemo(() => {
     // ─── 分时图（S1）：1min close 连线 + 均价 + 成交量 + 昨收基准 ───
-    if (selectedTimeframe === 'intraday') {
-      if (intradaySrc.length === 0) return {};
-      const times = intradaySrc.map((k) => {
+    if (isIntraday) {
+      const bars = bucketizeBars(intradaySrc);
+      if (bars.length === 0) return {};
+      const times = bars.map((k) => {
         const d = new Date(k.time);
         return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
       });
-      const closes = intradaySrc.map((k) => k.close);
-      const vols = intradaySrc.map((k) => k.volume);
+      const closes = bars.map((k) => k.close);
+      const vols = bars.map((k) => k.volume);
       const prevClose = intradaySrc[0]?.open || closes[0] || 0;
       let cumVol = 0, cumAmt = 0;
       const avgLine = closes.map((c, i) => { cumVol += vols[i]; cumAmt += c * vols[i]; return cumVol ? cumAmt / cumVol : c; });
       const lastColor = closes[closes.length - 1] >= prevClose ? '#e03131' : '#00c853';
       return {
-        animationDuration: 300, animationDurationUpdate: 300, backgroundColor: 'transparent',
+        animationDuration: 150, animationDurationUpdate: 150, backgroundColor: 'transparent',
         grid: [
-          { left: '8%', right: '8%', top: 30, bottom: 90 },
-          { left: '8%', right: '8%', top: '74%', bottom: 20 },
+          { left: '8%', right: '8%', top: 30, bottom: 60 },
+          { left: '8%', right: '8%', top: '74%', bottom: 16 },
         ],
         xAxis: [
           { type: 'category', data: times, axisLine: { lineStyle: { color: '#2e3240' } }, axisLabel: { color: '#6a6d78', fontSize: 10 } },
@@ -99,9 +123,9 @@ export function ChartPanel() {
       };
     }
 
-    // ─── K线分支（含指标 + 历史回看 dataZoom） ───
-    const closes = klineData.map((k) => k.close);
-    // 注意：返回数字（字符串会导致 tooltip formatter 对字符串调 toFixed 崩溃）
+    // ─── K线分支：LoD 降采样后统一绘制（坐标轴/网格随增量更新不再整体重绘） ───
+    const bars = bucketizeBars(klineData);
+    const closes = bars.map((k) => k.close);
     const calcMA = (period: number): (number | null)[] => {
       const r: (number | null)[] = new Array(closes.length).fill(null);
       for (let i = period - 1; i < closes.length; i++) {
@@ -141,22 +165,22 @@ export function ChartPanel() {
     const ma5 = calcMA(5), ma10 = calcMA(10), ma20 = calcMA(20);
     const rsi = calcRSI(14);
     const bb = calcBB(20);
-    const klineTimes = klineData.map((k) => {
+    const klineTimes = bars.map((k) => {
       const d = new Date(k.time);
       return selectedTimeframe === 'daily' || selectedTimeframe === 'weekly' || selectedTimeframe === 'monthly'
         ? `${d.getMonth()+1}/${d.getDate()}`
         : `${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
     });
-    const candleData = klineData.map((k) => [k.open, k.close, k.low, k.high]);
+    const candleData = bars.map((k) => [k.open, k.close, k.low, k.high]);
 
     return {
-      animationDuration: 300,
-      animationDurationUpdate: 300,
+      animationDuration: 150,
+      animationDurationUpdate: 150,
       animationEasingUpdate: 'linear',
       backgroundColor: 'transparent',
       grid: [
-        { left: '8%', right: '8%', top: 30, bottom: 90 },
-        { left: '8%', right: '8%', top: '74%', bottom: 20 },
+        { left: '8%', right: '8%', top: 30, bottom: 60 },
+        { left: '8%', right: '8%', top: '74%', bottom: 16 },
       ],
       xAxis: [
         { type: 'category', data: klineTimes, axisLine: { lineStyle: { color: '#2e3240' } }, axisLabel: { color: '#6a6d78', fontSize: 10 } },
@@ -209,13 +233,9 @@ export function ChartPanel() {
         },
       },
       legend: { data: ['MA5', 'MA10', 'MA20', 'BOLL中', 'RSI(14)'], top: 2, textStyle: { color: '#9fa3b0', fontSize: 10 } },
-      // 历史回看（B1）：滑动/缩放查看历史 K 线
-      dataZoom: [
-        { type: 'inside', start: 50, end: 100 },
-        { type: 'slider', height: 14, bottom: 4, start: 50, end: 100, borderColor: '#2e3240', backgroundColor: '#171922', fillerColor: 'rgba(47,111,237,0.15)', handleStyle: { color: '#2f6fed' }, textStyle: { color: '#6a6d78', fontSize: 9 } },
-      ],
     };
-  }, [klineData, selectedTimeframe, intradaySrc]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [klineData, selectedTimeframe, intradaySrc, isIntraday]);
 
   const prevClose = stock?.dayOpen != null ? Number(stock.dayOpen) : (stock?.price ?? price ?? 0);
   const changePct = prevClose > 0 && price != null ? ((price - prevClose) / prevClose) * 100 : 0;
@@ -253,20 +273,37 @@ export function ChartPanel() {
             </span>
           )}
         </div>
+        {/* QoL：分时独立 + K线展开子项 */}
         <div className="chart-tabs">
-          {TIMEFRAMES.map((tf) => (
-            <button
-              key={tf.key}
-              className={selectedTimeframe === tf.key ? 'active' : ''}
-              onClick={() => setSelectedTimeframe(tf.key)}
-            >
-              {tf.label}
-            </button>
-          ))}
+          <button
+            className={isIntraday ? 'active' : ''}
+            onClick={() => setSelectedTimeframe('intraday')}
+          >
+            分时
+          </button>
+          <button
+            className={!isIntraday ? 'active' : ''}
+            onClick={() => { if (isIntraday) setSelectedTimeframe('1min'); }}
+          >
+            K线
+          </button>
         </div>
+        {!isIntraday && (
+          <div className="chart-tabs chart-tabs-sub">
+            {KLINE_TIMEFRAMES.map((tf) => (
+              <button
+                key={tf.key}
+                className={selectedTimeframe === tf.key ? 'active' : ''}
+                onClick={() => setSelectedTimeframe(tf.key)}
+              >
+                {tf.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="chart-indicators">
-        {selectedTimeframe === 'intraday' ? (
+        {isIntraday ? (
           <>
             <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>昨收 <b className="up" style={{ marginLeft: 4, fontFamily: 'var(--font-mono)' }}>{intradaySrc[0] ? Number(intradaySrc[0].open).toFixed(2) : '-'}</b></span>
             <span className="chart-listdate">黄色虚线为当日均价线</span>
@@ -284,7 +321,7 @@ export function ChartPanel() {
                 </span>
               );
             })}
-            <span className="chart-listdate">拖拽底部滑条回看历史</span>
+            <span className="chart-listdate">超过 400 点自动聚合（LoD），坐标轴增量更新</span>
           </>
         )}
         {stock?.code && <span className="chart-listdate">上市 {stock.listDate || '-'}</span>}
@@ -294,7 +331,6 @@ export function ChartPanel() {
           ref={chartRef}
           key={`${selectedSymbol}-${selectedTimeframe}`}
           option={chartOption}
-          opts={{ notMerge: true } as any}
           style={{ height: '100%', width: '100%' }}
         />
       </div>

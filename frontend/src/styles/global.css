@@ -1251,3 +1251,8 @@ body.density-compact .info-row { padding: 2px 0; }
 .index-hot { color: var(--text-muted); font-size: 12px; }
 .index-hot b { margin-right: 10px; color: var(--text-secondary); font-weight: 600; }
 .index-hot em { font-style: normal; font-family: var(--font-mono); }
+
+/* ═══ 性能优化：周期分层子项行 ═══ */
+.chart-tabs-sub { margin-left: 8px; }
+.chart-tabs-sub button { font-size: 11px; padding: 3px 8px; color: var(--text-muted); }
+.chart-tabs-sub button.active { color: var(--color-brand-light); background: var(--color-brand-subtle); border-radius: var(--radius-sm); }
