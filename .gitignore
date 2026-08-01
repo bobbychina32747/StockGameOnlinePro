@@ -10,3 +10,9 @@ data/
 # 备份目录
 *.bak/
 backend/data.bak/
+
+# TypeScript 增量构建缓存
+*.tsbuildinfo
+
+# 百度云盘上传残留
+*.baiduyun.uploading.cfg
