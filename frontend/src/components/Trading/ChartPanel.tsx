@@ -192,8 +192,8 @@ export function ChartPanel() {
       animation: false,
       backgroundColor: 'transparent',
       grid: [
-        { left: '8%', right: '8%', top: 30, bottom: 60 },
-        { left: '8%', right: '8%', top: '74%', bottom: 16 },
+        { left: '8%', right: '8%', top: 30, bottom: 90 },
+        { left: '8%', right: '8%', top: '74%', bottom: 20 },
       ],
       xAxis: [
         { type: 'category', data: klineTimes, axisLine: { lineStyle: { color: '#2e3240' } }, axisLabel: { color: '#6a6d78', fontSize: 10 } },
@@ -246,6 +246,11 @@ export function ChartPanel() {
         },
       },
       legend: { data: ['MA5', 'MA10', 'MA20', 'BOLL中', 'RSI(14)'], top: 2, textStyle: { color: '#9fa3b0', fontSize: 10 } },
+      // 图表缩放（滚轮 + 底部滑条）：只切可视窗口，不影响 LoD 合并结果
+      dataZoom: [
+        { type: 'inside', start: 40, end: 100 },
+        { type: 'slider', height: 14, bottom: 4, start: 40, end: 100, borderColor: '#2e3240', backgroundColor: '#171922', fillerColor: 'rgba(47,111,237,0.15)', handleStyle: { color: '#2f6fed' }, textStyle: { color: '#6a6d78', fontSize: 9 } },
+      ],
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [klineData, selectedTimeframe, intradaySrc, isIntraday]);
