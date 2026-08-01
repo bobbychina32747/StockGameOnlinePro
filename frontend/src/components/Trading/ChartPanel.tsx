@@ -81,6 +81,19 @@ export function ChartPanel() {
     return () => { clearTimeout(t1); clearTimeout(t2); ro.disconnect(); };
   }, [selectedSymbol, selectedTimeframe]);
 
+  // ─── 缩放：仅在挂载时设置一次（切股票/周期重建实例时重新设默认） ───
+  // 后续 tick 更新 option 不含 dataZoom → 用户滚轮/滑条缩放比例不会被重置
+  useEffect(() => {
+    const inst = chartRef.current?.getEchartsInstance();
+    if (!inst) return;
+    inst.setOption({
+      dataZoom: [
+        { type: 'inside', start: 40, end: 100 },
+        { type: 'slider', height: 14, bottom: 4, start: 40, end: 100, borderColor: '#2e3240', backgroundColor: '#171922', fillerColor: 'rgba(47,111,237,0.15)', handleStyle: { color: '#2f6fed' }, textStyle: { color: '#6a6d78', fontSize: 9 } },
+      ],
+    });
+  }, []);
+
   const chartOption = useMemo(() => {
   // ─── 分时图（S1）：当日 1min（均匀时间轴，不合并 → 无跨天断裂/分层） ───
     if (isIntraday) {
@@ -246,11 +259,6 @@ export function ChartPanel() {
         },
       },
       legend: { data: ['MA5', 'MA10', 'MA20', 'BOLL中', 'RSI(14)'], top: 2, textStyle: { color: '#9fa3b0', fontSize: 10 } },
-      // 图表缩放（滚轮 + 底部滑条）：只切可视窗口，不影响 LoD 合并结果
-      dataZoom: [
-        { type: 'inside', start: 40, end: 100 },
-        { type: 'slider', height: 14, bottom: 4, start: 40, end: 100, borderColor: '#2e3240', backgroundColor: '#171922', fillerColor: 'rgba(47,111,237,0.15)', handleStyle: { color: '#2f6fed' }, textStyle: { color: '#6a6d78', fontSize: 9 } },
-      ],
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [klineData, selectedTimeframe, intradaySrc, isIntraday]);
