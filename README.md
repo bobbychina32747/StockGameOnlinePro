@@ -124,4 +124,8 @@ docs/
 
 ## 📄 许可证
 
-MIT License（见 [LICENSE](LICENSE)）
+**PolyForm Noncommercial License 1.0.0**（见 [LICENSE](LICENSE)）
+
+- ✅ 允许：自由 fork、修改、自用部署
+- ⚠️ 禁止：商业用途（除非获得授权）
+- 📌 必须：保留版权与许可声明

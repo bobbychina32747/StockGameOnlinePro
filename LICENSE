@@ -1,21 +1,113 @@
-MIT License
+PolyForm Noncommercial License 1.0.0
 
-Copyright (c) 2026 Bobbychina (bobbychina32747)
+<https://polyformproject.org/licenses/noncommercial/1.0.0>
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+## Acceptance
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+In order to get any license under these terms, you must agree to them as both
+strict obligations and conditions to your license. You may not use this
+software for any purpose, and may not receive any license, unless you agree to
+comply with all obligations and conditions of these terms. You must not make
+these terms or any related obligations or conditions the subject of any claim
+or demand against any licensor or any third party, and you must not use this
+software in any way that would violate, or facilitate the violation of, any
+law or regulation to which you are subject or in which you are involved.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+## Noncommercial Purpose
+
+You may use this software for any noncommercial purpose. A noncommercial
+purpose is a purpose other than a commercial purpose. A commercial purpose is
+a purpose intended for or that results in commercial advantage or monetary
+compensation.
+
+## Conditions
+
+### Redistribution
+
+You may reproduce or distribute the software in any medium, provided that you
+meet the following conditions:
+
+- You must give any other recipients of the software a copy of this license,
+  and retain any attribution notices, license notices, and other material that
+  the licensor placed on the software.
+
+- You must not distribute, sublicense, or otherwise make the software
+  available to any third party that is not a recipient of the software, except
+  as part of your own software that uses the software.
+
+- You must not use the software for any commercial purpose.
+
+- You must not remove or alter any notices placed on the software by the
+  licensor.
+
+- You may not assert any trademark rights or other intellectual property
+  rights of the licensor, or use any names, logos, or other branding of the
+  licensor, except as needed to comply with the attribution requirements
+  above.
+
+### Changes
+
+You may make changes to the software and distribute your changes under the
+same license and conditions, provided that you:
+
+- Do not remove or alter any notices placed on the software by the licensor.
+
+- Keep your changes clearly marked, so that they can be distinguished from the
+  original software.
+
+- Do not use the software in any way that would violate, or facilitate the
+  violation of, any law or regulation to which you are subject or in which you
+  are involved.
+
+## Notices
+
+You must ensure that anyone who receives a copy of any part of the software
+from you also receives a copy of these terms or the URL for them above, as
+well as copies of any notices required by any license for the software that
+you distribute.
+
+## Patent License
+
+The licensor grants you a license under any patent claims owned or controlled
+by the licensor that are necessarily infringed by the software as distributed
+under these terms, to make, have made, use, offer to sell, sell, import, and
+otherwise transfer the software, solely for your noncommercial purpose. The
+licensor reserves all rights not expressly granted in these terms.
+
+## Disclaimer
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OR CONDITION OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTIBILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+LICENSORS DO NOT WARRANT THAT THE SOFTWARE WILL MEET YOUR REQUIREMENTS OR
+THAT ITS OPERATION WILL BE UNINTERRUPTED OR ERROR FREE, AND LICENSORS DO NOT
+ASSUME ANY LIABILITY ARISING OUT OF THE USE OF THE SOFTWARE.
+
+## Limitations of Liability
+
+IN NO EVENT SHALL THE LICENSOR BE LIABLE TO YOU OR ANY OTHER PERSON FOR ANY
+INDIRECT, SPECIAL, INCIDENTAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES OF ANY
+CHARACTER ARISING OUT OF OR IN RELATION TO THIS LICENSE OR YOUR USE OF THE
+SOFTWARE, INCLUDING WITHOUT LIMITATION, DAMAGES FOR LOSS OF GOODWILL, WORK
+STOPPAGE, COMPUTER FAILURE OR MALFUNCTION, OR ANY AND ALL OTHER COMMERCIAL
+DAMAGES OR LOSSES, EVEN IF THE LICENSOR SHALL HAVE BEEN INFORMED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+
+## Termination
+
+If you violate any term of these terms, then any license granted under these
+terms terminates automatically, without notice or any other action. Licensor
+may provide notice of termination or other action in any manner that is
+reasonable under the circumstances.
+
+## Miscellaneous
+
+These terms are governed by the laws of the jurisdiction in which the licensor
+is located, without regard to its conflict of laws rules. If any provision of
+these terms is held by a court of competent jurisdiction to be invalid,
+illegal, or unenforceable, the remaining provisions of these terms will remain
+in full force and effect.
+
+These terms are the entire agreement between the parties regarding the
+software, and supersede any prior or contemporaneous agreements or
+understandings, whether written or oral, regarding the software.
