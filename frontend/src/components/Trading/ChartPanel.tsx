@@ -90,7 +90,8 @@ export function ChartPanel() {
       const avgLine = closes.map((c, i) => { cumVol += vols[i]; cumAmt += c * vols[i]; return cumVol ? cumAmt / cumVol : c; });
       const lastColor = closes[closes.length - 1] >= prevClose ? '#e03131' : '#00c853';
       return {
-        animationDuration: 150, animationDurationUpdate: 150, backgroundColor: 'transparent',
+        // merge 更新无动画（无感刷新 + 性能最优）
+        animation: false, backgroundColor: 'transparent',
         grid: [
           { left: '8%', right: '8%', top: 30, bottom: 60 },
           { left: '8%', right: '8%', top: '74%', bottom: 16 },
@@ -174,9 +175,8 @@ export function ChartPanel() {
     const candleData = bars.map((k) => [k.open, k.close, k.low, k.high]);
 
     return {
-      animationDuration: 150,
-      animationDurationUpdate: 150,
-      animationEasingUpdate: 'linear',
+      // merge 更新无动画（无感刷新 + 性能最优）
+      animation: false,
       backgroundColor: 'transparent',
       grid: [
         { left: '8%', right: '8%', top: 30, bottom: 60 },
