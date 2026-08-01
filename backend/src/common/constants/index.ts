@@ -46,7 +46,17 @@ export const STOCK_POOL = [
     { symbol: 'V2', name: '次元文创', code: '600120', listDate: '2013-10-25', industry: '动漫IP', initialPrice: 9, mu: 9, sigma: 0.026, theta: 0.11, description: '动漫 IP 运营与衍生品制造，手握多个国民级动漫形象，谷子经济浪潮受益者。' },
     { symbol: 'V3', name: '速鹰物流', code: '002120', listDate: '2012-05-18', industry: '物流', initialPrice: 7, mu: 7, sigma: 0.019, theta: 0.14, description: '综合物流与供应链服务商，无人机配送试点城市超五十座，时效承诺行业领先。' },
 ];
-
+// 玩法：IPO 待上市池（每 30 个交易日上市 1-2 只，动态扩充市场）
+export const IPO_POOL = [
+    { symbol: 'X1', name: '天穹航天', code: '688123', listDate: '', industry: '航天科技', initialPrice: 55, mu: 55, sigma: 0.034, theta: 0.08, description: '商业航天运载与卫星制造，可回收火箭技术验证成功，星座组网提速。' },
+    { symbol: 'X2', name: '轻舟电池', code: '300888', listDate: '', industry: '锂电池', initialPrice: 66, mu: 66, sigma: 0.032, theta: 0.09, description: '半固态电池量产先行者，能量密度行业领先，储能订单饱满。' },
+    { symbol: 'X3', name: '云鲸数据', code: '688199', listDate: '', industry: '数据要素', initialPrice: 40, mu: 40, sigma: 0.030, theta: 0.10, description: '公共数据授权运营与数据资产入表服务商，数据要素市场化受益者。' },
+    { symbol: 'X4', name: '半夏医药', code: '300777', listDate: '', industry: '创新药', initialPrice: 32, mu: 32, sigma: 0.029, theta: 0.10, description: '聚焦肿瘤免疫双抗创新药，多款管线进入临床后期。' },
+    { symbol: 'X5', name: '拾光影像', code: '002999', listDate: '', industry: '影视传媒', initialPrice: 18, mu: 18, sigma: 0.028, theta: 0.11, description: '纪录片与院线发行双轮驱动，自制内容口碑票房双丰收。' },
+    { symbol: 'X6', name: '极客金融', code: '601666', listDate: '', industry: '金融科技', initialPrice: 28, mu: 28, sigma: 0.027, theta: 0.12, description: '智能风控与量化资管技术服务商，服务数十家持牌机构。' },
+    { symbol: 'X7', name: '星环教育', code: '300666', listDate: '', industry: '在线教育', initialPrice: 15, mu: 15, sigma: 0.026, theta: 0.12, description: 'AI 个性化学习平台，素质教育课程订阅快速增长。' },
+    { symbol: 'X8', name: '绿洲农业', code: '600777', listDate: '', industry: '农业', initialPrice: 10, mu: 10, sigma: 0.022, theta: 0.13, description: '智慧农业与数字农场运营商，无人化种植示范面积全国领先。' },
+];
 // 行业对各宏观因子的敏感度（决定板块联动与分化）
 export const INDUSTRY_SENSITIVITY: Record<string, Partial<Record<string, number>>> = {
     '半导体': { '行业景气': 1.6, '政策风险': 1.4, '国际环境': 1.3 },

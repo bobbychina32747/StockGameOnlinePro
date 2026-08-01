@@ -26,6 +26,7 @@ function gameSession(tickCount?: number): { label: string; open: boolean } {
 // 顶部大盘指数条 + 涨跌家数（S3）+ 交易时段（A2）+ 市场状态
 export function MarketIndexBar() {
   const [indices, setIndices] = useState<any[]>([]);
+  const [hotTopics, setHotTopics] = useState<any[]>([]);
   const stocks = useMarketStore((s) => s.stocks);
   const marketRegime = useMarketStore((s) => s.marketRegime);
   const gameDay = useMarketStore((s) => s.gameDay);
@@ -38,6 +39,9 @@ export function MarketIndexBar() {
     const load = () => {
       marketApi.indices().then((list) => {
         if (alive && Array.isArray(list)) setIndices(list);
+      }).catch(() => {});
+      marketApi.state().then((st) => {
+        if (alive && Array.isArray(st?.hotTopics)) setHotTopics(st.hotTopics);
       }).catch(() => {});
     };
     load();
@@ -71,6 +75,13 @@ export function MarketIndexBar() {
         <i className="sep">/</i>
         平 <b>{flatCount}</b>
       </span>
+      {hotTopics.length > 0 && (
+        <span className="index-hot">
+          🔥 热点：{hotTopics.map((h) => (
+            <b key={h.industry}>{h.industry} <em style={{ color: 'var(--color-up)' }}>+{(h.strength * 100).toFixed(1)}%</em></b>
+          ))}
+        </span>
+      )}
       <span className="index-regime">
         市场状态：{REGIME_LABEL[marketRegime] || marketRegime}
       </span>

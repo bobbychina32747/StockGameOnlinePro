@@ -68,6 +68,7 @@ export const marketApi = {
   prices: () => api.get('/market/prices').then((r) => r.data),
   stocks: () => api.get('/market/stocks').then((r) => r.data),
   indices: () => api.get('/market/indices').then((r) => r.data),
+  state: () => api.get('/market/state').then((r) => r.data),
   reports: (symbol?: string) => api.get(`/market/reports${symbol ? '?symbol=' + symbol : ''}`).then((r) => r.data),
   backtest: (params: any) => api.get('/market/backtest', { params }).then((r) => r.data),
   klines: (symbol: string, timeframe: string) =>

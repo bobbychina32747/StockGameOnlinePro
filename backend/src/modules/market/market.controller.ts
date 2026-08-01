@@ -28,6 +28,9 @@ let MarketController = class MarketController {
     getIndices() {
         return this.marketService.getIndices();
     }
+    getState() {
+        return this.marketService.getState();
+    }
     getReports(symbol) {
         return this.marketService.getReports(symbol);
     }
@@ -66,6 +69,12 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], MarketController.prototype, "getReports", null);
+__decorate([
+    (0, common_1.Get)('state'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], MarketController.prototype, "getState", null);
 __decorate([
     (0, common_1.Get)('backtest'),
     __param(0, (0, common_1.Query)('symbol')),

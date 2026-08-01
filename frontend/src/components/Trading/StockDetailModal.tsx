@@ -125,6 +125,9 @@ export function StockDetailModal() {
                 <div className="modal-stat"><span className="label">营收同比</span><span className={`value ${reports[0].revenueYoy >= 0 ? 'up' : 'down'}`}>{reports[0].revenueYoy >= 0 ? '+' : ''}{reports[0].revenueYoy}%</span></div>
                 <div className="modal-stat"><span className="label">净利润</span><span className="value">{reports[0].netProfit} 亿</span></div>
                 <div className="modal-stat"><span className="label">净利率</span><span className="value">{reports[0].netMargin}%</span></div>
+                {reports[0].dividend > 0 && (
+                  <div className="modal-stat"><span className="label">每股分红</span><span className="value up">{reports[0].dividend} 元（已除权）</span></div>
+                )}
               </div>
               <div style={{ fontSize: 11, marginTop: 6 }}>
                 <span className={reports[0].surprise === 1 ? 'up' : reports[0].surprise === -1 ? 'down' : ''}>

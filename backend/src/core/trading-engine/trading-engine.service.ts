@@ -443,6 +443,27 @@ let TradingEngineService = class TradingEngineService {
         this.removeUserOrder(order.symbol, order.id);
         return true;
     }
+    // 玩法：分红现金到账（日终结算，按持仓数量发放）
+    async payDividends(dividends) {
+        if (!dividends || dividends.length === 0)
+            return 0;
+        const allPositions = await this.positionRepo.find({ relations: ['account'] });
+        let paid = 0;
+        for (const pos of allPositions) {
+            const div = dividends.find((d) => d.symbol === pos.symbol);
+            if (!div)
+                continue;
+            const qty = (pos.longQty || 0) - (pos.shortQty || 0);
+            if (qty <= 0)
+                continue;
+            const amount = Number((qty * Number(div.perShare)).toFixed(2));
+            pos.account.cash = Number(pos.account.cash) + amount;
+            await this.accountRepo.save(pos.account);
+            paid += amount;
+            this.logger.log(`💰 分红到账: ${pos.symbol} ${qty}股 × ${div.perShare}元 = ${amount}元`);
+        }
+        return paid;
+    }
     async getPendingOrders(accountId) {
         return this.orderRepo.find({
             where: { accountId, status: order_entity_1.OrderStatus.PENDING },

@@ -36,6 +36,13 @@ let MarketDataService = class MarketDataService {
         this.tickCount = 0;
         // 财报事件（真实化：按财报季生成并影响股价）
         this.reports = new Map<string, any[]>();
+        // ─── 玩法引擎：热点题材 / IPO / 黑天鹅 / 分红 ───
+        this.hotTopics = [];
+        this.hotDay = -1;
+        this.ipoQueue = [...constants_1.IPO_POOL];
+        this.nextIpoDay = 30;
+        this.dayEvents = null;
+        this.dividends = new Map<string, any[]>();
         this.gameDay = 0;
         this.factors = {} as Record<string, number>;
         this.isRunning = false;
@@ -212,6 +219,10 @@ let MarketDataService = class MarketDataService {
             if (industryWeight) weight = industryWeight;
             impact += (val as number) * weight;
         }
+        // 玩法：热点题材板块动量加成（持续数日）
+        const hot = this.hotTopics.find((h) => h.industry === industry);
+        if (hot)
+            impact += hot.strength * 0.9;
         return impact;
     }
     // ─── 私有辅助函数：订单流不平衡影响 ───
@@ -608,6 +619,7 @@ let MarketDataService = class MarketDataService {
             tickCount: this.tickCount,
             marketRegime: this.marketRegime,
             factors: { ...this.factors },
+            hotTopics: [...this.hotTopics],
         };
     }
     applyFactorImpulse(factor, impact) {
@@ -639,10 +651,17 @@ let MarketDataService = class MarketDataService {
                 netMargin: Number((netMargin * 100).toFixed(1)),
                 surprise,
                 quarter: 'Q' + (1 + Math.floor(Math.random() * 4)),
+                dividend: 0,
             };
             // 财报冲击股价：超预期 +2.5%，不及预期 -2.5%，符合 ±0.5%
             const shock = surprise === 1 ? 0.025 : surprise === -1 ? -0.025 : (Math.random() > 0.5 ? 1 : -1) * 0.005;
             st.price = Math.max(0.5, st.price * (1 + shock));
+            // 玩法：分红（30% 概率，每股 0.3~1.5 元，当日除权，持仓者日终现金到账）
+            if (Math.random() < 0.3) {
+                const perShare = Number((0.3 + Math.random() * 1.2).toFixed(2));
+                this.recordDividend(st.symbol, perShare, this.gameDay);
+                report.dividend = perShare;
+            }
             st.lastReturn = shock;
             const list = this.reports.get(st.symbol) || [];
             list.push(report);
@@ -652,6 +671,155 @@ let MarketDataService = class MarketDataService {
     }
     getReports(symbol) {
         return symbol ? (this.reports.get(symbol) || []) : [...this.reports.values()].flat();
+    }
+    // ─── 玩法：每天开盘刷新（热点/IPO/黑天鹅），由 market.service 在 tickCounter===0 调用 ───
+    startNewDay() {
+        this.refreshHotTopics();
+        const ipo = this.maybeListIPO();
+        const swan = this.maybeBlackSwan();
+        this.dayEvents = { ipo, swan };
+    }
+    getDayEvents() {
+        const e = this.dayEvents;
+        this.dayEvents = null;
+        return e;
+    }
+    // 热点题材：60% 概率生成 1-2 个热点板块（持续 1-3 天）
+    refreshHotTopics() {
+        const today = this.gameDay;
+        // 移除到期热点
+        this.hotTopics = this.hotTopics.filter((h) => h.day + h.duration > today);
+        // 生成新热点
+        if (this.hotTopics.length < 2 && Math.random() < 0.6) {
+            const industries = [...new Set([...this.stocks.values()].map((x) => x.industry).filter(Boolean))];
+            if (industries.length > 0) {
+                const count = Math.random() < 0.4 ? 2 : 1;
+                for (let i = 0; i < count; i++) {
+                    const industry = industries[Math.floor(Math.random() * industries.length)];
+                    if (!this.hotTopics.some((h) => h.industry === industry)) {
+                        this.hotTopics.push({
+                            industry,
+                            strength: 0.3 + Math.random() * 0.3,
+                            day: today,
+                            duration: 1 + Math.floor(Math.random() * 3),
+                        });
+                    }
+                }
+            }
+        }
+    }
+    // IPO：每 30 天上市 1-2 只新股（首日高波动）
+    maybeListIPO() {
+        // 重启后清理已上市的（防止重复上市 UNIQUE 冲突）
+        this.ipoQueue = this.ipoQueue.filter((cfg) => cfg && !this.stocks.has(cfg.symbol));
+        if (this.ipoQueue.length === 0 || this.gameDay < this.nextIpoDay)
+            return null;
+        const count = Math.min(2, this.ipoQueue.length);
+        const listed = [];
+        for (let i = 0; i < count; i++) {
+            const cfg = this.ipoQueue.shift();
+            if (!cfg)
+                break;
+            const price = Number(cfg.initialPrice);
+            this.createStockInMemory(cfg, price);
+            // 首日高波动
+            const st = this.stocks.get(cfg.symbol);
+            if (st)
+                st.volatility = Number(cfg.sigma) * 1.6;
+            listed.push(cfg);
+            this.logger.log('🚀 新股上市: ' + cfg.name + ' (' + cfg.code + ') 发行价 ' + price + ' 元');
+        }
+        this.nextIpoDay = this.gameDay + 30;
+        return { listed };
+    }
+    // 黑天鹅：3% 概率，市场级/板块级/个股级冲击
+    maybeBlackSwan() {
+        if (Math.random() > 0.03)
+            return null;
+        const arr = [...this.stocks.values()];
+        if (arr.length === 0)
+            return null;
+        const roll = Math.random();
+        if (roll < 0.35) {
+            // 市场级：-2~-4%
+            const impact = -(2 + Math.random() * 2);
+            for (const st of arr) {
+                st.price = Math.max(0.5, st.price * (1 + impact / 100));
+                st.lastReturn = impact / 100;
+            }
+            this.factors['市场情绪'] = this.clamp((this.factors['市场情绪'] ?? 0) - 0.08, -0.2, 0.2);
+            return { type: 'market', impact, desc: '系统性风险：市场恐慌性抛售' };
+        }
+        else if (roll < 0.8) {
+            // 板块级：-5~-8%
+            const industries = [...new Set(arr.map((x) => x.industry))];
+            const industry = industries[Math.floor(Math.random() * industries.length)];
+            const impact = -(5 + Math.random() * 3);
+            for (const st of arr) {
+                if (st.industry === industry) {
+                    st.price = Math.max(0.5, st.price * (1 + impact / 100));
+                    st.lastReturn = impact / 100;
+                }
+            }
+            this.factors['行业景气'] = this.clamp((this.factors['行业景气'] ?? 0) - 0.05, -0.2, 0.2);
+            return { type: 'industry', impact, industry, desc: industry + '行业重大利空：监管或技术事故冲击' };
+        }
+        else {
+            // 个股级：-10~-15%
+            const st = arr[Math.floor(Math.random() * arr.length)];
+            const impact = -(10 + Math.random() * 5);
+            st.price = Math.max(0.5, st.price * (1 + impact / 100));
+            st.lastReturn = impact / 100;
+            return { type: 'stock', impact, symbol: st.symbol, name: st.name, desc: st.name + '突发利空：造假指控或重大事故' };
+        }
+    }
+    // 内存/DB 双写创建股票（init 与 IPO 共用）
+    async createStockInMemory(cfg, price) {
+        const stock = this.stockRepo.create({
+            symbol: cfg.symbol,
+            name: cfg.name,
+            code: cfg.code || '',
+            listDate: cfg.listDate || (this.gameDay + '-xx-xx'),
+            industry: cfg.industry,
+            description: cfg.description || '',
+            initialPrice: price,
+            mu: cfg.mu || price,
+            sigma: cfg.sigma || 0.025,
+            theta: cfg.theta || 0.12,
+            isActive: true,
+        });
+        await this.stockRepo.save(stock);
+        this.poolBySymbol.set(cfg.symbol, cfg);
+        const baseVol = Math.max(8000, Math.floor(price * 120));
+        this.stocks.set(cfg.symbol, {
+            symbol: cfg.symbol, name: cfg.name, industry: cfg.industry,
+            code: cfg.code || '', listDate: cfg.listDate || '', description: cfg.description || '',
+            price, volatility: Number(cfg.sigma) * 0.5, lastReturn: 0,
+            prevClose: price, lastVolume: baseVol, avgVolume: baseVol, baseVolume: baseVol, prevVolume: baseVol,
+            dayOpen: price, dayHigh: price, dayLow: price, dayVolume: 0, minuteCounter: 0,
+            kline1min: [], kline5min: [], klineDaily: [], current1min: null, current5min: null, currentDaily: null,
+            trendCounter: 0, trendDirection: 0, trendAccumulated: 0, isTrending: false,
+        });
+    }
+    // 分红：财报季记录（除权 + 持仓现金到账）
+    recordDividend(symbol, perShare, day) {
+        const list = this.dividends.get(symbol) || [];
+        list.push({ perShare, day });
+        this.dividends.set(symbol, list);
+        // 除权：股价下调
+        const st = this.stocks.get(symbol);
+        if (st)
+            st.price = Math.max(0.5, st.price - perShare);
+    }
+    getDividends(day) {
+        const out = [];
+        for (const [symbol, list] of this.dividends.entries()) {
+            for (const d of list) {
+                if (d.day === day)
+                    out.push({ symbol, perShare: d.perShare });
+            }
+        }
+        return out;
     }
     // 随机取一只股票（新闻占位符填充用）
     getRandomStock() {

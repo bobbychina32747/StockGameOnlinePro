@@ -57,6 +57,23 @@ let MarketService = class MarketService {
                     const fills = await this.engine.checkPendingOrders();
                     fills.forEach((f) => { this.gateway.broadcastFill(f); });
                     if (this.tickCounter === 0) {
+                        // 玩法：热点/IPO/黑天鹅
+                        this.marketData.startNewDay();
+                        const events = this.marketData.getDayEvents();
+                        if (events && events.ipo && events.ipo.listed) {
+                            for (const n of events.ipo.listed) {
+                                this.gateway.broadcastNews({
+                                    title: `🚀 新股上市：${n.name}（${n.code}）`, description: `发行价 ${n.initialPrice} 元，所属行业 ${n.industry}，今日起可交易`, type: 'bullish', impact: {}, duration: 1,
+                                });
+                                this.logger.log(`🚀 新股上市: ${n.name}`);
+                            }
+                        }
+                        if (events && events.swan) {
+                            this.gateway.broadcastNews({
+                                title: `🦢 黑天鹅：${events.swan.desc}`, description: `影响：${events.swan.type === 'market' ? '全市场' : events.swan.type === 'industry' ? events.swan.industry + '板块' : events.swan.name} 约 ${events.swan.impact}%`, type: 'bearish', impact: {}, duration: 2,
+                            });
+                            this.logger.warn(`🦢 黑天鹅: ${events.swan.desc}`);
+                        }
                         this.engine.setDayOpen(prices);
                         await this.engine.resetBoughtToday();
                         const state = this.marketData.getState();
@@ -72,6 +89,13 @@ let MarketService = class MarketService {
                         }
                     }
                     if (this.tickCounter === 385) {
+                        // 玩法：分红到账（当日财报季产生的分红）
+                        try {
+                            await this.engine.payDividends(this.marketData.getDividends(this.marketData.gameDay));
+                        }
+                        catch (e) {
+                            this.logger.error(`分红发放失败: ${e.message}`);
+                        }
                         const nightEvent = this.newsService.processNightEvent();
                         if (nightEvent && nightEvent.impact !== 0) {
                             const prices = this.marketData.getPrices();
@@ -120,6 +144,9 @@ let MarketService = class MarketService {
     }
     getIndices() {
         return this.marketData.getIndices();
+    }
+    getState() {
+        return this.marketData.getState();
     }
     getReports(symbol) {
         return this.marketData.getReports(symbol);

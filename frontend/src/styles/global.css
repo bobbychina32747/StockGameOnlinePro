@@ -1246,3 +1246,8 @@ body.density-compact .card { padding: 10px; }
 body.density-compact .stock-list-row { padding: 3px 6px; }
 body.density-compact .ob-row { padding: 1px 3px; }
 body.density-compact .info-row { padding: 2px 0; }
+
+/* ═══ 玩法：热点条 ═══ */
+.index-hot { color: var(--text-muted); font-size: 12px; }
+.index-hot b { margin-right: 10px; color: var(--text-secondary); font-weight: 600; }
+.index-hot em { font-style: normal; font-family: var(--font-mono); }
