@@ -11,7 +11,7 @@
 const http = require('http');
 const BASE = process.env.API_BASE || 'http://localhost:8000/api';
 const USERNAME = process.argv[2] || 'Bobbychina';
-const PASSWORD = process.argv[3] || 'ThisIsTheBestProjectEver';
+const PASSWORD = process.argv[3] || process.env.API_PASSWORD || ''; // 必填：登录密码（不提供默认值）
 const MODE = process.argv[4] || 'US';
 const ORDER_QTY = 100;
 const LOOP_SEC = 5;
@@ -53,6 +53,7 @@ function sma(closes, period) {
 async function main() {
   console.log(`[quant-bot] 连接 ${BASE}，模式 ${MODE}，策略 MA5/MA10 交叉`);
   const login = await api('POST', '/auth/login', { username: USERNAME, password: PASSWORD });
+  if (!PASSWORD) { console.error('[quant-bot] 请传入密码: node quant-bot.js [用户名] [密码] [模式] 或设置环境变量 API_PASSWORD'); process.exit(1); }
   if (!login.token) { console.error('[quant-bot] 登录失败'); process.exit(1); }
   const token = login.token;
   console.log('[quant-bot] 登录成功');
