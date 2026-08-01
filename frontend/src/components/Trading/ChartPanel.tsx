@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactEChartsCore from 'echarts-for-react';
 import { useMarketStore, useUIStore } from '../../store';
 import { PriceText } from './PriceText';
@@ -81,18 +81,15 @@ export function ChartPanel() {
     return () => { clearTimeout(t1); clearTimeout(t2); ro.disconnect(); };
   }, [selectedSymbol, selectedTimeframe]);
 
-  // ─── 缩放：仅在挂载时设置一次（切股票/周期重建实例时重新设默认） ───
-  // 后续 tick 更新 option 不含 dataZoom → 用户滚轮/滑条缩放比例不会被重置
-  useEffect(() => {
-    const inst = chartRef.current?.getEchartsInstance();
-    if (!inst) return;
-    inst.setOption({
-      dataZoom: [
-        { type: 'inside', start: 40, end: 100 },
-        { type: 'slider', height: 14, bottom: 4, start: 40, end: 100, borderColor: '#2e3240', backgroundColor: '#171922', fillerColor: 'rgba(47,111,237,0.15)', handleStyle: { color: '#2f6fed' }, textStyle: { color: '#6a6d78', fontSize: 9 } },
-      ],
-    });
-  }, []);
+  // ─── 受控缩放：用户缩放时保存 start/end，每次 option 更新都用当前值（不被重置） ───
+  const [zoom, setZoom] = useState({ start: 40, end: 100 });
+  const onChartEvents = {
+    datazoom: (params: any) => {
+      const b = params?.batch?.[0];
+      if (b && b.start != null && b.end != null) setZoom({ start: b.start, end: b.end });
+      else if (params?.start != null && params?.end != null) setZoom({ start: params.start, end: params.end });
+    },
+  };
 
   const chartOption = useMemo(() => {
   // ─── 分时图（S1）：当日 1min（均匀时间轴，不合并 → 无跨天断裂/分层） ───
@@ -259,9 +256,14 @@ export function ChartPanel() {
         },
       },
       legend: { data: ['MA5', 'MA10', 'MA20', 'BOLL中', 'RSI(14)'], top: 2, textStyle: { color: '#9fa3b0', fontSize: 10 } },
+      // 受控缩放：start/end 来自用户当前缩放（merge 更新不会重置）
+      dataZoom: [
+        { type: 'inside', ...zoom },
+        { type: 'slider', height: 14, bottom: 4, ...zoom, borderColor: '#2e3240', backgroundColor: '#171922', fillerColor: 'rgba(47,111,237,0.15)', handleStyle: { color: '#2f6fed' }, textStyle: { color: '#6a6d78', fontSize: 9 } },
+      ],
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [klineData, selectedTimeframe, intradaySrc, isIntraday]);
+  }, [klineData, selectedTimeframe, intradaySrc, isIntraday, zoom]);
 
   const prevClose = stock?.dayOpen != null ? Number(stock.dayOpen) : (stock?.price ?? price ?? 0);
   const changePct = prevClose > 0 && price != null ? ((price - prevClose) / prevClose) * 100 : 0;
@@ -357,6 +359,7 @@ export function ChartPanel() {
           ref={chartRef}
           key={`${selectedSymbol}-${selectedTimeframe}`}
           option={chartOption}
+          onEvents={onChartEvents}
           style={{ height: '100%', width: '100%' }}
         />
       </div>
