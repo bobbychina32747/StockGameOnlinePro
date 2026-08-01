@@ -25,13 +25,16 @@ const KLINE_TIMEFRAMES = [
 // ─── LoD 降采样：超过 MAX_POINTS 时按比例聚合（桶聚合），大幅减少绘制点 ───
 const MAX_POINTS = 400;
 
-// K线桶聚合：open=桶首、close=桶尾、high=max、low=min、volume=sum
+// K线桶聚合：固定粒度 + 尾部对齐（历史桶严格稳定 = 历史数据只读）
+// 新 tick 只影响最后一桶，之前的蜡烛/颜色永不变；1min 2000根→400点
 function bucketizeBars(bars: KlineData[]): KlineData[] {
-  if (bars.length <= MAX_POINTS) return bars;
-  const factor = Math.ceil(bars.length / MAX_POINTS);
+  const len = bars.length;
+  if (len <= MAX_POINTS) return bars;
+  const factor = 5; // 固定桶大小（1min 每 5 分钟一柱，历史只读）
   const out: KlineData[] = [];
-  for (let i = 0; i < bars.length; i += factor) {
-    const chunk = bars.slice(i, i + factor);
+  for (let end = len; end > 0; end -= factor) {
+    const start = Math.max(0, end - factor);
+    const chunk = bars.slice(start, end);
     let high = chunk[0].high, low = chunk[0].low, vol = 0;
     for (const b of chunk) {
       if (b.high > high) high = b.high;
@@ -40,6 +43,7 @@ function bucketizeBars(bars: KlineData[]): KlineData[] {
     }
     out.push({ time: chunk[0].time, open: chunk[0].open, close: chunk[chunk.length - 1].close, high, low, volume: vol });
   }
+  out.reverse();
   return out;
 }
 
@@ -85,7 +89,7 @@ export function ChartPanel() {
       });
       const closes = bars.map((k) => k.close);
       const vols = bars.map((k) => k.volume);
-      const prevClose = intradaySrc[0]?.open || closes[0] || 0;
+      const prevClose = stock?.dayOpen != null ? Number(stock.dayOpen) : (intradaySrc[0]?.open || closes[0] || 0);
       let cumVol = 0, cumAmt = 0;
       const avgLine = closes.map((c, i) => { cumVol += vols[i]; cumAmt += c * vols[i]; return cumVol ? cumAmt / cumVol : c; });
       const lastColor = closes[closes.length - 1] >= prevClose ? '#e03131' : '#00c853';
@@ -124,7 +128,7 @@ export function ChartPanel() {
       };
     }
 
-    // ─── K线分支：LoD 降采样后统一绘制（坐标轴/网格随增量更新不再整体重绘） ───
+    // ─── K线分支：LoD 固定粒度降采样（历史只读，仅尾桶随实时更新） ───
     const bars = bucketizeBars(klineData);
     const closes = bars.map((k) => k.close);
     const calcMA = (period: number): (number | null)[] => {
