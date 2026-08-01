@@ -22,28 +22,54 @@ const KLINE_TIMEFRAMES = [
   { key: 'monthly', label: '月线' },
 ];
 
-// ─── LoD 降采样：超过 MAX_POINTS 时按比例聚合（桶聚合），大幅减少绘制点 ───
-const MAX_POINTS = 400;
+// ─── LoD 动态合并（用户方案）：相邻点变化 ≤ MERGE_PCT% 时合并 ───
+// 历史 bar 只读 → 合并判定确定性 → 历史蜡烛/颜色稳定；仅尾桶随实时更新
+const MERGE_PCT = 5; // 相邻收盘变化阈值（%），若合并过度可调小
+const MIN_KEEP = 60; // 保底：合并后至少保留的根数（防趋势平缓时全并成 1 根）
 
-// K线桶聚合：固定粒度 + 尾部对齐（历史桶严格稳定 = 历史数据只读）
-// 新 tick 只影响最后一桶，之前的蜡烛/颜色永不变；1min 2000根→400点
-function bucketizeBars(bars: KlineData[]): KlineData[] {
-  const len = bars.length;
-  if (len <= MAX_POINTS) return bars;
-  const factor = 5; // 固定桶大小（1min 每 5 分钟一柱，历史只读）
+function mergeOnce(bars: KlineData[], pct: number): KlineData[] {
   const out: KlineData[] = [];
-  for (let end = len; end > 0; end -= factor) {
-    const start = Math.max(0, end - factor);
-    const chunk = bars.slice(start, end);
-    let high = chunk[0].high, low = chunk[0].low, vol = 0;
-    for (const b of chunk) {
-      if (b.high > high) high = b.high;
-      if (b.low < low) low = b.low;
-      vol += b.volume;
+  let cur: KlineData | null = null;
+  for (const b of bars) {
+    if (!cur) {
+      cur = { ...b };
+      continue;
     }
-    out.push({ time: chunk[0].time, open: chunk[0].open, close: chunk[chunk.length - 1].close, high, low, volume: vol });
+    // 动态监测：与最近一点的偏差 ≤ 阈值则合并（OHLC 保形：open 首/close 尾/high max/low min/vol 累加）
+    const change = Math.abs(b.close - cur.close) / cur.close;
+    if (change <= pct / 100) {
+      cur = {
+        time: cur.time, open: cur.open, close: b.close,
+        high: Math.max(cur.high, b.high), low: Math.min(cur.low, b.low),
+        volume: cur.volume + b.volume,
+      };
+    }
+    else {
+      out.push(cur);
+      cur = { ...b };
+    }
   }
-  out.reverse();
+  if (cur) out.push(cur);
+  return out;
+}
+
+function dynamicMerge(bars: KlineData[]): KlineData[] {
+  if (bars.length <= 400) return bars; // 数据少不合并
+  // 双向调节：合并过少(≤5%太宽)则收窄阈值，过多则放宽，目标 [MIN_KEEP, 400] 根
+  let pct = MERGE_PCT;
+  let out = mergeOnce(bars, pct);
+  let guard = 0;
+  while (guard++ < 12) {
+    if (out.length > 400) {
+      pct *= 1.5;
+      out = mergeOnce(bars, pct);
+    }
+    else if (out.length < MIN_KEEP) {
+      pct /= 1.8;
+      out = mergeOnce(bars, pct);
+    }
+    else break;
+  }
   return out;
 }
 
@@ -81,7 +107,7 @@ export function ChartPanel() {
   const chartOption = useMemo(() => {
     // ─── 分时图（S1）：1min close 连线 + 均价 + 成交量 + 昨收基准 ───
     if (isIntraday) {
-      const bars = bucketizeBars(intradaySrc);
+      const bars = dynamicMerge(intradaySrc);
       if (bars.length === 0) return {};
       const times = bars.map((k) => {
         const d = new Date(k.time);
@@ -128,8 +154,8 @@ export function ChartPanel() {
       };
     }
 
-    // ─── K线分支：LoD 固定粒度降采样（历史只读，仅尾桶随实时更新） ───
-    const bars = bucketizeBars(klineData);
+    // ─── K线分支：LoD 动态合并（历史只读，仅尾桶随实时更新） ───
+    const bars = dynamicMerge(klineData);
     const closes = bars.map((k) => k.close);
     const calcMA = (period: number): (number | null)[] => {
       const r: (number | null)[] = new Array(closes.length).fill(null);
@@ -325,7 +351,7 @@ export function ChartPanel() {
                 </span>
               );
             })}
-            <span className="chart-listdate">超过 400 点自动聚合（LoD），坐标轴增量更新</span>
+            <span className="chart-listdate">LoD 动态合并（相邻变化 ≤5% 合并），历史只读</span>
           </>
         )}
         {stock?.code && <span className="chart-listdate">上市 {stock.listDate || '-'}</span>}
