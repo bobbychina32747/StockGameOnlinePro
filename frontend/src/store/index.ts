@@ -80,7 +80,8 @@ export const useMarketStore = create<MarketState>((set) => ({
         };
       } else {
         arr.push({ time, open: tick.price, high: tick.price, low: tick.price, close: tick.price, volume: tick.volume });
-        if (arr.length > 2000) arr.shift();
+        // 大 cap：session 内头部不滚动（防 LoD 头部桶重排 = 历史只读）
+        if (arr.length > 50000) arr.shift();
       }
       symKlines['1min'] = arr;
       klines[tick.symbol] = symKlines;

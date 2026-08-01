@@ -389,7 +389,7 @@ let MarketDataService = class MarketDataService {
         if (!stock.current1min || stock.current1min.startMinute !== minute) {
             if (stock.current1min) {
                 stock.kline1min.push(stock.current1min);
-                if (stock.kline1min.length > 2000)
+                if (stock.kline1min.length > 50000)
                     stock.kline1min.shift();
             }
             stock.current1min = {
@@ -408,7 +408,7 @@ let MarketDataService = class MarketDataService {
         if (!stock.current5min || stock.current5min.startFiveIdx !== fiveIdx) {
             if (stock.current5min) {
                 stock.kline5min.push(stock.current5min);
-                if (stock.kline5min.length > 1000)
+                if (stock.kline5min.length > 20000)
                     stock.kline5min.shift();
             }
             stock.current5min = {
@@ -775,6 +775,7 @@ let MarketDataService = class MarketDataService {
     }
     // 内存/DB 双写创建股票（init 与 IPO 共用）
     async createStockInMemory(cfg, price) {
+        if (this.stocks.has(cfg.symbol)) return; // 双保险：已存在跳过
         const stock = this.stockRepo.create({
             symbol: cfg.symbol,
             name: cfg.name,

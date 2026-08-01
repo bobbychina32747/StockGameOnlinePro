@@ -105,9 +105,14 @@ export function ChartPanel() {
   }, [selectedSymbol, selectedTimeframe]);
 
   const chartOption = useMemo(() => {
-    // ─── 分时图（S1）：1min close 连线 + 均价 + 成交量 + 昨收基准 ───
+    // ─── 分时图（S1）：当日 1min（均匀时间轴，不合并 → 无跨天断裂/分层） ───
     if (isIntraday) {
-      const bars = dynamicMerge(intradaySrc);
+      // 只取最近一天（按模拟日期），消除跨天价格跳空导致的断裂
+      let bars = intradaySrc;
+      if (bars.length > 0) {
+        const lastDay = new Date(bars[bars.length - 1].time).toDateString();
+        bars = bars.filter((k) => new Date(k.time).toDateString() === lastDay);
+      }
       if (bars.length === 0) return {};
       const times = bars.map((k) => {
         const d = new Date(k.time);
