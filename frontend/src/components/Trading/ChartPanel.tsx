@@ -24,9 +24,9 @@ const KLINE_TIMEFRAMES = [
 
 // ─── LoD 动态合并（用户方案）：相邻点变化 ≤ MERGE_PCT% 时合并 ───
 // 历史 bar 只读 → 合并判定确定性 → 历史蜡烛/颜色稳定；仅尾桶随实时更新
-const MERGE_PCT = 5; // 相邻收盘变化阈值（%），若合并过度可调小
-const MIN_KEEP = 60; // 保底：合并后至少保留的根数（防趋势平缓时全并成 1 根）
+const MERGE_PCT = 1; // LoD 固定参数（只读）：相邻变化≤1%合并；从头贪心→历史桶定稿即冻结（5%会把分钟线压成几根）
 
+// ─── LoD 动态合并（固定阈值 0.3%，只读）：从头贪心，历史桶定稿即冻结 ───
 function mergeOnce(bars: KlineData[], pct: number): KlineData[] {
   const out: KlineData[] = [];
   let cur: KlineData | null = null;
@@ -35,9 +35,8 @@ function mergeOnce(bars: KlineData[], pct: number): KlineData[] {
       cur = { ...b };
       continue;
     }
-    // 动态监测：与最近一点的偏差 ≤ 阈值则合并（OHLC 保形：open 首/close 尾/high max/low min/vol 累加）
-    const change = Math.abs(b.close - cur.close) / cur.close;
-    if (change <= pct / 100) {
+    // 动态监测：与最近点的偏差 ≤ 阈值则合并（OHLC 保形：open 首/close 尾/high max/low min/vol 累加）
+    if (Math.abs(b.close - cur.close) / cur.close <= pct / 100) {
       cur = {
         time: cur.time, open: cur.open, close: b.close,
         high: Math.max(cur.high, b.high), low: Math.min(cur.low, b.low),
@@ -45,7 +44,7 @@ function mergeOnce(bars: KlineData[], pct: number): KlineData[] {
       };
     }
     else {
-      out.push(cur);
+      out.push(cur); // 定稿：push 后永不再改（历史只读）
       cur = { ...b };
     }
   }
@@ -53,28 +52,6 @@ function mergeOnce(bars: KlineData[], pct: number): KlineData[] {
   return out;
 }
 
-function dynamicMerge(bars: KlineData[]): KlineData[] {
-  if (bars.length <= 400) return bars; // 数据少不合并
-  // 双向调节：合并过少(≤5%太宽)则收窄阈值，过多则放宽，目标 [MIN_KEEP, 400] 根
-  let pct = MERGE_PCT;
-  let out = mergeOnce(bars, pct);
-  let guard = 0;
-  while (guard++ < 12) {
-    if (out.length > 400) {
-      pct *= 1.5;
-      out = mergeOnce(bars, pct);
-    }
-    else if (out.length < MIN_KEEP) {
-      pct /= 1.8;
-      out = mergeOnce(bars, pct);
-    }
-    else break;
-  }
-  return out;
-}
-
-
-// 中间图表区（标题栏 + 分层周期切换 + 分时/K线 + LoD 降采样 + 增量更新）
 export function ChartPanel() {
   const klines = useMarketStore((s) => s.klines);
   const prices = useMarketStore((s) => s.prices);
@@ -85,7 +62,7 @@ export function ChartPanel() {
   const setDetailSymbol = useUIStore((s) => s.setDetailSymbol);
 
   const klineData: KlineData[] = (klines[selectedSymbol]?.[selectedTimeframe] || []) as KlineData[];
-  // 分时图数据源：1min K 线（S1）
+  // 分时图数据源：1min K 线
   const intradaySrc = (klines[selectedSymbol]?.['1min'] || []) as KlineData[];
   const stock = stocks.find((s: any) => s.symbol === selectedSymbol);
   const price = prices[selectedSymbol];
@@ -105,7 +82,7 @@ export function ChartPanel() {
   }, [selectedSymbol, selectedTimeframe]);
 
   const chartOption = useMemo(() => {
-    // ─── 分时图（S1）：当日 1min（均匀时间轴，不合并 → 无跨天断裂/分层） ───
+  // ─── 分时图（S1）：当日 1min（均匀时间轴，不合并 → 无跨天断裂/分层） ───
     if (isIntraday) {
       // 只取最近一天（按模拟日期），消除跨天价格跳空导致的断裂
       let bars = intradaySrc;
@@ -113,6 +90,7 @@ export function ChartPanel() {
         const lastDay = new Date(bars[bars.length - 1].time).toDateString();
         bars = bars.filter((k) => new Date(k.time).toDateString() === lastDay);
       }
+      // 分时：当天数据不合并（≤390 点直接画，保持均匀时间轴）
       if (bars.length === 0) return {};
       const times = bars.map((k) => {
         const d = new Date(k.time);
@@ -160,7 +138,7 @@ export function ChartPanel() {
     }
 
     // ─── K线分支：LoD 动态合并（历史只读，仅尾桶随实时更新） ───
-    const bars = dynamicMerge(klineData);
+    const bars = mergeOnce(klineData, MERGE_PCT);
     const closes = bars.map((k) => k.close);
     const calcMA = (period: number): (number | null)[] => {
       const r: (number | null)[] = new Array(closes.length).fill(null);
