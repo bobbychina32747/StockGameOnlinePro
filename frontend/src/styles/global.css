@@ -1170,15 +1170,10 @@ body.theme-light {
 }
 .theme-toggle-btn { cursor: pointer; font-size: 14px; }
 
-/* ═══ B5 移动端适配 ═══ */
-@media (max-width: 1024px) {
-  .dashboard { flex-direction: column; height: auto; }
-  .dashboard > .resizable-panel, .dashboard > .resizable-panel .side-panel { width: 100% !important; height: auto; }
-  .dashboard > .resizable-panel { min-height: 0; }
-  .stock-list-panel { max-height: 260px; }
-  .side-panel { max-height: none; overflow: visible; }
+/* ═══ B5 移动端适配（≤1024 紧凑，≤768 走 dashboard-mobile 底部Tab方案）═══ */
+@media (max-width: 1024px) and (min-width: 769px) {
   .drag-handle { display: none; }
-  .chart-container { min-height: 280px; }
+  .chart-container { min-height: 320px; }
   .market-index-bar { gap: 10px; }
   .index-regime { display: none; }
 }

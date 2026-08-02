@@ -26,6 +26,14 @@ const KLINE_TIMEFRAMES = [
 // 历史 bar 只读 → 合并判定确定性 → 历史蜡烛/颜色稳定；仅尾桶随实时更新
 const MERGE_PCT = 1; // LoD 固定参数（只读）：相邻变化≤1%合并；从头贪心→历史桶定稿即冻结（5%会把分钟线压成几根）
 
+// ─── 成交量 y 轴上限：95 分位 × 1.5（防单根大单/用户成交撑爆比例，超出截断） ───
+function volYMax(vals: number[]): number {
+  if (!vals.length) return 1000;
+  const sorted = [...vals].sort((a, b) => a - b);
+  const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+  return Math.max(1000, Math.ceil(p95 * 1.5));
+}
+
 // ─── LoD 动态合并（固定阈值 0.3%，只读）：从头贪心，历史桶定稿即冻结 ───
 function mergeOnce(bars: KlineData[], pct: number): KlineData[] {
   const out: KlineData[] = [];
@@ -125,7 +133,7 @@ export function ChartPanel() {
         ],
         yAxis: [
           { type: 'value', scale: true, splitLine: { lineStyle: { color: '#2e3240', type: 'dashed' } }, axisLabel: { color: '#6a6d78', fontSize: 10, formatter: (v: number) => v.toFixed(2) } },
-          { type: 'value', gridIndex: 1, splitLine: { show: false }, axisLabel: { show: false } },
+          { type: 'value', gridIndex: 1, splitLine: { show: false }, axisLabel: { show: false }, max: volYMax(vols) },
         ],
         series: [
           { type: 'line', data: closes, smooth: false, symbol: 'none', lineStyle: { width: 1.5, color: lastColor }, itemStyle: { color: lastColor }, areaStyle: { color: lastColor + '26' }, name: '价格', markLine: { silent: true, symbol: 'none', data: [{ yAxis: prevClose, lineStyle: { color: '#556080', type: 'dashed' } }], label: { show: false } } },

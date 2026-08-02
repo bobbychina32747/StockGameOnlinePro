@@ -19,15 +19,17 @@ export function PriceText({
   suffix?: string;
 }) {
   const animEnabled = useUIStore((s) => s.animEnabled);
-  const [display, setDisplay] = useState(value);
+  // 空值防护：null/undefined/NaN 一律兜底为 0（避免 .toFixed 崩溃）
+  const safeValue = typeof value === 'number' && Number.isFinite(value) ? value : Number(value) || 0;
+  const [display, setDisplay] = useState(safeValue);
   const [flash, setFlash] = useState<'up' | 'down' | null>(null);
-  const fromRef = useRef(value);
-  const prevRef = useRef(value);
+  const fromRef = useRef(safeValue);
+  const prevRef = useRef(safeValue);
 
   // 数字滚动动画（开关关闭时直接跳到新值）
   useEffect(() => {
     const from = fromRef.current;
-    const to = value;
+    const to = safeValue;
     if (from === to) return;
     if (!animEnabled) {
       fromRef.current = to;
@@ -45,18 +47,18 @@ export function PriceText({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [value, duration, animEnabled]);
+  }, [safeValue, duration, animEnabled]);
 
   // 涨跌闪烁
   useEffect(() => {
     const prev = prevRef.current;
-    if (value !== prev) {
-      prevRef.current = value;
-      setFlash(value > prev ? 'up' : 'down');
+    if (safeValue !== prev) {
+      prevRef.current = safeValue;
+      setFlash(safeValue > prev ? 'up' : 'down');
       const t = setTimeout(() => setFlash(null), 650);
       return () => clearTimeout(t);
     }
-  }, [value]);
+  }, [safeValue]);
 
   const cls = ['price-text', flash ? `flash-${flash}` : '', className].filter(Boolean).join(' ');
   return (

@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store';
 import { AppLayout } from './components/Layout/AppLayout';
+import ErrorBoundary from './components/UI/ErrorBoundary';
 import Login from './pages/Login/Login';
 import Dashboard from './pages/Dashboard/Dashboard';
 import Ranking from './pages/Ranking/Ranking';
@@ -24,15 +25,52 @@ export default function App() {
         path="/"
         element={
           <ProtectedRoute>
-            <AppLayout />
+            <ErrorBoundary label="布局">
+              <AppLayout />
+            </ErrorBoundary>
           </ProtectedRoute>
         }
       >
-        <Route index element={<Dashboard />} />
-        <Route path="ranking" element={<Ranking />} />
-        <Route path="backtest" element={<Backtest />} />
-        <Route path="transactions" element={<Transactions />} />
-        <Route path="profile" element={<Profile />} />
+        <Route
+          index
+          element={
+            <ErrorBoundary label="交易面板">
+              <Dashboard />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="ranking"
+          element={
+            <ErrorBoundary label="排行榜">
+              <Ranking />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="backtest"
+          element={
+            <ErrorBoundary label="回测">
+              <Backtest />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="transactions"
+          element={
+            <ErrorBoundary label="流水">
+              <Transactions />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="profile"
+          element={
+            <ErrorBoundary label="个人中心">
+              <Profile />
+            </ErrorBoundary>
+          }
+        />
       </Route>
     </Routes>
   );
