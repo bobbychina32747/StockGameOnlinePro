@@ -168,6 +168,11 @@ export function StockListPanel() {
                     {up ? '+' : ''}{changePct.toFixed(2)}%
                   </span>
                   {limitTag && <span className={`limit-badge ${limitTag === '涨停' ? 'up' : 'down'}`}>{limitTag}</span>}
+                  {Number(s.bubble) > 1.3 && (
+                    <span className={`bubble-badge ${Number(s.bubble) > 2 ? 'danger' : 'warn'}`} title={`板块泡沫度 ${Number(s.bubble).toFixed(2)}x（价格/内在价值），小心破灭`}>
+                      {Number(s.bubble) > 2 ? '💥 泡沫高危' : '🔥 泡沫'}
+                    </span>
+                  )}
                 </div>
               );
             })}

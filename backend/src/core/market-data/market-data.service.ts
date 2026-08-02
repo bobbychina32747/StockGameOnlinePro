@@ -48,6 +48,10 @@ let MarketDataService = class MarketDataService {
         this.gameDay = 0;
         this.factors = {} as Record<string, number>;
         this.isRunning = false;
+        // 经济泡沫机制：破灭中的行业 + 破灭事件广播队列
+        this.burstingIndustries = new Set();
+        this.burstEvents = [];
+        this.industryBubbleMap = {};
         // AI 对手盘：机构/游资/散户市场参与者（每服务器独立）
         this.aiAgents = [
             { type: '机构', activity: 0.25, scale: 25000 },
@@ -99,7 +103,7 @@ let MarketDataService = class MarketDataService {
         }
         let dbStocks = await this.stockRepo.find(); // 全部（含 inactive，避免重复创建 UNIQUE）
         // 迁移：只停用不在任何市场池的遗留股票（三服务器共用全池判断，避免互相误停）
-        const ALL_SYMBOLS = new Set([...constants_1.STOCK_POOL, ...constants_1.HK_POOL, ...constants_1.US_POOL].map((c) => c.symbol));
+        const ALL_SYMBOLS = new Set([...constants_1.STOCK_POOL, ...constants_1.HK_POOL, ...constants_1.US_POOL, ...constants_1.IPO_POOL].map((c) => c.symbol));
         for (const s of dbStocks) {
             if (!ALL_SYMBOLS.has(s.symbol)) {
                 if (s.isActive) {
@@ -138,6 +142,27 @@ let MarketDataService = class MarketDataService {
         }
         for (const cfg of POOL_FOR_THIS) {
             this.poolBySymbol.set(cfg.symbol, cfg);
+        }
+        // 加载已上市的 IPO 股票（DB 已有 → 仅内存，防重复创建 UNIQUE）
+        for (const cfg of constants_1.IPO_POOL) {
+            if (this.stocks.has(cfg.symbol))
+                continue;
+            const dbRow = dbStocks.find((x) => x.symbol === cfg.symbol);
+            if (!dbRow || !dbRow.isActive)
+                continue;
+            const ipoPrice = Number(dbRow.initialPrice) || Number(cfg.initialPrice);
+            this.poolBySymbol.set(cfg.symbol, cfg);
+            const ipoBaseVol = Math.max(8000, Math.floor(ipoPrice * 120));
+            this.stocks.set(cfg.symbol, {
+                symbol: cfg.symbol, name: cfg.name, industry: cfg.industry,
+                code: cfg.code || '', listDate: cfg.listDate || '', description: cfg.description || '',
+                price: ipoPrice, intrinsic: ipoPrice, volatility: Number(cfg.sigma) * 0.5, lastReturn: 0,
+                prevClose: ipoPrice, lastVolume: ipoBaseVol, avgVolume: ipoBaseVol, baseVolume: ipoBaseVol, prevVolume: ipoBaseVol,
+                dayOpen: ipoPrice, dayHigh: ipoPrice, dayLow: ipoPrice, dayVolume: 0, minuteCounter: 0,
+                kline1min: [], kline5min: [], klineDaily: [], current1min: null, current5min: null, currentDaily: null,
+                trendCounter: 0, trendDirection: 0, trendAccumulated: 0, isTrending: false,
+            });
+            this.logger.log('📌 已加载已上市 IPO: ' + cfg.name);
         }
         for (const s of dbStocks) {
             const price = Number(s.initialPrice);
@@ -360,8 +385,26 @@ let MarketDataService = class MarketDataService {
                 meanReversion = Number(cfg.theta ?? 0.15) * (mu - stock.price) * dt;
             } else {
                 momentumBoost = 0.2 * dt * 1.5;
+                // 经济泡沫积累：行业泡沫度越高追涨越强（受控）
+                const ib = this.industryBubbleMap[stock.industry] || 1;
+                if (ib > 1.3) {
+                    momentumBoost += Math.min(0.3, (ib - 1) * 0.12) * dt * 4;
+                }
             }
-            let priceChange = drift + shock + jump + factorImpact * dt * 5 + ofiImpact + meanReversion + momentumBoost;
+            // 经济泡沫：破灭期向内在价值快速回归
+            let burstDrift = 0;
+            if (this.burstingIndustries.has(stock.industry)) {
+                const intrinsic = Number(stock.intrinsic) || 1;
+                const target = intrinsic * 1.05;
+                if (stock.price > target) {
+                    burstDrift = -0.008; // 每 tick 回归 0.8%（泡沫破灭暴跌）
+                }
+                else if (stock.price >= intrinsic * 0.9) {
+                    this.burstingIndustries.delete(stock.industry); // 回归完成
+                    this.logger.log('🧊 泡沫出清: ' + stock.industry + ' 回归内在价值');
+                }
+            }
+            let priceChange = drift + shock + jump + factorImpact * dt * 5 + ofiImpact + meanReversion + momentumBoost + burstDrift;
             priceChange = this.clamp(priceChange, -0.03, 0.03);
             let newPrice = stock.price * (1 + priceChange);
             if (isNaN(newPrice) || !isFinite(newPrice))
@@ -408,6 +451,58 @@ let MarketDataService = class MarketDataService {
         this.tickCount++;
         return results;
     }
+    // ─── 经济泡沫：行业泡沫度 = 行业均价 / 行业内在价值 ───
+    computeIndustryBubble() {
+        const sumPrice = {};
+        const sumIntr = {};
+        const cnt = {};
+        for (const st of this.stocks.values()) {
+            const ind = st.industry || '其他';
+            sumPrice[ind] = (sumPrice[ind] || 0) + Number(st.price);
+            sumIntr[ind] = (sumIntr[ind] || 0) + (Number(st.intrinsic) || Number(st.price));
+            cnt[ind] = (cnt[ind] || 0) + 1;
+        }
+        this.industryBubbleMap = {};
+        for (const k of Object.keys(cnt)) {
+            const intr = sumIntr[k] / cnt[k];
+            this.industryBubbleMap[k] = intr > 0 ? (sumPrice[k] / cnt[k]) / intr : 1;
+        }
+    }
+    // 每日泡沫破灭判定：泡沫度>2 的行业 5% 概率破灭
+    maybeBurstBubble() {
+        this.computeIndustryBubble();
+        for (const [ind, ratioRaw] of Object.entries(this.industryBubbleMap)) {
+            const ratio = ratioRaw as number;
+            if (ratio > 2 && !this.burstingIndustries.has(ind) && Math.random() < 0.05) {
+                this.triggerBurst(ind, '市场恐慌情绪蔓延');
+            }
+            else if (ratio > 1.5 && Math.random() < 0.01) {
+                this.triggerBurst(ind, '获利盘集体出逃');
+            }
+        }
+    }
+    // 细小抛售触发（用户/AI 卖出时若泡沫度高则戳破）
+    checkSellTrigger(industry) {
+        const ratio = this.industryBubbleMap ? this.industryBubbleMap[industry] : 1;
+        if (ratio > 2 && !this.burstingIndustries.has(industry) && Math.random() < 0.3) {
+            this.triggerBurst(industry, '细小抛售引发连锁恐慌');
+            return true;
+        }
+        return false;
+    }
+    triggerBurst(industry, reason) {
+        if (this.burstingIndustries.has(industry))
+            return;
+        this.burstingIndustries.add(industry);
+        this.burstEvents.push({ industry, reason });
+        this.factors['市场情绪'] = Math.max(-0.15, (this.factors['市场情绪'] ?? 0) - 0.04);
+        this.logger.warn('💥 泡沫破灭: ' + industry + '（' + reason + '）');
+    }
+    getBurstEvents() {
+        const ev = this.burstEvents;
+        this.burstEvents = [];
+        return ev;
+    }
     // ─── B1 波动检测：单 tick 任一股票涨跌 > 1.5%（黑天鹅/跳空/大单）→ 立即触发行业传导 ───
     hasVolatileMove() {
         for (const st of this.stocks.values()) {
@@ -427,6 +522,10 @@ let MarketDataService = class MarketDataService {
         const avgTurnover = (stock.avgVolume || 8000) * (Number(stock.price) || 1);
         const impact = Math.min(0.01, (turnover / Math.max(1, avgTurnover * 2)) * 0.5);
         const dir = (fill.side === 'BUY' || fill.side === 'COVER') ? 1 : -1;
+        // 经济泡沫：细小抛售戳破泡沫
+        if (dir < 0 && stock.industry) {
+            this.checkSellTrigger(stock.industry);
+        }
         stock.price = Math.max(0.5, stock.price * (1 + dir * impact));
         // 成交量并入当前 K 线（本 tick 的购买售出纳入图表与总额计算）
         const qty = Number(fill.filledQuantity) || 0;
@@ -516,6 +615,10 @@ let MarketDataService = class MarketDataService {
             // 价格冲击（上限 0.5%，防 AI 单边拉爆）
             const impact = Math.min(0.005, (qty / Math.max(1, target.baseVolume || 8000)) * 0.3);
             target.price = Math.max(0.5, target.price * (1 + dir * impact));
+            // AI 抛售也可戳破泡沫
+            if (dir < 0 && target.industry) {
+                this.checkSellTrigger(target.industry);
+            }
             target.lastVolume += qty;
             target.dayVolume += qty;
             // 并入当前 K 线
@@ -694,6 +797,10 @@ let MarketDataService = class MarketDataService {
         this.gameDay = maxDay + 1;
     }
     async endOfDay(skipPersist = false) {
+        // 内在价值每日微增（基本面缓慢向好，泡沫度相对下降）
+        for (const st of this.stocks.values()) {
+            st.intrinsic = (Number(st.intrinsic) || Number(st.price)) * 1.001;
+        }
         const batchKlines = [];
         for (const stock of this.stocks.values()) {
             // S1 持久化：1min / 5min / daily 全部落库（重启可恢复历史）
@@ -811,6 +918,7 @@ let MarketDataService = class MarketDataService {
     }
     // 股票列表：名称/行业/现价/涨跌幅/今开/高低/成交量（用于前端行情列表）
     getStockList() {
+        this.computeIndustryBubble();
         const list = [];
         for (const state of this.stocks.values()) {
             const prevClose = Number(state.prevClose) || Number(state.dayOpen) || 1;
@@ -830,6 +938,7 @@ let MarketDataService = class MarketDataService {
                 dayHigh: Number(state.dayHigh.toFixed(2)),
                 dayLow: Number(state.dayLow.toFixed(2)),
                 dayVolume: state.dayVolume,
+                bubble: Math.round((this.industryBubbleMap[state.industry] || 1) * 100) / 100,
             });
         }
         return list;
@@ -966,6 +1075,7 @@ let MarketDataService = class MarketDataService {
     }
     // ─── 玩法：每天开盘刷新（热点/IPO/黑天鹅），由 market.service 在 tickCounter===0 调用 ───
     startNewDay() {
+        this.maybeBurstBubble();
         this.refreshHotTopics();
         const ipo = this.maybeListIPO();
         const swan = this.maybeBlackSwan();
@@ -1090,7 +1200,8 @@ let MarketDataService = class MarketDataService {
         this.stocks.set(cfg.symbol, {
             symbol: cfg.symbol, name: cfg.name, industry: cfg.industry,
             code: cfg.code || '', listDate: cfg.listDate || '', description: cfg.description || '',
-            price, volatility: Number(cfg.sigma) * 0.5, lastReturn: 0,
+            price, intrinsic: price, // 内在价值（泡沫锚点）：初始=发行价，每日微增
+            volatility: Number(cfg.sigma) * 0.5, lastReturn: 0,
             prevClose: price, lastVolume: baseVol, avgVolume: baseVol, baseVolume: baseVol, prevVolume: baseVol,
             dayOpen: price, dayHigh: price, dayLow: price, dayVolume: 0, minuteCounter: 0,
             kline1min: [], kline5min: [], klineDaily: [], current1min: null, current5min: null, currentDaily: null,

@@ -1384,3 +1384,21 @@ body.density-compact .info-row { padding: 2px 0; }
   color: rgba(255, 255, 255, 0.45);
   margin-top: 6px;
 }
+
+/* ═══ 经济泡沫徽章 ═══ */
+.bubble-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  line-height: 16px;
+  margin-left: 4px;
+  cursor: help;
+}
+.bubble-badge.warn { color: #ffd43b; background: rgba(255, 212, 59, 0.15); border: 1px solid rgba(255, 212, 59, 0.4); }
+.bubble-badge.danger { color: #fff; background: #e03131; border: 1px solid #e03131; animation: bubble-pulse 1s infinite; }
+@keyframes bubble-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}

@@ -103,6 +103,14 @@ let MarketService = class MarketService {
             this.gateway.broadcastTick(ticks);
             const fills = await this.engine.checkPendingOrders();
             fills.forEach((f) => { this.gateway.broadcastFill(f); });
+            // 经济泡沫破灭广播
+            const bursts = marketData.getBurstEvents();
+            for (const b of bursts) {
+                this.gateway.broadcastNews({
+                    title: `💥 泡沫破灭：${b.industry} 板块崩盘`, description: `${b.reason}，板块股价向内在价值剧烈回归，谨防踩踏`, type: 'bearish', impact: {}, duration: 2,
+                });
+                this.logger.warn(`💥 [${market}] 泡沫破灭: ${b.industry}（${b.reason}）`);
+            }
             const counter = this[counterKey] || 0;
             if (counter === 0) {
                 // 玩法：热点/IPO/黑天鹅（各市场独立）
