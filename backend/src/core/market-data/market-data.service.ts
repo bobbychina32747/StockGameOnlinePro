@@ -370,6 +370,15 @@ let MarketDataService = class MarketDataService {
             stock.price = newPrice;
             this.updateTrend(stock, priceChange);
             // B1 波动检测：记录本 tick 前价（用于事件驱动传导判断）
+            // 价格安全网：单 tick 涨跌 ±10%（prevTickPrice 为本 tick 前价）
+            if (stock.prevTickPrice && stock.prevTickPrice > 0) {
+                const maxUp = stock.prevTickPrice * 1.1;
+                const maxDn = stock.prevTickPrice * 0.9;
+                if (stock.price > maxUp)
+                    stock.price = maxUp;
+                if (stock.price < maxDn)
+                    stock.price = maxDn;
+            }
             stock.prevTickPrice = stock.price;
             stock.lastReturn = priceChange;
             // prevClose 保持"昨收"不变（涨跌幅基准），仅由 endOfDay 更新
@@ -463,7 +472,8 @@ let MarketDataService = class MarketDataService {
             for (const [dst, w] of Object.entries(map)) {
                 if (mom[dst] == null || dst === src)
                     continue;
-                const boost = srcMom * w * 0.15;
+                // 单次传导上限 ±0.5%（防行业间正反馈滚雪球）
+                const boost = Math.max(-0.005, Math.min(0.005, srcMom * w * 0.15));
                 for (const st of this.stocks.values()) {
                     if (st.industry === dst) {
                         st.price = Math.max(0.5, st.price * (1 + boost));
@@ -498,7 +508,8 @@ let MarketDataService = class MarketDataService {
                 dir = ret > 0.015 ? -1 : ret < -0.015 ? 1 : (Math.random() < 0.5 ? 1 : -1);
             }
             else {
-                dir = ret >= 0 ? 1 : -1;
+                // 防自激：已大涨(>3%)不再追买、大跌(<-3%)不再追卖
+                dir = ret > 0.03 ? 0 : ret < -0.03 ? 0 : (ret >= 0 ? 1 : -1);
             }
             // 量级：按 agent scale × 随机
             const qty = Math.round(agent.scale * (0.5 + Math.random()));
@@ -527,7 +538,8 @@ let MarketDataService = class MarketDataService {
             sum += Number(i.changePct) || 0;
         }
         const avg = sum / idx.length; // 平均指数涨跌幅（%）
-        this.factors['市场情绪'] = this.clamp((this.factors['市场情绪'] ?? 0) + avg * 0.0008, -0.2, 0.2);
+        // 削弱系数：% 转小数 + 极弱反馈（一天最多 ~0.003，防正反馈自激爆炸）
+        this.factors['市场情绪'] = this.clamp((this.factors['市场情绪'] ?? 0) + avg * 0.00002, -0.1, 0.1);
     }
     // ─── 宏观反馈：股票表现反向影响宏观因子（双向联动，缓慢平滑防自激震荡） ───
     updateMacroFeedback() {
