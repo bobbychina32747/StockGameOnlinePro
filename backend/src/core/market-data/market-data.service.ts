@@ -40,7 +40,8 @@ let MarketDataService = class MarketDataService {
         // ─── 玩法引擎：热点题材 / IPO / 黑天鹅 / 分红 ───
         this.hotTopics = [];
         this.hotDay = -1;
-        this.ipoQueue = [...constants_1.IPO_POOL];
+        // IPO 池仅 A 股服务器使用（三服务器共用会重复上市同一新股 → UNIQUE 冲突）
+        this.ipoQueue = this.market === 'CN' ? [...constants_1.IPO_POOL] : [];
         this.nextIpoDay = 30;
         this.dayEvents = null;
         this.dividends = new Map<string, any[]>();
