@@ -77,7 +77,20 @@ export function OrderPanel() {
   const cash = Number(account?.cash ?? 0);
   const overBudget = orderSide === 'buy' && totalCost > cash && estimated > 0;
   const invalidQty = !orderQty || orderQty <= 0 || !Number.isInteger(Number(orderQty));
-  const canSubmit = !orderSubmitting && !invalidQty && !overBudget && effPrice > 0;
+  // S2 休市禁用：真实交易时段才可下单（每 10s 刷新）
+  const isTradingTimeNow = () => {
+    const now = new Date();
+    const day = now.getDay();
+    if (day === 0 || day === 6) return false;
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    return (minutes >= 570 && minutes < 690) || (minutes >= 780 && minutes < 900);
+  };
+  const [marketOpen, setMarketOpen] = useState(isTradingTimeNow());
+  useEffect(() => {
+    const id = setInterval(() => setMarketOpen(isTradingTimeNow()), 10000);
+    return () => clearInterval(id);
+  }, []);
+  const canSubmit = !orderSubmitting && !invalidQty && !overBudget && effPrice > 0 && marketOpen;
 
   // ─── 下单 ───
   const placeOrder = async () => {
@@ -205,7 +218,7 @@ export function OrderPanel() {
           )}
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn btn-primary" style={{ flex: 1 }} onClick={placeOrder} disabled={!canSubmit}>
-              {orderSubmitting ? '提交中...' : '确认下单'}
+              {!marketOpen ? '休市中（9:30-11:30/13:00-15:00）' : orderSubmitting ? '提交中...' : '确认下单'}
             </button>
             <button className="btn btn-danger btn-sm" onClick={quickClear}>清仓</button>
           </div>

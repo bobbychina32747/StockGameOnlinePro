@@ -34,16 +34,47 @@ let MarketService = class MarketService {
         this.tickCounter = 0;
         this.processing = false;
     }
+    // S2 真实交易时段判断：周一至周五 9:30-11:30 / 13:00-15:00
+    isTradingTime() {
+        const now = new Date();
+        const day = now.getDay();
+        if (day === 0 || day === 6)
+            return false; // 周末休市
+        const minutes = now.getHours() * 60 + now.getMinutes();
+        const morning = minutes >= 9 * 60 + 30 && minutes < 11 * 60 + 30;
+        const afternoon = minutes >= 13 * 60 && minutes < 15 * 60;
+        return morning || afternoon;
+    }
+    // S2 市场是否开市（供下单校验）
+    isMarketOpen() {
+        return this.isTradingTime();
+    }
     async onModuleInit() {
         await this.marketData.init();
+        // S2 启动校准：交易中启动时 tickCounter 对齐当前真实时段分钟数（避免误触发开盘/日终）
+        const now = new Date();
+        const minutes = now.getHours() * 60 + now.getMinutes();
+        if (minutes >= 570 && minutes < 690) {
+            this.tickCounter = minutes - 570;
+        }
+        else if (minutes >= 780 && minutes < 900) {
+            this.tickCounter = 120 + (minutes - 780);
+        }
+        else {
+            this.tickCounter = 0;
+        }
         this.startTickLoop();
-        this.logger.log('市场行情推送已启动');
+        this.logger.log('市场行情推送已启动（交易时段同步），tickCounter=' + this.tickCounter);
     }
     async startTickLoop() {
         const tick = async () => {
             if (this.processing) return;
             this.processing = true;
             try {
+                // S2 交易时段同步：休市（非9:30-11:30/13:00-15:00或周末）不生成行情
+                if (!this.isTradingTime()) {
+                    return;
+                }
                 const ticks = this.marketData.generateTick();
                 if (ticks.length > 0) {
                     const prices = {};
@@ -78,7 +109,7 @@ let MarketService = class MarketService {
                         await this.engine.resetBoughtToday();
                         const state = this.marketData.getState();
                         // 财报季（每 20 个交易日）
-                        if (this.marketData.gameDay > 0 && this.marketData.gameDay % 20 === 0) {
+                        if (this.marketData.gameDay > 0 && this.marketData.gameDay % 7 === 0) { // S2 节奏：财报季每周一次
                             const n = this.marketData.generateReports();
                             if (n > 0)
                                 this.logger.log(`📊 财报季: ${n} 家公司披露季度财报`);
@@ -88,7 +119,7 @@ let MarketService = class MarketService {
                             this.logger.log(`📰 ${news.title}`);
                         }
                     }
-                    if (this.tickCounter === 385) {
+                    if (this.tickCounter === 239) { // 分红/夜间事件
                         // 玩法：分红到账（当日财报季产生的分红）
                         try {
                             await this.engine.payDividends(this.marketData.getDividends(this.marketData.gameDay));
@@ -106,7 +137,7 @@ let MarketService = class MarketService {
                         }
                     }
                     // 日终：第 389 tick 结束时执行结算
-                    if (this.tickCounter === 389) {
+                    if (this.tickCounter === 239) { // 日终结算(最后tick)
                         await this.marketData.endOfDay();
                         const day = this.marketData.gameDay;
                         // F6 修复：日终结算所有账户（更新权益/峰值/快照，排行榜数据源）
@@ -117,7 +148,7 @@ let MarketService = class MarketService {
                         await this.engine.forceLiquidateMarginalAccounts();
                         this.logger.log(`📅 第 ${day} 个交易日结束`);
                     }
-                    this.tickCounter = (this.tickCounter + 1) % 390;
+                    this.tickCounter = (this.tickCounter + 1) % 240;
                 }
             }
             catch (e) {

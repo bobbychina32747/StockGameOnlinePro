@@ -147,15 +147,40 @@ let MarketDataService = class MarketDataService {
                 isTrending: false,
             });
         }
-        // Q2 历史 30 天：让 daily/周线/月线与回测真正可用（1min 保留最近 2000 根）
-        for (let d = 0; d < 30; d++) {
-            for (let t = 0; t < constants_1.MARKET.TICKS_PER_DAY; t++) {
-                this.generateTick();
+        // S1 历史持久化：若 klines 表已有历史则恢复，否则生成 30 天初始历史并落库
+        const historyRows = await this.klineRepo.find({ order: { time: 'ASC' } });
+        if (historyRows.length > 0) {
+            this.restoreFromHistory(historyRows);
+            // S1 补齐：恢复的天数不足 30 天则补生成（内存，不落库）
+            const missingDays = Math.max(0, 30 - this.gameDay);
+            for (let d = 0; d < missingDays; d++) {
+                for (let t = 0; t < constants_1.MARKET.TICKS_PER_DAY; t++) {
+                    this.generateTick();
+                }
+                await this.endOfDay(true);
             }
-            await this.endOfDay();
+            this.logger.log(`[S1] 已恢复历史K线 ${historyRows.length} 条, 从第 ${this.gameDay} 个交易日继续（补齐 ${missingDays} 天）`);
+        } else {
+            for (let d = 0; d < 30; d++) {
+                for (let t = 0; t < constants_1.MARKET.TICKS_PER_DAY; t++) {
+                    this.generateTick();
+                }
+                await this.endOfDay(true); // skipPersist：初始30天仅内存生成(快速)
+            }
+            // 注意：不重置 gameDay，历史 30 天用 0..29，实时从 30 开始，避免 K 线时间戳重叠
+            this.logger.log(`市场数据已初始化(首次): ${dbStocks.length} 只股票, 30天历史已生成并落库`);
         }
-        // 注意：不重置 gameDay，历史 30 天用 0..29，实时从 30 开始，避免 K 线时间戳重叠
-        this.logger.log(`市场数据已初始化: ${dbStocks.length} 只股票`);
+        // 恢复/生成后：确保最新价格作为开盘基准
+        for (const st of this.stocks.values()) {
+            const last = st.klineDaily[st.klineDaily.length - 1];
+            if (last && st.dayOpen === st.price) {
+                st.price = last.close;
+                st.prevClose = st.klineDaily.length > 1 ? st.klineDaily[st.klineDaily.length - 2].close : last.close;
+                st.dayOpen = last.close;
+                st.dayHigh = last.close;
+                st.dayLow = last.close;
+            }
+        }
     }
     start() {
         if (this.isRunning)
@@ -380,8 +405,13 @@ let MarketDataService = class MarketDataService {
             };
         });
     }
+    // S2 交易时段时间映射：0-119 → 9:30-11:30；120-239 → 13:00-15:00（真实A股时段）
+    tradingTime(day, minute) {
+        if (minute < 120) return new Date(2024, 0, 1 + day, 9, 30 + minute, 0);
+        return new Date(2024, 0, 1 + day, 13, minute - 120, 0);
+    }
     updateKlines(stock) {
-        // 每 tick 即 1 分钟（TICKS_PER_DAY=390=A股分钟数），minuteCounter 每天 0 起
+        // 每 tick 即 1 分钟（TICKS_PER_DAY=240=A股真实交易分钟数），minuteCounter 每天 0 起
         const minute = stock.minuteCounter;
         const price = stock.price;
         const volume = stock.lastVolume;
@@ -394,7 +424,7 @@ let MarketDataService = class MarketDataService {
             }
             stock.current1min = {
                 startMinute: minute,
-                time: new Date(2024, 0, 1 + this.gameDay, 9, 30 + minute, 0),
+                time: this.tradingTime(this.gameDay, minute),
                 open: price, high: price, low: price, close: price, volume: 0,
             };
         }
@@ -413,7 +443,7 @@ let MarketDataService = class MarketDataService {
             }
             stock.current5min = {
                 startFiveIdx: fiveIdx,
-                time: new Date(2024, 0, 1 + this.gameDay, 9, 30 + fiveIdx * 5, 0),
+                time: this.tradingTime(this.gameDay, fiveIdx * 5),
                 open: price, high: price, low: price, close: price, volume: 0,
             };
         }
@@ -435,31 +465,78 @@ let MarketDataService = class MarketDataService {
             stock.currentDaily.volume = stock.dayVolume;
         }
     }
-    async endOfDay() {
+    // S1 从 klines 表恢复历史（1min/5min/daily + gameDay + 价格）
+    restoreFromHistory(rows) {
+        const BASE = new Date(2024, 0, 1).getTime();
+        const DAY_MS = 86400000;
+        const byStock = {};
+        for (const r of rows) {
+            if (!byStock[r.symbol])
+                byStock[r.symbol] = { '1min': [], '5min': [], daily: [] };
+            const bar = {
+                time: new Date(r.time),
+                open: r.open, high: r.high, low: r.low, close: r.close, volume: r.volume,
+            };
+            if (r.timeframe === '1min') byStock[r.symbol]['1min'].push(bar);
+            else if (r.timeframe === '5min') byStock[r.symbol]['5min'].push(bar);
+            else byStock[r.symbol].daily.push(bar);
+        }
+        const dedupe = (arr) => {
+            const seen = new Set();
+            return arr.filter((b) => {
+                const k = new Date(b.time).getTime();
+                if (seen.has(k))
+                    return false;
+                seen.add(k);
+                return true;
+            });
+        };
+        let maxDay = -1;
+        for (const st of this.stocks.values()) {
+            const h = byStock[st.symbol] || { '1min': [], '5min': [], daily: [] };
+            st.kline1min = dedupe(h['1min']);
+            st.kline5min = dedupe(h['5min']);
+            st.klineDaily = dedupe(h.daily);
+            for (const d of st.klineDaily) {
+                const day = Math.floor((new Date(d.time).getTime() - BASE) / DAY_MS);
+                if (day > maxDay)
+                    maxDay = day;
+            }
+        }
+        this.gameDay = maxDay + 1;
+    }
+    async endOfDay(skipPersist = false) {
         const batchKlines = [];
         for (const stock of this.stocks.values()) {
+            // S1 持久化：1min / 5min / daily 全部落库（重启可恢复历史）
+            const persistBar = (timeframe, bar) => {
+                try {
+                    batchKlines.push(this.klineRepo.create({
+                        symbol: stock.symbol,
+                        timeframe,
+                        time: bar.time,
+                        open: bar.open,
+                        high: bar.high,
+                        low: bar.low,
+                        close: bar.close,
+                        volume: bar.volume,
+                    }));
+                } catch (e) { }
+            };
             if (stock.current1min) {
                 stock.kline1min.push(stock.current1min);
+                persistBar('1min', stock.current1min);
                 stock.current1min = null;
             }
             if (stock.current5min) {
                 stock.kline5min.push(stock.current5min);
+                persistBar('5min', stock.current5min);
                 stock.current5min = null;
             }
             if (stock.currentDaily) {
                 stock.klineDaily.push(stock.currentDaily);
-                try {
-                    batchKlines.push(this.klineRepo.create({
-                        symbol: stock.symbol,
-                        timeframe: 'daily',
-                        time: stock.currentDaily.time,
-                        open: stock.currentDaily.open,
-                        high: stock.currentDaily.high,
-                        low: stock.currentDaily.low,
-                        close: stock.currentDaily.close,
-                        volume: stock.currentDaily.volume,
-                    }));
-                } catch (e) { }
+                if (!skipPersist)
+                    persistBar('daily', stock.currentDaily);
                 stock.currentDaily = null;
             }
             if (Math.random() < constants_1.BLACK_SWAN.probability) {
@@ -482,7 +559,33 @@ let MarketDataService = class MarketDataService {
             stock.trendDirection = 0;
             stock.trendAccumulated = 0;
         }
-        // 批量写入日K线
+        // S1 补：当天完整 1min/5min 落库（current 只是最后一根，完整历史必须全量）
+        if (!skipPersist) {
+        const dayStart = new Date(2024, 0, 1 + this.gameDay).getTime();
+        for (const stock of this.stocks.values()) {
+            for (const bar of stock.kline1min) {
+                if (new Date(bar.time).getTime() >= dayStart) {
+                    try {
+                        batchKlines.push(this.klineRepo.create({
+                            symbol: stock.symbol, timeframe: '1min',
+                            time: bar.time, open: bar.open, high: bar.high, low: bar.low, close: bar.close, volume: bar.volume,
+                        }));
+                    } catch (e) { }
+                }
+            }
+            for (const bar of stock.kline5min) {
+                if (new Date(bar.time).getTime() >= dayStart) {
+                    try {
+                        batchKlines.push(this.klineRepo.create({
+                            symbol: stock.symbol, timeframe: '5min',
+                            time: bar.time, open: bar.open, high: bar.high, low: bar.low, close: bar.close, volume: bar.volume,
+                        }));
+                    } catch (e) { }
+                }
+            }
+        }
+        }
+        // 批量写入（daily + 当天完整 1min/5min）
         if (batchKlines.length > 0) {
             try {
                 await this.klineRepo.save(batchKlines);
@@ -729,7 +832,7 @@ let MarketDataService = class MarketDataService {
             listed.push(cfg);
             this.logger.log('🚀 新股上市: ' + cfg.name + ' (' + cfg.code + ') 发行价 ' + price + ' 元');
         }
-        this.nextIpoDay = this.gameDay + 30;
+        this.nextIpoDay = this.gameDay + 10; // S2 节奏适配：真实日同步后缩短（30游戏日≈6周太慢）
         return { listed };
     }
     // 黑天鹅：3% 概率，市场级/板块级/个股级冲击

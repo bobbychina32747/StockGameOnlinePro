@@ -10,17 +10,23 @@ const REGIME_LABEL: Record<string, string> = {
   volatile: '剧烈波动',
 };
 
-// A2 时段同步：由 WS tick 的 timestamp（游戏内 tickCount）计算游戏内时间
-// TICKS_PER_DAY=390 → 9:30 起每分钟 1 tick，9:30~16:00 连续竞价
-function gameSession(tickCount?: number): { label: string; open: boolean } {
-  if (tickCount == null) return { label: '--', open: false };
-  const dayTick = ((tickCount % 390) + 390) % 390;
-  if (dayTick >= 390) return { label: '已收盘', open: false };
-  if (dayTick === 0) return { label: '开盘', open: true };
-  const mins = 9 * 60 + 30 + dayTick;
-  const hh = String(Math.floor(mins / 60)).padStart(2, '0');
-  const mm = String(mins % 60).padStart(2, '0');
-  return { label: `盘中 ${hh}:${mm}`, open: true };
+// S2 时段与本地时钟完全同步：真实A股时段（周一至周五 9:30-11:30 / 13:00-15:00）
+function gameSession(): { label: string; open: boolean } {
+  const now = new Date();
+  const day = now.getDay();
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  if (day === 0 || day === 6) return { label: '周末休市', open: false };
+  if (minutes >= 570 && minutes < 690) {
+    const t = minutes - 570;
+    return { label: '盘中 ' + String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'), open: true };
+  }
+  if (minutes >= 690 && minutes < 780) return { label: '午间休市', open: false };
+  if (minutes >= 780 && minutes < 900) {
+    const t = minutes - 780;
+    return { label: '盘中 ' + String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'), open: true };
+  }
+  if (minutes >= 900) return { label: '已收盘', open: false };
+  return { label: '未开盘', open: false };
 }
 
 // 顶部大盘指数条 + 涨跌家数（S3）+ 交易时段（A2）+ 市场状态
@@ -30,9 +36,7 @@ export function MarketIndexBar() {
   const stocks = useMarketStore((s) => s.stocks);
   const marketRegime = useMarketStore((s) => s.marketRegime);
   const gameDay = useMarketStore((s) => s.gameDay);
-  const ticks = useMarketStore((s) => s.ticks);
-  const lastTick = ticks[ticks.length - 1];
-  const session = gameSession(lastTick?.timestamp);
+  const session = gameSession();
 
   useEffect(() => {
     let alive = true;

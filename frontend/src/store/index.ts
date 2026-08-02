@@ -62,9 +62,12 @@ export const useMarketStore = create<MarketState>((set) => ({
       const prices = { ...state.prices, [tick.symbol]: tick.price };
       const ticks = [...state.ticks.slice(-100), tick];
       // Q5：由 tick 实时维护 1min K 线（tick=1分钟，后端 bar 时间公式同步复现）
-      const gameDay = Math.floor(tick.timestamp / 390);
-      const dayTick = tick.timestamp % 390;
-      const time = new Date(2024, 0, 1 + gameDay, 9, 30 + dayTick).toISOString();
+      // S2 时段同步：TICKS_PER_DAY=240，1min 时间映射真实A股时段(0-119→9:30-11:30, 120-239→13:00-15:00)
+      const gameDay = Math.floor(tick.timestamp / 240);
+      const dayTick = tick.timestamp % 240;
+      const time = (dayTick < 120
+        ? new Date(2024, 0, 1 + gameDay, 9, 30 + dayTick)
+        : new Date(2024, 0, 1 + gameDay, 13, dayTick - 120)).toISOString();
       const klines = { ...state.klines };
       const symKlines = { ...(klines[tick.symbol] || {}) };
       const arr = (symKlines['1min'] || []).slice();
