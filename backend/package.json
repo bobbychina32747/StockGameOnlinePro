@@ -1,6 +1,6 @@
 {
   "name": "stock-game-online-pro-backend",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "StockSim Pro - Backend (NestJS)",
   "private": true,
   "scripts": {
