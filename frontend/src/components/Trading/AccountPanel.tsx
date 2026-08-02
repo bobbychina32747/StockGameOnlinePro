@@ -74,9 +74,9 @@ export function AccountPanel() {
         <div className="info-row" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 6, marginTop: 4 }}>
           <span className="label">交易模式</span>
           <span className="value" style={{ fontSize: 11 }}>
-            {isCN ? '🇨🇳 A股 T+1' : '🇺🇸 美股 T+0'}
-            <button className="btn btn-ghost btn-sm" style={{ marginLeft: 6 }} onClick={() => switchMode(isCN ? 'US' : 'CN')}>
-              {isCN ? '切美股' : '切A股'}
+            {mode === 'CN' ? '🇨🇳 A股 T+1' : mode === 'HK' ? '🇭🇰 港股 T+0' : '🇺🇸 美股 T+0'}
+            <button className="btn btn-ghost btn-sm" style={{ marginLeft: 6 }} onClick={() => switchMode(mode === 'CN' ? 'HK' : mode === 'HK' ? 'US' : 'CN')}>
+              {mode === 'CN' ? '切港股' : mode === 'HK' ? '切美股' : '切A股'}
             </button>
           </span>
         </div>

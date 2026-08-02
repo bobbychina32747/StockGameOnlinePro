@@ -40,7 +40,7 @@ let AuthService = class AuthService {
         const hashed = await bcrypt.hash(password, 10);
         const user = this.userRepo.create({ username, password: hashed });
         await this.userRepo.save(user);
-        for (const mode of ['US', 'CN']) {
+        for (const mode of ['CN', 'HK', 'US']) { // B1 多市场：A股/港股/美股三账户
             const account = this.accountRepo.create({
                 userId: user.id,
                 marketMode: mode,

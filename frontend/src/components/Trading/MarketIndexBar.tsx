@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { marketApi } from '../../services/api.client';
-import { useMarketStore } from '../../store';
+import { useMarketStore, useUIStore } from '../../store';
 import { marketBreadth } from '../../utils/quote';
 
 const REGIME_LABEL: Record<string, string> = {
@@ -35,6 +35,7 @@ export function MarketIndexBar() {
   const [hotTopics, setHotTopics] = useState<any[]>([]);
   const stocks = useMarketStore((s) => s.stocks);
   const marketRegime = useMarketStore((s) => s.marketRegime);
+  const marketMode = useUIStore((s) => s.marketMode);
   const gameDay = useMarketStore((s) => s.gameDay);
   const session = gameSession();
 
@@ -62,7 +63,7 @@ export function MarketIndexBar() {
 
   return (
     <div className="market-index-bar">
-      {indices.map((idx) => {
+      {indices.filter((idx) => !idx.market || idx.market === marketMode).map((idx) => {
         const up = idx.changePct >= 0;
         return (
           <span key={idx.code} className={`index-item ${up ? 'up' : 'down'}`}>

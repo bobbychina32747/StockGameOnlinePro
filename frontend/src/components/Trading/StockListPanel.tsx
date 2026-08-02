@@ -33,7 +33,11 @@ export function StockListPanel() {
     return () => clearInterval(timer);
   }, [setStocks]);
 
-  const sorted = useMemo(() => [...stocks].sort((a, b) => (a.symbol < b.symbol ? -1 : 1)), [stocks]);
+  // B1 多市场：按当前市场过滤（HK/US/CN），自选视图跨市场
+  const sorted = useMemo(() => {
+    const all = [...stocks].sort((a, b) => (a.symbol < b.symbol ? -1 : 1));
+    return all.filter((s) => !s.market || s.market === marketMode);
+  }, [stocks, marketMode]);
 
   // 搜索过滤（代码/名称）
   const filtered = useMemo(() => {
@@ -49,6 +53,9 @@ export function StockListPanel() {
   const list = view === 'fav'
     ? filtered.filter((s) => favoriteSymbols.includes(s.symbol))
     : filtered;
+  // B1 自选跨市场：若当前市场无自选股，显示全部自选（跨市场）
+  const favAll = useMemo(() => stocks.filter((s) => favoriteSymbols.includes(s.symbol)), [stocks, favoriteSymbols]);
+  const effectiveList = view === 'fav' && list.length === 0 && favAll.length > 0 ? favAll : list;
 
   // 行业板块聚合（S2）
   const boards = useMemo(() => {
@@ -119,7 +126,7 @@ export function StockListPanel() {
                 {view === 'fav' ? '暂无自选，点击列表名称旁 ☆ 添加' : '加载中...'}
               </div>
             )}
-            {list.map((s) => {
+            {effectiveList.map((s) => {
               const q = liveQuote(stocks, prices, s.symbol);
               const price = q.price;
               const changePct = q.changePct;

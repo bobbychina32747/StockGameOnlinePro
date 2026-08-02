@@ -56,6 +56,7 @@ let MarketDataService = class MarketDataService {
         }
         // 迁移：旧库补 industry/code/listDate/description 列（SQLite ALTER，幂等）
         const migrateCols = [
+            ['market', 'varchar DEFAULT "CN"'],
             ['industry', 'varchar DEFAULT "综合"'],
             ['code', 'varchar DEFAULT ""'],
             ['listDate', 'varchar DEFAULT ""'],
@@ -69,10 +70,12 @@ let MarketDataService = class MarketDataService {
                 // 列已存在时忽略
             }
         }
+        // B1 多市场：统一池 = A股 + 港股 + 美股
+        const ALL_POOL = [...constants_1.STOCK_POOL, ...constants_1.HK_POOL, ...constants_1.US_POOL];
         // 迁移：按股票池补齐已存在股票的行业与 lore 字段
         try {
-            for (const cfg of constants_1.STOCK_POOL) {
-                await this.stockRepo.query(`UPDATE stocks SET industry='${cfg.industry}', code='${cfg.code}', listDate='${cfg.listDate}', description='${(cfg.description || '').replace(/'/g, "''")}' WHERE symbol='${cfg.symbol}'`);
+            for (const cfg of ALL_POOL) {
+                await this.stockRepo.query(`UPDATE stocks SET market='${(((cfg as any).market || 'CN'))}', industry='${cfg.industry}', code='${cfg.code}', listDate='${cfg.listDate}', description='${(cfg.description || '').replace(/'/g, "''")}' WHERE symbol='${cfg.symbol}'`);
             }
         }
         catch (e) {
@@ -80,7 +83,7 @@ let MarketDataService = class MarketDataService {
         }
         let dbStocks = await this.stockRepo.find({ where: { isActive: true } });
         // 迁移：不在股票池的旧股票（如历史 A/B）标记停用
-        const poolSymbols = new Set(constants_1.STOCK_POOL.map((c) => c.symbol));
+        const poolSymbols = new Set(ALL_POOL.map((c) => c.symbol));
         for (const s of dbStocks) {
             if (!poolSymbols.has(s.symbol)) {
                 s.isActive = false;
@@ -90,7 +93,7 @@ let MarketDataService = class MarketDataService {
         dbStocks = dbStocks.filter((s) => poolSymbols.has(s.symbol));
         // 增量补齐：按 symbol 缺失创建（兼容旧库升级）
         const existingSymbols = new Set(dbStocks.map((s) => s.symbol));
-        for (const cfg of constants_1.STOCK_POOL) {
+        for (const cfg of ALL_POOL) {
             if (existingSymbols.has(cfg.symbol)) continue;
             const stock = this.stockRepo.create({
                 symbol: cfg.symbol,
@@ -101,6 +104,7 @@ let MarketDataService = class MarketDataService {
                 theta: cfg.theta,
             });
             // 直接赋值（避免 create 对实例属性的过滤问题）
+            stock.market = (((cfg as any).market || 'CN'));
             stock.industry = cfg.industry;
             stock.code = cfg.code;
             stock.listDate = cfg.listDate;
@@ -108,7 +112,7 @@ let MarketDataService = class MarketDataService {
             await this.stockRepo.save(stock);
             dbStocks.push(stock);
         }
-        for (const cfg of constants_1.STOCK_POOL) {
+        for (const cfg of ALL_POOL) {
             this.poolBySymbol.set(cfg.symbol, cfg);
         }
         for (const s of dbStocks) {
@@ -118,6 +122,7 @@ let MarketDataService = class MarketDataService {
             this.stocks.set(s.symbol, {
                 symbol: s.symbol,
                 name: s.name,
+                market: s.market || 'CN',
                 industry: s.industry || '综合',
                 code: s.code || '',
                 listDate: s.listDate || '',
@@ -387,6 +392,10 @@ let MarketDataService = class MarketDataService {
             { code: '399006', name: '创业板指', base: 2200, filter: (s) => /^300/.test(s.code || '') },
             { code: '000688', name: '科创50', base: 950, filter: (s) => /^688/.test(s.code || '') },
             { code: '399999', name: '中证文娱', base: 1200, filter: (s) => /^(G|V)/.test(s.symbol) },
+            // B1 多市场指数
+            { code: 'HSI', name: '恒生指数', market: 'HK', base: 18500, filter: (s) => s.market === 'HK' },
+            { code: 'NDX', name: '纳斯达克', market: 'US', base: 16500, filter: (s) => s.market === 'US' && /^(U[1-4])/.test(s.symbol) },
+            { code: 'DJI', name: '道琼斯', market: 'US', base: 38500, filter: (s) => s.market === 'US' && /^(U[5-8])/.test(s.symbol) },
         ];
         return defs.map((d) => {
             const members = [...this.stocks.values()].filter((st) => d.filter(st));
@@ -628,6 +637,7 @@ let MarketDataService = class MarketDataService {
             const prevClose = Number(state.prevClose) || Number(state.dayOpen) || 1;
             list.push({
                 symbol: state.symbol,
+                market: state.market || 'CN',
                 name: state.name || state.symbol,
                 code: state.code || '',
                 listDate: state.listDate || '',

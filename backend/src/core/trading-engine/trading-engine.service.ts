@@ -263,7 +263,7 @@ let TradingEngineService = class TradingEngineService {
     }
     // ─── 费用计算（市价单与挂单触发共用） ───
     calcFees(side, turnover, qty = 0, mode = 'US') {
-        const fees = mode === 'CN' ? constants_1.CN_FEES : constants_1.US_FEES;
+        const fees = mode === 'CN' ? constants_1.CN_FEES : mode === 'HK' ? constants_1.HK_FEES : constants_1.US_FEES;
         const commission = Math.max(turnover * fees.commissionRate, fees.minCommission);
         const stampDuty = (side === order_entity_1.OrderSide.SELL || side === order_entity_1.OrderSide.COVER) ? turnover * fees.stampDutyRate : 0;
         const transferFee = turnover * fees.transferFeeRate;

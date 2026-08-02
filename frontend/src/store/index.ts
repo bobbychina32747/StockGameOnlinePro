@@ -173,7 +173,7 @@ export const useUIStore = create<UIState>((set) => ({
   setSelectedSymbol: (s) => { localStorage.setItem('ss.symbol', s); set({ selectedSymbol: s }); },
   selectedTimeframe: localStorage.getItem('ss.tf') || '1min',
   setSelectedTimeframe: (tf) => { localStorage.setItem('ss.tf', tf); set({ selectedTimeframe: tf }); },
-  marketMode: localStorage.getItem('ss.mode') || 'US',
+  marketMode: localStorage.getItem('ss.mode') || 'CN', // B1 多市场：CN/HK/US
   setMarketMode: (mode) => { localStorage.setItem('ss.mode', mode); set({ marketMode: mode }); },
   detailSymbol: null,
   setDetailSymbol: (s) => set({ detailSymbol: s }),

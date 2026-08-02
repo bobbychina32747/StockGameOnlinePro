@@ -9,6 +9,8 @@ export const MARKET = {
     TICK_INTERVAL_MS: 1000,
 };
 
+// B1 多市场：A股池（market 默认 CN），港股 HK_POOL / 美股 US_POOL 见下
+// B1 多市场：A股池（market 默认 CN），港股 HK_POOL / 美股 US_POOL 见下
 export const STOCK_POOL = [
     // 科技（高波动、高景气敏感）
     { symbol: 'T1', name: '芯澜半导体', code: '688001', listDate: '2019-08-12', industry: '半导体', initialPrice: 45, mu: 45, sigma: 0.028, theta: 0.10, description: '专注 AI 推理芯片与低功耗算力，为游戏主机与智能终端提供边缘计算方案，自研架构已流片三代。' },
@@ -101,6 +103,20 @@ export const US_FEES = {
     priceLimit: null,
 };
 
+
+// B1 港股费率：佣金0.03%最低50 + 印花税0.13%(卖出) + 交易征费0.0027% + 交易费0.005%
+export const HK_FEES = {
+    commissionRate: 0.0003,
+    stampDutyRate: 0.0013,
+    transferFeeRate: 0.000077,
+    minCommission: 50,
+    secFeeRate: 0.000027,
+    tafFeePerShare: 0,
+};
+
+
+
+
 export const CN_FEES = {
     commissionRate: 0.00025,
     stampDutyRate: 0.001,
@@ -161,6 +177,32 @@ export const NEWS_PROBABILITY = 0.7;
 
 
 // S2 真实交易时段（本地时钟）：周一至周五 9:30-11:30 / 13:00-15:00
+
+// B1 港股池（虚构，港股风格：5位代码/中文名）
+export const HK_POOL = [
+    { market: 'HK', symbol: 'H1', name: '云顶网络', code: '00700', listDate: '2004-06-16', industry: '互联网', initialPrice: 320, mu: 320, sigma: 0.022, theta: 0.12, description: '社交平台与游戏巨头，旗下「云讯」国民级应用覆盖超十亿用户，游戏与广告双轮驱动。' },
+    { market: 'HK', symbol: 'H2', name: '金港电信', code: '00941', listDate: '2002-10-09', industry: '通信', initialPrice: 68, mu: 68, sigma: 0.018, theta: 0.10, description: '粤港澳大湾区主导运营商，5G 基建与云计算业务稳步扩张，派息稳定著称。' },
+    { market: 'HK', symbol: 'H3', name: '云帆电商', code: '09988', listDate: '2019-11-26', industry: '电商', initialPrice: 88, mu: 88, sigma: 0.026, theta: 0.15, description: '跨境电商平台，海外仓网络覆盖 40+ 国家，新兴市场 GMV 高速增长。' },
+    { market: 'HK', symbol: 'H4', name: '美图生活', code: '03690', listDate: '2018-09-20', industry: '消费', initialPrice: 128, mu: 128, sigma: 0.024, theta: 0.14, description: '本地生活服务龙头，外卖与到店业务双线并进，即时零售打开第二曲线。' },
+    { market: 'HK', symbol: 'H5', name: '华融银行', code: '01398', listDate: '2005-10-27', industry: '银行', initialPrice: 5.2, mu: 5.2, sigma: 0.012, theta: 0.08, description: '大湾区跨境金融服务平台，绿色金融与数字银行转型，分红率常年领先同业。' },
+    { market: 'HK', symbol: 'H6', name: '港能集团', code: '00002', listDate: '1990-01-02', industry: '公用事业', initialPrice: 52, mu: 52, sigma: 0.010, theta: 0.07, description: '香港电力与燃气双牌照运营商，新能源业务占比提升，现金牛属性突出。' },
+    { market: 'HK', symbol: 'H7', name: '辉腾医药', code: '01093', listDate: '2000-12-19', industry: '医药', initialPrice: 42, mu: 42, sigma: 0.020, theta: 0.11, description: '创新药出海先锋，多款药物获海外上市批准，license-out 收入持续落地。' },
+    { market: 'HK', symbol: 'H8', name: '长桥地产', code: '01113', listDate: '1972-11-01', industry: '地产', initialPrice: 36, mu: 36, sigma: 0.025, theta: 0.16, description: '港岛核心商业地产持有者，写字楼与零售组合穿越周期，低估值高股息。' },
+];
+
+// B1 美股池（虚构，美股风格：字母代码/英文名）
+export const US_POOL = [
+    { market: 'US', symbol: 'U1', name: 'NovaChip', code: 'NVDA', listDate: '1999-01-22', industry: '半导体', initialPrice: 480, mu: 480, sigma: 0.035, theta: 0.12, description: 'AI 算力芯片霸主，GPU 数据中心营收爆发式增长，先进制程代工产能紧俏。' },
+    { market: 'US', symbol: 'U2', name: 'GalaxyNet', code: 'META', listDate: '2012-05-18', industry: '人工智能', initialPrice: 210, mu: 210, sigma: 0.030, theta: 0.13, description: '社交网络与元宇宙平台，AI 推荐引擎提升广告效率，VR 生态初见规模。' },
+    { market: 'US', symbol: 'U3', name: 'VoltAuto', code: 'TSLA', listDate: '2010-06-29', industry: '新能源', initialPrice: 180, mu: 180, sigma: 0.040, theta: 0.18, description: '电动车与储能巨头，全球超级工厂产能爬坡，Robotaxi 与机器人业务点燃想象。' },
+    { market: 'US', symbol: 'U4', name: 'CloudPeak', code: 'MSFT', listDate: '1986-03-13', industry: '软件', initialPrice: 310, mu: 310, sigma: 0.020, theta: 0.09, description: '云与企业软件双巨头，Copilot 全线渗透，Azure 增速领先主要对手。' },
+    { market: 'US', symbol: 'U5', name: 'QuantumPay', code: 'VISA', listDate: '2008-03-19', industry: '金融科技', initialPrice: 260, mu: 260, sigma: 0.018, theta: 0.08, description: '全球支付网络，跨境清算壁垒深，消费复苏与数字钱包打开增量空间。' },
+    { market: 'US', symbol: 'U6', name: 'MedForge', code: 'JNJ', listDate: '1944-09-05', industry: '医药', initialPrice: 150, mu: 150, sigma: 0.015, theta: 0.08, description: '医疗健康巨头，制药+器械+消费健康三引擎，创新管线后劲充足。' },
+    { market: 'US', symbol: 'U7', name: 'FalconAero', code: 'BA', listDate: '1934-09-05', industry: '军工', initialPrice: 190, mu: 190, sigma: 0.028, theta: 0.14, description: '航空航天与防务龙头，窄体机订单积压创纪录，国防预算上行周期受益。' },
+    { market: 'US', symbol: 'U8', name: 'RiverBank', code: 'JPM', listDate: '1969-01-02', industry: '银行', initialPrice: 140, mu: 140, sigma: 0.016, theta: 0.07, description: '全能银行巨头，投行与财富管理双轮驱动，利率高位净息差改善明显。' },
+];
+
+
 export function isTradingTimeNow() {
     const now = new Date();
     const day = now.getDay();
