@@ -188,9 +188,13 @@ export const HK_POOL = [
     { market: 'HK', symbol: 'H6', name: '港能集团', code: '00002', listDate: '1990-01-02', industry: '公用事业', initialPrice: 52, mu: 52, sigma: 0.010, theta: 0.07, description: '香港电力与燃气双牌照运营商，新能源业务占比提升，现金牛属性突出。' },
     { market: 'HK', symbol: 'H7', name: '辉腾医药', code: '01093', listDate: '2000-12-19', industry: '医药', initialPrice: 42, mu: 42, sigma: 0.020, theta: 0.11, description: '创新药出海先锋，多款药物获海外上市批准，license-out 收入持续落地。' },
     { market: 'HK', symbol: 'H8', name: '长桥地产', code: '01113', listDate: '1972-11-01', industry: '地产', initialPrice: 36, mu: 36, sigma: 0.025, theta: 0.16, description: '港岛核心商业地产持有者，写字楼与零售组合穿越周期，低估值高股息。' },
+    { market: 'HK', symbol: 'H9', name: '裕丰保险', code: '01299', listDate: '2004-06-24', industry: '保险', initialPrice: 58, mu: 58, sigma: 0.018, theta: 0.10, description: '亚太寿险龙头，代理人渠道转型数字化，健康险与养老险双赛道扩张，内含价值持续增长。' },
+    { market: 'HK', symbol: 'H10', name: '环球航运', code: '01919', listDate: '2005-06-30', industry: '航运', initialPrice: 14, mu: 14, sigma: 0.028, theta: 0.16, description: '全球集装箱航运巨头，运力规模前三，运价周期弹性大，长协与自有码头平滑波动。' },
+    { market: 'HK', symbol: 'H11', name: '皇冠珠宝', code: '01929', listDate: '2011-12-15', industry: '消费', initialPrice: 9.6, mu: 9.6, sigma: 0.020, theta: 0.12, description: '黄金珠宝零售龙头，门店超 7000 家，婚嫁与保值需求双驱动，金价上行周期受益。' },
+    { market: 'HK', symbol: 'H12', name: '湾区制造', code: '02333', listDate: '2003-12-30', industry: '制造业', initialPrice: 12.8, mu: 12.8, sigma: 0.022, theta: 0.13, description: '高端装备制造集团，工程机械出口全球前五，氢能设备与电动重卡打开第二曲线。' },
 ];
 
-// B1 美股池（虚构，美股风格：字母代码/英文名）
+// B1 美股池（虚构，美股风格：字母代码/英文名，FAANG 大企业特色）
 export const US_POOL = [
     { market: 'US', symbol: 'U1', name: 'NovaChip', code: 'NVDA', listDate: '1999-01-22', industry: '半导体', initialPrice: 480, mu: 480, sigma: 0.035, theta: 0.12, description: 'AI 算力芯片霸主，GPU 数据中心营收爆发式增长，先进制程代工产能紧俏。' },
     { market: 'US', symbol: 'U2', name: 'GalaxyNet', code: 'META', listDate: '2012-05-18', industry: '人工智能', initialPrice: 210, mu: 210, sigma: 0.030, theta: 0.13, description: '社交网络与元宇宙平台，AI 推荐引擎提升广告效率，VR 生态初见规模。' },
@@ -200,8 +204,11 @@ export const US_POOL = [
     { market: 'US', symbol: 'U6', name: 'MedForge', code: 'JNJ', listDate: '1944-09-05', industry: '医药', initialPrice: 150, mu: 150, sigma: 0.015, theta: 0.08, description: '医疗健康巨头，制药+器械+消费健康三引擎，创新管线后劲充足。' },
     { market: 'US', symbol: 'U7', name: 'FalconAero', code: 'BA', listDate: '1934-09-05', industry: '军工', initialPrice: 190, mu: 190, sigma: 0.028, theta: 0.14, description: '航空航天与防务龙头，窄体机订单积压创纪录，国防预算上行周期受益。' },
     { market: 'US', symbol: 'U8', name: 'RiverBank', code: 'JPM', listDate: '1969-01-02', industry: '银行', initialPrice: 140, mu: 140, sigma: 0.016, theta: 0.07, description: '全能银行巨头，投行与财富管理双轮驱动，利率高位净息差改善明显。' },
+    { market: 'US', symbol: 'U9', name: 'PixelSoft', code: 'AAPL', listDate: '1980-12-12', industry: '消费电子', initialPrice: 175, mu: 175, sigma: 0.022, theta: 0.10, description: '消费电子与生态服务巨头，硬件+软件+服务三位一体，高端市场护城河深厚，现金储备雄厚。' },
+    { market: 'US', symbol: 'U10', name: 'AlphaSearch', code: 'GOOGL', listDate: '2004-08-19', industry: '互联网', initialPrice: 142, mu: 142, sigma: 0.024, theta: 0.11, description: '搜索引擎与广告之王，AI 大模型重塑搜索体验，云业务扭亏为盈，Waymo 商业化提速。' },
+    { market: 'US', symbol: 'U11', name: 'GoldenFry', code: 'MCD', listDate: '1965-04-21', industry: '餐饮', initialPrice: 250, mu: 250, sigma: 0.014, theta: 0.07, description: '全球快餐连锁之王，特许经营模式轻资产扩张，门店超 4 万家，穿越周期稳健现金流。' },
+    { market: 'US', symbol: 'U12', name: 'EverGreen Energy', code: 'XOM', listDate: '1920-01-01', industry: '能源', initialPrice: 105, mu: 105, sigma: 0.020, theta: 0.12, description: '油气与化工能源巨头，上游资源储量全球领先，LNG 出口业务扩张，股息与回购回馈股东。' },
 ];
-
 
 export function isTradingTimeNow() {
     const now = new Date();
