@@ -938,7 +938,6 @@ let MarketDataService = class MarketDataService {
                 dayHigh: Number(state.dayHigh.toFixed(2)),
                 dayLow: Number(state.dayLow.toFixed(2)),
                 dayVolume: state.dayVolume,
-                bubble: Math.round((this.industryBubbleMap[state.industry] || 1) * 100) / 100,
             });
         }
         return list;
