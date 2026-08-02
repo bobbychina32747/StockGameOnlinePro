@@ -12,6 +12,7 @@ export function StockListPanel() {
   const setStocks = useMarketStore((s) => s.setStocks);
   const prices = useMarketStore((s) => s.prices);
   const selectedSymbol = useUIStore((s) => s.selectedSymbol);
+  const marketMode = useUIStore((s) => s.marketMode);
   const setSelectedSymbol = useUIStore((s) => s.setSelectedSymbol);
   const setDetailSymbol = useUIStore((s) => s.setDetailSymbol);
   const favoriteSymbols = useUIStore((s) => s.favoriteSymbols);
@@ -123,6 +124,11 @@ export function StockListPanel() {
               const price = q.price;
               const changePct = q.changePct;
               const up = changePct >= 0;
+              // C2 涨跌停可视化（CN 模式 ±10%）：基于今开价计算
+              const dayOpen = Number(s.dayOpen) || Number(s.price) || price;
+              const limitUp = marketMode === 'CN' ? dayOpen * 1.1 : null;
+              const limitDown = marketMode === 'CN' ? dayOpen * 0.9 : null;
+              const limitTag = limitUp && price >= limitUp ? '涨停' : limitDown && price <= limitDown ? '跌停' : null;
               const isFav = favoriteSymbols.includes(s.symbol);
               return (
                 <div
@@ -154,6 +160,7 @@ export function StockListPanel() {
                   <span className={`stock-change ${up ? 'up' : 'down'}`}>
                     {up ? '+' : ''}{changePct.toFixed(2)}%
                   </span>
+                  {limitTag && <span className={`limit-badge ${limitTag === '涨停' ? 'up' : 'down'}`}>{limitTag}</span>}
                 </div>
               );
             })}

@@ -99,11 +99,16 @@ let MarketService = class MarketService {
                                 this.logger.log(`🚀 新股上市: ${n.name}`);
                             }
                         }
-                        if (events && events.swan) {
+                                                                        if (events && events.swan) {
+                            // C1 利好型（政策红包）→ bullish；利空型（黑天鹅）→ bearish
+                            const good = events.swan.direction === 'good';
                             this.gateway.broadcastNews({
-                                title: `🦢 黑天鹅：${events.swan.desc}`, description: `影响：${events.swan.type === 'market' ? '全市场' : events.swan.type === 'industry' ? events.swan.industry + '板块' : events.swan.name} 约 ${events.swan.impact}%`, type: 'bearish', impact: {}, duration: 2,
+                                title: good ? `🎉 利好：${events.swan.desc}` : `🦊 黑天鹅：${events.swan.desc}`, description: `影响：${events.swan.type === 'market' ? '全市场' : events.swan.type === 'industry' ? events.swan.industry + '板块' : events.swan.name} 约 ${events.swan.impact}%`, type: good ? 'bullish' : 'bearish', impact: {}, duration: 2,
                             });
-                            this.logger.warn(`🦢 黑天鹅: ${events.swan.desc}`);
+                            if (good)
+                                this.logger.log(`🎉 政策红包: ${events.swan.desc}`);
+                            else
+                                this.logger.warn(`🦊 黑天鹅: ${events.swan.desc}`);
                         }
                         this.engine.setDayOpen(prices);
                         await this.engine.resetBoughtToday();

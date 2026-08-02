@@ -836,44 +836,47 @@ let MarketDataService = class MarketDataService {
         return { listed };
     }
     // 黑天鹅：3% 概率，市场级/板块级/个股级冲击
+    // C1 事件：40% 利好（政策红包/行业利好/个股重大利好），60% 利空（黑天鹅）
     maybeBlackSwan() {
         if (Math.random() > 0.03)
             return null;
         const arr = [...this.stocks.values()];
         if (arr.length === 0)
             return null;
+        const good = Math.random() < 0.4;
+        const direction = good ? 'good' : 'bad';
         const roll = Math.random();
         if (roll < 0.35) {
-            // 市场级：-2~-4%
-            const impact = -(2 + Math.random() * 2);
+            // 市场级：±2~4%
+            const impact = good ? 2 + Math.random() * 2 : -(2 + Math.random() * 2);
             for (const st of arr) {
                 st.price = Math.max(0.5, st.price * (1 + impact / 100));
                 st.lastReturn = impact / 100;
             }
-            this.factors['市场情绪'] = this.clamp((this.factors['市场情绪'] ?? 0) - 0.08, -0.2, 0.2);
-            return { type: 'market', impact, desc: '系统性风险：市场恐慌性抛售' };
+            this.factors['市场情绪'] = this.clamp((this.factors['市场情绪'] ?? 0) + (good ? 0.08 : -0.08), -0.2, 0.2);
+            return { type: 'market', impact, direction, desc: good ? '政策红包：央行降准降息，市场全面利好' : '系统性风险：市场恐慌性抛售' };
         }
         else if (roll < 0.8) {
-            // 板块级：-5~-8%
+            // 板块级：±5~8%
             const industries = [...new Set(arr.map((x) => x.industry))];
             const industry = industries[Math.floor(Math.random() * industries.length)];
-            const impact = -(5 + Math.random() * 3);
+            const impact = good ? 5 + Math.random() * 3 : -(5 + Math.random() * 3);
             for (const st of arr) {
                 if (st.industry === industry) {
                     st.price = Math.max(0.5, st.price * (1 + impact / 100));
                     st.lastReturn = impact / 100;
                 }
             }
-            this.factors['行业景气'] = this.clamp((this.factors['行业景气'] ?? 0) - 0.05, -0.2, 0.2);
-            return { type: 'industry', impact, industry, desc: industry + '行业重大利空：监管或技术事故冲击' };
+            this.factors['行业景气'] = this.clamp((this.factors['行业景气'] ?? 0) + (good ? 0.05 : -0.05), -0.2, 0.2);
+            return { type: 'industry', impact, direction, industry, desc: good ? industry + '行业重大利好：政策扶持或技术突破' : industry + '行业重大利空：监管或技术事故冲击' };
         }
         else {
-            // 个股级：-10~-15%
+            // 个股级：±10~15%
             const st = arr[Math.floor(Math.random() * arr.length)];
-            const impact = -(10 + Math.random() * 5);
+            const impact = good ? 10 + Math.random() * 5 : -(10 + Math.random() * 5);
             st.price = Math.max(0.5, st.price * (1 + impact / 100));
             st.lastReturn = impact / 100;
-            return { type: 'stock', impact, symbol: st.symbol, name: st.name, desc: st.name + '突发利空：造假指控或重大事故' };
+            return { type: 'stock', impact, direction, symbol: st.symbol, name: st.name, desc: good ? st.name + '重大利好：拿下超级订单或新品发布' : st.name + '突发利空：造假指控或重大事故' };
         }
     }
     // 内存/DB 双写创建股票（init 与 IPO 共用）

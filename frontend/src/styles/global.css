@@ -1336,3 +1336,15 @@ body.density-compact .info-row { padding: 2px 0; }
   /* 盘口深度条紧凑 */
   .ob-depth { min-width: 0; }
 }
+
+/* C2 涨跌停徽章 */
+.limit-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  line-height: 16px;
+}
+.limit-badge.up { color: #fff; background: #e03131; }
+.limit-badge.down { color: #fff; background: #00c853; }

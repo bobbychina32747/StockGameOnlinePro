@@ -3,7 +3,7 @@ import { accountApi } from '../../services/api.client';
 import { useMarketStore } from '../../store';
 
 const SIDE_LABEL: Record<string, string> = {
-  buy: '买入', sell: '卖出', short: '做空', cover: '平仓',
+  buy: '买入', sell: '卖出', short: '做空', cover: '平仓', DIVIDEND: '分红',
 };
 const SIDE_CLS: Record<string, string> = {
   buy: 'up', sell: 'down', short: 'up', cover: 'down',
@@ -35,7 +35,7 @@ export default function Transactions() {
     <div className="transactions-page">
       <h2>💸 交易流水</h2>
       <div className="ranking-tabs" style={{ marginBottom: 10 }}>
-        {([['all', '全部'], ['buy', '买入'], ['sell', '卖出'], ['short', '做空'], ['cover', '平仓']] as const).map(([k, label]) => (
+        {([['all', '全部'], ['buy', '买入'], ['sell', '卖出'], ['short', '做空'], ['cover', '平仓'], ['DIVIDEND', '分红']] as const).map(([k, label]) => (
           <button key={k} className={filter === k ? 'active' : ''} onClick={() => setFilter(k)}>
             {label}
           </button>

@@ -459,6 +459,19 @@ let TradingEngineService = class TradingEngineService {
             const amount = Number((qty * Number(div.perShare)).toFixed(2));
             pos.account.cash = Number(pos.account.cash) + amount;
             await this.accountRepo.save(pos.account);
+            // C3 分红进交易流水
+            try {
+                await this.txRepo.save(this.txRepo.create({
+                    accountId: pos.account.id,
+                    symbol: pos.symbol,
+                    side: 'DIVIDEND',
+                    quantity: qty,
+                    price: Number(div.perShare),
+                    turnover: amount,
+                    commission: 0, stampDuty: 0, transferFee: 0, totalFees: 0,
+                }));
+            }
+            catch (e) { }
             paid += amount;
             this.logger.log(`💰 分红到账: ${pos.symbol} ${qty}股 × ${div.perShare}元 = ${amount}元`);
         }
