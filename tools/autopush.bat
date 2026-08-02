@@ -7,6 +7,6 @@ rem =====================================================
 cd /d E:\Files\Games\StockGameOnlinePro
 
 git add -A
-git commit -m "auto backup" >nul 2>&1
+git commit -m "[Auto] auto backup" >nul 2>&1
 git push origin master:main >>tools\autopush.log 2>&1
 echo [%date% %time%] backup done >>tools\autopush.log
