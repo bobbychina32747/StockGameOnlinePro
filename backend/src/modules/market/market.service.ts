@@ -16,6 +16,8 @@ import market_data_service_1 = require("../../core/market-data/market-data.servi
 
 import trading_engine_service_1 = require("../../core/trading-engine/trading-engine.service");
 
+import debug_mode_service_1 = require("../../common/debug-mode/debug-mode.service");
+
 import risk_manager_service_1 = require("../../core/risk-manager/risk-manager.service");
 
 import market_gateway_1 = require("./market.gateway");
@@ -24,7 +26,8 @@ import news_service_1 = require("./news.service");
 
 let MarketService = class MarketService {
     [key: string]: any;
-    constructor(marketData, engine, gateway, newsService, riskManager, marketDataHK, marketDataUS) {
+    constructor(marketData, engine, gateway, newsService, riskManager, marketDataHK, marketDataUS, debugMode) {
+        this.debugMode = debugMode;
         this.marketData = marketData;
         this.marketDataHK = marketDataHK;
         this.marketDataUS = marketDataUS;
@@ -167,7 +170,7 @@ let MarketService = class MarketService {
             this.processing = true;
             try {
                 // S2 交易时段同步：休市不生成行情
-                if (!this.isTradingTime()) {
+                if (!this.debugMode.get() && !this.isTradingTime()) {
                     return;
                 }
                 // 三服务器：轮流处理 CN/HK/US（各自独立 gameDay/因子/事件）
@@ -184,8 +187,9 @@ let MarketService = class MarketService {
             }
             finally {
                 this.processing = false;
+                // 递归必须在 finally 内：try 内 return（休市）会跳过其后的 setTimeout
+                setTimeout(tick, 1000);
             }
-            setTimeout(tick, 1000);
         };
         setTimeout(tick, 1000);
     }
@@ -314,7 +318,8 @@ MarketService = __decorate(
         news_service_1.NewsService,
         risk_manager_service_1.RiskManagerService,
         market_data_service_1.MarketDataService,
-        market_data_service_1.MarketDataService])
+        market_data_service_1.MarketDataService,
+        debug_mode_service_1.DebugModeService])
 ],
 MarketService
 );

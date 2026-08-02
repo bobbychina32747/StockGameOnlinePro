@@ -147,6 +147,8 @@ interface UIState {
   markNoticesRead: () => void;
   animEnabled: boolean;
   setAnimEnabled: (v: boolean) => void;
+  debugMode: boolean;
+  setDebugMode: (v: boolean) => void;
   density: 'standard' | 'compact';
   setDensity: (d: 'standard' | 'compact') => void;
   theme: 'dark' | 'light';
@@ -212,6 +214,8 @@ export const useUIStore = create<UIState>((set) => ({
   // Q12 设置：动画开关 + 字体密度
   animEnabled: localStorage.getItem('ss.anim') !== '0',
   setAnimEnabled: (v) => { localStorage.setItem('ss.anim', v ? '1' : '0'); set({ animEnabled: v }); },
+  debugMode: false,
+  setDebugMode: (v) => set({ debugMode: v }),
   density: (localStorage.getItem('ss.density') as any) || 'standard',
   setDensity: (d) => { localStorage.setItem('ss.density', d); set({ density: d }); },
   addNews: (news) =>

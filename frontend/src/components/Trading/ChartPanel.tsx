@@ -68,6 +68,7 @@ export function ChartPanel() {
   const selectedTimeframe = useUIStore((s) => s.selectedTimeframe);
   const setSelectedTimeframe = useUIStore((s) => s.setSelectedTimeframe);
   const setDetailSymbol = useUIStore((s) => s.setDetailSymbol);
+  const debugMode = useUIStore((s) => s.debugMode);
 
   const klineData: KlineData[] = (klines[selectedSymbol]?.[selectedTimeframe] || []) as KlineData[];
   // 分时图数据源：1min K 线
@@ -75,6 +76,28 @@ export function ChartPanel() {
   const stock = stocks.find((s: any) => s.symbol === selectedSymbol);
   const price = prices[selectedSymbol];
   const isIntraday = selectedTimeframe === 'intraday';
+
+  // ─── 休市超大遮罩：真实时段外显示（调试模式下不显示） ───
+  const isTradingTimeNow = () => {
+    const now = new Date();
+    const day = now.getDay();
+    if (day === 0 || day === 6) return false;
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    return (minutes >= 570 && minutes < 690) || (minutes >= 780 && minutes < 900);
+  };
+  const [marketClosed, setMarketClosed] = useState(!isTradingTimeNow());
+  useEffect(() => {
+    const id = setInterval(() => setMarketClosed(!isTradingTimeNow()), 10000);
+    return () => clearInterval(id);
+  }, []);
+  const nextOpenText = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    if (day === 0 || day === 6 || minutes >= 900) return '下次开盘：明日 9:30';
+    if (minutes < 570) return '下次开盘：今日 9:30';
+    return '下次开盘：今日 13:00';
+  };
 
   // ─── 图表修复：切页重挂载后强制 resize + 监听容器尺寸变化 ───
   const chartRef = useRef<any>(null);
@@ -371,6 +394,15 @@ export function ChartPanel() {
           style={{ height: '100%', width: '100%' }}
         />
       </div>
+      {/* 休市超大遮罩（调试模式/开盘时自动隐藏） */}
+      {marketClosed && !debugMode && (
+        <div className="market-closed-overlay">
+          <div className="mco-title">📴 已休市</div>
+          <div className="mco-sub">交易时段 9:30 - 11:30 / 13:00 - 15:00（工作日）</div>
+          <div className="mco-next">{nextOpenText()}</div>
+          <div className="mco-tip">当前为模拟历史数据，开盘后实时更新</div>
+        </div>
+      )}
     </div>
   );
 }

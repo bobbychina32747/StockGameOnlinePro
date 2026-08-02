@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { accountApi } from '../../services/api.client';
-import { useAuthStore } from '../../store';
+import { accountApi, adminApi } from '../../services/api.client';
+import { useAuthStore, useUIStore } from '../../store';
 import { AchievementBoard } from '../../components/Trading/AchievementBoard';
 import { EquityCurve } from '../../components/Trading/EquityCurve';
 
@@ -8,6 +8,26 @@ export default function Profile() {
   const user = useAuthStore((s) => s.user);
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [debugOn, setDebugOn] = useState(false);
+
+  // 管理员：读取调试模式状态
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      adminApi.debugStatus().then((d: any) => setDebugOn(!!d?.debug)).catch(() => {});
+    }
+  }, [user?.role]);
+
+  const setDebugMode = useUIStore((s) => s.setDebugMode);
+  const toggleDebug = async () => {
+    const next = !debugOn;
+    try {
+      const r = await adminApi.debug(next);
+      setDebugOn(!!r?.debug);
+      setDebugMode(!!r?.debug);
+    } catch (e) {
+      console.error('切换调试模式失败', e);
+    }
+  };
 
   useEffect(() => {
     const fetchMetrics = async () => {
@@ -51,6 +71,21 @@ export default function Profile() {
           <span className="label">角色</span>
           <span className="value">{user?.role === 'admin' ? '管理员' : '用户'}</span>
         </div>
+        {/* 管理员调试模式：休市期间可生成行情/下单 */}
+        {user?.role === 'admin' && (
+          <div className="info-row" style={{ marginTop: 10, alignItems: 'center' }}>
+            <span className="label">🧪 调试模式</span>
+            <span className="value" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                className={`btn btn-sm ${debugOn ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={toggleDebug}
+              >
+                {debugOn ? '🔓 已开启（休市可交易）' : '🔒 已关闭'}
+              </button>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>开启后休市期间也生成行情、可下单（仅管理员）</span>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* 账户信息 */}

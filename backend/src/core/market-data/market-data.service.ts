@@ -96,12 +96,19 @@ let MarketDataService = class MarketDataService {
         catch (e) {
             // 表尚未就绪时忽略
         }
-        let dbStocks = await this.stockRepo.find({ where: { isActive: true } });
+        let dbStocks = await this.stockRepo.find(); // 全部（含 inactive，避免重复创建 UNIQUE）
         // 迁移：只停用不在任何市场池的遗留股票（三服务器共用全池判断，避免互相误停）
         const ALL_SYMBOLS = new Set([...constants_1.STOCK_POOL, ...constants_1.HK_POOL, ...constants_1.US_POOL].map((c) => c.symbol));
         for (const s of dbStocks) {
             if (!ALL_SYMBOLS.has(s.symbol)) {
-                s.isActive = false;
+                if (s.isActive) {
+                    s.isActive = false;
+                    await this.stockRepo.save(s);
+                }
+            }
+            else if (!s.isActive) {
+                // 池内 inactive（历史误停遗留）→ 重新激活
+                s.isActive = true;
                 await this.stockRepo.save(s);
             }
         }

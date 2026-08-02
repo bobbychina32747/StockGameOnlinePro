@@ -77,6 +77,12 @@ export const marketApi = {
     api.get(`/market/orderbook?symbol=${symbol}`).then((r) => r.data),
 };
 
+// ─── Admin（调试模式）───
+export const adminApi = {
+  debug: (on: boolean) => api.post(`/admin/debug`, { on }).then((r) => r.data),
+  debugStatus: () => api.get(`/admin/debug`).then((r) => r.data),
+};
+
 // ─── Ranking ───
 export const rankingApi = {
   get: (limit = 20, sort?: string, market?: string) => api.get(`/ranking?limit=${limit}&sort=${sort || 'totalReturn'}&market=${market || 'ALL'}`).then((r) => r.data),

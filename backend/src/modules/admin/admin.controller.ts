@@ -16,12 +16,15 @@ import jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 
 import user_entity_1 = require("../../infrastructure/database/entities/user.entity");
 
+import debug_mode_service_1 = require("../../common/debug-mode/debug-mode.service");
+
 import admin_service_1 = require("./admin.service");
 
 let AdminController = class AdminController {
     [key: string]: any;
-    constructor(adminService) {
+    constructor(adminService, debugMode) {
         this.adminService = adminService;
+        this.debugMode = debugMode;
     }
     async getStats(user) {
         if (user.role !== user_entity_1.UserRole.ADMIN)
@@ -38,6 +41,18 @@ let AdminController = class AdminController {
             throw new Error('无权限');
         await this.adminService.setUserActive(userId, isActive);
         return { success: true };
+    }
+    // 调试模式：休市期间可生成行情/下单（管理员专用）
+    async setDebug(user, on) {
+        if (user.role !== user_entity_1.UserRole.ADMIN)
+            throw new Error('无权限');
+        this.debugMode.set(on === true);
+        return { success: true, debug: this.debugMode.get() };
+    }
+    async getDebug(user) {
+        if (user.role !== user_entity_1.UserRole.ADMIN)
+            throw new Error('无权限');
+        return { debug: this.debugMode.get() };
     }
 };
 __decorate([
@@ -65,6 +80,21 @@ __decorate([
     __metadata("design:paramtypes", [user_entity_1.User, String, Boolean]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "toggleUser", null);
+__decorate([
+    (0, common_1.Post)('debug'),
+    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)('on')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [user_entity_1.User, Boolean]),
+    __metadata("design:returntype", Promise)
+], AdminController.prototype, "setDebug", null);
+__decorate([
+    (0, common_1.Get)('debug'),
+    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [user_entity_1.User]),
+    __metadata("design:returntype", Promise)
+], AdminController.prototype, "getDebug", null);
 
 export { AdminController };
 
@@ -72,7 +102,7 @@ AdminController = __decorate(
 [
     (0, common_1.Controller)('admin'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    __metadata("design:paramtypes", [admin_service_1.AdminService])
+    __metadata("design:paramtypes", [admin_service_1.AdminService, debug_mode_service_1.DebugModeService])
 ],
 AdminController
 );

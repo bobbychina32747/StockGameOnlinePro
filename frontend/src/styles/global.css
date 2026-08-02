@@ -1343,3 +1343,44 @@ body.density-compact .info-row { padding: 2px 0; }
 }
 .limit-badge.up { color: #fff; background: #e03131; }
 .limit-badge.down { color: #fff; background: #00c853; }
+
+/* ═══ 休市超大遮罩 ═══ */
+.chart-area { position: relative; }
+.market-closed-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(12, 14, 20, 0.78);
+  backdrop-filter: blur(3px);
+  border-radius: 8px;
+  cursor: default;
+  user-select: none;
+}
+.mco-title {
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
+}
+.mco-sub {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.75);
+  letter-spacing: 1px;
+}
+.mco-next {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffd43b;
+  margin-top: 4px;
+}
+.mco-tip {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 6px;
+}

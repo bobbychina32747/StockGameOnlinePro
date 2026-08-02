@@ -8,13 +8,21 @@ import account_entity_1 = require("./entities/account.entity");
 
 import stock_entity_1 = require("./entities/stock.entity");
 
+import position_entity_1 = require("./entities/position.entity");
+
+import order_entity_1 = require("./entities/order.entity");
+
+import transaction_entity_1 = require("./entities/transaction.entity");
+
+import kline_entity_1 = require("./entities/kline.entity");
+
 import constants_1 = require("../../common/constants");
 
 async function seed() {
     const ds = new typeorm_1.DataSource({
         type: 'sqljs',
         location: './data/stockgame.db',
-        entities: [user_entity_1.User, account_entity_1.Account, stock_entity_1.Stock],
+        entities: [user_entity_1.User, account_entity_1.Account, stock_entity_1.Stock, position_entity_1.Position, order_entity_1.Order, transaction_entity_1.Transaction, kline_entity_1.Kline],
         synchronize: true,
     });
     await ds.initialize();

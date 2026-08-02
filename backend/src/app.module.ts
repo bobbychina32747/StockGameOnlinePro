@@ -24,6 +24,8 @@ import account_module_1 = require("./modules/account/account.module");
 
 import trading_module_1 = require("./modules/trading/trading.module");
 
+import debug_mode_module_1 = require("./common/debug-mode/debug-mode.module");
+
 import market_module_1 = require("./modules/market/market.module");
 
 import fund_module_1 = require("./modules/fund/fund.module");
@@ -81,6 +83,7 @@ AppModule = __decorate(
             user_module_1.UserModule,
             account_module_1.AccountModule,
             trading_module_1.TradingModule,
+            debug_mode_module_1.DebugModeModule,
             market_module_1.MarketModule,
             fund_module_1.FundModule,
             ranking_module_1.RankingModule,

@@ -26,11 +26,14 @@ import transaction_entity_1 = require("../../infrastructure/database/entities/tr
 
 import trading_engine_service_1 = require("../../core/trading-engine/trading-engine.service");
 
+import debug_mode_service_1 = require("../../common/debug-mode/debug-mode.service");
+
 import constants_1 = require("../../common/constants");
 
 let OrderService = class OrderService {
     [key: string]: any;
-    constructor(accountRepo, positionRepo, orderRepo, txRepo, engine, dataSource) {
+    constructor(accountRepo, positionRepo, orderRepo, txRepo, engine, dataSource, debugMode) {
+        this.debugMode = debugMode;
         this.accountRepo = accountRepo;
         this.positionRepo = positionRepo;
         this.orderRepo = orderRepo;
@@ -41,7 +44,8 @@ let OrderService = class OrderService {
     }
     async placeOrder(userId, mode, symbol, type, side, quantity, price, triggerPrice) {
         // S2 休市校验：非交易时段拒绝下单
-        if (!(0, constants_1.isTradingTimeNow)()) {
+        // 调试模式（管理员）跳过休市检查
+        if (!this.debugMode.get() && !(0, constants_1.isTradingTimeNow)()) {
             throw new common_1.BadRequestException('休市中（交易时段 9:30-11:30 / 13:00-15:00），无法下单');
         }
         const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });
@@ -99,7 +103,8 @@ OrderService = __decorate(
         typeorm_2.Repository,
         typeorm_2.Repository,
         trading_engine_service_1.TradingEngineService,
-        typeorm_2.DataSource])
+        typeorm_2.DataSource,
+        debug_mode_service_1.DebugModeService])
 ],
 OrderService
 );

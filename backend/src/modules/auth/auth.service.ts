@@ -33,6 +33,37 @@ let AuthService = class AuthService {
         this.accountRepo = accountRepo;
         this.jwtService = jwtService;
     }
+    // 主应用启动自动确保管理员存在（防 DB 覆盖丢失）
+    async onModuleInit() {
+        try {
+            const existing = await this.userRepo.findOne({ where: { username: 'admin' } });
+            if (!existing) {
+                const hashed = await bcrypt.hash('admin123', 10);
+                const admin = this.userRepo.create({
+                    username: 'admin',
+                    password: hashed,
+                    role: user_entity_1.UserRole.ADMIN,
+                });
+                await this.userRepo.save(admin);
+                for (const mode of ['CN', 'HK', 'US']) {
+                    const account = this.accountRepo.create({
+                        userId: admin.id,
+                        marketMode: mode,
+                        cash: constants_1.RISK.initialCash,
+                        totalEquity: constants_1.RISK.initialCash,
+                        peakEquity: constants_1.RISK.initialCash,
+                        initialEquity: constants_1.RISK.initialCash,
+                        dayStartEquity: constants_1.RISK.initialCash,
+                    });
+                    await this.accountRepo.save(account);
+                }
+                console.log('[Seed] 管理员账号已自动创建: admin / admin123');
+            }
+        }
+        catch (e) {
+            console.error('[Seed] 管理员创建失败:', e.message);
+        }
+    }
     async register(username, password) {
         const existing = await this.userRepo.findOne({ where: { username } });
         if (existing)
