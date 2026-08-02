@@ -360,8 +360,60 @@ let MarketDataService = class MarketDataService {
         }
         // 宏观反馈回路：个股表现 → 宏观因子（股票成为影响金融体系的真实嵌入体）
         this.updateMacroFeedback();
+        // B1 复合反应：行业动量传导（每 5 分钟）+ 指数影响全局（跨市场指数 → 市场情绪）
+        if (this.tickCount % 5 === 0) {
+            this.updateIndustryLinks();
+        }
+        this.updateIndexFeedback();
         this.tickCount++;
         return results;
+    }
+    // ─── B1 行业复合传导：行业动量按关联矩阵传导给相关行业（半导体涨 → 消费电子/软件跟涨） ───
+    updateIndustryLinks() {
+        const links = constants_1.INDUSTRY_LINKS;
+        if (!links)
+            return;
+        // 各行业当日动量（平均涨跌幅）
+        const mom = {};
+        const counts = {};
+        for (const st of this.stocks.values()) {
+            const base = Number(st.dayOpen) || 1;
+            const ret = (st.price - base) / base;
+            mom[st.industry] = (mom[st.industry] || 0) + ret;
+            counts[st.industry] = (counts[st.industry] || 0) + 1;
+        }
+        for (const k of Object.keys(mom)) {
+            mom[k] /= counts[k] || 1;
+        }
+        // 按矩阵传导：目标行业 += 来源动量 × 关联度 × 0.15（衰减系数，防自激）
+        for (const [src, map] of Object.entries(links)) {
+            const srcMom = mom[src];
+            if (srcMom == null)
+                continue;
+            for (const [dst, w] of Object.entries(map)) {
+                if (mom[dst] == null || dst === src)
+                    continue;
+                const boost = srcMom * w * 0.15;
+                for (const st of this.stocks.values()) {
+                    if (st.industry === dst) {
+                        st.price = Math.max(0.5, st.price * (1 + boost));
+                        st.lastReturn = (st.price - (Number(st.dayOpen) || 1)) / (Number(st.dayOpen) || 1);
+                    }
+                }
+            }
+        }
+    }
+    // ─── B1 指数影响全局：跨市场指数平均变化 → 市场情绪因子（指数涨 → 情绪升 → 全市场偏多） ───
+    updateIndexFeedback() {
+        const idx = this.getIndices();
+        if (!idx || idx.length === 0)
+            return;
+        let sum = 0;
+        for (const i of idx) {
+            sum += Number(i.changePct) || 0;
+        }
+        const avg = sum / idx.length; // 平均指数涨跌幅（%）
+        this.factors['市场情绪'] = this.clamp((this.factors['市场情绪'] ?? 0) + avg * 0.0008, -0.2, 0.2);
     }
     // ─── 宏观反馈：股票表现反向影响宏观因子（双向联动，缓慢平滑防自激震荡） ───
     updateMacroFeedback() {

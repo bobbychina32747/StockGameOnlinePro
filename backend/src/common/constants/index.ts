@@ -191,6 +191,14 @@ export const HK_POOL = [
     { market: 'HK', symbol: 'H9', name: '裕丰保险', code: '01299', listDate: '2004-06-24', industry: '保险', initialPrice: 58, mu: 58, sigma: 0.018, theta: 0.10, description: '亚太寿险龙头，代理人渠道转型数字化，健康险与养老险双赛道扩张，内含价值持续增长。' },
     { market: 'HK', symbol: 'H10', name: '环球航运', code: '01919', listDate: '2005-06-30', industry: '航运', initialPrice: 14, mu: 14, sigma: 0.028, theta: 0.16, description: '全球集装箱航运巨头，运力规模前三，运价周期弹性大，长协与自有码头平滑波动。' },
     { market: 'HK', symbol: 'H11', name: '皇冠珠宝', code: '01929', listDate: '2011-12-15', industry: '消费', initialPrice: 9.6, mu: 9.6, sigma: 0.020, theta: 0.12, description: '黄金珠宝零售龙头，门店超 7000 家，婚嫁与保值需求双驱动，金价上行周期受益。' },
+    { market: 'HK', symbol: 'H13', name: '恒芯科技', code: '00981', listDate: '2004-03-18', industry: '半导体', initialPrice: 26, mu: 26, sigma: 0.030, theta: 0.15, description: '内地晶圆代工龙头，成熟制程产能满载，国产替代加速，先进封装布局领先。' },
+    { market: 'HK', symbol: 'H14', name: '百佳零售', code: '06808', listDate: '2011-07-15', industry: '零售', initialPrice: 3.8, mu: 3.8, sigma: 0.022, theta: 0.13, description: '大卖场与会员店双业态，供应链效率提升，自有品牌占比扩大，O2O 即时达覆盖全城。' },
+    { market: 'HK', symbol: 'H15', name: '港汽集团', code: '01728', listDate: '2005-12-20', industry: '汽车', initialPrice: 11.2, mu: 11.2, sigma: 0.026, theta: 0.14, description: '自主品牌乘用车出海先锋，东南亚与中东市占率攀升，混动平台降本增效显著。' },
+    { market: 'HK', symbol: 'H16', name: '康达医疗', code: '02269', listDate: '2017-07-18', industry: '医疗', initialPrice: 34, mu: 34, sigma: 0.024, theta: 0.12, description: '高值耗材与影像设备双平台，集采压力消化后创新品种放量，海外认证持续落地。' },
+    { market: 'HK', symbol: 'H17', name: '国泰航空', code: '00293', listDate: '1986-05-15', industry: '航空', initialPrice: 8.4, mu: 8.4, sigma: 0.028, theta: 0.16, description: '区域枢纽航空龙头，国际航线恢复至疫情前九成，货运与飞机维修贡献稳定利润。' },
+    { market: 'HK', symbol: 'H18', name: '港联交易所', code: '00388', listDate: '2000-06-27', industry: '金融', initialPrice: 285, mu: 285, sigma: 0.020, theta: 0.09, description: '亚太核心交易所集团，现货与衍生品双轮驱动，南向资金持续活跃，互联互通扩容。' },
+    { market: 'HK', symbol: 'H19', name: '维他食品', code: '00345', listDate: '1994-03-30', industry: '食品饮料', initialPrice: 7.2, mu: 7.2, sigma: 0.018, theta: 0.10, description: '植物蛋白饮品龙头，内地渠道下沉叠加海外扩张，健康化转型打开估值空间。' },
+    { market: 'HK', symbol: 'H20', name: '南海能源', code: '00857', listDate: '2000-04-07', industry: '能源', initialPrice: 6.6, mu: 6.6, sigma: 0.020, theta: 0.11, description: '上游油气生产龙头，储量接替率高，天然气与新能源业务双轨并进，分红稳定。' },
     { market: 'HK', symbol: 'H12', name: '湾区制造', code: '02333', listDate: '2003-12-30', industry: '制造业', initialPrice: 12.8, mu: 12.8, sigma: 0.022, theta: 0.13, description: '高端装备制造集团，工程机械出口全球前五，氢能设备与电动重卡打开第二曲线。' },
 ];
 
@@ -207,6 +215,14 @@ export const US_POOL = [
     { market: 'US', symbol: 'U9', name: 'PixelSoft', code: 'AAPL', listDate: '1980-12-12', industry: '消费电子', initialPrice: 175, mu: 175, sigma: 0.022, theta: 0.10, description: '消费电子与生态服务巨头，硬件+软件+服务三位一体，高端市场护城河深厚，现金储备雄厚。' },
     { market: 'US', symbol: 'U10', name: 'AlphaSearch', code: 'GOOGL', listDate: '2004-08-19', industry: '互联网', initialPrice: 142, mu: 142, sigma: 0.024, theta: 0.11, description: '搜索引擎与广告之王，AI 大模型重塑搜索体验，云业务扭亏为盈，Waymo 商业化提速。' },
     { market: 'US', symbol: 'U11', name: 'GoldenFry', code: 'MCD', listDate: '1965-04-21', industry: '餐饮', initialPrice: 250, mu: 250, sigma: 0.014, theta: 0.07, description: '全球快餐连锁之王，特许经营模式轻资产扩张，门店超 4 万家，穿越周期稳健现金流。' },
+    { market: 'US', symbol: 'U13', name: 'Amazonia', code: 'AMZN', listDate: '1997-05-15', industry: '电商', initialPrice: 178, mu: 178, sigma: 0.030, theta: 0.13, description: '全球电商与云服务双龙头，Prime 会员粘性深厚，AWS 利润率修复，广告业务高增长。' },
+    { market: 'US', symbol: 'U14', name: 'CryptoPay', code: 'PYPL', listDate: '2015-07-20', industry: '金融科技', initialPrice: 62, mu: 62, sigma: 0.028, theta: 0.15, description: '数字支付与钱包巨头，跨境结算网络覆盖全球，商户收单份额领先，成本优化见效。' },
+    { market: 'US', symbol: 'U15', name: 'WaltRealm', code: 'DIS', listDate: '1962-09-20', industry: '传媒', initialPrice: 96, mu: 96, sigma: 0.024, theta: 0.12, description: '娱乐帝国，流媒体用户破 2 亿，主题乐园与 IP 授权全链条变现，内容库无出其右。' },
+    { market: 'US', symbol: 'U16', name: 'PfizerLab', code: 'PFE', listDate: '1942-06-19', industry: '医药', initialPrice: 28, mu: 28, sigma: 0.018, theta: 0.10, description: '制药巨头，肿瘤与疫苗管线密集，重磅新品获批节奏加快，专利悬崖后重回增长。' },
+    { market: 'US', symbol: 'U17', name: 'HomeCraft', code: 'HD', listDate: '1981-09-22', industry: '零售', initialPrice: 335, mu: 335, sigma: 0.016, theta: 0.08, description: '家装建材零售龙头，门店网络全美第一，专业客户业务高增长，股息连续 14 年上调。' },
+    { market: 'US', symbol: 'U18', name: 'StreamRealm', code: 'NFLX', listDate: '2002-05-23', industry: '传媒', initialPrice: 610, mu: 610, sigma: 0.032, theta: 0.14, description: '流媒体之王，全球订阅用户超 2.7 亿，广告分层模式打开 ARPU 空间，原创内容护城河。' },
+    { market: 'US', symbol: 'U19', name: 'IntelCore', code: 'INTC', listDate: '1971-10-13', industry: '半导体', initialPrice: 44, mu: 44, sigma: 0.030, theta: 0.16, description: '老牌芯片巨头，代工业务转型关键期，先进制程追赶与 AI 芯片放量决定未来三年。' },
+    { market: 'US', symbol: 'U20', name: 'CocaRiver', code: 'KO', listDate: '1919-09-05', industry: '食品饮料', initialPrice: 61, mu: 61, sigma: 0.012, theta: 0.06, description: '饮料之王，全球品牌渗透无出其右，瓶装水与咖啡矩阵扩张，股息连续 60 年上调。' },
     { market: 'US', symbol: 'U12', name: 'EverGreen Energy', code: 'XOM', listDate: '1920-01-01', industry: '能源', initialPrice: 105, mu: 105, sigma: 0.020, theta: 0.12, description: '油气与化工能源巨头，上游资源储量全球领先，LNG 出口业务扩张，股息与回购回馈股东。' },
 ];
 
@@ -217,3 +233,42 @@ export function isTradingTimeNow() {
     const minutes = now.getHours() * 60 + now.getMinutes();
     return (minutes >= 570 && minutes < 690) || (minutes >= 780 && minutes < 900);
 }
+
+// B1 行业传导矩阵：行业间联动（源 → 目标: 关联度 0~1），每 5 tick 按动量传导
+export const INDUSTRY_LINKS: Record<string, Record<string, number>> = {
+    半导体: { 人工智能: 0.5, 软件: 0.4, 消费电子: 0.4 },
+    人工智能: { 半导体: 0.5, 软件: 0.4, 互联网: 0.3, 游戏: 0.3 },
+    软件: { 半导体: 0.3, 人工智能: 0.4, 互联网: 0.3 },
+    互联网: { 软件: 0.3, 人工智能: 0.3, 游戏: 0.4, 电商: 0.4, 传媒: 0.3 },
+    游戏: { 互联网: 0.4, 人工智能: 0.3, 传媒: 0.4, 动漫: 0.5 },
+    传媒: { 游戏: 0.4, 互联网: 0.3, 消费: 0.2 },
+    消费电子: { 半导体: 0.4, 软件: 0.3, 消费: 0.3 },
+    新能源: { 汽车: 0.5, 锂电池: 0.5, 能源: 0.3 },
+    汽车: { 新能源: 0.5, 制造业: 0.3, 锂电池: 0.4 },
+    能源: { 新能源: 0.3, 公用事业: 0.3, 资源: 0.4 },
+    锂电池: { 新能源: 0.5, 汽车: 0.4, 半导体: 0.2 },
+    银行: { 保险: 0.4, 地产: 0.3, 金融科技: 0.4, 金融: 0.4 },
+    保险: { 银行: 0.4, 地产: 0.2, 金融: 0.4 },
+    金融: { 银行: 0.4, 保险: 0.4, 地产: 0.3, 金融科技: 0.4 },
+    地产: { 银行: 0.3, 保险: 0.2, 消费: 0.2, 制造业: 0.2 },
+    金融科技: { 银行: 0.4, 互联网: 0.3, 软件: 0.3 },
+    消费: { 餐饮: 0.5, 电商: 0.3, 食品饮料: 0.4, 零售: 0.4, 白酒: 0.4 },
+    餐饮: { 消费: 0.5, 食品饮料: 0.4, 零售: 0.3 },
+    食品饮料: { 消费: 0.4, 餐饮: 0.4, 零售: 0.3 },
+    零售: { 消费: 0.4, 电商: 0.4, 食品饮料: 0.3 },
+    白酒: { 消费: 0.4, 食品饮料: 0.3, 零售: 0.2 },
+    电商: { 消费: 0.3, 互联网: 0.4, 零售: 0.4, 物流: 0.4 },
+    物流: { 电商: 0.4, 消费: 0.2, 航运: 0.3, 制造业: 0.2 },
+    航运: { 物流: 0.3, 资源: 0.3, 能源: 0.3, 制造业: 0.2 },
+    医药: { 医疗: 0.4, 生物科技: 0.3, 消费: 0.2 },
+    医疗: { 医药: 0.4, 生物科技: 0.3, 制造业: 0.2 },
+    生物科技: { 医药: 0.3, 医疗: 0.3, 人工智能: 0.2 },
+    军工: { 航空: 0.4, 制造业: 0.3, 半导体: 0.3 },
+    航空: { 军工: 0.4, 能源: 0.3, 消费: 0.2, 旅游: 0.3 },
+    公用事业: { 能源: 0.3, 新能源: 0.3, 地产: 0.2 },
+    通信: { 互联网: 0.3, 半导体: 0.3, 软件: 0.3 },
+    资源: { 能源: 0.4, 航运: 0.3, 制造业: 0.3 },
+    制造业: { 汽车: 0.3, 军工: 0.3, 新能源: 0.2, 半导体: 0.2 },
+    动漫: { 游戏: 0.5, 传媒: 0.4, 消费: 0.2 },
+    旅游: { 消费: 0.3, 航空: 0.3, 零售: 0.2 },
+};
