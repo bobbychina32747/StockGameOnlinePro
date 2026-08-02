@@ -8,7 +8,7 @@ export function connectWebSocket(): Socket {
 
   // 开发模式走 Vite 代理，生产模式直连后端
   socket = io(import.meta.env.DEV ? '/market' : `http://${window.location.hostname}:8000/market`, {
-    transports: ['websocket', 'polling'],
+    transports: ['websocket'], // 只走 WS（polling 长轮询经 vite proxy 会 ECONNABORTED）
     autoConnect: true,
     reconnection: true,
     reconnectionDelay: 2000,
