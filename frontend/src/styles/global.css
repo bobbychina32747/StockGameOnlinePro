@@ -1256,3 +1256,83 @@ body.density-compact .info-row { padding: 2px 0; }
 .chart-tabs-sub { margin-left: 8px; }
 .chart-tabs-sub button { font-size: 11px; padding: 3px 8px; color: var(--text-muted); }
 .chart-tabs-sub button.active { color: var(--color-brand-light); background: var(--color-brand-subtle); border-radius: var(--radius-sm); }
+
+/* ═══════ A1 移动端适配（≤768px）═══════ */
+@media (max-width: 768px) {
+  .dashboard-mobile {
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    gap: 6px;
+    padding-bottom: 54px; /* 底部 Tab 空间 */
+  }
+  .dashboard-mobile .drag-handle { display: none; }
+  .m-view {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    width: 100%;
+  }
+  .m-view.m-trade {
+    overflow-y: auto;
+    padding: 4px 8px 8px;
+    gap: 8px;
+  }
+  .m-view .chart-area { flex: 1; min-height: 0; }
+  .m-view .stock-list-panel { flex: 1; min-height: 0; }
+
+  /* 底部 Tab 栏 */
+  .m-tabbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    display: flex;
+    background: var(--bg-card, #171922);
+    border-top: 1px solid var(--border, #2e3240);
+    z-index: 100;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+  .m-tab {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: #8b90a0;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+  .m-tab.active {
+    color: var(--color-brand, #2f6fed);
+    font-weight: 600;
+  }
+
+  /* 顶部栏紧凑 */
+  .top-bar { padding: 0 8px; gap: 8px; }
+  .top-bar .logo { font-size: 13px; white-space: nowrap; }
+  .top-bar .status-center { display: none; }
+  .top-bar .nav-links a { padding: 6px 8px; font-size: 12px; }
+
+  /* 指数条横向滚动 */
+  .market-index-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* 弹窗底部弹出（F10/详情） */
+  .modal-overlay { align-items: flex-end; }
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 86vh;
+    border-radius: 14px 14px 0 0;
+    overflow-y: auto;
+  }
+
+  /* 盘口深度条紧凑 */
+  .ob-depth { min-width: 0; }
+}

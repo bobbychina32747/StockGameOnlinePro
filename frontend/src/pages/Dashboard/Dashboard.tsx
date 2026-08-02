@@ -100,6 +100,19 @@ export default function Dashboard() {
 
   // ─── 三栏宽度拖拽（左列表 / 右面板） ───
   // S4 布局持久化：宽度从 localStorage 恢复
+  // A1 移动端：设备检测（≤768px 视为移动端）+ 底部Tab切换
+  const isMobile = useUIStore((s) => s.isMobile);
+  const setMobile = useUIStore((s) => s.setMobile);
+  const mobileTab = useUIStore((s) => s.mobileTab);
+  const setMobileTab = useUIStore((s) => s.setMobileTab);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const apply = () => setMobile(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, [setMobile]);
+
   const [leftWidth, setLeftWidth] = useState(() => Number(localStorage.getItem('ss.leftW')) || 230);
   const [rightWidth, setRightWidth] = useState(() => Number(localStorage.getItem('ss.rightW')) || 330);
   const dragRef = useRef<{ side: 'left' | 'right'; startX: number; startW: number } | null>(null);
@@ -140,27 +153,59 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="dashboard">
+    <div className={isMobile ? 'dashboard dashboard-mobile' : 'dashboard'}>
       {!wsConnected && (
         <div className="ws-offline-tip">
           ⚠️ 实时行情连接已断开，正在通过轮询获取数据...
         </div>
       )}
-      <div className="resizable-panel" style={{ width: leftWidth }}>
-        <StockListPanel />
-      </div>
-      <div className="drag-handle" onMouseDown={(e) => startDrag(e, 'left')} title="拖拽调整宽度" />
-      <ChartPanel />
-      <div className="drag-handle" onMouseDown={(e) => startDrag(e, 'right')} title="拖拽调整宽度" />
-      <div className="resizable-panel" style={{ width: rightWidth }}>
-        <div className="side-panel">
-          <OrderBookPanel />
-          <AccountPanel />
-          <OrderPanel />
-          <AIAssistant />
-        </div>
-      </div>
+      {!isMobile && (
+        <>
+          <div className="resizable-panel" style={{ width: leftWidth }}>
+            <StockListPanel />
+          </div>
+          <div className="drag-handle" onMouseDown={(e) => startDrag(e, 'left')} title="拖拽调整宽度" />
+        </>
+      )}
+      {isMobile ? (
+        mobileTab === 'list' ? (
+          <div className="m-view">
+            <StockListPanel />
+          </div>
+        ) : mobileTab === 'chart' ? (
+          <div className="m-view">
+            <ChartPanel />
+            <OrderBookPanel />
+          </div>
+        ) : (
+          <div className="m-view m-trade">
+            <AccountPanel />
+            <OrderPanel />
+            <AIAssistant />
+          </div>
+        )
+      ) : (
+        <>
+          <ChartPanel />
+          <div className="drag-handle" onMouseDown={(e) => startDrag(e, 'right')} title="拖拽调整宽度" />
+          <div className="resizable-panel" style={{ width: rightWidth }}>
+            <div className="side-panel">
+              <OrderBookPanel />
+              <AccountPanel />
+              <OrderPanel />
+              <AIAssistant />
+            </div>
+          </div>
+        </>
+      )}
       <StockDetailModal />
+      {isMobile && (
+        <div className="m-tabbar">
+          <button className={mobileTab === 'list' ? 'm-tab active' : 'm-tab'} onClick={() => setMobileTab('list')}>📈 行情</button>
+          <button className={mobileTab === 'chart' ? 'm-tab active' : 'm-tab'} onClick={() => setMobileTab('chart')}>📊 图表</button>
+          <button className={mobileTab === 'trade' ? 'm-tab active' : 'm-tab'} onClick={() => setMobileTab('trade')}>💼 交易</button>
+        </div>
+      )}
     </div>
   );
 }

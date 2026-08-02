@@ -151,6 +151,11 @@ interface UIState {
   setDensity: (d: 'standard' | 'compact') => void;
   theme: 'dark' | 'light';
   setTheme: (t: 'dark' | 'light') => void;
+  // A1 移动端：设备判断 + 底部Tab（行情/图表/交易）
+  isMobile: boolean;
+  setMobile: (v: boolean) => void;
+  mobileTab: 'list' | 'chart' | 'trade';
+  setMobileTab: (t: 'list' | 'chart' | 'trade') => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -186,6 +191,10 @@ export const useUIStore = create<UIState>((set) => ({
     }),
   theme: (localStorage.getItem('ss.theme') as any) || 'dark',
   setTheme: (t) => { localStorage.setItem('ss.theme', t); set({ theme: t }); },
+  isMobile: false,
+  setMobile: (v) => set({ isMobile: v }),
+  mobileTab: 'list',
+  setMobileTab: (t) => set({ mobileTab: t }),
   // Q6 通知中心（localStorage 持久化，cap 50）
   notices: JSON.parse(localStorage.getItem('ss.notices') || '[]'),
   addNotice: (item) =>
