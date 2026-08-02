@@ -26,8 +26,9 @@ import trading_engine_service_1 = require("../trading-engine/trading-engine.serv
 
 let MarketDataService = class MarketDataService {
     [key: string]: any;
-    constructor(stockRepo, klineRepo, engine) {
+    constructor(stockRepo, klineRepo, engine, market = 'CN') {
         this.stockRepo = stockRepo;
+        this.market = market; // 三服务器：CN/HK/US 独立实例
         this.klineRepo = klineRepo;
         this.engine = engine;
         this.logger = new common_1.Logger(MarketDataService.name);
@@ -46,6 +47,19 @@ let MarketDataService = class MarketDataService {
         this.gameDay = 0;
         this.factors = {} as Record<string, number>;
         this.isRunning = false;
+        // AI 对手盘：机构/游资/散户市场参与者（每服务器独立）
+        this.aiAgents = [
+            { type: '机构', activity: 0.25, scale: 25000 },
+            { type: '机构', activity: 0.2, scale: 30000 },
+            { type: '游资', activity: 0.45, scale: 9000 },
+            { type: '游资', activity: 0.4, scale: 7000 },
+            { type: '游资', activity: 0.35, scale: 6000 },
+            { type: '散户', activity: 0.7, scale: 2500 },
+            { type: '散户', activity: 0.6, scale: 1800 },
+            { type: '散户', activity: 0.55, scale: 1500 },
+            { type: '散户', activity: 0.5, scale: 1200 },
+            { type: '散户', activity: 0.45, scale: 900 },
+        ];
         this.intervalHandle = null;
         // 性能优化：股票池配置缓存（消除每 tick 的 find O(n)）
         this.poolBySymbol = new Map<string, any>();
@@ -70,11 +84,12 @@ let MarketDataService = class MarketDataService {
                 // 列已存在时忽略
             }
         }
-        // B1 多市场：统一池 = A股 + 港股 + 美股
+        // B1 多市场：统一池（init 按本服务器市场过滤）
         const ALL_POOL = [...constants_1.STOCK_POOL, ...constants_1.HK_POOL, ...constants_1.US_POOL];
+        const POOL_FOR_THIS = this.market === 'HK' ? constants_1.HK_POOL : this.market === 'US' ? constants_1.US_POOL : ALL_POOL.filter((c) => !(c as any).market || (c as any).market === 'CN');
         // 迁移：按股票池补齐已存在股票的行业与 lore 字段
         try {
-            for (const cfg of ALL_POOL) {
+            for (const cfg of POOL_FOR_THIS) {
                 await this.stockRepo.query(`UPDATE stocks SET market='${(((cfg as any).market || 'CN'))}', industry='${cfg.industry}', code='${cfg.code}', listDate='${cfg.listDate}', description='${(cfg.description || '').replace(/'/g, "''")}' WHERE symbol='${cfg.symbol}'`);
             }
         }
@@ -82,18 +97,19 @@ let MarketDataService = class MarketDataService {
             // 表尚未就绪时忽略
         }
         let dbStocks = await this.stockRepo.find({ where: { isActive: true } });
-        // 迁移：不在股票池的旧股票（如历史 A/B）标记停用
-        const poolSymbols = new Set(ALL_POOL.map((c) => c.symbol));
+        // 迁移：只停用不在任何市场池的遗留股票（三服务器共用全池判断，避免互相误停）
+        const ALL_SYMBOLS = new Set([...constants_1.STOCK_POOL, ...constants_1.HK_POOL, ...constants_1.US_POOL].map((c) => c.symbol));
         for (const s of dbStocks) {
-            if (!poolSymbols.has(s.symbol)) {
+            if (!ALL_SYMBOLS.has(s.symbol)) {
                 s.isActive = false;
                 await this.stockRepo.save(s);
             }
         }
+        const poolSymbols = new Set(POOL_FOR_THIS.map((c) => c.symbol));
         dbStocks = dbStocks.filter((s) => poolSymbols.has(s.symbol));
         // 增量补齐：按 symbol 缺失创建（兼容旧库升级）
         const existingSymbols = new Set(dbStocks.map((s) => s.symbol));
-        for (const cfg of ALL_POOL) {
+        for (const cfg of POOL_FOR_THIS) {
             if (existingSymbols.has(cfg.symbol)) continue;
             const stock = this.stockRepo.create({
                 symbol: cfg.symbol,
@@ -112,7 +128,7 @@ let MarketDataService = class MarketDataService {
             await this.stockRepo.save(stock);
             dbStocks.push(stock);
         }
-        for (const cfg of ALL_POOL) {
+        for (const cfg of POOL_FOR_THIS) {
             this.poolBySymbol.set(cfg.symbol, cfg);
         }
         for (const s of dbStocks) {
@@ -154,7 +170,9 @@ let MarketDataService = class MarketDataService {
             });
         }
         // S1 历史持久化：若 klines 表已有历史则恢复，否则生成 30 天初始历史并落库
-        const historyRows = await this.klineRepo.find({ order: { time: 'ASC' } });
+        const allHistory = await this.klineRepo.find({ order: { time: 'ASC' } });
+        // 三服务器：仅恢复本市场的 K 线（各实例 stocks 只含自己市场）
+        const historyRows = allHistory.filter((r) => this.stocks.has(r.symbol));
         if (historyRows.length > 0) {
             this.restoreFromHistory(historyRows);
             // S1 补齐：恢复的天数不足 30 天则补生成（内存，不落库）
@@ -367,6 +385,8 @@ let MarketDataService = class MarketDataService {
         if (this.tickCount % 5 === 0 || this.hasVolatileMove()) {
             this.updateIndustryLinks();
         }
+        // AI 对手盘：机构/游资/散户交易行为（多空博弈）
+        this.applyAiTrading();
         this.updateIndexFeedback();
         this.tickCount++;
         return results;
@@ -445,6 +465,50 @@ let MarketDataService = class MarketDataService {
             }
         }
     }
+    // ─── AI 对手盘：机构(低频大单价值)/游资(追热点快进快出)/散户(追涨杀跌小单) ───
+    applyAiTrading() {
+        const arr = [...this.stocks.values()];
+        if (arr.length === 0)
+            return;
+        for (const agent of this.aiAgents) {
+            if (Math.random() > agent.activity)
+                continue;
+            // 选股：游资追热点行业，机构/散户随机
+            let target;
+            if (agent.type === '游资' && this.hotTopics.length > 0) {
+                const hotIndustry = this.hotTopics[0].industry;
+                target = arr.find((st) => st.industry === hotIndustry && Math.random() < 0.4) || arr[Math.floor(Math.random() * arr.length)];
+            }
+            else {
+                target = arr[Math.floor(Math.random() * arr.length)];
+            }
+            // 方向：机构/散户追涨杀跌；游资低吸高抛（反转）
+            const base = Number(target.dayOpen) || 1;
+            const ret = (target.price - base) / base;
+            let dir;
+            if (agent.type === '游资') {
+                dir = ret > 0.015 ? -1 : ret < -0.015 ? 1 : (Math.random() < 0.5 ? 1 : -1);
+            }
+            else {
+                dir = ret >= 0 ? 1 : -1;
+            }
+            // 量级：按 agent scale × 随机
+            const qty = Math.round(agent.scale * (0.5 + Math.random()));
+            // 价格冲击（上限 0.5%，防 AI 单边拉爆）
+            const impact = Math.min(0.005, (qty / Math.max(1, target.baseVolume || 8000)) * 0.3);
+            target.price = Math.max(0.5, target.price * (1 + dir * impact));
+            target.lastVolume += qty;
+            target.dayVolume += qty;
+            // 并入当前 K 线
+            const k1 = target.current1min;
+            if (k1) {
+                k1.volume += qty;
+                k1.high = Math.max(k1.high, target.price);
+                k1.low = Math.min(k1.low, target.price);
+                k1.close = target.price;
+            }
+        }
+    }
     // ─── B1 指数影响全局：跨市场指数平均变化 → 市场情绪因子（指数涨 → 情绪升 → 全市场偏多） ───
     updateIndexFeedback() {
         const idx = this.getIndices();
@@ -480,18 +544,19 @@ let MarketDataService = class MarketDataService {
     }
     // ─── 指数体系：按成分股实时计算（基准点位 × 成分平均涨跌） ───
     getIndices() {
+        // 三服务器：仅显示本市场指数
         const defs = [
-            { code: '000001', name: '上证指数', base: 3100, filter: () => true },
-            { code: '399001', name: '深证成指', base: 10500, filter: (s) => /^(000|002|300)/.test(s.code || '') },
-            { code: '399006', name: '创业板指', base: 2200, filter: (s) => /^300/.test(s.code || '') },
-            { code: '000688', name: '科创50', base: 950, filter: (s) => /^688/.test(s.code || '') },
-            { code: '399999', name: '中证文娱', base: 1200, filter: (s) => /^(G|V)/.test(s.symbol) },
+            { code: '000001', name: '上证指数', base: 3100, market: 'CN', filter: () => true },
+            { code: '399001', name: '深证成指', base: 10500, market: 'CN', filter: (s) => /^(000|002|300)/.test(s.code || '') },
+            { code: '399006', name: '创业板指', base: 2200, market: 'CN', filter: (s) => /^300/.test(s.code || '') },
+            { code: '000688', name: '科创50', base: 950, market: 'CN', filter: (s) => /^688/.test(s.code || '') },
+            { code: '399999', name: '中证文娱', base: 1200, market: 'CN', filter: (s) => /^(G|V)/.test(s.symbol) },
             // B1 多市场指数
             { code: 'HSI', name: '恒生指数', market: 'HK', base: 18500, filter: (s) => s.market === 'HK' },
             { code: 'NDX', name: '纳斯达克', market: 'US', base: 16500, filter: (s) => s.market === 'US' && /^(U[1-4])/.test(s.symbol) },
             { code: 'DJI', name: '道琼斯', market: 'US', base: 38500, filter: (s) => s.market === 'US' && /^(U[5-8])/.test(s.symbol) },
         ];
-        return defs.map((d) => {
+        return defs.filter((d) => d.market === this.market || (d.market === 'CN' && this.market === 'CN')).map((d) => {
             const members = [...this.stocks.values()].filter((st) => d.filter(st));
             let total = 0;
             for (const st of members) {

@@ -19,14 +19,15 @@ let RankingController = class RankingController {
     constructor(rankingService) {
         this.rankingService = rankingService;
     }
-    getRankings(limit, sort) {
-        return this.rankingService.getRankings(limit || 20, sort || 'totalReturn');
+    getRankings(limit, sort, market) {
+        return this.rankingService.getRankings(limit || 20, sort || 'totalReturn', market || 'ALL');
     }
 };
 __decorate([
     (0, common_1.Get)(),
     __param(0, (0, common_1.Query)('limit')),
     __param(1, (0, common_1.Query)('sort')),
+    __param(2, (0, common_1.Query)('market')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)

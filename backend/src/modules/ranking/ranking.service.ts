@@ -52,6 +52,7 @@ let RankingService = class RankingService {
             .filter((a) => Number(a.initialEquity) > 0)
             .map((a) => ({
             userId: a.userId,
+            market: a.marketMode || 'CN',
             username: a.user?.username || '未知',
             totalEquity: Number(a.totalEquity),
             totalReturn: (Number(a.totalEquity) - Number(a.initialEquity)) / Number(a.initialEquity),
@@ -63,10 +64,14 @@ let RankingService = class RankingService {
         this.cache = entries;
         return entries;
     }
-    getRankings(limit = 20, sort = 'totalReturn') {
+    // 三服务器排行：market=ALL 跨服总榜；CN/HK/US 服内榜
+    getRankings(limit = 20, sort = 'totalReturn', market = 'ALL') {
         // sort: totalReturn(总收益) | dayReturn(今日) | equity(总资产)
         const key = sort === 'dayReturn' ? 'dayReturn' : sort === 'equity' ? 'equity' : 'totalReturn';
-        return [...this.cache].sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0)).slice(0, limit);
+        const list = market && market !== 'ALL'
+            ? this.cache.filter((e) => e.market === market)
+            : this.cache;
+        return [...list].sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0)).slice(0, limit);
     }
     getUserRank(userId) {
         return this.cache.find((e) => e.userId === userId);

@@ -33,10 +33,10 @@ function gameSession(): { label: string; open: boolean } {
 export function MarketIndexBar() {
   const [indices, setIndices] = useState<any[]>([]);
   const [hotTopics, setHotTopics] = useState<any[]>([]);
+  const [localRegime, setLocalRegime] = useState('sideways');
+  const [localGameDay, setLocalGameDay] = useState(0);
   const stocks = useMarketStore((s) => s.stocks);
-  const marketRegime = useMarketStore((s) => s.marketRegime);
   const marketMode = useUIStore((s) => s.marketMode);
-  const gameDay = useMarketStore((s) => s.gameDay);
   const session = gameSession();
 
   useEffect(() => {
@@ -46,7 +46,11 @@ export function MarketIndexBar() {
         if (alive && Array.isArray(list)) setIndices(list);
       }).catch(() => {});
       marketApi.state().then((st) => {
-        if (alive && Array.isArray(st?.hotTopics)) setHotTopics(st.hotTopics);
+        // 三服务器：按当前市场取各自状态（gameDay/热点/市场状态独立）
+        const m = st?.markets?.[marketMode] || st;
+        if (alive && Array.isArray(m?.hotTopics)) setHotTopics(m.hotTopics);
+        if (alive && m?.marketRegime) setLocalRegime(m.marketRegime);
+        if (alive && m?.gameDay != null) setLocalGameDay(m.gameDay);
       }).catch(() => {});
     };
     load();
@@ -88,10 +92,10 @@ export function MarketIndexBar() {
         </span>
       )}
       <span className="index-regime">
-        市场状态：{REGIME_LABEL[marketRegime] || marketRegime}
+        市场状态：{REGIME_LABEL[localRegime] || localRegime}
       </span>
       <span className={`index-session ${session.open ? 'open' : ''}`}>{session.label}</span>
-      <span className="index-day">第 {gameDay + 1} 个交易日</span>
+      <span className="index-day">第 {localGameDay + 1} 个交易日</span>
     </div>
   );
 }

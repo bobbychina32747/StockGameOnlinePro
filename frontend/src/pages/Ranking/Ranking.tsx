@@ -17,12 +17,14 @@ export default function Ranking() {
   const [entries, setEntries] = useState<RankingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<SortKey>('totalReturn');
+  // 三服务器：跨服总榜 / 服内榜（CN/HK/US）
+  const [market, setMarket] = useState('ALL');
 
   useEffect(() => {
     const fetchRankings = async () => {
       try {
         // A4 排序切换
-        const data = await rankingApi.get(50, sort);
+        const data = await rankingApi.get(50, sort, market);
         setEntries(Array.isArray(data) ? data : []);
       } catch (e) {
         console.error('获取排行榜失败', e);
@@ -33,7 +35,7 @@ export default function Ranking() {
     fetchRankings();
     const interval = setInterval(fetchRankings, 30000);
     return () => clearInterval(interval);
-  }, [sort]);
+  }, [sort, market]);
 
   if (loading) {
     return (
@@ -65,7 +67,12 @@ export default function Ranking() {
       </div>
 
       <h2>🏆 排行榜</h2>
-      <div className="ranking-tabs">
+      
+        <div className="ranking-tabs" style={{ marginTop: 4 }}>
+          {([['ALL', '🏆 跨服总榜'], ['CN', '🇨🇳 A股服'], ['HK', '🇭🇰 港股服'], ['US', '🇺🇸 美股服']] as const).map(([k, label]) => (
+            <button key={k} className={market === k ? 'active' : ''} onClick={() => setMarket(k)}>{label}</button>
+          ))}
+        </div><div className="ranking-tabs">
         {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
           <button key={k} className={sort === k ? 'active' : ''} onClick={() => setSort(k)}>
             {SORT_LABEL[k]}

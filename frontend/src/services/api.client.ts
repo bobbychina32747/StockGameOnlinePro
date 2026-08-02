@@ -79,7 +79,7 @@ export const marketApi = {
 
 // ─── Ranking ───
 export const rankingApi = {
-  get: (limit = 20, sort?: string) => api.get(`/ranking?limit=${limit}&sort=${sort || 'totalReturn'}`).then((r) => r.data),
+  get: (limit = 20, sort?: string, market?: string) => api.get(`/ranking?limit=${limit}&sort=${sort || 'totalReturn'}&market=${market || 'ALL'}`).then((r) => r.data),
 };
 
 // ─── Fund ───

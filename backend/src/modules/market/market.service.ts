@@ -24,8 +24,14 @@ import news_service_1 = require("./news.service");
 
 let MarketService = class MarketService {
     [key: string]: any;
-    constructor(marketData, engine, gateway, newsService, riskManager) {
+    constructor(marketData, engine, gateway, newsService, riskManager, marketDataHK, marketDataUS) {
         this.marketData = marketData;
+        this.marketDataHK = marketDataHK;
+        this.marketDataUS = marketDataUS;
+        // 三服务器：全局价格聚合（riskManager 需全部市场价格）
+        this.allPrices = {};
+        this.tickCounterHK = 0;
+        this.tickCounterUS = 0;
         this.engine = engine;
         this.gateway = gateway;
         this.newsService = newsService;
@@ -51,6 +57,13 @@ let MarketService = class MarketService {
     }
     async onModuleInit() {
         await this.marketData.init();
+        // 三服务器：HK/US 实例手动初始化（factory 创建不触发生命周期钩子）
+        if (this.marketDataHK) {
+            await this.marketDataHK.init();
+        }
+        if (this.marketDataUS) {
+            await this.marketDataUS.init();
+        }
         // S2 启动校准：交易中启动时 tickCounter 对齐当前真实时段分钟数（避免误触发开盘/日终）
         const now = new Date();
         const minutes = now.getHours() * 60 + now.getMinutes();
@@ -66,101 +79,104 @@ let MarketService = class MarketService {
         // B1 用户成交 → 行情引擎回调（价格冲击 + 成交量并入当前K线）
         this.engine.setUserFillHook((fill) => {
             try {
-                this.marketData.applyUserFill(fill);
+                this.marketDataFor(fill.symbol).applyUserFill(fill);
             }
             catch (e) { }
         });
         this.startTickLoop();
         this.logger.log('市场行情推送已启动（交易时段同步），tickCounter=' + this.tickCounter);
     }
+    // 三服务器：单市场 tick 处理（行情生成/开盘事件/日终结算/挂单触发）
+    async processMarket(market, marketData, counterKey) {
+        try {
+            const ticks = marketData.generateTick();
+            if (ticks.length === 0) return;
+            const prices = {};
+            ticks.forEach((t) => { prices[t.symbol] = t.price; });
+            // 聚合到全局（风控需全市场价格）
+            Object.assign(this.allPrices, prices);
+            this.engine.updatePrices(prices);
+            this.engine.refreshOrderBooks(prices);
+            this.gateway.broadcastTick(ticks);
+            const fills = await this.engine.checkPendingOrders();
+            fills.forEach((f) => { this.gateway.broadcastFill(f); });
+            const counter = this[counterKey] || 0;
+            if (counter === 0) {
+                // 玩法：热点/IPO/黑天鹅（各市场独立）
+                marketData.startNewDay();
+                const events = marketData.getDayEvents();
+                if (events && events.ipo && events.ipo.listed) {
+                    for (const n of events.ipo.listed) {
+                        this.gateway.broadcastNews({
+                            title: `🚀 新股上市：${n.name}（${n.code}）`, description: `发行价 ${n.initialPrice} 元，所属行业 ${n.industry}，今日起可交易`, type: 'bullish', impact: {}, duration: 1,
+                        });
+                        this.logger.log(`🚀 新股上市: ${n.name}`);
+                    }
+                }
+                if (events && events.swan) {
+                    const good = events.swan.direction === 'good';
+                    this.gateway.broadcastNews({
+                        title: good ? `🎉 利好：${events.swan.desc}` : `🦊 黑天鹅：${events.swan.desc}`, description: `影响：${events.swan.type === 'market' ? '全市场' : events.swan.type === 'industry' ? events.swan.industry + '板块' : events.swan.name} 约 ${events.swan.impact}%`, type: good ? 'bullish' : 'bearish', impact: {}, duration: 2,
+                    });
+                    if (good) this.logger.log(`🎉 政策红包: ${events.swan.desc}`);
+                    else this.logger.warn(`🦊 黑天鹅: ${events.swan.desc}`);
+                }
+                this.engine.setDayOpen(prices);
+                await this.engine.resetBoughtToday();
+                const state = marketData.getState();
+                // 财报季
+                if (marketData.gameDay > 0 && marketData.gameDay % 7 === 0) {
+                    const n = marketData.generateReports();
+                    if (n > 0) this.logger.log(`📊 [` + market + `] 财报季: ${n} 家公司披露季度财报`);
+                }
+                const news = this.newsService.generateDailyNews(state.marketRegime, marketData.gameDay);
+                if (news) this.logger.log(`📰 [` + market + `] ${news.title}`);
+            }
+            if (counter === 239) { // 分红/夜间事件
+                try {
+                    await this.engine.payDividends(marketData.getDividends(marketData.gameDay));
+                } catch (e) {
+                    this.logger.error(`分红发放失败: ${e.message}`);
+                }
+                const nightEvent = this.newsService.processNightEvent();
+                if (nightEvent && nightEvent.impact !== 0) {
+                    const prices = marketData.getPrices();
+                    for (const sym of Object.keys(prices)) {
+                        prices[sym] *= (1 + nightEvent.impact);
+                    }
+                    this.engine.updatePrices(prices);
+                }
+            }
+            if (counter === 239) { // 日终结算
+                await marketData.endOfDay();
+                const day = marketData.gameDay;
+                if (this.riskManager) {
+                    await this.riskManager.settleAllAccounts(day);
+                }
+                await this.engine.forceLiquidateMarginalAccounts();
+                this.logger.log(`📅 [` + market + `] 第 ${day} 个交易日结束`);
+            }
+            this[counterKey] = (counter + 1) % 240;
+        } catch (e) {
+            this.logger.error(`[` + market + `] Tick处理异常: ${e.message}`);
+        }
+    }
     async startTickLoop() {
         const tick = async () => {
             if (this.processing) return;
             this.processing = true;
             try {
-                // S2 交易时段同步：休市（非9:30-11:30/13:00-15:00或周末）不生成行情
+                // S2 交易时段同步：休市不生成行情
                 if (!this.isTradingTime()) {
                     return;
                 }
-                const ticks = this.marketData.generateTick();
-                if (ticks.length > 0) {
-                    const prices = {};
-                    ticks.forEach((t) => { prices[t.symbol] = t.price; });
-                    this.engine.updatePrices(prices);
-                    this.engine.refreshOrderBooks(prices);
-                    if (this.riskManager) {
-                        this.riskManager.setMarketPrices(prices);
-                    }
-                    this.gateway.broadcastTick(ticks);
-                    const fills = await this.engine.checkPendingOrders();
-                    fills.forEach((f) => { this.gateway.broadcastFill(f); });
-                    if (this.tickCounter === 0) {
-                        // 玩法：热点/IPO/黑天鹅
-                        this.marketData.startNewDay();
-                        const events = this.marketData.getDayEvents();
-                        if (events && events.ipo && events.ipo.listed) {
-                            for (const n of events.ipo.listed) {
-                                this.gateway.broadcastNews({
-                                    title: `🚀 新股上市：${n.name}（${n.code}）`, description: `发行价 ${n.initialPrice} 元，所属行业 ${n.industry}，今日起可交易`, type: 'bullish', impact: {}, duration: 1,
-                                });
-                                this.logger.log(`🚀 新股上市: ${n.name}`);
-                            }
-                        }
-                                                                        if (events && events.swan) {
-                            // C1 利好型（政策红包）→ bullish；利空型（黑天鹅）→ bearish
-                            const good = events.swan.direction === 'good';
-                            this.gateway.broadcastNews({
-                                title: good ? `🎉 利好：${events.swan.desc}` : `🦊 黑天鹅：${events.swan.desc}`, description: `影响：${events.swan.type === 'market' ? '全市场' : events.swan.type === 'industry' ? events.swan.industry + '板块' : events.swan.name} 约 ${events.swan.impact}%`, type: good ? 'bullish' : 'bearish', impact: {}, duration: 2,
-                            });
-                            if (good)
-                                this.logger.log(`🎉 政策红包: ${events.swan.desc}`);
-                            else
-                                this.logger.warn(`🦊 黑天鹅: ${events.swan.desc}`);
-                        }
-                        this.engine.setDayOpen(prices);
-                        await this.engine.resetBoughtToday();
-                        const state = this.marketData.getState();
-                        // 财报季（每 20 个交易日）
-                        if (this.marketData.gameDay > 0 && this.marketData.gameDay % 7 === 0) { // S2 节奏：财报季每周一次
-                            const n = this.marketData.generateReports();
-                            if (n > 0)
-                                this.logger.log(`📊 财报季: ${n} 家公司披露季度财报`);
-                        }
-                        const news = this.newsService.generateDailyNews(state.marketRegime, this.marketData.gameDay);
-                        if (news) {
-                            this.logger.log(`📰 ${news.title}`);
-                        }
-                    }
-                    if (this.tickCounter === 239) { // 分红/夜间事件
-                        // 玩法：分红到账（当日财报季产生的分红）
-                        try {
-                            await this.engine.payDividends(this.marketData.getDividends(this.marketData.gameDay));
-                        }
-                        catch (e) {
-                            this.logger.error(`分红发放失败: ${e.message}`);
-                        }
-                        const nightEvent = this.newsService.processNightEvent();
-                        if (nightEvent && nightEvent.impact !== 0) {
-                            const prices = this.marketData.getPrices();
-                            for (const sym of Object.keys(prices)) {
-                                prices[sym] *= (1 + nightEvent.impact);
-                            }
-                            this.engine.updatePrices(prices);
-                        }
-                    }
-                    // 日终：第 389 tick 结束时执行结算
-                    if (this.tickCounter === 239) { // 日终结算(最后tick)
-                        await this.marketData.endOfDay();
-                        const day = this.marketData.gameDay;
-                        // F6 修复：日终结算所有账户（更新权益/峰值/快照，排行榜数据源）
-                        if (this.riskManager) {
-                            await this.riskManager.settleAllAccounts(day);
-                        }
-                        // F7 修复：爆仓账户强制平仓
-                        await this.engine.forceLiquidateMarginalAccounts();
-                        this.logger.log(`📅 第 ${day} 个交易日结束`);
-                    }
-                    this.tickCounter = (this.tickCounter + 1) % 240;
+                // 三服务器：轮流处理 CN/HK/US（各自独立 gameDay/因子/事件）
+                await this.processMarket('CN', this.marketData, 'tickCounter');
+                await this.processMarket('HK', this.marketDataHK, 'tickCounterHK');
+                await this.processMarket('US', this.marketDataUS, 'tickCounterUS');
+                // 全局价格聚合 → 风控/保证金
+                if (this.riskManager) {
+                    this.riskManager.setMarketPrices(this.allPrices);
                 }
             }
             catch (e) {
@@ -173,30 +189,64 @@ let MarketService = class MarketService {
         };
         setTimeout(tick, 1000);
     }
+    // 三服务器路由：按股票代码前缀选择对应市场实例（H→HK，U→US，其他→CN）
+    marketDataFor(symbol) {
+        if (/^H/.test(symbol || ''))
+            return this.marketDataHK;
+        if (/^U/.test(symbol || ''))
+            return this.marketDataUS;
+        return this.marketData;
+    }
     getKlines(symbol, timeframe) {
-        return this.marketData.getKlines(symbol, timeframe);
+        return this.marketDataFor(symbol).getKlines(symbol, timeframe);
     }
     getOrderBook(symbol) {
         return this.engine.getOrderBook(symbol);
     }
     getPrices() {
-        return this.marketData.getPrices();
+        // 三服务器合并
+        const all = {};
+        for (const md of [this.marketData, this.marketDataHK, this.marketDataUS]) {
+            if (md)
+                Object.assign(all, md.getPrices());
+        }
+        return all;
     }
     getStocks() {
-        return this.marketData.getStockList();
+        // 三服务器合并（前端按市场过滤）
+        const all = [];
+        for (const md of [this.marketData, this.marketDataHK, this.marketDataUS]) {
+            if (md)
+                all.push(...md.getStockList());
+        }
+        return all;
     }
     getIndices() {
-        return this.marketData.getIndices();
+        // 三服务器合并（前端按市场过滤显示）
+        const all = [];
+        for (const md of [this.marketData, this.marketDataHK, this.marketDataUS]) {
+            if (md)
+                all.push(...md.getIndices());
+        }
+        return all;
     }
     getState() {
-        return this.marketData.getState();
+        // 合并：当前市场用 CN（前端市场切换时按各自 state 展示）
+        const cn = this.marketData.getState();
+        // 浅拷贝避免循环引用（markets.CN 不能引用 cn 自身）
+        cn.markets = {
+            CN: { ...cn },
+            HK: this.marketDataHK ? this.marketDataHK.getState() : null,
+            US: this.marketDataUS ? this.marketDataUS.getState() : null,
+        };
+        return cn;
     }
     getReports(symbol) {
-        return this.marketData.getReports(symbol);
+        return this.marketDataFor(symbol).getReports(symbol);
     }
     // ─── B2 回测：MA 交叉策略（返回结果 + 收益曲线抽样 40 点） ───
     backtest(symbol, fast = 5, slow = 20, timeframe = '1min') {
-        const klines = this.marketData.getKlines(symbol, timeframe);
+        const klines = this.marketDataFor(symbol).getKlines(symbol, timeframe);
         const closes = klines.map((k) => Number(k.close));
         const fastN = Number(fast) || 5;
         const slowN = Number(slow) || 20;
@@ -256,11 +306,15 @@ MarketService = __decorate(
 [
     (0, common_1.Injectable)(),
     __param(4, (0, common_1.Optional)()),
+    __param(5, (0, common_1.Inject)('MarketDataHK')),
+    __param(6, (0, common_1.Inject)('MarketDataUS')),
     __metadata("design:paramtypes", [market_data_service_1.MarketDataService,
         trading_engine_service_1.TradingEngineService,
         market_gateway_1.MarketGateway,
         news_service_1.NewsService,
-        risk_manager_service_1.RiskManagerService])
+        risk_manager_service_1.RiskManagerService,
+        market_data_service_1.MarketDataService,
+        market_data_service_1.MarketDataService])
 ],
 MarketService
 );
