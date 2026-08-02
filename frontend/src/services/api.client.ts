@@ -44,6 +44,7 @@ export const accountApi = {
   metrics: (mode: string = 'US') => api.get(`/account/metrics?mode=${mode}`).then((r) => r.data),
   history: (mode: string = 'US') => api.get(`/account/history?mode=${mode}`).then((r) => r.data),
   transactions: (mode: string = 'US') => api.get(`/account/transactions?mode=${mode}`).then((r) => r.data),
+  reviews: () => api.get(`/account/reviews`).then((r) => r.data),
   setLeverage: (mode: string, leverage: number) =>
     api.post(`/account/leverage?mode=${mode}`, { leverage }).then((r) => r.data),
   reset: (mode: string, preset: string) =>

@@ -143,11 +143,12 @@ let MarketDataService = class MarketDataService {
         for (const cfg of POOL_FOR_THIS) {
             this.poolBySymbol.set(cfg.symbol, cfg);
         }
-        // 加载已上市的 IPO 股票（DB 已有 → 仅内存，防重复创建 UNIQUE）
+        // 加载已上市的 IPO 股票（DB 已有 → 仅内存，防重复创建 UNIQUE；独立查询不依赖已过滤的 dbStocks）
+        const ipoDbRows = await this.stockRepo.find({ where: { isActive: true } });
         for (const cfg of constants_1.IPO_POOL) {
             if (this.stocks.has(cfg.symbol))
                 continue;
-            const dbRow = dbStocks.find((x) => x.symbol === cfg.symbol);
+            const dbRow = ipoDbRows.find((x) => x.symbol === cfg.symbol);
             if (!dbRow || !dbRow.isActive)
                 continue;
             const ipoPrice = Number(dbRow.initialPrice) || Number(cfg.initialPrice);

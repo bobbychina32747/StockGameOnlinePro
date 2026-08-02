@@ -161,7 +161,7 @@ export function OrderPanel() {
     <>
       <CollapsibleCard title={`📝 下单 (${selectedSymbol})`}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <select className="input" value={orderType} onChange={(e) => setOrderType(e.target.value)}>
+          <select className="input" value={orderType} onChange={(e) => { setOrderType(e.target.value); if (e.target.value === 'limit') useUIStore.getState().tutorialEvent('limit'); }}>
             <option value="market">市价单</option>
             <option value="limit">限价单</option>
             <option value="stop">止损单</option>

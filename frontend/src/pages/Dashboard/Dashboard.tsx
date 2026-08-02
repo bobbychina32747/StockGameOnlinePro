@@ -9,6 +9,7 @@ import { AccountPanel } from '../../components/Trading/AccountPanel';
 import { OrderPanel } from '../../components/Trading/OrderPanel';
 import { StockDetailModal } from '../../components/Trading/StockDetailModal';
 import { AIAssistant } from '../../components/Trading/AIAssistant';
+import { TutorialOverlay } from '../../components/Tutorial/TutorialOverlay';
 
 // 主交易页（同花顺式三栏布局：股票列表 | 图表 | 盘口/账户/下单，两侧可拖拽调宽）
 export default function Dashboard() {
@@ -199,6 +200,7 @@ export default function Dashboard() {
         </>
       )}
       <StockDetailModal />
+      <TutorialOverlay />
       {isMobile && (
         <div className="m-tabbar">
           <button className={mobileTab === 'list' ? 'm-tab active' : 'm-tab'} onClick={() => setMobileTab('list')}>📈 行情</button>

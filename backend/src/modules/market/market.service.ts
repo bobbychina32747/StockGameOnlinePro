@@ -110,6 +110,13 @@ let MarketService = class MarketService {
                     title: `💥 泡沫破灭：${b.industry} 板块崩盘`, description: `${b.reason}，板块股价向内在价值剧烈回归，谨防踩踏`, type: 'bearish', impact: {}, duration: 2,
                 });
                 this.logger.warn(`💥 [${market}] 泡沫破灭: ${b.industry}（${b.reason}）`);
+                // 复盘：泡沫破灭教育卡
+                if (this.riskManager) {
+                    this.riskManager.addGlobalReview({
+                        type: '泡沫破灭',
+                        title: `💥 ${b.industry} 板块泡沫破灭`, desc: `${b.reason}。板块股价正在向内在价值剧烈回归`, lesson: '泡沫破灭的教训：板块连续暴涨（涨幅远超基本面）时，任何细小抛售都可能引发连锁崩盘。识别泡沫：关注涨幅是否离谱、回调时是否放量下跌。破灭期不要抄底，等价格回归价值企稳后再介入',
+                    });
+                }
             }
             const counter = this[counterKey] || 0;
             if (counter === 0) {
@@ -164,7 +171,23 @@ let MarketService = class MarketService {
                 if (this.riskManager) {
                     await this.riskManager.settleAllAccounts(day);
                 }
-                await this.engine.forceLiquidateMarginalAccounts();
+                const liquidated = await this.engine.forceLiquidateMarginalAccounts();
+                // 复盘：强平教训卡
+                if (this.riskManager && liquidated && liquidated.length > 0) {
+                    for (const l of liquidated) {
+                        const acct = await this.engine.getAccountById(l.accountId);
+                        if (acct) {
+                            this.riskManager.addReview(acct.userId, {
+                                type: '强平',
+                                title: '💔 账户被强制平仓', desc: `保证金率跌破阈值（${(l.marginLevel * 100).toFixed(1)}%），所有持仓被强平`, lesson: '强平的教训：做空/融资仓位要预留充足保证金，保证金率跌破 100% 就会被强平。建议：①控制杠杆 ≤2x ②单边行情别满仓做空 ③及时补足保证金',
+                            });
+                        }
+                    }
+                    this.riskManager.addGlobalReview({
+                        type: '市场警示',
+                        title: '💔 有玩家被强制平仓', desc: '高杠杆玩家因保证金不足被强平，市场风险释放', lesson: '杠杆是把双刃剑：暴涨时放大收益，回调时直接出局。新手建议从无杠杆开始',
+                    });
+                }
                 this.logger.log(`📅 [` + market + `] 第 ${day} 个交易日结束`);
             }
             this[counterKey] = (counter + 1) % 240;

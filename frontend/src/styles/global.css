@@ -1385,3 +1385,56 @@ body.density-compact .info-row { padding: 2px 0; }
   margin-top: 6px;
 }
 
+
+/* ═══ 交易复盘卡 ═══ */
+.review-card {
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid #e03131;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 8px 0;
+  background: rgba(224, 49, 49, 0.04);
+}
+.review-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.review-lesson {
+  font-size: 11px;
+  color: #ffd43b;
+  margin-top: 5px;
+  line-height: 1.5;
+  background: rgba(255, 212, 59, 0.06);
+  border-radius: 4px;
+  padding: 5px 8px;
+}
+
+/* ═══ 新手教程 ═══ */
+.tutorial-overlay {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  animation: tutorial-slide 0.3s ease-out;
+}
+@keyframes tutorial-slide {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.tutorial-bubble {
+  width: 320px;
+  background: var(--bg-card);
+  border: 1px solid rgba(47, 111, 237, 0.4);
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+.tutorial-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; color: #fff; }
+.tutorial-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+.tutorial-action { font-size: 12px; color: #ffd43b; margin-top: 6px; }
+.tutorial-btns { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.tutorial-progress { flex: 1; display: flex; gap: 3px; }
+.tutorial-progress i { width: 8px; height: 4px; border-radius: 2px; background: var(--border-strong); }
+.tutorial-progress i.on { background: #2f6fed; }

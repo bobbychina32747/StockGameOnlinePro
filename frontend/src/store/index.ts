@@ -149,6 +149,10 @@ interface UIState {
   setAnimEnabled: (v: boolean) => void;
   debugMode: boolean;
   setDebugMode: (v: boolean) => void;
+  tutorialStep: number;
+  tutorialDone: boolean;
+  tutorialEvent: (event: string) => void;
+  skipTutorial: () => void;
   density: 'standard' | 'compact';
   setDensity: (d: 'standard' | 'compact') => void;
   theme: 'dark' | 'light';
@@ -216,6 +220,27 @@ export const useUIStore = create<UIState>((set) => ({
   setAnimEnabled: (v) => { localStorage.setItem('ss.anim', v ? '1' : '0'); set({ animEnabled: v }); },
   debugMode: false,
   setDebugMode: (v) => set({ debugMode: v }),
+  // 新手教程：7 步引导（localStorage 持久化）
+  tutorialStep: Number(localStorage.getItem('ss.tut') || 0),
+  tutorialDone: localStorage.getItem('ss.tutDone') === '1',
+  tutorialEvent: (event) => {
+    const done = localStorage.getItem('ss.tutDone') === '1';
+    if (done) return;
+    const cur = Number(localStorage.getItem('ss.tut') || 0);
+    // 事件 → 步骤完成映射（0 welcome 需点下一步；1 buy；2 timeframe；3 limit；4 mode；5 tx）
+    const eventMap: Record<string, number> = { buy: 1, timeframe: 2, limit: 3, mode: 4, tx: 5 };
+    const target = eventMap[event];
+    if (target != null && cur === target) {
+      const next = cur + 1;
+      localStorage.setItem('ss.tut', String(next));
+      set({ tutorialStep: next });
+    }
+  },
+  skipTutorial: () => {
+    localStorage.setItem('ss.tut', '6');
+    localStorage.setItem('ss.tutDone', '1');
+    set({ tutorialStep: 6, tutorialDone: true });
+  },
   density: (localStorage.getItem('ss.density') as any) || 'standard',
   setDensity: (d) => { localStorage.setItem('ss.density', d); set({ density: d }); },
   addNews: (news) =>

@@ -37,6 +37,9 @@ let AccountController = class AccountController {
     getTransactions(user, mode = 'US', limit) {
         return this.accountService.getTransactions(user.id, mode, limit);
     }
+    getReviews(user) {
+        return this.accountService.getReviews(user.id);
+    }
     async setLeverage(user, mode, leverage) {
         return this.accountService.setLeverage(user.id, mode || 'US', leverage);
     }
@@ -86,6 +89,13 @@ __decorate([
     __metadata("design:paramtypes", [user_entity_1.User, String, Number]),
     __metadata("design:returntype", Promise)
 ], AccountController.prototype, "setLeverage", null);
+__decorate([
+    (0, common_1.Get)('reviews'),
+    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [user_entity_1.User]),
+    __metadata("design:returntype", Promise)
+], AccountController.prototype, "getReviews", null);
 __decorate([
     (0, common_1.Post)('reset'),
     __param(0, (0, jwt_auth_guard_1.CurrentUser)()),

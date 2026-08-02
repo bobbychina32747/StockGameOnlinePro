@@ -66,7 +66,8 @@ export function ChartPanel() {
   const stocks = useMarketStore((s) => s.stocks);
   const selectedSymbol = useUIStore((s) => s.selectedSymbol);
   const selectedTimeframe = useUIStore((s) => s.selectedTimeframe);
-  const setSelectedTimeframe = useUIStore((s) => s.setSelectedTimeframe);
+  const setSelectedTimeframeRaw = useUIStore((s) => s.setSelectedTimeframe);
+  const setSelectedTimeframe = (tf: string) => { setSelectedTimeframeRaw(tf); if (tf !== 'intraday') useUIStore.getState().tutorialEvent('timeframe'); };
   const setDetailSymbol = useUIStore((s) => s.setDetailSymbol);
   const debugMode = useUIStore((s) => s.debugMode);
 

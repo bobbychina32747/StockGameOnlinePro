@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useUIStore } from '../../store';
 import { accountApi } from '../../services/api.client';
 import { useMarketStore } from '../../store';
 
@@ -17,6 +18,7 @@ export default function Transactions() {
   const stocks = useMarketStore((s) => s.stocks);
 
   useEffect(() => {
+    useUIStore.getState().tutorialEvent('tx');
     let alive = true;
     accountApi.transactions('US').then((t) => {
       if (alive && Array.isArray(t)) setList(t);

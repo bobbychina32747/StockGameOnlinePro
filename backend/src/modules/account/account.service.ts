@@ -90,6 +90,10 @@ let AccountService = class AccountService {
         account.leverage = leverage;
         return this.accountRepo.save(account);
     }
+    // 交易复盘：个人 + 全局教训卡
+    getReviews(userId) {
+        return this.riskManager ? this.riskManager.getReviews(userId) : [];
+    }
     async resetAccount(userId, mode, preset) {
         const presets = {
             '散户': { cash: 100000, leverage: 1 },

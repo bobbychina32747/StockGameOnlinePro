@@ -79,6 +79,11 @@ __decorate([
     (0, typeorm_1.Column)('float', { default: 0 }),
     __metadata("design:type", Number)
 ], Account.prototype, "totalPnl", void 0);
+    // 段位系统：评分 + 段位 + 累计交易次数
+    __decorate([(0, typeorm_1.Column)({ default: '青铜' }), __metadata("design:type", String)], Account.prototype, "tier", void 0);
+    __decorate([(0, typeorm_1.Column)('float', { default: 0 }), __metadata("design:type", Number)], Account.prototype, "tierScore", void 0);
+    __decorate([(0, typeorm_1.Column)({ default: 0 }), __metadata("design:type", Number)], Account.prototype, "totalTrades", void 0);
+
 __decorate([
     (0, typeorm_1.OneToMany)(() => position_entity_1.Position, (pos) => pos.account),
     __metadata("design:type", Array)

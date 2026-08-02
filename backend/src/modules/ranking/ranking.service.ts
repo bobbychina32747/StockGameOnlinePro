@@ -53,6 +53,7 @@ let RankingService = class RankingService {
             .map((a) => ({
             userId: a.userId,
             market: a.marketMode || 'CN',
+            tier: a.tier || '青铜',
             username: a.user?.username || '未知',
             totalEquity: Number(a.totalEquity),
             totalReturn: (Number(a.totalEquity) - Number(a.initialEquity)) / Number(a.initialEquity),

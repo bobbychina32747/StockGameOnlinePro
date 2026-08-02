@@ -24,6 +24,7 @@ export function AccountPanel() {
   }, [mode, fetchAccount]);
 
   const switchMode = async (newMode: string) => {
+    useUIStore.getState().tutorialEvent('mode');
     setMarketMode(newMode);
     await fetchAccount(newMode);
   };

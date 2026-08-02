@@ -33,6 +33,9 @@ let RiskManagerService = class RiskManagerService {
         this.logger = new common_1.Logger(RiskManagerService.name);
         this.equityHistory = new Map<string, any>();
         this.currentPrices = {};
+        // 交易复盘：个人复盘 + 全局复盘（教育卡）
+        this.reviews = new Map();
+        this.globalReviews = [];
     }
     setMarketPrices(prices) {
         this.currentPrices = prices;
@@ -57,6 +60,49 @@ let RiskManagerService = class RiskManagerService {
         });
         await this.snapshotRepo.save(snapshot);
     }
+    // 交易复盘：个人复盘卡（强平/大亏损）+ 全局复盘（泡沫破灭教育）
+    addReview(userId, review) {
+        if (!userId)
+            return;
+        const arr = this.reviews.get(userId) || [];
+        arr.unshift({ ...review, time: new Date().toISOString() });
+        if (arr.length > 20)
+            arr.length = 20;
+        this.reviews.set(userId, arr);
+    }
+    addGlobalReview(review) {
+        this.globalReviews.unshift({ ...review, time: new Date().toISOString() });
+        if (this.globalReviews.length > 10)
+            this.globalReviews.length = 10;
+    }
+    getReviews(userId) {
+        const mine = userId ? (this.reviews.get(userId) || []) : [];
+        return [...mine, ...this.globalReviews].slice(0, 20);
+    }
+    // 段位评分：收益(总收益归一化) + 风控(回撤) + 活跃(交易次数)
+    computeTier(account) {
+        const initial = Number(account.initialEquity) || 1;
+        const totalReturn = (Number(account.totalEquity) - initial) / initial;
+        const retScore = Math.max(0, Math.min(1, totalReturn / 0.5)) * 100;
+        const peak = Number(account.peakEquity) || Number(account.totalEquity);
+        const drawdown = peak > 0 ? Math.max(0, (peak - Number(account.totalEquity)) / peak) : 0;
+        const riskScore = Math.max(0, Math.min(1, 1 - drawdown / 0.5)) * 100;
+        const trades = Number(account.totalTrades) || 0;
+        const actScore = Math.max(0, Math.min(1, trades / 50)) * 100;
+        const tierScore = Math.round(retScore * 0.4 + riskScore * 0.3 + actScore * 0.3);
+        const tiers = [
+            { min: 92, name: '王者', icon: '🐉' },
+            { min: 82, name: '大师', icon: '👑' },
+            { min: 70, name: '钻石', icon: '🔷' },
+            { min: 55, name: '铂金', icon: '💎' },
+            { min: 35, name: '黄金', icon: '🥇' },
+            { min: 15, name: '白银', icon: '🥈' },
+            { min: 0, name: '青铜', icon: '🥉' },
+        ];
+        const tier = tiers.find((t) => tierScore >= t.min) || tiers[tiers.length - 1];
+        account.tier = tier.name;
+        account.tierScore = tierScore;
+    }
     async dailySettlement(account, day) {
         const positions = await this.getPositionsValue(account);
         if (positions.marginUsed > 0) {
@@ -64,6 +110,16 @@ let RiskManagerService = class RiskManagerService {
             account.cash = Number(account.cash) - interest;
         }
         account.totalEquity = Number(account.cash) + positions.holdValue;
+        // 复盘：单日大亏损 >10% → 生成教训卡
+        if (Number(account.dayStartEquity) > 0) {
+            const dayRet = (Number(account.totalEquity) - Number(account.dayStartEquity)) / Number(account.dayStartEquity);
+            if (dayRet < -0.1) {
+                this.addReview(account.userId, {
+                    type: '大亏损',
+                    title: `📉 单日亏损 ${(Math.abs(dayRet) * 100).toFixed(1)}%`, desc: `第 ${day} 个交易日，你的账户单日亏损超过 10%`, lesson: '单日巨亏通常是重仓追高或未设止损。建议：①控制单笔仓位 ≤20% ②永远设止损单 ③泡沫期的暴涨回调往往最凶',
+                });
+            }
+        }
         account.peakEquity = Math.max(Number(account.peakEquity), Number(account.totalEquity));
         account.dailyPnl = Number(account.totalEquity) - Number(account.dayStartEquity);
         account.totalPnl = Number(account.totalEquity) - Number(account.initialEquity);
@@ -80,6 +136,9 @@ let RiskManagerService = class RiskManagerService {
         for (const account of accounts) {
             try {
                 settled.push(await this.dailySettlement(account, day));
+                // 段位系统：收益40% + 风控30% + 活跃30%
+                this.computeTier(account);
+                await this.accountRepo.save(account);
             }
             catch (e) {
                 this.logger.error(`日终结算失败 account=${account.id}: ${e.message}`);

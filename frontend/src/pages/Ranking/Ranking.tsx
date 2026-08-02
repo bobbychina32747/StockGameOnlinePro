@@ -8,6 +8,8 @@ interface RankingEntry {
   totalReturn: number;
   dayReturn?: number;
   rank: number;
+  tier?: string;
+  market?: string;
 }
 
 type SortKey = 'totalReturn' | 'dayReturn' | 'equity';
@@ -103,7 +105,7 @@ export default function Ranking() {
                       e.rank || '-'
                     )}
                   </td>
-                  <td>{e.username}</td>
+                  <td>{e.username} {e.tier && <span title={`段位 ${e.tier}`} style={{ fontSize: 12 }}>{({ 王者: '🐉', 大师: '👑', 钻石: '🔷', 铂金: '💎', 黄金: '🥇', 白银: '🥈', 青铜: '🥉' } as Record<string, string>)[e.tier] || ''}</span>}</td>
                   <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
                     ¥{(sort === 'dayReturn' ? val : e.totalEquity).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
                   </td>

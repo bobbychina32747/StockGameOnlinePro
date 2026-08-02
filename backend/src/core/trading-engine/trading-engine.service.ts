@@ -350,6 +350,7 @@ let TradingEngineService = class TradingEngineService {
             // SELL
             account.cash = Number(account.cash) + totalCost - fees.totalFees;
         }
+        account.totalTrades = (Number(account.totalTrades) || 0) + 1;
         await this.accountRepo.save(account);
         if (!pos) {
             pos = this.positionRepo.create({ accountId: account.id, symbol, longQty: 0, shortQty: 0, longCost: 0, shortCost: 0, boughtToday: 0, lockDay: 0 });
@@ -551,6 +552,14 @@ let TradingEngineService = class TradingEngineService {
         return recovered;
     }
     // F7 修复：日终检查所有账户保证金，爆仓（liquidate）则强制平仓
+    async getAccountById(accountId) {
+        try {
+            return await this.accountRepo.findOne({ where: { id: accountId } });
+        }
+        catch (e) {
+            return null;
+        }
+    }
     async forceLiquidateMarginalAccounts() {
         const accounts = await this.accountRepo.find();
         const priceObj = {};
