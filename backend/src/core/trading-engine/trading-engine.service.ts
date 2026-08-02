@@ -39,6 +39,7 @@ let TradingEngineService = class TradingEngineService {
         this.dayOpenPrices = new Map<string, any>();
         // F4 修复：成交结算串行队列，防止并发下单导致读-改-写竞态（超买/超卖）
         this.settlementQueue = Promise.resolve();
+        this.userFillHook = null; // B1 用户成交 → 行情引擎（价格冲击/成交量纳入）
         // 盘口按股票池动态初始化（支持多股票）
         for (const cfg of constants_1.STOCK_POOL) {
             this.orderBooks.set(cfg.symbol, { bids: [], asks: [] });
@@ -55,6 +56,10 @@ let TradingEngineService = class TradingEngineService {
         for (const [sym, price] of Object.entries(prices)) {
             this.dayOpenPrices.set(sym, price);
         }
+    }
+    // B1 用户成交回调：成交后通知行情引擎（价格冲击 + 成交量并入当前K线）
+    setUserFillHook(fn) {
+        this.userFillHook = fn;
     }
     async resetBoughtToday() {
         // 新交易日重置所有持仓的 boughtToday（T+1 解锁）
@@ -353,6 +358,13 @@ let TradingEngineService = class TradingEngineService {
         await this.positionRepo.save(pos);
         const tx = this.txRepo.create({ accountId: account.id, symbol, side, quantity: fill.filledQuantity, price: fill.avgPrice, turnover: totalCost, ...fees });
         await this.txRepo.save(tx);
+        // B1 用户成交计入行情：价格冲击 + 成交量并入当前 tick 的 K 线
+        if (this.userFillHook) {
+            try {
+                this.userFillHook({ symbol, side, filledQuantity: fill.filledQuantity, avgPrice: fill.avgPrice });
+            }
+            catch (e) { }
+        }
         this.logger.log(`成交: ${symbol} ${side} ${fill.filledQuantity}股 @ ${fill.avgPrice}`);
         return {
             success: true,

@@ -128,6 +128,7 @@ let MarketDataService = class MarketDataService {
                 listDate: s.listDate || '',
                 description: s.description || '',
                 price,
+                prevTickPrice: price,
                 volatility: Number(s.sigma) * 0.5,
                 lastReturn: 0,
                 prevClose: price,
@@ -342,6 +343,8 @@ let MarketDataService = class MarketDataService {
             newPrice = Math.max(0.5, newPrice);
             stock.price = newPrice;
             this.updateTrend(stock, priceChange);
+            // B1 波动检测：记录本 tick 前价（用于事件驱动传导判断）
+            stock.prevTickPrice = stock.price;
             stock.lastReturn = priceChange;
             // prevClose 保持"昨收"不变（涨跌幅基准），仅由 endOfDay 更新
             stock.lastVolume = this.calcVolume(stock, regimes);
@@ -360,13 +363,52 @@ let MarketDataService = class MarketDataService {
         }
         // 宏观反馈回路：个股表现 → 宏观因子（股票成为影响金融体系的真实嵌入体）
         this.updateMacroFeedback();
-        // B1 复合反应：行业动量传导（每 5 分钟）+ 指数影响全局（跨市场指数 → 市场情绪）
-        if (this.tickCount % 5 === 0) {
+        // B1 复合反应 LoD：平稳期每 5 分钟传导，剧烈波动（黑天鹅等）立即传导
+        if (this.tickCount % 5 === 0 || this.hasVolatileMove()) {
             this.updateIndustryLinks();
         }
         this.updateIndexFeedback();
         this.tickCount++;
         return results;
+    }
+    // ─── B1 波动检测：单 tick 任一股票涨跌 > 1.5%（黑天鹅/跳空/大单）→ 立即触发行业传导 ───
+    hasVolatileMove() {
+        for (const st of this.stocks.values()) {
+            const prev = st.prevTickPrice || st.price;
+            if (prev > 0 && Math.abs(st.price - prev) / prev > 0.015)
+                return true;
+        }
+        return false;
+    }
+    // ─── B1 用户成交计入行情：价格冲击 + 成交量并入当前 tick K 线 ───
+    applyUserFill(fill) {
+        const stock = this.stocks.get(fill.symbol);
+        if (!stock)
+            return;
+        // 价格冲击：成交额 / (日均成交额×2)，买推高卖压低，上限 1%（防大单操纵过度）
+        const turnover = Number(fill.filledQuantity) * Number(fill.avgPrice);
+        const avgTurnover = (stock.avgVolume || 8000) * (Number(stock.price) || 1);
+        const impact = Math.min(0.01, (turnover / Math.max(1, avgTurnover * 2)) * 0.5);
+        const dir = (fill.side === 'BUY' || fill.side === 'COVER') ? 1 : -1;
+        stock.price = Math.max(0.5, stock.price * (1 + dir * impact));
+        // 成交量并入当前 K 线（本 tick 的购买售出纳入图表与总额计算）
+        const qty = Number(fill.filledQuantity) || 0;
+        stock.lastVolume += qty;
+        stock.dayVolume += qty;
+        const k1 = stock.current1min;
+        if (k1) {
+            k1.volume += qty;
+            k1.high = Math.max(k1.high, stock.price);
+            k1.low = Math.min(k1.low, stock.price);
+            k1.close = stock.price;
+        }
+        const k5 = stock.current5min;
+        if (k5) {
+            k5.volume += qty;
+            k5.high = Math.max(k5.high, stock.price);
+            k5.low = Math.min(k5.low, stock.price);
+            k5.close = stock.price;
+        }
     }
     // ─── B1 行业复合传导：行业动量按关联矩阵传导给相关行业（半导体涨 → 消费电子/软件跟涨） ───
     updateIndustryLinks() {

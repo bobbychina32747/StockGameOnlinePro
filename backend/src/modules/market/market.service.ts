@@ -63,6 +63,13 @@ let MarketService = class MarketService {
         else {
             this.tickCounter = 0;
         }
+        // B1 用户成交 → 行情引擎回调（价格冲击 + 成交量并入当前K线）
+        this.engine.setUserFillHook((fill) => {
+            try {
+                this.marketData.applyUserFill(fill);
+            }
+            catch (e) { }
+        });
         this.startTickLoop();
         this.logger.log('市场行情推送已启动（交易时段同步），tickCounter=' + this.tickCounter);
     }
