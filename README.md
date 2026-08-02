@@ -1,5 +1,10 @@
 # StockSim Pro — 模拟炒股游戏
 
+[![Release](https://img.shields.io/github/v/release/bobbychina32747/StockGameOnlinePro?label=Release&color=2f6fed)](https://github.com/bobbychina32747/StockGameOnlinePro/releases)
+[![更新日志](https://img.shields.io/badge/Changelog-Keep%20a%20Changelog-8251EE)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial-10b981)](LICENSE)
+[![Last Commit](https://img.shields.io/github/last-commit/bobbychina32747/StockGameOnlinePro?label=最后提交)](https://github.com/bobbychina32747/StockGameOnlinePro/commits)
+
 > **🟡 BETA 版本** — 核心功能已完成，持续迭代中。行情为模拟数据，不构成任何投资建议。
 
 一个纯VibeCoding的高仿真度的模拟炒股平台，目标是做出**同花顺级别的交易体验**：真实的行情引擎、宏观因子反馈、板块轮动、新闻驱动、做空/融资、量化 API 一应俱全。
@@ -155,6 +160,17 @@ docs/
 - **JWT_SECRET**：生产环境必须在 `backend/.env` 配置强密钥（默认 `dev-secret` 仅用于开发）
 - **默认账号**：`admin/admin123` 为演示账号，部署到公网前请修改或禁用
 - **数据库**：`backend/data/*.db` 为本地模拟数据，请勿提交到版本控制（已 gitignore）
+
+---
+
+## 📦 版本与发布
+
+- **当前版本**：[v0.1.0](https://github.com/bobbychina32747/StockGameOnlinePro/releases)（BETA 首个正式版本）
+- **更新日志**：所有变更记录在 [CHANGELOG.md](CHANGELOG.md)（Keep a Changelog 格式，Unreleased 区块记录进行中的迭代）
+- **版本号**：遵循语义化版本（SemVer）——`v0.x.y`，`git tag` 打标签后推送，GitHub Releases 发布
+- **查看历史版本**：[Releases 页面](https://github.com/bobbychina32747/StockGameOnlinePro/releases) 查看每个版本的发布说明与可下载代码包
+
+> 每轮功能迭代都会更新 CHANGELOG 并视规模发布新版本。
 
 ---
 
