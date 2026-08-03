@@ -406,7 +406,8 @@ let MarketDataService = class MarketDataService {
                 }
             }
             let priceChange = drift + shock + jump + factorImpact * dt * 5 + ofiImpact + meanReversion + momentumBoost + burstDrift;
-            priceChange = this.clamp(priceChange, -0.03, 0.03);
+            // 收紧单 tick 波动 ±2%：保证相邻 K 线价格区间贴近（消除图表割裂）
+            priceChange = this.clamp(priceChange, -0.02, 0.02);
             let newPrice = stock.price * (1 + priceChange);
             if (isNaN(newPrice) || !isFinite(newPrice))
                 newPrice = stock.price;
@@ -714,10 +715,12 @@ let MarketDataService = class MarketDataService {
                 if (stock.kline1min.length > 50000)
                     stock.kline1min.shift();
             }
+            // 价格连续性：新 bar 的 open = 上一条 close（相邻 bar 区间自然交叠，消除图表割裂）
+            const prevClose1 = stock.kline1min.length > 0 ? Number(stock.kline1min[stock.kline1min.length - 1].close) : price;
             stock.current1min = {
                 startMinute: minute,
                 time: this.tradingTime(this.gameDay, minute),
-                open: price, high: price, low: price, close: price, volume: 0,
+                open: prevClose1, high: Math.max(prevClose1, price), low: Math.min(prevClose1, price), close: price, volume: 0,
             };
         }
         const k1 = stock.current1min;
@@ -733,10 +736,11 @@ let MarketDataService = class MarketDataService {
                 if (stock.kline5min.length > 20000)
                     stock.kline5min.shift();
             }
+            const prevClose5 = stock.kline5min.length > 0 ? Number(stock.kline5min[stock.kline5min.length - 1].close) : price;
             stock.current5min = {
                 startFiveIdx: fiveIdx,
                 time: this.tradingTime(this.gameDay, fiveIdx * 5),
-                open: price, high: price, low: price, close: price, volume: 0,
+                open: prevClose5, high: Math.max(prevClose5, price), low: Math.min(prevClose5, price), close: price, volume: 0,
             };
         }
         const k5 = stock.current5min;
