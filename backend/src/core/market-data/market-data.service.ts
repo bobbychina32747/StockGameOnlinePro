@@ -144,26 +144,29 @@ let MarketDataService = class MarketDataService {
             this.poolBySymbol.set(cfg.symbol, cfg);
         }
         // 加载已上市的 IPO 股票（DB 已有 → 仅内存，防重复创建 UNIQUE；独立查询不依赖已过滤的 dbStocks）
-        const ipoDbRows = await this.stockRepo.find({ where: { isActive: true } });
-        for (const cfg of constants_1.IPO_POOL) {
-            if (this.stocks.has(cfg.symbol))
-                continue;
-            const dbRow = ipoDbRows.find((x) => x.symbol === cfg.symbol);
-            if (!dbRow || !dbRow.isActive)
-                continue;
-            const ipoPrice = Number(dbRow.initialPrice) || Number(cfg.initialPrice);
-            this.poolBySymbol.set(cfg.symbol, cfg);
-            const ipoBaseVol = Math.max(8000, Math.floor(ipoPrice * 120));
-            this.stocks.set(cfg.symbol, {
-                symbol: cfg.symbol, name: cfg.name, industry: cfg.industry,
-                code: cfg.code || '', listDate: cfg.listDate || '', description: cfg.description || '',
-                price: ipoPrice, intrinsic: ipoPrice, volatility: Number(cfg.sigma) * 0.5, lastReturn: 0,
-                prevClose: ipoPrice, lastVolume: ipoBaseVol, avgVolume: ipoBaseVol, baseVolume: ipoBaseVol, prevVolume: ipoBaseVol,
-                dayOpen: ipoPrice, dayHigh: ipoPrice, dayLow: ipoPrice, dayVolume: 0, minuteCounter: 0,
-                kline1min: [], kline5min: [], klineDaily: [], current1min: null, current5min: null, currentDaily: null,
-                trendCounter: 0, trendDirection: 0, trendAccumulated: 0, isTrending: false,
-            });
-            this.logger.log('📌 已加载已上市 IPO: ' + cfg.name);
+        // FIX(IPO重复): 已上市 IPO 仅 A 股服务器加载，避免 HK/US 实例重复持有（前端出现多个相同股票 + K线3倍落库）
+        if (this.market === 'CN') {
+            const ipoDbRows = await this.stockRepo.find({ where: { isActive: true } });
+            for (const cfg of constants_1.IPO_POOL) {
+                if (this.stocks.has(cfg.symbol))
+                    continue;
+                const dbRow = ipoDbRows.find((x) => x.symbol === cfg.symbol);
+                if (!dbRow || !dbRow.isActive)
+                    continue;
+                const ipoPrice = Number(dbRow.initialPrice) || Number(cfg.initialPrice);
+                this.poolBySymbol.set(cfg.symbol, cfg);
+                const ipoBaseVol = Math.max(8000, Math.floor(ipoPrice * 120));
+                this.stocks.set(cfg.symbol, {
+                    symbol: cfg.symbol, name: cfg.name, industry: cfg.industry,
+                    code: cfg.code || '', listDate: cfg.listDate || '', description: cfg.description || '',
+                    price: ipoPrice, intrinsic: ipoPrice, volatility: Number(cfg.sigma) * 0.5, lastReturn: 0,
+                    prevClose: ipoPrice, lastVolume: ipoBaseVol, avgVolume: ipoBaseVol, baseVolume: ipoBaseVol, prevVolume: ipoBaseVol,
+                    dayOpen: ipoPrice, dayHigh: ipoPrice, dayLow: ipoPrice, dayVolume: 0, minuteCounter: 0,
+                    kline1min: [], kline5min: [], klineDaily: [], current1min: null, current5min: null, currentDaily: null,
+                    trendCounter: 0, trendDirection: 0, trendAccumulated: 0, isTrending: false,
+                });
+                this.logger.log('📌 已加载已上市 IPO: ' + cfg.name);
+            }
         }
         for (const s of dbStocks) {
             const price = Number(s.initialPrice);
@@ -825,12 +828,11 @@ let MarketDataService = class MarketDataService {
             };
             if (stock.current1min) {
                 stock.kline1min.push(stock.current1min);
-                persistBar('1min', stock.current1min);
+                // FIX(K线重复): 不再单独落库，统一由下方「当天完整落库」写入，避免最后一根 1min 被重复落库
                 stock.current1min = null;
             }
             if (stock.current5min) {
                 stock.kline5min.push(stock.current5min);
-                persistBar('5min', stock.current5min);
                 stock.current5min = null;
             }
             if (stock.currentDaily) {
