@@ -28,30 +28,30 @@ let AdminController = class AdminController {
     }
     async getStats(user) {
         if (user.role !== user_entity_1.UserRole.ADMIN)
-            throw new Error('无权限');
+            throw new common_1.ForbiddenException('无权限');
         return this.adminService.getStats();
     }
     async getUsers(user, page, limit) {
         if (user.role !== user_entity_1.UserRole.ADMIN)
-            throw new Error('无权限');
+            throw new common_1.ForbiddenException('无权限');
         return this.adminService.getUsers(page, limit);
     }
     async toggleUser(admin, userId, isActive) {
         if (admin.role !== user_entity_1.UserRole.ADMIN)
-            throw new Error('无权限');
+            throw new common_1.ForbiddenException('无权限');
         await this.adminService.setUserActive(userId, isActive);
         return { success: true };
     }
     // 调试模式：休市期间可生成行情/下单（管理员专用）
     async setDebug(user, on) {
         if (user.role !== user_entity_1.UserRole.ADMIN)
-            throw new Error('无权限');
+            throw new common_1.ForbiddenException('无权限');
         this.debugMode.set(on === true);
         return { success: true, debug: this.debugMode.get() };
     }
     async getDebug(user) {
         if (user.role !== user_entity_1.UserRole.ADMIN)
-            throw new Error('无权限');
+            throw new common_1.ForbiddenException('无权限');
         return { debug: this.debugMode.get() };
     }
 };

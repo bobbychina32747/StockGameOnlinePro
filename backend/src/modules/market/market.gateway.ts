@@ -47,7 +47,8 @@ export { MarketGateway };
 MarketGateway = __decorate(
 [
     (0, websockets_1.WebSocketGateway)({
-        cors: { origin: '*', credentials: true },
+        // FIX(M5): 收紧 CORS 白名单（原 origin:'*' 为无差别放行）
+        cors: { origin: ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000'], credentials: true },
         namespace: '/market',
     })
 ],

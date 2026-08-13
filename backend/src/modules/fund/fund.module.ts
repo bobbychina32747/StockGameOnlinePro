@@ -10,6 +10,8 @@ import typeorm_1 = require("@nestjs/typeorm");
 
 import account_entity_1 = require("../../infrastructure/database/entities/account.entity");
 
+import fund_holding_entity_1 = require("../../infrastructure/database/entities/fund-holding.entity");
+
 import fund_controller_1 = require("./fund.controller");
 
 import fund_service_1 = require("./fund.service");
@@ -23,7 +25,7 @@ export { FundModule };
 FundModule = __decorate(
 [
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([account_entity_1.Account])],
+        imports: [typeorm_1.TypeOrmModule.forFeature([account_entity_1.Account, fund_holding_entity_1.FundHolding])],
         controllers: [fund_controller_1.FundController],
         providers: [fund_service_1.FundService],
         exports: [fund_service_1.FundService],

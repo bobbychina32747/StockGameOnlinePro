@@ -32,7 +32,9 @@ async function seed() {
     const stockRepo = ds.getRepository(stock_entity_1.Stock);
     const existingAdmin = await userRepo.findOne({ where: { username: 'admin' } });
     if (!existingAdmin) {
-        const hashed = await bcrypt.hash('admin123', 10);
+        // SECURITY(C2): 管理员密码从环境变量读取，生产环境勿用默认值
+        const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+        const hashed = await bcrypt.hash(adminPassword, 10);
         const admin = userRepo.create({
             username: 'admin',
             password: hashed,
@@ -48,14 +50,15 @@ async function seed() {
             dayStartEquity: constants_1.RISK.initialCash,
         });
         await accountRepo.save(account);
-        console.log('[Seed] 管理员账号已创建: admin / admin123');
+        console.log('[Seed] 管理员账号已创建: admin');
     }
     else {
         console.log('[Seed] 管理员账号已存在');
     }
     const existingDemo = await userRepo.findOne({ where: { username: 'demo' } });
     if (!existingDemo) {
-        const hashed = await bcrypt.hash('demo123', 10);
+        const demoPassword = process.env.DEMO_PASSWORD || 'demo123';
+        const hashed = await bcrypt.hash(demoPassword, 10);
         const demo = userRepo.create({
             username: 'demo',
             password: hashed,
@@ -71,7 +74,7 @@ async function seed() {
             dayStartEquity: constants_1.RISK.initialCash,
         });
         await accountRepo.save(account);
-        console.log('[Seed] 演示用户已创建: demo / demo123');
+        console.log('[Seed] 演示用户已创建: demo');
     }
     for (const cfg of constants_1.STOCK_POOL) {
         const existing = await stockRepo.findOne({ where: { symbol: cfg.symbol } });

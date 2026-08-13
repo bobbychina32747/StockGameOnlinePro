@@ -36,11 +36,23 @@ let AuthService = class AuthService {
     // 主应用启动自动确保管理员存在（防 DB 覆盖丢失）
     async onModuleInit() {
         try {
-            const existing = await this.userRepo.findOne({ where: { username: 'admin' } });
+            const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+            const existing = await this.userRepo.findOne({ where: { username: adminUsername } });
             if (!existing) {
-                const hashed = await bcrypt.hash('admin123', 10);
+                const adminPassword = process.env.ADMIN_PASSWORD;
+                const isProd = process.env.NODE_ENV === 'production';
+                // SECURITY(C2): 生产环境必须设置强管理员密码，否则拒绝创建默认管理员（避免默认后门）
+                if (isProd && (!adminPassword || adminPassword.length < 8)) {
+                    console.error('[Seed] 生产环境未设置强 ADMIN_PASSWORD（>=8位），已拒绝创建默认管理员账号');
+                    return;
+                }
+                const passwordToUse = adminPassword && adminPassword.length >= 8 ? adminPassword : 'admin123';
+                if (!adminPassword || adminPassword.length < 8) {
+                    console.warn('[Seed] 使用默认管理员密码 admin123（仅限开发环境，生产请设置 ADMIN_PASSWORD 环境变量）');
+                }
+                const hashed = await bcrypt.hash(passwordToUse, 10);
                 const admin = this.userRepo.create({
-                    username: 'admin',
+                    username: adminUsername,
                     password: hashed,
                     role: user_entity_1.UserRole.ADMIN,
                 });
@@ -57,12 +69,25 @@ let AuthService = class AuthService {
                     });
                     await this.accountRepo.save(account);
                 }
-                console.log('[Seed] 管理员账号已自动创建: admin / admin123');
+                console.log('[Seed] 管理员账号已创建: ' + adminUsername);
             }
         }
         catch (e) {
             console.error('[Seed] 管理员创建失败:', e.message);
         }
+    }
+    // SECURITY(H3): 序列化时排除密码哈希，避免泄露
+    toSafeUser(user) {
+        if (!user)
+            return user;
+        return {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            isActive: user.isActive,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+        };
     }
     async register(username, password) {
         const existing = await this.userRepo.findOne({ where: { username } });
@@ -84,7 +109,7 @@ let AuthService = class AuthService {
             await this.accountRepo.save(account);
         }
         const token = this.jwtService.sign({ sub: user.id, username: user.username, role: user.role });
-        return { user, token };
+        return { user: this.toSafeUser(user), token };
     }
     async login(username, password) {
         const user = await this.userRepo.findOne({ where: { username } });
@@ -94,7 +119,7 @@ let AuthService = class AuthService {
         if (!valid)
             throw new common_1.UnauthorizedException('用户名或密码错误');
         const token = this.jwtService.sign({ sub: user.id, username: user.username, role: user.role });
-        return { user, token };
+        return { user: this.toSafeUser(user), token };
     }
 };
 

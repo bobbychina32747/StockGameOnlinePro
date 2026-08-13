@@ -65,19 +65,19 @@ __decorate([
 ], AccountController.prototype, "getMetrics", null);
 __decorate([
     (0, common_1.Get)('history'),
-    __param(0, (0, common_1.Request)()),
+    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
     __param(1, (0, common_1.Query)('mode')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:paramtypes", [user_entity_1.User, String]),
     __metadata("design:returntype", void 0)
 ], AccountController.prototype, "getHistory", null);
 __decorate([
     (0, common_1.Get)('transactions'),
-    __param(0, (0, common_1.Request)()),
+    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
     __param(1, (0, common_1.Query)('mode')),
     __param(2, (0, common_1.Query)('limit')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String, String]),
+    __metadata("design:paramtypes", [user_entity_1.User, String, String]),
     __metadata("design:returntype", void 0)
 ], AccountController.prototype, "getTransactions", null);
 __decorate([

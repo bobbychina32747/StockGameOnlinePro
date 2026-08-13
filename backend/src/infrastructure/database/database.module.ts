@@ -24,9 +24,12 @@ import stock_entity_1 = require("./entities/stock.entity");
 
 import daily_snapshot_entity_1 = require("./entities/daily-snapshot.entity");
 
+import fund_holding_entity_1 = require("./entities/fund-holding.entity");
+
 const entities = [
     user_entity_1.User, account_entity_1.Account, position_entity_1.Position, order_entity_1.Order,
     transaction_entity_1.Transaction, kline_entity_1.Kline, stock_entity_1.Stock, daily_snapshot_entity_1.DailySnapshot,
+    fund_holding_entity_1.FundHolding,
 ];
 let DatabaseModule = class DatabaseModule {
     [key: string]: any;

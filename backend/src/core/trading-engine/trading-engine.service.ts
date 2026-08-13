@@ -350,6 +350,8 @@ let TradingEngineService = class TradingEngineService {
             // SELL
             account.cash = Number(account.cash) + totalCost - fees.totalFees;
         }
+        // FIX(H4): 现金规范化到分，减少浮点累积误差
+        account.cash = Math.round(account.cash * 100) / 100;
         account.totalTrades = (Number(account.totalTrades) || 0) + 1;
         await this.accountRepo.save(account);
         if (!pos) {

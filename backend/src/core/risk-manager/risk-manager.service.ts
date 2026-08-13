@@ -172,7 +172,7 @@ let RiskManagerService = class RiskManagerService {
                 maxDrawdown: 0,
                 calmarRatio: 0,
                 winRate: 0,
-                totalTrades: 0,
+                totalTrades: Number(account.totalTrades) || 0,
                 volatility: 0,
             };
         }
@@ -191,19 +191,27 @@ let RiskManagerService = class RiskManagerService {
                 maxDrawdown = drawdown;
         }
         const totalReturn = (Number(account.totalEquity) - Number(account.initialEquity)) / Number(account.initialEquity);
+        // FIX(M3): winRate 用「盈利交易日占比」近似（真实交易胜率需流水配对）；totalTrades 用账户真实值
+        const winDays = returns.filter((r) => r > 0).length;
         return {
             totalReturn,
             dailyReturns: returns,
             sharpeRatio: Number(sharpeRatio.toFixed(4)),
             maxDrawdown: Number(maxDrawdown.toFixed(4)),
             calmarRatio: maxDrawdown > 0 ? totalReturn / maxDrawdown : 0,
-            winRate: 0,
-            totalTrades: 0,
+            winRate: Number((returns.length ? winDays / returns.length : 0).toFixed(4)),
+            totalTrades: Number(account.totalTrades) || 0,
             volatility: Number(volatility.toFixed(4)),
         };
     }
-    calculateVaR(confidence = 0.95, days = 20) {
-        return 0.02;
+    calculateVaR(accountId, confidence = 0.95, days = 20) {
+        // FIX(M3): 历史模拟法 VaR——取指定账户最近 days 天日收益的 (1-confidence) 分位数损失
+        const history = accountId ? (this.equityHistory.get(accountId) || []) : [...this.equityHistory.values()].flat();
+        if (history.length < 2)
+            return 0;
+        const returns = history.slice(-days).map((h) => h.return).sort((a, b) => a - b);
+        const idx = Math.max(0, Math.floor(returns.length * (1 - confidence)));
+        return Math.max(0, -returns[idx]);
     }
     kellyCriterion(winRate, avgWin, avgLoss) {
         if (avgLoss === 0)

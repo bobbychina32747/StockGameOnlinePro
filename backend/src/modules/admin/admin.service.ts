@@ -44,7 +44,9 @@ let AdminService = class AdminService {
             take: limit,
             order: { createdAt: 'DESC' },
         });
-        return { users, total, page, limit };
+        // SECURITY(H3): 排除密码哈希
+        const safeUsers = users.map((u) => ({ id: u.id, username: u.username, role: u.role, isActive: u.isActive, createdAt: u.createdAt, updatedAt: u.updatedAt }));
+        return { users: safeUsers, total, page, limit };
     }
     async setUserActive(userId, isActive) {
         await this.userRepo.update(userId, { isActive });

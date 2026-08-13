@@ -168,25 +168,28 @@ let MarketService = class MarketService {
             if (counter === 239) { // 日终结算
                 await marketData.endOfDay();
                 const day = marketData.gameDay;
-                if (this.riskManager) {
-                    await this.riskManager.settleAllAccounts(day);
-                }
-                const liquidated = await this.engine.forceLiquidateMarginalAccounts();
-                // 复盘：强平教训卡
-                if (this.riskManager && liquidated && liquidated.length > 0) {
-                    for (const l of liquidated) {
-                        const acct = await this.engine.getAccountById(l.accountId);
-                        if (acct) {
-                            this.riskManager.addReview(acct.userId, {
-                                type: '强平',
-                                title: '💔 账户被强制平仓', desc: `保证金率跌破阈值（${(l.marginLevel * 100).toFixed(1)}%），所有持仓被强平`, lesson: '强平的教训：做空/融资仓位要预留充足保证金，保证金率跌破 100% 就会被强平。建议：①控制杠杆 ≤2x ②单边行情别满仓做空 ③及时补足保证金',
-                            });
-                        }
+                // FIX(H1): 全局账户日终结算只执行一次（三市场同 tick 到达日终，避免重复扣息/记快照/强平）
+                if (market === 'CN') {
+                    if (this.riskManager) {
+                        await this.riskManager.settleAllAccounts(day);
                     }
-                    this.riskManager.addGlobalReview({
-                        type: '市场警示',
-                        title: '💔 有玩家被强制平仓', desc: '高杠杆玩家因保证金不足被强平，市场风险释放', lesson: '杠杆是把双刃剑：暴涨时放大收益，回调时直接出局。新手建议从无杠杆开始',
-                    });
+                    const liquidated = await this.engine.forceLiquidateMarginalAccounts();
+                    // 复盘：强平教训卡
+                    if (this.riskManager && liquidated && liquidated.length > 0) {
+                        for (const l of liquidated) {
+                            const acct = await this.engine.getAccountById(l.accountId);
+                            if (acct) {
+                                this.riskManager.addReview(acct.userId, {
+                                    type: '强平',
+                                    title: '💔 账户被强制平仓', desc: `保证金率跌破阈值（${(l.marginLevel * 100).toFixed(1)}%），所有持仓被强平`, lesson: '强平的教训：做空/融资仓位要预留充足保证金，保证金率跌破 100% 就会被强平。建议：①控制杠杆 ≤2x ②单边行情别满仓做空 ③及时补足保证金',
+                                });
+                            }
+                        }
+                        this.riskManager.addGlobalReview({
+                            type: '市场警示',
+                            title: '💔 有玩家被强制平仓', desc: '高杠杆玩家因保证金不足被强平，市场风险释放', lesson: '杠杆是把双刃剑：暴涨时放大收益，回调时直接出局。新手建议从无杠杆开始',
+                        });
+                    }
                 }
                 this.logger.log(`📅 [` + market + `] 第 ${day} 个交易日结束`);
             }

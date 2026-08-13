@@ -18,16 +18,20 @@ import typeorm_2 = require("typeorm");
 
 import account_entity_1 = require("../../infrastructure/database/entities/account.entity");
 
+import fund_holding_entity_1 = require("../../infrastructure/database/entities/fund-holding.entity");
+
 let FundService = class FundService {
     [key: string]: any;
-    constructor(accountRepo) {
+    constructor(accountRepo, holdingRepo) {
         this.accountRepo = accountRepo;
+        this.holdingRepo = holdingRepo;
         this.logger = new common_1.Logger(FundService.name);
         this.funds = [
             { id: 'fund-1', name: '沪深300 ETF', type: 'ETF', nav: 4.5, dailyReturn: 0.001 },
             { id: 'fund-2', name: '货币基金 A', type: '货币基金', nav: 1.0, dailyReturn: 0.0001 },
         ];
-        this.holdings = {};
+        // FIX(M6): 定期更新基金净值（模拟净值波动）
+        setInterval(() => this.updateNavs(), 60 * 1000);
     }
     getFunds() {
         return this.funds;
@@ -50,11 +54,14 @@ let FundService = class FundService {
         const shares = Number(amount) / fund.nav;
         account.cash = Number(account.cash) - Number(amount);
         await this.accountRepo.save(account);
-        const key = `${userId}_${mode}_${fundId}`;
-        if (!this.holdings[key])
-            this.holdings[key] = { shares: 0, totalInvested: 0 };
-        this.holdings[key].shares += shares;
-        this.holdings[key].totalInvested += Number(amount);
+        // FIX(H5): 份额落库，重启不丢失
+        let holding = await this.holdingRepo.findOne({ where: { userId, marketMode: mode || 'US', fundId } });
+        if (!holding) {
+            holding = this.holdingRepo.create({ userId, marketMode: mode || 'US', fundId, shares: 0, totalInvested: 0 });
+        }
+        holding.shares = Number(holding.shares) + shares;
+        holding.totalInvested = Number(holding.totalInvested) + Number(amount);
+        await this.holdingRepo.save(holding);
         this.logger.log(`用户 ${userId} 申购 ${fund.name} ${shares.toFixed(4)} 份 (¥${amount})`);
         return { success: true, shares: Number(shares.toFixed(4)), nav: fund.nav };
     }
@@ -65,9 +72,8 @@ let FundService = class FundService {
         const fund = this.getFund(fundId);
         if (!fund)
             return { success: false, error: '基金不存在' };
-        const key = `${userId}_${mode}_${fundId}`;
-        const holding = this.holdings[key];
-        if (!holding || holding.shares < Number(shares))
+        const holding = await this.holdingRepo.findOne({ where: { userId, marketMode: mode || 'US', fundId } });
+        if (!holding || Number(holding.shares) < Number(shares))
             return { success: false, error: '持仓份额不足' };
         const amount = Number(shares) * fund.nav;
         const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode || 'US' } });
@@ -75,9 +81,13 @@ let FundService = class FundService {
             return { success: false, error: '账户不存在' };
         account.cash = Number(account.cash) + amount;
         await this.accountRepo.save(account);
-        holding.shares -= Number(shares);
-        if (holding.shares <= 0)
-            delete this.holdings[key];
+        holding.shares = Number(holding.shares) - Number(shares);
+        if (Number(holding.shares) <= 0) {
+            await this.holdingRepo.delete(holding.id);
+        }
+        else {
+            await this.holdingRepo.save(holding);
+        }
         this.logger.log(`用户 ${userId} 赎回 ${fund.name} ${shares.toFixed(4)} 份 (¥${amount})`);
         return { success: true, amount: Number(amount.toFixed(2)), nav: fund.nav };
     }
@@ -95,8 +105,9 @@ FundService = __decorate(
 [
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(account_entity_1.Account)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __param(1, (0, typeorm_1.InjectRepository)(fund_holding_entity_1.FundHolding)),
+    __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository])
 ],
 FundService
 );
-

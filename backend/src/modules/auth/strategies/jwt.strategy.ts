@@ -31,6 +31,11 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
         if (!secret) {
             throw new Error('JWT_SECRET 环境变量未配置！请在 .env 中设置强密钥');
         }
+        // SECURITY(C3): 拒绝默认弱密钥，防止攻击者伪造 JWT
+        const weakSecrets = ['change_this_to_a_random_secret_in_production', 'change_this_refresh_secret_too', 'dev-secret', 'secret', 'jwt-secret', 'REPLACE_WITH_STRONG_RANDOM_SECRET'];
+        if (weakSecrets.includes(secret) || secret.length < 16) {
+            throw new Error('JWT_SECRET 过弱（使用了默认占位值或长度不足 16），请设置强随机密钥');
+        }
         super({
             jwtFromRequest: passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken(),
             secretOrKey: secret,
