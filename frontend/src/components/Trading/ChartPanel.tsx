@@ -22,9 +22,8 @@ const KLINE_TIMEFRAMES = [
   { key: 'monthly', label: '月线' },
 ];
 
-// ─── LoD 动态合并（用户方案）：相邻点变化 ≤ MERGE_PCT% 时合并 ───
-// 历史 bar 只读 → 合并判定确定性 → 历史蜡烛/颜色稳定；仅尾桶随实时更新
-const MERGE_PCT = 1; // LoD 固定参数（只读）：相邻变化≤1%合并；从头贪心→历史桶定稿即冻结（5%会把分钟线压成几根）
+// ─── LoD 降采样（视图宽度驱动）：按目标桶数均匀分桶合并，OHLC 保形（open 首/close 尾/high max/low min/vol 累加） ───
+// 渲染点数 = min(原始点数, 目标桶数)，把几万根 K 线压到与视图宽度匹配的几百根，性能提升数倍
 
 // ─── 成交量 y 轴上限：95 分位 × 1.5（防单根大单/用户成交撑爆比例，超出截断） ───
 function volYMax(vals: number[]): number {
@@ -34,29 +33,23 @@ function volYMax(vals: number[]): number {
   return Math.max(1000, Math.ceil(p95 * 1.5));
 }
 
-// ─── LoD 动态合并（固定阈值 0.3%，只读）：从头贪心，历史桶定稿即冻结 ───
-function mergeOnce(bars: KlineData[], pct: number): KlineData[] {
+// ─── LoD 降采样：按目标桶数均匀分桶，每桶合并为一根（OHLC 保形 + 成交量累加） ───
+function lodResample(bars: KlineData[], targetCount: number): KlineData[] {
+  if (!bars.length || targetCount <= 1 || bars.length <= targetCount) return bars;
   const out: KlineData[] = [];
-  let cur: KlineData | null = null;
-  for (const b of bars) {
-    if (!cur) {
-      cur = { ...b };
-      continue;
+  const step = bars.length / targetCount;
+  for (let i = 0; i < targetCount; i++) {
+    const start = Math.floor(i * step);
+    const end = Math.max(start + 1, Math.floor((i + 1) * step));
+    let high = -Infinity, low = Infinity, vol = 0;
+    for (let j = start; j < end; j++) {
+      if (bars[j].high > high) high = bars[j].high;
+      if (bars[j].low < low) low = bars[j].low;
+      vol += bars[j].volume;
     }
-    // 动态监测：与最近点的偏差 ≤ 阈值则合并（OHLC 保形：open 首/close 尾/high max/low min/vol 累加）
-    if (Math.abs(b.close - cur.close) / cur.close <= pct / 100) {
-      cur = {
-        time: cur.time, open: cur.open, close: b.close,
-        high: Math.max(cur.high, b.high), low: Math.min(cur.low, b.low),
-        volume: cur.volume + b.volume,
-      };
-    }
-    else {
-      out.push(cur); // 定稿：push 后永不再改（历史只读）
-      cur = { ...b };
-    }
+    const first = bars[start], last = bars[end - 1];
+    out.push({ time: first.time, open: first.open, close: last.close, high, low, volume: vol });
   }
-  if (cur) out.push(cur);
   return out;
 }
 
@@ -103,12 +96,17 @@ export function ChartPanel() {
   // ─── 图表修复：切页重挂载后强制 resize + 监听容器尺寸变化 ───
   const chartRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(800);
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const t1 = setTimeout(() => chartRef.current?.getEchartsInstance()?.resize(), 120);
     const t2 = setTimeout(() => chartRef.current?.getEchartsInstance()?.resize(), 400);
-    const ro = new ResizeObserver(() => chartRef.current?.getEchartsInstance()?.resize());
+    const ro = new ResizeObserver((entries) => {
+      chartRef.current?.getEchartsInstance()?.resize();
+      const w = entries[0]?.contentRect?.width;
+      if (w && w > 0) setContainerWidth(w);
+    });
     ro.observe(el);
     return () => { clearTimeout(t1); clearTimeout(t2); ro.disconnect(); };
   }, [selectedSymbol, selectedTimeframe]);
@@ -179,8 +177,9 @@ export function ChartPanel() {
       };
     }
 
-    // ─── K线分支：LoD 动态合并（历史只读，仅尾桶随实时更新） ───
-    const bars = mergeOnce(klineData, MERGE_PCT);
+    // ─── K线分支：LoD 降采样（按视图宽度，把几万根压到几百根） ───
+    const targetCount = Math.max(50, Math.round(containerWidth / 2));
+    const bars = lodResample(klineData, targetCount);
     const closes = bars.map((k) => k.close);
     const calcMA = (period: number): (number | null)[] => {
       const r: (number | null)[] = new Array(closes.length).fill(null);
@@ -295,7 +294,7 @@ export function ChartPanel() {
       ],
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [klineData, selectedTimeframe, intradaySrc, isIntraday, zoom]);
+  }, [klineData, selectedTimeframe, intradaySrc, isIntraday, zoom, containerWidth]);
 
   const prevClose = stock?.dayOpen != null ? Number(stock.dayOpen) : (stock?.price ?? price ?? 0);
   const changePct = prevClose > 0 && price != null ? ((price - prevClose) / prevClose) * 100 : 0;
@@ -381,7 +380,7 @@ export function ChartPanel() {
                 </span>
               );
             })}
-            <span className="chart-listdate">LoD 动态合并（相邻变化 ≤5% 合并），历史只读</span>
+            <span className="chart-listdate">LoD 降采样（按视图宽度合并，性能优化）</span>
           </>
         )}
         {stock?.code && <span className="chart-listdate">上市 {stock.listDate || '-'}</span>}
