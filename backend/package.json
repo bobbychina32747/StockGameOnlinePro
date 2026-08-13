@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node dist/src/main.js",
     "start:dev": "node --watch dist/src/main.js",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest --config jest.config.js",
+    "test": "jest --config jest.config.js",
     "build": "rm -rf dist && tsc -p tsconfig.json"
   },
   "devDependencies": {
