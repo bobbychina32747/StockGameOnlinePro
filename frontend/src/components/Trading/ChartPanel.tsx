@@ -33,22 +33,20 @@ function volYMax(vals: number[]): number {
   return Math.max(1000, Math.ceil(p95 * 1.5));
 }
 
-// ─── LoD 降采样：按目标桶数均匀分桶，每桶合并为一根（OHLC 保形 + 成交量累加） ───
-function lodResample(bars: KlineData[], targetCount: number): KlineData[] {
-  if (!bars.length || targetCount <= 1 || bars.length <= targetCount) return bars;
+// ─── LoD 降采样：按固定桶宽贪心分桶（历史桶定稿即冻结，仅尾桶随实时数据增长） ───
+// 桶宽由调用方缓存，只在容器宽度变化时重算 → 数据追加不改变历史桶边界，避免图表历史蜡烛跳动
+function lodResample(bars: KlineData[], bucketSize: number): KlineData[] {
+  if (!bars.length || bucketSize <= 1) return bars;
   const out: KlineData[] = [];
-  const step = bars.length / targetCount;
-  for (let i = 0; i < targetCount; i++) {
-    const start = Math.floor(i * step);
-    const end = Math.max(start + 1, Math.floor((i + 1) * step));
+  for (let i = 0; i < bars.length; i += bucketSize) {
+    const end = Math.min(i + bucketSize, bars.length);
     let high = -Infinity, low = Infinity, vol = 0;
-    for (let j = start; j < end; j++) {
+    for (let j = i; j < end; j++) {
       if (bars[j].high > high) high = bars[j].high;
       if (bars[j].low < low) low = bars[j].low;
       vol += bars[j].volume;
     }
-    const first = bars[start], last = bars[end - 1];
-    out.push({ time: first.time, open: first.open, close: last.close, high, low, volume: vol });
+    out.push({ time: bars[i].time, open: bars[i].open, close: bars[end - 1].close, high, low, volume: vol });
   }
   return out;
 }
@@ -97,6 +95,9 @@ export function ChartPanel() {
   const chartRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
+  // LoD 桶宽缓存：仅在容器宽度（目标桶数）变化时重算，数据追加只增长尾桶，保证历史蜡烛稳定
+  const bucketSizeRef = useRef(1);
+  const lastTargetRef = useRef(0);
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -178,8 +179,19 @@ export function ChartPanel() {
     }
 
     // ─── K线分支：LoD 降采样（按视图宽度，把几万根压到几百根） ───
+    // 桶宽只在容器宽度变化时重算；数据追加只增长尾桶，历史桶定稿即冻结（不随实时数据跳动）
     const targetCount = Math.max(50, Math.round(containerWidth / 2));
-    const bars = lodResample(klineData, targetCount);
+    let bars: KlineData[];
+    if (klineData.length <= targetCount) {
+      bars = klineData;
+    }
+    else {
+      if (lastTargetRef.current !== targetCount) {
+        lastTargetRef.current = targetCount;
+        bucketSizeRef.current = Math.max(1, Math.floor(klineData.length / targetCount));
+      }
+      bars = lodResample(klineData, bucketSizeRef.current);
+    }
     const closes = bars.map((k) => k.close);
     const calcMA = (period: number): (number | null)[] => {
       const r: (number | null)[] = new Array(closes.length).fill(null);
