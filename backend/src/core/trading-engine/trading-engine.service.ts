@@ -194,6 +194,8 @@ let TradingEngineService = class TradingEngineService {
         }
         book.asks = asks;
         book.bids = bids;
+        book.sealedUp = !!sealedUp;
+        book.sealedDown = !!sealedDown;
         // P0 真实盘口：合并真实挂单队列（用户限价单常驻盘口，按价格聚合，最多 10 档）
         const realBook = this.realBooks.get(symbol);
         if (realBook) {
@@ -238,15 +240,30 @@ let TradingEngineService = class TradingEngineService {
         }
         let remaining = real.remaining;
         const book = this.orderBooks.get(symbol);
-        if (book) {
-            const levels = isBuy ? book.asks : book.bids;
-            for (const level of levels) {
-                if (remaining <= 0)
-                    break;
-                const fill = Math.min(remaining, level.size);
-                totalCost += fill * level.price;
-                totalQty += fill;
-                remaining -= fill;
+        const levels = book ? (isBuy ? book.asks : book.bids) : [];
+        for (const level of levels) {
+            if (remaining <= 0)
+                break;
+            const fill = Math.min(remaining, level.size);
+            totalCost += fill * level.price;
+            totalQty += fill;
+            remaining -= fill;
+        }
+        // P2 滑点模型：剩余量按逐级恶化价格成交（每 500 股恶化 0.1%，上限 2%）；封板/无报价时不适用
+        if (remaining > 0) {
+            const knownPrice = this.prices.get(symbol);
+            const sealed = book && (isBuy ? book.sealedUp : book.sealedDown);
+            if (!sealed && knownPrice !== undefined && knownPrice !== null) {
+                const dirMul = isBuy ? 1 : -1;
+                let slip = 0;
+                const anchor = levels.length > 0 ? levels[levels.length - 1].price : Number(knownPrice);
+                while (remaining > 0 && slip < 0.02) {
+                    slip = Math.min(0.02, slip + 0.001);
+                    const tranche = Math.min(remaining, 500);
+                    totalCost += tranche * anchor * (1 + dirMul * slip);
+                    totalQty += tranche;
+                    remaining -= tranche;
+                }
             }
         }
         if (totalQty === 0)
@@ -404,18 +421,36 @@ let TradingEngineService = class TradingEngineService {
         }
         let remaining = real.remaining;
         const book = this.orderBooks.get(symbol);
-        if (book) {
-            const levels = isBuy ? book.asks : book.bids;
-            for (const level of levels) {
-                if (remaining <= 0)
-                    break;
-                const acceptable = isBuy ? level.price <= limitPrice : level.price >= limitPrice;
-                if (!acceptable)
-                    break;
-                const fill = Math.min(remaining, level.size);
-                totalCost += fill * level.price;
-                totalQty += fill;
-                remaining -= fill;
+        const levels = book ? (isBuy ? book.asks : book.bids) : [];
+        for (const level of levels) {
+            if (remaining <= 0)
+                break;
+            const acceptable = isBuy ? level.price <= limitPrice : level.price >= limitPrice;
+            if (!acceptable)
+                break;
+            const fill = Math.min(remaining, level.size);
+            totalCost += fill * level.price;
+            totalQty += fill;
+            remaining -= fill;
+        }
+        // P2 滑点模型（限价约束内）：剩余量按逐级恶化价格成交；封板/无报价时不适用
+        if (remaining > 0) {
+            const knownPrice = this.prices.get(symbol);
+            const sealed = book && (isBuy ? book.sealedUp : book.sealedDown);
+            if (!sealed && knownPrice !== undefined && knownPrice !== null) {
+                const dirMul = isBuy ? 1 : -1;
+                let slip = 0;
+                const anchor = levels.length > 0 ? levels[levels.length - 1].price : Number(knownPrice);
+                while (remaining > 0 && slip < 0.02) {
+                    const price = anchor * (1 + dirMul * slip);
+                    if (isBuy ? price > limitPrice : price < limitPrice)
+                        break; // 超出限价不再成交
+                    const tranche = Math.min(remaining, 500);
+                    totalCost += tranche * price;
+                    totalQty += tranche;
+                    remaining -= tranche;
+                    slip = Math.min(0.02, slip + 0.001);
+                }
             }
         }
         if (totalQty === 0)
@@ -478,6 +513,50 @@ let TradingEngineService = class TradingEngineService {
             if (fill.counterFills && fill.counterFills.length > 0) {
                 await this.settleCounterFills(orderData.symbol, account.marketMode, fill.counterFills);
             }
+            return { success: true, fill, settle };
+        }
+        if (orderData.type === order_entity_1.OrderType.FOK || orderData.type === order_entity_1.OrderType.IOC) {
+            // P2 FOK（全部成交否则取消）/ IOC（立即成交否则取消剩余）：按限价立即撮合，不进入盘口排队
+            const limitPrice = Number(orderData.price);
+            const fill = this.executeMarketOrderLimited(orderData.symbol, orderData.side, orderData.quantity, limitPrice, orderData.accountId);
+            const isFok = orderData.type === order_entity_1.OrderType.FOK;
+            const rollback = () => {
+                if (fill && fill.counterFills) {
+                    for (const cf of fill.counterFills) {
+                        this.placeRestingOrder(orderData.symbol, cf.orderId, cf.accountId, cf.side, cf.price, cf.qty);
+                    }
+                }
+            };
+            if (!fill) {
+                return { success: false, error: isFok ? 'FOK 无法成交，已撤销' : 'IOC 无可成交数量，已撤销' };
+            }
+            if (isFok && fill.filledQuantity < Number(orderData.quantity)) {
+                rollback();
+                return { success: false, error: 'FOK 无法全部成交，已撤销' };
+            }
+            const settle = await this.settleFill(account.id, orderData.symbol, orderData.side, fill, account.marketMode);
+            if (!settle.success) {
+                rollback();
+                return { success: false, error: settle.error };
+            }
+            if (fill.counterFills && fill.counterFills.length > 0) {
+                await this.settleCounterFills(orderData.symbol, account.marketMode, fill.counterFills);
+            }
+            // 记录成交订单实体（不排队）
+            const order = this.orderRepo.create({
+                userId: orderData.userId,
+                accountId: orderData.accountId,
+                symbol: orderData.symbol,
+                type: orderData.type,
+                side: orderData.side,
+                price: orderData.price,
+                triggerPrice: orderData.triggerPrice,
+                quantity: orderData.quantity,
+                status: order_entity_1.OrderStatus.FILLED,
+                filledQty: fill.filledQuantity,
+                avgFillPrice: fill.avgPrice,
+            });
+            await this.orderRepo.save(order);
             return { success: true, fill, settle };
         }
         const order = this.orderRepo.create({
@@ -548,8 +627,9 @@ let TradingEngineService = class TradingEngineService {
         if (!this.prices.has(order.symbol) && !this.orderBooks.has(order.symbol)) {
             return { valid: false, error: '股票不存在，请检查代码' };
         }
-        if (order.type === order_entity_1.OrderType.LIMIT && (!Number.isFinite(Number(order.price)) || Number(order.price) <= 0 || Number(order.price) > 1000000)) {
-            return { valid: false, error: '限价单需要有效价格（0~1000000）' };
+        const needsPrice = order.type === order_entity_1.OrderType.LIMIT || order.type === order_entity_1.OrderType.FOK || order.type === order_entity_1.OrderType.IOC;
+        if (needsPrice && (!Number.isFinite(Number(order.price)) || Number(order.price) <= 0 || Number(order.price) > 1000000)) {
+            return { valid: false, error: '限价/FOK/IOC 指令需要有效价格（0~1000000）' };
         }
         if (order.type === order_entity_1.OrderType.STOP && (!Number.isFinite(Number(order.triggerPrice)) || Number(order.triggerPrice) <= 0 || Number(order.triggerPrice) > 1000000)) {
             return { valid: false, error: '止损单需要有效触发价（0~1000000）' };

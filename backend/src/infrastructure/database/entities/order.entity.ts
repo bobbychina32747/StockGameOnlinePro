@@ -18,6 +18,8 @@ export enum OrderType {
     LIMIT = "limit",
     STOP = "stop",
     STOP_LIMIT = "stop-limit",
+    FOK = "fok",
+    IOC = "ioc",
 }
 export enum OrderSide {
     BUY = "buy",

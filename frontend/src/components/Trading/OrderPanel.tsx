@@ -68,7 +68,7 @@ export function OrderPanel() {
   // ─── Q8 实时校验：资金预算 / 数量 / 价格 ───
   const livePrice = prices[selectedSymbol] ?? 0;
   const effPrice =
-    (orderType === 'limit' || orderType === 'stop-limit') && parseFloat(orderPrice)
+    (orderType === 'limit' || orderType === 'stop-limit' || orderType === 'fok' || orderType === 'ioc') && parseFloat(orderPrice)
       ? parseFloat(orderPrice)
       : livePrice;
   const feeRate = 0.0008; // 综合费率估算（佣金+印花税）
@@ -91,7 +91,7 @@ export function OrderPanel() {
   const placeOrder = async () => {
     if (orderSubmitting) return;
     // 限价/止损类订单必须填写 >0 的价格
-    if ((orderType === 'limit' || orderType === 'stop' || orderType === 'stop-limit') && !(parseFloat(orderPrice) > 0)) {
+    if ((orderType === 'limit' || orderType === 'stop' || orderType === 'stop-limit' || orderType === 'fok' || orderType === 'ioc') && !(parseFloat(orderPrice) > 0)) {
       addNotification('请输入大于 0 的订单价格', 'error');
       return;
     }
@@ -173,6 +173,8 @@ export function OrderPanel() {
             <option value="limit">限价单</option>
             <option value="stop">止损单</option>
             <option value="stop-limit">止损限价单</option>
+            <option value="fok">FOK（全成或撤）</option>
+            <option value="ioc">IOC（即成余撤）</option>
           </select>
           <div style={{ display: 'flex', gap: 6 }}>
           <select className="input" value={orderSide} onChange={(e) => setOrderSide(e.target.value)}>

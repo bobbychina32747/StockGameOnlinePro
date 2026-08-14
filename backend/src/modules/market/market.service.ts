@@ -46,8 +46,9 @@ let MarketService = class MarketService {
         this.logger = new common_1.Logger(MarketService.name);
         this.tickCounter = 0;
         this.processing = false;
-        // P1 开盘竞价：各市场最近一次竞价开盘价（dayOpen 基准合并用）
+        // P1 开盘竞价：各市场最近一次竞价开盘价（dayOpen 基准合并用）+ 每市场当日竞价已执行标记
         this.lastAuctionPrices = {};
+        this.lastAuctionDay = {};
         // P0 时间尺度：TICK_INTERVAL_MS 控制每个行情 tick 的真实间隔（1000=高速回放 1秒1分钟，60000=实时分钟级），钳制 200~60000
         const rawInterval = Number(config && config.get ? config.get('TICK_INTERVAL_MS', 1000) : 1000);
         this.tickIntervalMs = Math.min(Math.max(Number.isFinite(rawInterval) ? rawInterval : 1000, 200), 60000);
@@ -102,6 +103,15 @@ let MarketService = class MarketService {
     async processMarket(market, marketData, counterKey) {
         let advanceCounter = false;
         try {
+            // P2: A 股盘前集合竞价申报窗口（9:15-9:25）：窗口内不生成行情只撮合一次竞价
+            if (!this.debugMode.get() && (0, constants_1.isAuctionTimeFor)(market)) {
+                const todayKey = new Date().toDateString();
+                if (this.lastAuctionDay[market] !== todayKey) {
+                    this.lastAuctionDay[market] = todayKey;
+                    await this.runOpeningAuctions(market, marketData);
+                }
+                return;
+            }
             // P1: 各市场独立时段——非本市场交易时段（且非调试模式）直接跳过，不生成行情
             if (!this.debugMode.get() && !(0, constants_1.isTradingTimeFor)(market)) {
                 return;
@@ -121,7 +131,12 @@ let MarketService = class MarketService {
                 // SECURITY: 日初先重置 T+1 再撮合挂单，避免首 tick 触发卖单被误判 T+1 取消
                 await this.engine.resetBoughtToday();
                 // P1 开盘集合竞价：按最大成交量原则形成开盘价并撮合交叉挂单（早于连续竞价）
-                await this.runOpeningAuctions(market, marketData);
+                // P2: 当日已在盘前窗口竞价过则跳过（每天仅一次）
+                const todayKey = new Date().toDateString();
+                if (this.lastAuctionDay[market] !== todayKey) {
+                    this.lastAuctionDay[market] = todayKey;
+                    await this.runOpeningAuctions(market, marketData);
+                }
             }
             const fills = await this.engine.checkPendingOrders();
             fills.forEach((f) => { this.gateway.broadcastFill(f); });

@@ -45,7 +45,9 @@ let OrderService = class OrderService {
     async placeOrder(userId, mode, symbol, type, side, quantity, price, triggerPrice) {
         // S2 休市校验：非交易时段拒绝下单
         // 调试模式仅对开启它的管理员（canBypassHours 白名单）跳过休市检查
-        if (!this.debugMode.canBypassHours(userId) && !(0, constants_1.isTradingTimeFor)(mode)) {
+        // P2: 盘前集合竞价窗口（A股 9:15-9:25）内允许挂单申报，9:25 竞价撮合
+        const inAuction = (0, constants_1.isAuctionTimeFor)(mode);
+        if (!this.debugMode.canBypassHours(userId) && !(0, constants_1.isTradingTimeFor)(mode) && !inAuction) {
             throw new common_1.BadRequestException('休市中，当前市场不在交易时段，无法下单');
         }
         const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });

@@ -158,6 +158,33 @@ describe('TradingEngineService 真实订单簿（P0）', () => {
     });
   });
 
+  describe('P2 FOK/IOC 指令与市价滑点', () => {
+    test('IOC：限价内部分成交，超出部分取消（不排队）', () => {
+      engine.prices.set('T1', 10.0);
+      engine.placeRestingOrder('T1', 'o1', 'A1', 'sell', 10.0, 60);
+      const fill = engine.executeMarketOrderLimited('T1', 'buy', 200, 10.0, 'BUYER');
+      // 真实 60 + 合成 10.01x100=100 均在限价 10.0 内？10.01>10.0 不成交 → 仅真实 60
+      expect(fill.filledQuantity).toBe(60);
+      expect(fill.counterFills[0]).toMatchObject({ orderId: 'o1', qty: 60 });
+    });
+
+    test('市价单滑点：吃穿合成深度后剩余量按恶化价格成交', () => {
+      engine.prices.set('T1', 10.0);
+      // 合成卖盘 10.01x100 + 10.02x200，买 10000 股 → 剩余按滑点成交
+      const fill = engine.executeMarketOrder('T1', 'buy', 10000, 'BUYER');
+      expect(fill.filledQuantity).toBe(10000);
+      expect(fill.avgPrice).toBeGreaterThan(10.02); // 平均价高于最深档
+    });
+
+    test('封板时市价单不受滑点模型影响（仍无法成交）', () => {
+      engine.prices.set('T1', 110);
+      engine.setDayOpen({ T1: 100 });
+      engine.refreshOrderBook('T1', 110); // 涨停封板
+      const fill = engine.executeMarketOrder('T1', 'buy', 10000, 'BUYER');
+      expect(fill).toBeNull();
+    });
+  });
+
   describe('P2 AI 虚拟订单流', () => {
     test('虚拟挂单进入盘口，AI 市价单吃掉虚拟深度（无账户不结算）', () => {
       engine.placeVirtualOrder('T1', 'sell', 10.0, 100, 999999);
