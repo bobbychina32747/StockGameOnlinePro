@@ -59,8 +59,8 @@ let OrderService = class OrderService {
             return { success: false, error: result.error };
         }
         if (type === order_entity_1.OrderType.MARKET) {
-            // 统一走引擎结算（submitOrder 已撮合并返回 fill，避免二次撮合）
-            return this.engine.settleFill(account.id, symbol, side, result.fill, account.marketMode);
+            // P0: 本方与对手方结算已由引擎 submitOrder 完成（返回 settle），避免二次撮合
+            return result.settle || result;
         }
         return { success: true, order: result.order };
     }

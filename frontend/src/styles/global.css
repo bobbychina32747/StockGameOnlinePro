@@ -1297,6 +1297,17 @@ body.density-compact .info-row { padding: 2px 0; }
     border: none;
     background: transparent;
     color: #8b90a0;
+
+/* P0 行情速度徽章（顶部状态栏：高速回放/实时行情） */
+.market-speed-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--color-warning);
+  white-space: nowrap;
+}
     font-size: 13px;
     cursor: pointer;
     display: flex;

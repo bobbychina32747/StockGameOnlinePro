@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore, useMarketStore, useUIStore } from '../../store';
+import { marketApi } from '../../services/api.client';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { NotificationContainer } from '../UI/Notification';
 import { MarketIndexBar } from '../Trading/MarketIndexBar';
@@ -19,6 +20,14 @@ export function AppLayout() {
   const setTheme = useUIStore((s) => s.setTheme);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // P0 时间尺度标识：tickIntervalMs < 30s 视为高速回放（1秒=1分钟），否则实时行情
+  const [tickIntervalMs, setTickIntervalMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    marketApi.state().then((s: any) => {
+      if (s && Number.isFinite(Number(s.tickIntervalMs))) setTickIntervalMs(Number(s.tickIntervalMs));
+    }).catch(() => {});
+  }, []);
 
   // C3 主题应用
   useEffect(() => {
@@ -50,6 +59,11 @@ export function AppLayout() {
         </div>
 
         <div className="status-center">
+          {tickIntervalMs !== null && (
+            <span className="market-speed-badge" title="TICK_INTERVAL_MS 配置">
+              {tickIntervalMs < 30000 ? '⏩ 高速回放（1秒=1分钟）' : '🕐 实时行情'}
+            </span>
+          )}
           {prices['T1'] && (
             <span>688001 芯澜: <b>{prices['T1'].toFixed(2)}</b></span>
           )}

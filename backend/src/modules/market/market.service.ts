@@ -24,9 +24,11 @@ import market_gateway_1 = require("./market.gateway");
 
 import news_service_1 = require("./news.service");
 
+import config_1 = require("@nestjs/config");
+
 let MarketService = class MarketService {
     [key: string]: any;
-    constructor(marketData, engine, gateway, newsService, riskManager, marketDataHK, marketDataUS, debugMode) {
+    constructor(marketData, engine, gateway, newsService, riskManager, marketDataHK, marketDataUS, debugMode, config) {
         this.debugMode = debugMode;
         this.marketData = marketData;
         this.marketDataHK = marketDataHK;
@@ -42,6 +44,9 @@ let MarketService = class MarketService {
         this.logger = new common_1.Logger(MarketService.name);
         this.tickCounter = 0;
         this.processing = false;
+        // P0 时间尺度：TICK_INTERVAL_MS 控制每个行情 tick 的真实间隔（1000=高速回放 1秒1分钟，60000=实时分钟级），钳制 200~60000
+        const rawInterval = Number(config && config.get ? config.get('TICK_INTERVAL_MS', 1000) : 1000);
+        this.tickIntervalMs = Math.min(Math.max(Number.isFinite(rawInterval) ? rawInterval : 1000, 200), 60000);
     }
     // S2 真实交易时段判断：周一至周五 9:30-11:30 / 13:00-15:00
     isTradingTime() {
@@ -230,10 +235,10 @@ let MarketService = class MarketService {
             finally {
                 this.processing = false;
                 // 递归必须在 finally 内：try 内 return（休市）会跳过其后的 setTimeout
-                setTimeout(tick, 1000);
+                setTimeout(tick, this.tickIntervalMs);
             }
         };
-        setTimeout(tick, 1000);
+        setTimeout(tick, this.tickIntervalMs);
     }
     // 三服务器路由：按股票代码前缀选择对应市场实例（H→HK，U→US，其他→CN）
     marketDataFor(symbol) {
@@ -279,6 +284,8 @@ let MarketService = class MarketService {
     getState() {
         // 合并：当前市场用 CN（前端市场切换时按各自 state 展示）
         const cn = this.marketData.getState();
+        // P0: 暴露 tick 间隔，前端据此标注「高速回放」或「实时行情」
+        cn.tickIntervalMs = this.tickIntervalMs;
         // 浅拷贝避免循环引用（markets.CN 不能引用 cn 自身）
         cn.markets = {
             CN: { ...cn },
@@ -354,6 +361,7 @@ MarketService = __decorate(
     __param(4, (0, common_1.Optional)()),
     __param(5, (0, common_1.Inject)('MarketDataHK')),
     __param(6, (0, common_1.Inject)('MarketDataUS')),
+    __param(8, config_1.ConfigService),
     __metadata("design:paramtypes", [market_data_service_1.MarketDataService,
         trading_engine_service_1.TradingEngineService,
         market_gateway_1.MarketGateway,
@@ -361,7 +369,8 @@ MarketService = __decorate(
         risk_manager_service_1.RiskManagerService,
         market_data_service_1.MarketDataService,
         market_data_service_1.MarketDataService,
-        debug_mode_service_1.DebugModeService])
+        debug_mode_service_1.DebugModeService,
+        config_1.ConfigService])
 ],
 MarketService
 );
