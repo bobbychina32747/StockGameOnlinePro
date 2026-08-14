@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore, useMarketStore, useUIStore } from '../../store';
-import { marketApi } from '../../services/api.client';
+import { adminApi, marketApi } from '../../services/api.client';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { NotificationContainer } from '../UI/Notification';
 import { MarketIndexBar } from '../Trading/MarketIndexBar';
@@ -28,6 +28,13 @@ export function AppLayout() {
       if (s && Number.isFinite(Number(s.tickIntervalMs))) setTickIntervalMs(Number(s.tickIntervalMs));
     }).catch(() => {});
   }, []);
+
+  // 管理员调试模式：布局挂载时同步服务端状态（刷新/直达交易页也生效；非管理员 403 静默忽略）
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      adminApi.debugStatus().then((d: any) => useUIStore.setState({ debugMode: !!d?.debug })).catch(() => {});
+    }
+  }, [user?.role]);
 
   // C3 主题应用
   useEffect(() => {

@@ -24,10 +24,13 @@ export default function Profile() {
     return () => clearInterval(t);
   }, []);
 
-  // 管理员：读取调试模式状态
+  // 管理员：读取调试模式状态（同步到全局 store，供下单面板/休市遮罩使用）
   useEffect(() => {
     if (user?.role === 'admin') {
-      adminApi.debugStatus().then((d: any) => setDebugOn(!!d?.debug)).catch(() => {});
+      adminApi.debugStatus().then((d: any) => {
+        setDebugOn(!!d?.debug);
+        useUIStore.setState({ debugMode: !!d?.debug });
+      }).catch(() => {});
     }
   }, [user?.role]);
 
