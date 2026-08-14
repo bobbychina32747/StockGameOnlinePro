@@ -124,6 +124,40 @@ describe('TradingEngineService 真实订单簿（P0）', () => {
     });
   });
 
+  describe('P1 开盘集合竞价', () => {
+    test('最大成交量原则形成开盘价并撮合交叉挂单', () => {
+      engine.placeRestingOrder('T1', 'b1', 'A1', 'buy', 10.2, 100);
+      engine.placeRestingOrder('T1', 'b2', 'A2', 'buy', 10.1, 100);
+      engine.placeVirtualOrder('T1', 'sell', 10.0, 150, 999999);
+      engine.placeRestingOrder('T1', 'a1', 'A3', 'sell', 10.15, 120);
+      const res = engine.runOpeningAuction('T1', 10.0);
+      // 10.0 成交量 min(200,150)=150 且距昨收最近 → 开盘价 10.0
+      expect(res.auctionPrice).toBe(10.0);
+      expect(res.fills.length).toBe(4); // 2 对（买2×卖1虚拟）
+      const book = engine.realBooks.get('T1');
+      expect(book.bids.length).toBe(1); // b2 部分成交剩 50 股继续排队
+      expect(book.bids[0].qty).toBe(50);
+      expect(book.asks.length).toBe(1); // a1 未参与竞价（10.15 > 10.0）
+      expect(book.asks[0].qty).toBe(120);
+    });
+
+    test('A 股竞价价限制在涨跌停区间内', () => {
+      engine.placeRestingOrder('T1', 'b1', 'A1', 'buy', 12.0, 100); // 高于涨停 11.0 → 候选价被剔除
+      engine.placeVirtualOrder('T1', 'sell', 11.0, 100, 999999);
+      const res = engine.runOpeningAuction('T1', 10.0);
+      expect(res.auctionPrice).toBe(11.0);
+      expect(res.fills.length).toBe(2);
+    });
+
+    test('无交叉挂单时返回昨收价、无成交', () => {
+      engine.placeRestingOrder('T1', 'b1', 'A1', 'buy', 9.5, 100);
+      engine.placeRestingOrder('T1', 'a1', 'A2', 'sell', 10.5, 100);
+      const res = engine.runOpeningAuction('T1', 10.0);
+      expect(res.auctionPrice).toBe(10.0);
+      expect(res.fills.length).toBe(0);
+    });
+  });
+
   describe('P2 AI 虚拟订单流', () => {
     test('虚拟挂单进入盘口，AI 市价单吃掉虚拟深度（无账户不结算）', () => {
       engine.placeVirtualOrder('T1', 'sell', 10.0, 100, 999999);

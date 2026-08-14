@@ -144,7 +144,7 @@ let TradingEngineService = class TradingEngineService {
             if (!priceOk)
                 break; // 按价格有序，后续档位只会更差
             const fillQty = Math.min(remaining, entry.qty);
-            fills.push({ orderId: entry.orderId, accountId: entry.accountId, side: entry.side, price: entry.price, qty: fillQty });
+            fills.push({ orderId: entry.orderId, accountId: entry.accountId, side: entry.side, price: entry.price, qty: fillQty, virtual: !!entry.virtual });
             if (fillQty >= entry.qty) {
                 list.splice(i, 1);
             }
@@ -309,6 +309,88 @@ let TradingEngineService = class TradingEngineService {
             counterFills: real.fills,
         };
     }
+    // P1 开盘集合竞价：按最大成交量原则形成开盘价，交叉挂单以开盘价撮合（用户订单走真实结算）
+    // 返回 { auctionPrice, fills }；fills 中买卖双方各一条（virtual 标记区分 AI 虚拟挂单）
+    runOpeningAuction(symbol, prevClose) {
+        const book = this.realBooks.get(symbol);
+        if (!book)
+            return { auctionPrice: Number(prevClose) || 0, fills: [] };
+        const bids = book.bids.slice();
+        const asks = book.asks.slice();
+        if (bids.length === 0 || asks.length === 0)
+            return { auctionPrice: Number(prevClose) || 0, fills: [] };
+        const isCN = !/^H/.test(symbol) && !/^U/.test(symbol);
+        const base = Number(prevClose) || Number(bids[0].price) || 1;
+        const limitUp = isCN ? base * 1.10 : Infinity;
+        const limitDown = isCN ? base * 0.90 : 0;
+        // 候选价：盘口所有价位 + 昨收（A 股限制在涨跌停区间内）
+        const candidates = new Set<number>();
+        for (const e of [...bids, ...asks]) {
+            const p = Number(e.price);
+            if (isCN && (p > limitUp || p < limitDown))
+                continue;
+            candidates.add(p);
+        }
+        candidates.add(Math.min(Math.max(base, limitDown), limitUp));
+        const volumeAt = (p) => {
+            let bidVol = 0;
+            for (const e of bids)
+                if (e.price >= p)
+                    bidVol += e.qty;
+            let askVol = 0;
+            for (const e of asks)
+                if (e.price <= p)
+                    askVol += e.qty;
+            return Math.min(bidVol, askVol);
+        };
+        let best = null;
+        for (const p of [...candidates].sort((a, b) => a - b)) {
+            const v = volumeAt(p);
+            if (best === null || v > best.volume || (v === best.volume && Math.abs(p - base) < Math.abs(best.price - base))) {
+                best = { price: p, volume: v };
+            }
+        }
+        const auctionPrice = best ? best.price : base;
+        const bidQueue = bids.filter((e) => e.price >= auctionPrice);
+        const askQueue = asks.filter((e) => e.price <= auctionPrice);
+        const fills = [];
+        const removeEntry = (arr, entry, qty) => {
+            const idx = arr.indexOf(entry);
+            if (idx < 0)
+                return;
+            if (qty >= entry.qty)
+                arr.splice(idx, 1);
+            else
+                arr[idx].qty -= qty;
+        };
+        // 用独立剩余计数器撮合（removeEntry 已同步扣减盘口数量，避免双扣减）
+        let i = 0;
+        let j = 0;
+        let bidLeft = bidQueue.length > 0 ? bidQueue[0].qty : 0;
+        let askLeft = askQueue.length > 0 ? askQueue[0].qty : 0;
+        while (i < bidQueue.length && j < askQueue.length) {
+            const b = bidQueue[i];
+            const a = askQueue[j];
+            const qty = Math.min(bidLeft, askLeft);
+            fills.push({ orderId: b.orderId, accountId: b.accountId, side: b.side, price: Number(Number(auctionPrice).toFixed(2)), qty, virtual: !!b.virtual });
+            fills.push({ orderId: a.orderId, accountId: a.accountId, side: a.side, price: Number(Number(auctionPrice).toFixed(2)), qty, virtual: !!a.virtual });
+            removeEntry(book.bids, b, qty);
+            removeEntry(book.asks, a, qty);
+            bidLeft -= qty;
+            askLeft -= qty;
+            if (bidLeft <= 0) {
+                i++;
+                if (i < bidQueue.length)
+                    bidLeft = bidQueue[i].qty;
+            }
+            if (askLeft <= 0) {
+                j++;
+                if (j < askQueue.length)
+                    askLeft = askQueue[j].qty;
+            }
+        }
+        return { auctionPrice: Number(Number(auctionPrice).toFixed(2)), fills };
+    }
     // SECURITY: 限价单按限价封顶撮合——买入只吃价格<=限价的档位，卖出相反；不足则部分成交
     executeMarketOrderLimited(symbol, side, quantity, limitPrice, excludeAccountId?) {
         // P0: 先撮合真实挂单（限价内），剩余量再吃合成深度
@@ -351,8 +433,8 @@ let TradingEngineService = class TradingEngineService {
     // P0: 结算对手方真实挂单成交（对方账户走统一结算队列，并同步订单实体的 filledQty/status）
     async settleCounterFills(symbol, mode, counterFills) {
         for (const cf of counterFills) {
-            // P2: AI 虚拟挂单（orderId=null）无账户，跳过结算
-            if (!cf.orderId)
+            // P2: AI 虚拟挂单（virtual 标记或 orderId=null）无账户，跳过结算
+            if (cf.virtual || !cf.orderId)
                 continue;
             const cfFill = {
                 symbol,

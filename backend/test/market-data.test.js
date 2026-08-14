@@ -88,6 +88,28 @@ describe('MarketDataService 行情引擎核心逻辑', () => {
     });
   });
 
+  describe('P1 复权因子', () => {
+    test('分红除权后累计复权因子并记录事件序列', () => {
+      svc.stocks.set('A', { symbol: 'A', price: 10 });
+      svc.recordDividend('A', 2, 5);
+      expect(svc.stocks.get('A').price).toBe(8);
+      const adj = svc.adjFactors.get('A');
+      expect(adj.factor).toBeCloseTo(0.8, 6);
+      expect(adj.series.length).toBe(1);
+      expect(adj.series[0].day).toBe(5);
+      expect(adj.series[0].factor).toBeCloseTo(0.8, 6);
+    });
+
+    test('多次分红因子累乘', () => {
+      svc.stocks.set('B', { symbol: 'B', price: 10 });
+      svc.recordDividend('B', 1, 3);   // 9/10 = 0.9
+      svc.recordDividend('B', 4.5, 9); // 4.5/9 = 0.5 → 0.45
+      const adj = svc.adjFactors.get('B');
+      expect(adj.factor).toBeCloseTo(0.45, 6);
+      expect(adj.series.length).toBe(2);
+    });
+  });
+
   describe('getIndices 指数实时计算', () => {
     test('上证指数随成分股涨跌计算', () => {
       svc.stocks.set('T1', { symbol: 'T1', code: '688001', market: 'CN', price: 110, prevClose: 100 });

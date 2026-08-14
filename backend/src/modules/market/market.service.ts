@@ -46,6 +46,8 @@ let MarketService = class MarketService {
         this.logger = new common_1.Logger(MarketService.name);
         this.tickCounter = 0;
         this.processing = false;
+        // P1 开盘竞价：各市场最近一次竞价开盘价（dayOpen 基准合并用）
+        this.lastAuctionPrices = {};
         // P0 时间尺度：TICK_INTERVAL_MS 控制每个行情 tick 的真实间隔（1000=高速回放 1秒1分钟，60000=实时分钟级），钳制 200~60000
         const rawInterval = Number(config && config.get ? config.get('TICK_INTERVAL_MS', 1000) : 1000);
         this.tickIntervalMs = Math.min(Math.max(Number.isFinite(rawInterval) ? rawInterval : 1000, 200), 60000);
@@ -118,6 +120,8 @@ let MarketService = class MarketService {
             if (counter === 0) {
                 // SECURITY: 日初先重置 T+1 再撮合挂单，避免首 tick 触发卖单被误判 T+1 取消
                 await this.engine.resetBoughtToday();
+                // P1 开盘集合竞价：按最大成交量原则形成开盘价并撮合交叉挂单（早于连续竞价）
+                await this.runOpeningAuctions(market, marketData);
             }
             const fills = await this.engine.checkPendingOrders();
             fills.forEach((f) => { this.gateway.broadcastFill(f); });
@@ -156,7 +160,10 @@ let MarketService = class MarketService {
                     if (good) this.logger.log(`🎉 政策红包: ${events.swan.desc}`);
                     else this.logger.warn(`🦊 黑天鹅: ${events.swan.desc}`);
                 }
-                this.engine.setDayOpen(prices);
+                // P1: dayOpen 基准 = 竞价开盘价（有竞价的股票），其余用首 tick 价格
+                const openBase = { ...prices };
+                Object.assign(openBase, this.lastAuctionPrices[market] || {});
+                this.engine.setDayOpen(openBase);
                 const state = marketData.getState();
                 // 财报季
                 if (marketData.gameDay > 0 && marketData.gameDay % 7 === 0) {
@@ -242,6 +249,43 @@ let MarketService = class MarketService {
             }
         };
         setTimeout(tick, this.tickIntervalMs);
+    }
+    // P1 开盘集合竞价：对每只有挂单的股票按最大成交量原则定价并撮合，用户成交走真实结算
+    async runOpeningAuctions(market, marketData) {
+        const prevCloses = marketData.getPrevCloses();
+        const auctionPrices = {};
+        const realFills = [];
+        for (const symbol of Object.keys(prevCloses)) {
+            let result;
+            try {
+                result = this.engine.runOpeningAuction(symbol, prevCloses[symbol]);
+            }
+            catch (e) {
+                this.logger.warn('集合竞价失败 ' + symbol + ': ' + ((e && e.message) || e));
+                continue;
+            }
+            if (!result || result.fills.length === 0)
+                continue;
+            auctionPrices[symbol] = result.auctionPrice;
+            for (const f of result.fills) {
+                if (!f.virtual && f.orderId) {
+                    realFills.push(f);
+                }
+            }
+            this.logger.log('🔔 [' + market + '] 开盘竞价: ' + symbol + ' @ ' + result.auctionPrice + '（成交 ' + Math.floor(result.fills.length / 2) + ' 对）');
+        }
+        if (realFills.length > 0) {
+            try {
+                await this.engine.settleCounterFills(market, realFills);
+            }
+            catch (e) {
+                this.logger.warn('集合竞价结算失败: ' + ((e && e.message) || e));
+            }
+        }
+        this.lastAuctionPrices[market] = auctionPrices;
+        if (Object.keys(auctionPrices).length > 0) {
+            marketData.setAuctionDayOpens(auctionPrices);
+        }
     }
     // 三服务器路由：按股票代码前缀选择对应市场实例（H→HK，U→US，其他→CN）
     marketDataFor(symbol) {

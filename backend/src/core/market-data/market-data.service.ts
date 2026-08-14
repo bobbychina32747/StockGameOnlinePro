@@ -46,6 +46,8 @@ let MarketDataService = class MarketDataService {
         // IPO 池仅 A 股服务器使用（三服务器共用会重复上市同一新股 → UNIQUE 冲突）
         this.ipoQueue = this.market === 'CN' ? [...constants_1.IPO_POOL] : [];
         this.nextIpoDay = 30;
+        // P1 复权：累计前复权因子与分红事件序列（历史价格 × 因子 = 前复权价）
+        this.adjFactors = new Map<string, { factor: number, series: { day: number, factor: number }[] }>();
         this.dayEvents = null;
         this.dividends = new Map<string, any[]>();
         this.gameDay = 0;
@@ -984,6 +986,23 @@ let MarketDataService = class MarketDataService {
         }
         return prices;
     }
+    // P1: 昨收价映射（开盘集合竞价的参考基准）
+    getPrevCloses() {
+        const out = {};
+        for (const [sym, state] of this.stocks) {
+            out[sym] = Number(state.prevClose) || Number(state.dayOpen) || Number(state.price) || 1;
+        }
+        return out;
+    }
+    // P1: 开盘集合竞价结果写回 dayOpen（今开 = 竞价开盘价）
+    setAuctionDayOpens(auctionPrices) {
+        for (const [sym, price] of Object.entries(auctionPrices)) {
+            const st = this.stocks.get(sym);
+            if (st && Number.isFinite(Number(price)) && Number(price) > 0) {
+                st.dayOpen = Number(price);
+            }
+        }
+    }
     // SECURITY: 全市场冲击写回引擎内部价格（原夜间事件只改 getPrices 返回副本，下一 tick 被覆盖失效）
     applyMarketwideShock(pct) {
         const factor = 1 + Number(pct);
@@ -1000,9 +1019,12 @@ let MarketDataService = class MarketDataService {
         const list = [];
         for (const state of this.stocks.values()) {
             const prevClose = Number(state.prevClose) || Number(state.dayOpen) || 1;
+            const adj = this.adjFactors.get(state.symbol) || { factor: 1, series: [] };
             list.push({
                 symbol: state.symbol,
                 market: state.market || 'CN',
+                adjFactor: Number(adj.factor),
+                adjustmentSeries: adj.series.map((s) => ({ day: s.day, factor: s.factor })),
                 name: state.name || state.symbol,
                 code: state.code || '',
                 listDate: state.listDate || '',
@@ -1300,8 +1322,17 @@ let MarketDataService = class MarketDataService {
         this.dividends.set(symbol, list);
         // 除权：股价下调
         const st = this.stocks.get(symbol);
-        if (st)
-            st.price = Math.max(0.5, st.price - perShare);
+        if (st) {
+            const before = Number(st.price);
+            st.price = Math.max(0.5, before - perShare);
+            // P1 复权：累计前复权因子（除权当日起历史价格按新因子折算，消除分红跳空）
+            if (before > 0) {
+                const info = this.adjFactors.get(symbol) || { factor: 1, series: [] };
+                info.factor = info.factor * (st.price / before);
+                info.series.push({ day: Number(day), factor: info.factor });
+                this.adjFactors.set(symbol, info);
+            }
+        }
     }
     getDividends(day) {
         const out = [];
