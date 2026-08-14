@@ -144,7 +144,8 @@ a:hover { color: var(--color-brand-hover); }
   border-bottom: 1px solid var(--border-subtle);
   gap: 16px;
   position: relative;
-  z-index: 10;
+  /* 顶栏包含设置弹窗/通知中心，backdrop-filter 会创建层叠上下文，z-index 必须全局最高 */
+  z-index: 3000;
 }
 
 .top-bar::after {
@@ -436,7 +437,7 @@ select.input {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 4000;
   animation: fadeIn 0.2s ease;
 }
 
@@ -1021,6 +1022,7 @@ select.input {
   justify-content: center;
   overflow-y: auto;
   padding: 4vh 0;
+  z-index: 4000;
 }
 .modal {
   width: min(520px, 92vw);
