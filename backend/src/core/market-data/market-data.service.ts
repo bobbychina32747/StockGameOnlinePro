@@ -58,6 +58,8 @@ let MarketDataService = class MarketDataService {
         this.burstEvents = [];
         this.industryBubbleMap = {};
         // AI 对手盘：机构/游资/散户市场参与者（每服务器独立）
+        // P3 AI 资金账户账本：现金/持仓/未平挂单市值（行为树资金约束）
+        this.aiLedger = [];
         this.aiAgents = [
             { type: '机构', activity: 0.25, scale: 25000 },
             { type: '机构', activity: 0.2, scale: 30000 },
@@ -70,6 +72,9 @@ let MarketDataService = class MarketDataService {
             { type: '散户', activity: 0.5, scale: 1200 },
             { type: '散户', activity: 0.45, scale: 900 },
         ];
+        for (let i = 0; i < this.aiAgents.length; i++) {
+            this.aiLedger.push({ cash: 20000000, positions: new Map<string, { qty: number, cost: number }>(), restingValue: 0 });
+        }
         this.intervalHandle = null;
         // 性能优化：股票池配置缓存（消除每 tick 的 find O(n)）
         this.poolBySymbol = new Map<string, any>();
@@ -627,9 +632,13 @@ let MarketDataService = class MarketDataService {
             }
             catch (e) { }
         }
-        for (const agent of this.aiAgents) {
+        for (let ai = 0; ai < this.aiAgents.length; ai++) {
+            const agent = this.aiAgents[ai];
             if (Math.random() > agent.activity)
                 continue;
+            const ledger = this.aiLedger[ai];
+            // 未平挂单市值指数衰减（近似 TTL 到期释放预算）
+            ledger.restingValue = (ledger.restingValue || 0) * 0.97;
             // 选股：游资追热点行业，机构/散户随机
             let target;
             if (agent.type === '游资' && this.hotTopics.length > 0) {
@@ -650,11 +659,31 @@ let MarketDataService = class MarketDataService {
                 // 防自激：已大涨(>3%)不再追买、大跌(<-3%)不再追卖
                 dir = ret > 0.03 ? 0 : ret < -0.03 ? 0 : (ret >= 0 ? 1 : -1);
             }
+            // P3 行为树：游资持仓止盈(+5%)/止损(-3%)；机构持仓过重(>现金60%)再平衡卖出
+            const priceNow = Number(target.price);
+            const held = ledger.positions.get(target.symbol);
+            const heldQty = held ? held.qty : 0;
+            const heldCost = held ? held.cost : 0;
+            if (heldQty > 0 && heldCost > 0) {
+                const pnl = (priceNow - heldCost) / heldCost;
+                if (agent.type === '游资' && (pnl > 0.05 || pnl < -0.03))
+                    dir = -1;
+            }
+            if (agent.type === '机构' && heldQty * priceNow > ledger.cash * 0.6)
+                dir = -1;
             if (dir === 0)
                 continue;
             const side = dir > 0 ? 'buy' : 'sell';
-            // 量级：按 agent scale × 随机
-            const qty = Math.round(agent.scale * (0.5 + Math.random()));
+            // P3 资金约束：买单受现金约束、卖单受持仓约束
+            let qty = Math.round(agent.scale * (0.5 + Math.random()));
+            if (side === 'buy') {
+                qty = Math.min(qty, Math.floor((ledger.cash * 0.8) / Math.max(priceNow, 0.01)));
+            }
+            else {
+                qty = Math.min(qty, heldQty);
+            }
+            if (qty <= 0)
+                continue;
             if (!this.engine)
                 continue;
             const isCN = target.market !== 'HK' && target.market !== 'US';
@@ -662,16 +691,19 @@ let MarketDataService = class MarketDataService {
             const limitDown = isCN && base > 0 ? base * 0.90 : null;
             if (Math.random() < 0.67) {
                 // 限价挂单进入盘口排队：机构贴价大单、游资中等、散户偏远小单；TTL 8~30 tick
+                if (ledger.restingValue + qty * priceNow > ledger.cash * 0.6)
+                    continue; // 挂单预算约束
                 const offsetPct = agent.type === '机构' ? 0.0005 + Math.random() * 0.001
                     : agent.type === '游资' ? 0.001 + Math.random() * 0.0015
                         : 0.0015 + Math.random() * 0.002;
-                let price = Number(target.price) * (1 + dir * offsetPct);
+                let price = priceNow * (1 + dir * offsetPct);
                 if (isCN && limitUp !== null && limitDown !== null) {
                     price = Math.min(Math.max(price, limitDown), limitUp);
                 }
                 const ttlTicks = 8 + Math.floor(Math.random() * 22);
                 try {
                     this.engine.placeVirtualOrder(target.symbol, side, Number(price.toFixed(2)), qty, this.tickCount + ttlTicks);
+                    ledger.restingValue += qty * Number(price.toFixed(2));
                 }
                 catch (e) { }
             }
@@ -687,6 +719,26 @@ let MarketDataService = class MarketDataService {
                     }
                     // 价格冲击 + 成交量并入 K 线（与用户成交同一路径，AI 抛售可戳破泡沫）
                     this.applyUserFill({ symbol: target.symbol, side, filledQuantity: fill.filledQuantity, avgPrice: fill.avgPrice });
+                    // P3 更新资金/持仓账本
+                    if (side === 'buy') {
+                        ledger.cash -= fill.filledQuantity * fill.avgPrice;
+                        const pos = ledger.positions.get(target.symbol) || { qty: 0, cost: 0 };
+                        const newQty = pos.qty + fill.filledQuantity;
+                        pos.cost = pos.qty > 0 ? (pos.cost * pos.qty + fill.avgPrice * fill.filledQuantity) / newQty : fill.avgPrice;
+                        pos.qty = newQty;
+                        ledger.positions.set(target.symbol, pos);
+                    }
+                    else {
+                        ledger.cash += fill.filledQuantity * fill.avgPrice;
+                        const pos = ledger.positions.get(target.symbol);
+                        if (pos) {
+                            pos.qty -= fill.filledQuantity;
+                            if (pos.qty <= 0)
+                                ledger.positions.delete(target.symbol);
+                            else
+                                ledger.positions.set(target.symbol, pos);
+                        }
+                    }
                 }
                 catch (e) {
                     this.logger.warn('AI 市价单执行失败: ' + (e && e.message ? e.message : e));
@@ -904,13 +956,21 @@ let MarketDataService = class MarketDataService {
                 this.logger.log('全生命周期历史: ' + stock.symbol + ' 补 ' + bars.length + ' 根日线（自 ' + (stock.listDate || '上市') + '）');
             }
         }
+        // SECURITY: 40 万行一次性 save 会触发 Maximum call stack size exceeded，按 2000 行分批落库
         if (batch.length > 0) {
-            try {
-                await this.klineRepo.save(batch);
+            const CHUNK = 2000;
+            let saved = 0;
+            for (let i = 0; i < batch.length; i += CHUNK) {
+                const chunk = batch.slice(i, i + CHUNK);
+                try {
+                    await this.klineRepo.save(chunk);
+                    saved += chunk.length;
+                }
+                catch (e) {
+                    this.logger.error('全生命周期日线落库失败（批次 ' + i + '）: ' + (e && e.message ? e.message : e));
+                }
             }
-            catch (e) {
-                this.logger.error('全生命周期日线落库失败: ' + (e && e.message ? e.message : e));
-            }
+            this.logger.log('全生命周期日线落库完成: ' + saved + '/' + batch.length);
         }
         this.logger.log('全生命周期历史补齐完成，共 ' + total + ' 根日线');
     }

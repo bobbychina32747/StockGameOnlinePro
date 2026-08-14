@@ -35,6 +35,7 @@ let AccountService = class AccountService {
         this.transactionRepo = transactionRepo;
         this.riskManager = riskManager;
         this.engine = engine;
+        this.logger = new common_1.Logger(AccountService.name);
     }
     async getAccount(userId, mode = 'US') {
         const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });
