@@ -63,7 +63,17 @@ let AdminController = class AdminController {
     async getDebug(user) {
         if (user.role !== user_entity_1.UserRole.ADMIN)
             throw new common_1.ForbiddenException('无权限');
-        return { debug: this.debugMode.get() };
+        return { debug: this.debugMode.get(), globalBypass: this.debugMode.getGlobalBypass() };
+    }
+    // P6 全服休市交易：开启后所有用户均可休市下单（行情全时生成）
+    async setDebugGlobal(user, on) {
+        if (user.role !== user_entity_1.UserRole.ADMIN)
+            throw new common_1.ForbiddenException('无权限');
+        this.debugMode.setGlobalBypass(on === true);
+        if (on === true) {
+            this.debugMode.set(true); // 全服休市交易依赖行情运行
+        }
+        return { success: true, debug: this.debugMode.get(), globalBypass: this.debugMode.getGlobalBypass() };
     }
 };
 __decorate([
@@ -106,6 +116,14 @@ __decorate([
     __metadata("design:paramtypes", [user_entity_1.User]),
     __metadata("design:returntype", Promise)
 ], AdminController.prototype, "getDebug", null);
+__decorate([
+    (0, common_1.Post)('debug/global'),
+    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)('on', common_1.ParseBoolPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [user_entity_1.User, Boolean]),
+    __metadata("design:returntype", Promise)
+], AdminController.prototype, "setDebugGlobal", null);
 
 export { AdminController };
 

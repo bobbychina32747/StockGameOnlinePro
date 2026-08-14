@@ -106,7 +106,7 @@ let MarketService = class MarketService {
         let advanceCounter = false;
         try {
             // P2: A 股盘前集合竞价申报窗口（9:15-9:25）：窗口内不生成行情只撮合一次竞价
-            if (!this.debugMode.get() && (0, constants_1.isAuctionTimeFor)(market)) {
+            if (!this.debugMode.isMarketActive() && (0, constants_1.isAuctionTimeFor)(market)) {
                 const todayKey = new Date().toDateString();
                 if (this.lastAuctionDay[market] !== todayKey) {
                     this.lastAuctionDay[market] = todayKey;
@@ -115,7 +115,7 @@ let MarketService = class MarketService {
                 return;
             }
             // P1: 各市场独立时段——非本市场交易时段（且非调试模式）直接跳过，不生成行情
-            if (!this.debugMode.get() && !(0, constants_1.isTradingTimeFor)(market)) {
+            if (!this.debugMode.isMarketActive() && !(0, constants_1.isTradingTimeFor)(market)) {
                 return;
             }
             const ticks = await marketData.generateTick();
@@ -386,6 +386,8 @@ let MarketService = class MarketService {
         const cn = this.marketData.getState();
         // P0: 暴露 tick 间隔，前端据此标注「高速回放」或「实时行情」
         cn.tickIntervalMs = this.tickIntervalMs;
+        // P6: 全服休市交易状态（所有客户端据此解锁休市下单）
+        cn.offHoursTrading = !!this.debugMode.getGlobalBypass();
         // 浅拷贝避免循环引用（markets.CN 不能引用 cn 自身）
         cn.markets = {
             CN: { ...cn },

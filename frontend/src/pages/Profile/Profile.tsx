@@ -25,11 +25,13 @@ export default function Profile() {
   }, []);
 
   // 管理员：读取调试模式状态（同步到全局 store，供下单面板/休市遮罩使用）
+  const [debugGlobalOn, setDebugGlobalOn] = useState(false);
   useEffect(() => {
     if (user?.role === 'admin') {
       adminApi.debugStatus().then((d: any) => {
         setDebugOn(!!d?.debug);
-        useUIStore.setState({ debugMode: !!d?.debug });
+        setDebugGlobalOn(!!d?.globalBypass);
+        useUIStore.setState({ debugMode: !!d?.debug, debugGlobal: !!d?.globalBypass });
       }).catch(() => {});
     }
   }, [user?.role]);
@@ -43,6 +45,19 @@ export default function Profile() {
       setDebugMode(!!r?.debug);
     } catch (e) {
       console.error('切换调试模式失败', e);
+    }
+  };
+
+  // P6 全服休市交易：开启后所有用户均可休市下单（行情全时生成）
+  const toggleDebugGlobal = async () => {
+    const next = !debugGlobalOn;
+    try {
+      const r = await adminApi.debugGlobal(next);
+      setDebugGlobalOn(!!r?.globalBypass);
+      useUIStore.setState({ debugGlobal: !!r?.globalBypass });
+      if (next) useUIStore.setState({ debugMode: true });
+    } catch (e) {
+      console.error('切换全服休市交易失败', e);
     }
   };
 
@@ -106,7 +121,22 @@ export default function Profile() {
               >
                 {debugOn ? '🔓 已开启（休市可交易）' : '🔒 已关闭'}
               </button>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>开启后休市期间也生成行情、可下单（仅管理员）</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>开启后休市期间也生成行情、可下单（仅管理员本人）</span>
+            </span>
+          </div>
+        )}
+        {/* P6 全服休市交易：所有用户休市可下单 */}
+        {user?.role === 'admin' && (
+          <div className="info-row" style={{ marginTop: 10, alignItems: 'center' }}>
+            <span className="label">🌐 全服休市交易</span>
+            <span className="value" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                className={`btn btn-sm ${debugGlobalOn ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={toggleDebugGlobal}
+              >
+                {debugGlobalOn ? '🔓 已开启（全服可休市下单）' : '🔒 已关闭'}
+              </button>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>开启后所有用户休市期间均可下单，行情全时生成</span>
             </span>
           </div>
         )}

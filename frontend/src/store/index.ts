@@ -170,6 +170,8 @@ interface UIState {
   setAnimEnabled: (v: boolean) => void;
   debugMode: boolean;
   setDebugMode: (v: boolean) => void;
+  debugGlobal: boolean;
+  setDebugGlobal: (v: boolean) => void;
   tutorialStep: number;
   tutorialDone: boolean;
   tutorialEvent: (event: string) => void;
@@ -241,6 +243,9 @@ export const useUIStore = create<UIState>((set) => ({
   setAnimEnabled: (v) => { localStorage.setItem('ss.anim', v ? '1' : '0'); set({ animEnabled: v }); },
   debugMode: false,
   setDebugMode: (v) => set({ debugMode: v }),
+  // P6 全服休市交易（管理员开启后所有用户休市可下单）
+  debugGlobal: false,
+  setDebugGlobal: (v) => set({ debugGlobal: v }),
   // 新手教程：7 步引导（localStorage 持久化）
   tutorialStep: Number(localStorage.getItem('ss.tut') || 0),
   tutorialDone: localStorage.getItem('ss.tutDone') === '1',

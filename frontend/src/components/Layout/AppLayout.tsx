@@ -24,9 +24,14 @@ export function AppLayout() {
   const [tickIntervalMs, setTickIntervalMs] = useState<number | null>(null);
 
   useEffect(() => {
-    marketApi.state().then((s: any) => {
+    const sync = () => marketApi.state().then((s: any) => {
       if (s && Number.isFinite(Number(s.tickIntervalMs))) setTickIntervalMs(Number(s.tickIntervalMs));
+      // P6 全服休市交易：公开状态同步全局（管理员开启后所有客户端解锁休市下单）
+      if (s) useUIStore.setState({ debugGlobal: !!s.offHoursTrading });
     }).catch(() => {});
+    sync();
+    const id = setInterval(sync, 30000);
+    return () => clearInterval(id);
   }, []);
 
   // 管理员调试模式：布局挂载时同步服务端状态（刷新/直达交易页也生效；非管理员 403 静默忽略）

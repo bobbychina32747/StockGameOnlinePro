@@ -87,6 +87,7 @@ export const marketApi = {
 export const adminApi = {
   debug: (on: boolean) => api.post(`/admin/debug`, { on }).then((r) => r.data),
   debugStatus: () => api.get(`/admin/debug`).then((r) => r.data),
+  debugGlobal: (on: boolean) => api.post(`/admin/debug/global`, { on }).then((r) => r.data),
 };
 
 // ─── Ranking ───

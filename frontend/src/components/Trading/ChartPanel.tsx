@@ -62,6 +62,7 @@ export function ChartPanel() {
   const setSelectedTimeframe = (tf: string) => { setSelectedTimeframeRaw(tf); if (tf !== 'intraday') useUIStore.getState().tutorialEvent('timeframe'); };
   const setDetailSymbol = useUIStore((s) => s.setDetailSymbol);
   const debugMode = useUIStore((s) => s.debugMode);
+  const debugGlobal = useUIStore((s) => s.debugGlobal);
   const marketMode = useUIStore((s) => s.marketMode);
 
   const stock = stocks.find((s: any) => s.symbol === selectedSymbol);
@@ -456,7 +457,7 @@ export function ChartPanel() {
         />
       </div>
       {/* 休市超大遮罩（调试模式/开盘时自动隐藏） */}
-      {marketClosed && !debugMode && (
+      {marketClosed && !debugMode && !debugGlobal && (
         <div className="market-closed-overlay">
           <div className="mco-title">📴 已休市</div>
           <div className="mco-sub">交易时段 9:30 - 11:30 / 13:00 - 15:00（工作日）</div>

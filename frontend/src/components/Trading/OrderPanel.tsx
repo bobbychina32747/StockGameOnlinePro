@@ -79,15 +79,16 @@ export function OrderPanel() {
   const overBudget = orderSide === 'buy' && totalCost > cash && estimated > 0;
   const invalidQty = !orderQty || orderQty <= 0 || !Number.isInteger(Number(orderQty));
   // P1 休市禁用：按当前市场独立时段判断（每 10s 刷新；后端下单接口同样按市场校验）
-  // 管理员调试模式（休市忽略）：服务端对开启者放行，前端同步解锁下单按钮
+  // 管理员调试模式（休市忽略）+ 全服休市交易：服务端放行时前端同步解锁下单按钮
   const debugMode = useUIStore((s) => s.debugMode);
+  const debugGlobal = useUIStore((s) => s.debugGlobal);
   const [marketOpen, setMarketOpen] = useState(isTradingTimeFor(mode));
   useEffect(() => {
     setMarketOpen(isTradingTimeFor(mode));
     const id = setInterval(() => setMarketOpen(isTradingTimeFor(mode)), 10000);
     return () => clearInterval(id);
   }, [mode]);
-  const canSubmit = !orderSubmitting && !invalidQty && !overBudget && effPrice > 0 && (marketOpen || debugMode);
+  const canSubmit = !orderSubmitting && !invalidQty && !overBudget && effPrice > 0 && (marketOpen || debugMode || debugGlobal);
 
   // ─── 下单 ───
   const placeOrder = async () => {
@@ -229,7 +230,7 @@ export function OrderPanel() {
           )}
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn btn-primary" style={{ flex: 1 }} onClick={placeOrder} disabled={!canSubmit}>
-              {!marketOpen && !debugMode ? `休市中（${sessionLabel(mode)}）` : orderSubmitting ? '提交中...' : '确认下单'}
+              {!marketOpen && !debugMode && !debugGlobal ? `休市中（${sessionLabel(mode)}）` : orderSubmitting ? '提交中...' : '确认下单'}
             </button>
             <button className="btn btn-danger btn-sm" onClick={quickClear}>清仓</button>
           </div>
