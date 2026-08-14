@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactEChartsCore from 'echarts-for-react';
 import { useMarketStore, useUIStore } from '../../store';
 import { PriceText } from './PriceText';
+import { isTradingTimeFor } from '../../utils/marketSessions';
 
 interface KlineData {
   time: Date;
@@ -61,6 +62,7 @@ export function ChartPanel() {
   const setSelectedTimeframe = (tf: string) => { setSelectedTimeframeRaw(tf); if (tf !== 'intraday') useUIStore.getState().tutorialEvent('timeframe'); };
   const setDetailSymbol = useUIStore((s) => s.setDetailSymbol);
   const debugMode = useUIStore((s) => s.debugMode);
+  const marketMode = useUIStore((s) => s.marketMode);
 
   const klineData: KlineData[] = (klines[selectedSymbol]?.[selectedTimeframe] || []) as KlineData[];
   // 分时图数据源：1min K 线
@@ -69,25 +71,24 @@ export function ChartPanel() {
   const price = prices[selectedSymbol];
   const isIntraday = selectedTimeframe === 'intraday';
 
-  // ─── 休市超大遮罩：真实时段外显示（调试模式下不显示） ───
-  const isTradingTimeNow = () => {
-    const now = new Date();
-    const day = now.getDay();
-    if (day === 0 || day === 6) return false;
-    const minutes = now.getHours() * 60 + now.getMinutes();
-    return (minutes >= 570 && minutes < 690) || (minutes >= 780 && minutes < 900);
-  };
-  const [marketClosed, setMarketClosed] = useState(!isTradingTimeNow());
+  // ─── 休市超大遮罩（P1 按市场独立时段；调试模式下不显示） ───
+  const [marketClosed, setMarketClosed] = useState(!isTradingTimeFor(marketMode));
   useEffect(() => {
-    const id = setInterval(() => setMarketClosed(!isTradingTimeNow()), 10000);
+    setMarketClosed(!isTradingTimeFor(marketMode));
+    const id = setInterval(() => setMarketClosed(!isTradingTimeFor(marketMode)), 10000);
     return () => clearInterval(id);
-  }, []);
+  }, [marketMode]);
   const nextOpenText = () => {
+    const m = marketMode || 'CN';
     const now = new Date();
     const day = now.getDay();
     const minutes = now.getHours() * 60 + now.getMinutes();
-    if (day === 0 || day === 6 || minutes >= 900) return '下次开盘：明日 9:30';
+    if (m === 'US') {
+      return (day === 0 || day === 6 || (minutes >= 240 && minutes < 1290)) ? '下次开盘：今日 21:30' : '下次开盘：明日 21:30';
+    }
+    if (day === 0 || day === 6 || minutes >= (m === 'HK' ? 960 : 900)) return '下次开盘：明日 9:30';
     if (minutes < 570) return '下次开盘：今日 9:30';
+    if ((m === 'HK' && minutes >= 720 && minutes < 780) || (minutes >= 690 && minutes < 780)) return '下次开盘：今日 13:00';
     return '下次开盘：今日 13:00';
   };
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { tradingApi } from '../../services/api.client';
 import { useAccountStore, useMarketStore, useUIStore } from '../../store';
 import { CollapsibleCard } from './CollapsibleCard';
+import { isTradingTimeFor, sessionLabel } from '../../utils/marketSessions';
 
 interface OrderEntry {
   id?: string;
@@ -77,19 +78,13 @@ export function OrderPanel() {
   const cash = Number(account?.cash ?? 0);
   const overBudget = orderSide === 'buy' && totalCost > cash && estimated > 0;
   const invalidQty = !orderQty || orderQty <= 0 || !Number.isInteger(Number(orderQty));
-  // S2 休市禁用：真实交易时段才可下单（每 10s 刷新）
-  const isTradingTimeNow = () => {
-    const now = new Date();
-    const day = now.getDay();
-    if (day === 0 || day === 6) return false;
-    const minutes = now.getHours() * 60 + now.getMinutes();
-    return (minutes >= 570 && minutes < 690) || (minutes >= 780 && minutes < 900);
-  };
-  const [marketOpen, setMarketOpen] = useState(isTradingTimeNow());
+  // P1 休市禁用：按当前市场独立时段判断（每 10s 刷新；后端下单接口同样按市场校验）
+  const [marketOpen, setMarketOpen] = useState(isTradingTimeFor(mode));
   useEffect(() => {
-    const id = setInterval(() => setMarketOpen(isTradingTimeNow()), 10000);
+    setMarketOpen(isTradingTimeFor(mode));
+    const id = setInterval(() => setMarketOpen(isTradingTimeFor(mode)), 10000);
     return () => clearInterval(id);
-  }, []);
+  }, [mode]);
   const canSubmit = !orderSubmitting && !invalidQty && !overBudget && effPrice > 0 && marketOpen;
 
   // ─── 下单 ───
@@ -230,7 +225,7 @@ export function OrderPanel() {
           )}
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn btn-primary" style={{ flex: 1 }} onClick={placeOrder} disabled={!canSubmit}>
-              {!marketOpen ? '休市中（9:30-11:30/13:00-15:00）' : orderSubmitting ? '提交中...' : '确认下单'}
+              {!marketOpen ? `休市中（${sessionLabel(mode)}）` : orderSubmitting ? '提交中...' : '确认下单'}
             </button>
             <button className="btn btn-danger btn-sm" onClick={quickClear}>清仓</button>
           </div>

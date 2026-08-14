@@ -261,6 +261,54 @@ let TradingEngineService = class TradingEngineService {
             counterFills: real.fills,
         };
     }
+    // P2: AI 虚拟限价挂单（进入盘口排队，TTL tick 到期自动撤单，无账户不结算）
+    placeVirtualOrder(symbol, side, price, qty, expiresAtTick) {
+        if (!Number.isFinite(Number(price)) || Number(price) <= 0 || !Number.isFinite(Number(qty)) || Number(qty) <= 0)
+            return;
+        let book = this.realBooks.get(symbol);
+        if (!book) {
+            book = { bids: [], asks: [] };
+            this.realBooks.set(symbol, book);
+        }
+        const isBid = side === 'buy' || side === 'cover';
+        const list = isBid ? book.bids : book.asks;
+        list.push({ orderId: null, accountId: null, side, price: Number(price), qty: Number(qty), time: Date.now(), virtual: true, expiresAtTick });
+        list.sort((a, b) => isBid ? (b.price - a.price) || (a.time - b.time) : (a.price - b.price) || (a.time - b.time));
+    }
+    // P2: 清理到期的 AI 虚拟挂单（每 tick 由行情引擎调用）
+    pruneExpiredVirtualOrders(currentTick) {
+        for (const book of this.realBooks.values()) {
+            for (const sideKey of ['bids', 'asks']) {
+                const arr = book[sideKey];
+                for (let i = arr.length - 1; i >= 0; i--) {
+                    if (arr[i].virtual && arr[i].expiresAtTick <= currentTick) {
+                        arr.splice(i, 1);
+                    }
+                }
+            }
+        }
+    }
+    // P2: AI 虚拟市价单——只吃真实盘口（AI 虚拟挂单 + 用户挂单），不吃合成深度
+    executeVirtualMarketOrder(symbol, side, quantity) {
+        const real = this.matchAgainstBook(symbol, side, quantity, undefined, undefined);
+        if (real.fills.length === 0)
+            return null;
+        let totalCost = 0;
+        let totalQty = 0;
+        for (const f of real.fills) {
+            totalCost += f.qty * f.price;
+            totalQty += f.qty;
+        }
+        const avgPrice = totalCost / totalQty;
+        return {
+            symbol,
+            side,
+            filledQuantity: totalQty,
+            avgPrice: Number(avgPrice.toFixed(4)),
+            totalCost: Number(totalCost.toFixed(2)),
+            counterFills: real.fills,
+        };
+    }
     // SECURITY: 限价单按限价封顶撮合——买入只吃价格<=限价的档位，卖出相反；不足则部分成交
     executeMarketOrderLimited(symbol, side, quantity, limitPrice, excludeAccountId?) {
         // P0: 先撮合真实挂单（限价内），剩余量再吃合成深度
@@ -303,6 +351,9 @@ let TradingEngineService = class TradingEngineService {
     // P0: 结算对手方真实挂单成交（对方账户走统一结算队列，并同步订单实体的 filledQty/status）
     async settleCounterFills(symbol, mode, counterFills) {
         for (const cf of counterFills) {
+            // P2: AI 虚拟挂单（orderId=null）无账户，跳过结算
+            if (!cf.orderId)
+                continue;
             const cfFill = {
                 symbol,
                 side: cf.side,

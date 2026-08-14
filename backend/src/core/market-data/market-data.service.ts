@@ -237,7 +237,7 @@ let MarketDataService = class MarketDataService {
             const missingDays = Math.max(0, 30 - this.gameDay);
             for (let d = 0; d < missingDays; d++) {
                 for (let t = 0; t < constants_1.MARKET.TICKS_PER_DAY; t++) {
-                    this.generateTick();
+                    await this.generateTick();
                 }
                 await this.endOfDay(true);
             }
@@ -245,7 +245,7 @@ let MarketDataService = class MarketDataService {
         } else {
             for (let d = 0; d < 30; d++) {
                 for (let t = 0; t < constants_1.MARKET.TICKS_PER_DAY; t++) {
-                    this.generateTick();
+                    await this.generateTick();
                 }
                 await this.endOfDay(true); // skipPersist：初始30天仅内存生成(快速)
             }
@@ -269,7 +269,7 @@ let MarketDataService = class MarketDataService {
             return;
         this.isRunning = true;
         this.intervalHandle = setInterval(() => {
-            this.generateTick();
+            this.generateTick().catch(() => { });
         }, constants_1.MARKET.TICK_INTERVAL_MS);
         this.logger.log('行情生成已启动');
     }
@@ -379,7 +379,7 @@ let MarketDataService = class MarketDataService {
         return Math.floor(volume);
     }
 
-    generateTick() {
+    async generateTick() {
         if (this.stocks.size === 0)
             return [];
         const results = [];
@@ -471,8 +471,8 @@ let MarketDataService = class MarketDataService {
         if (this.tickCount % 5 === 0 || this.hasVolatileMove()) {
             this.updateIndustryLinks();
         }
-        // AI 对手盘：机构/游资/散户交易行为（多空博弈）
-        this.applyAiTrading();
+        // AI 对手盘：机构/游资/散户交易行为（多空博弈，P2 订单流化）
+        await this.applyAiTrading();
         this.updateIndexFeedback();
         this.tickCount++;
         return results;
@@ -547,7 +547,9 @@ let MarketDataService = class MarketDataService {
         const turnover = Number(fill.filledQuantity) * Number(fill.avgPrice);
         const avgTurnover = (stock.avgVolume || 8000) * (Number(stock.price) || 1);
         const impact = Math.min(0.01, (turnover / Math.max(1, avgTurnover * 2)) * 0.5);
-        const dir = (fill.side === 'BUY' || fill.side === 'COVER') ? 1 : -1;
+        // 方向大小写兼容：引擎成交 side 为小写（buy/sell/short/cover），AI/其他路径可能传大写
+        const sideUp = String(fill.side || '').toUpperCase();
+        const dir = (sideUp === 'BUY' || sideUp === 'COVER') ? 1 : -1;
         // 经济泡沫：细小抛售戳破泡沫
         if (dir < 0 && stock.industry) {
             this.checkSellTrigger(stock.industry);
@@ -608,11 +610,19 @@ let MarketDataService = class MarketDataService {
             }
         }
     }
-    // ─── AI 对手盘：机构(低频大单价值)/游资(追热点快进快出)/散户(追涨杀跌小单) ───
-    applyAiTrading() {
+    // ─── AI 对手盘（P2 订单流化）：机构/游资/散户向真实盘口挂限价单/发市价单 ───
+    // 市价单吃掉真实挂单（AI 虚拟挂单 + 用户挂单），用户挂单触发真实结算；价格冲击与成交量走 applyUserFill
+    async applyAiTrading() {
         const arr = [...this.stocks.values()];
         if (arr.length === 0)
             return;
+        // 先清理过期的 AI 虚拟挂单（TTL 到期自动撤单）
+        if (this.engine) {
+            try {
+                this.engine.pruneExpiredVirtualOrders(this.tickCount);
+            }
+            catch (e) { }
+        }
         for (const agent of this.aiAgents) {
             if (Math.random() > agent.activity)
                 continue;
@@ -636,24 +646,47 @@ let MarketDataService = class MarketDataService {
                 // 防自激：已大涨(>3%)不再追买、大跌(<-3%)不再追卖
                 dir = ret > 0.03 ? 0 : ret < -0.03 ? 0 : (ret >= 0 ? 1 : -1);
             }
+            if (dir === 0)
+                continue;
+            const side = dir > 0 ? 'buy' : 'sell';
             // 量级：按 agent scale × 随机
             const qty = Math.round(agent.scale * (0.5 + Math.random()));
-            // 价格冲击（上限 0.5%，防 AI 单边拉爆）
-            const impact = Math.min(0.005, (qty / Math.max(1, target.baseVolume || 8000)) * 0.3);
-            target.price = Math.max(0.5, target.price * (1 + dir * impact));
-            // AI 抛售也可戳破泡沫
-            if (dir < 0 && target.industry) {
-                this.checkSellTrigger(target.industry);
+            if (!this.engine)
+                continue;
+            const isCN = target.market !== 'HK' && target.market !== 'US';
+            const limitUp = isCN && base > 0 ? base * 1.10 : null;
+            const limitDown = isCN && base > 0 ? base * 0.90 : null;
+            if (Math.random() < 0.67) {
+                // 限价挂单进入盘口排队：机构贴价大单、游资中等、散户偏远小单；TTL 8~30 tick
+                const offsetPct = agent.type === '机构' ? 0.0005 + Math.random() * 0.001
+                    : agent.type === '游资' ? 0.001 + Math.random() * 0.0015
+                        : 0.0015 + Math.random() * 0.002;
+                let price = Number(target.price) * (1 + dir * offsetPct);
+                if (isCN && limitUp !== null && limitDown !== null) {
+                    price = Math.min(Math.max(price, limitDown), limitUp);
+                }
+                const ttlTicks = 8 + Math.floor(Math.random() * 22);
+                try {
+                    this.engine.placeVirtualOrder(target.symbol, side, Number(price.toFixed(2)), qty, this.tickCount + ttlTicks);
+                }
+                catch (e) { }
             }
-            target.lastVolume += qty;
-            target.dayVolume += qty;
-            // 并入当前 K 线
-            const k1 = target.current1min;
-            if (k1) {
-                k1.volume += qty;
-                k1.high = Math.max(k1.high, target.price);
-                k1.low = Math.min(k1.low, target.price);
-                k1.close = target.price;
+            else {
+                // 市价单吃真实盘口：AI 虚拟挂单 + 用户挂单；用户挂单被吃掉走真实结算
+                try {
+                    const fill = this.engine.executeVirtualMarketOrder(target.symbol, side, qty);
+                    if (!fill)
+                        continue;
+                    const realFills = (fill.counterFills || []).filter((f) => f.orderId);
+                    if (realFills.length > 0) {
+                        await this.engine.settleCounterFills(target.symbol, this.market, realFills);
+                    }
+                    // 价格冲击 + 成交量并入 K 线（与用户成交同一路径，AI 抛售可戳破泡沫）
+                    this.applyUserFill({ symbol: target.symbol, side, filledQuantity: fill.filledQuantity, avgPrice: fill.avgPrice });
+                }
+                catch (e) {
+                    this.logger.warn('AI 市价单执行失败: ' + (e && e.message ? e.message : e));
+                }
             }
         }
     }
@@ -1065,6 +1098,8 @@ let MarketDataService = class MarketDataService {
             marketRegime: this.marketRegime,
             factors: { ...this.factors },
             hotTopics: [...this.hotTopics],
+            // P1: 本市场实时开市状态（含节假日历判断），供前端休市遮罩/下单禁用使用
+            isTradingTime: constants_1.isTradingTimeFor(this.market),
         };
     }
     applyFactorImpulse(factor, impact) {

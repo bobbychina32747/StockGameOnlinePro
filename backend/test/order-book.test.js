@@ -123,4 +123,37 @@ describe('TradingEngineService 真实订单簿（P0）', () => {
       expect(engine.realBooks.get('T1').asks.length).toBe(0);
     });
   });
+
+  describe('P2 AI 虚拟订单流', () => {
+    test('虚拟挂单进入盘口，AI 市价单吃掉虚拟深度（无账户不结算）', () => {
+      engine.placeVirtualOrder('T1', 'sell', 10.0, 100, 999999);
+      const fill = engine.executeVirtualMarketOrder('T1', 'buy', 60);
+      expect(fill.filledQuantity).toBe(60);
+      expect(fill.counterFills[0]).toMatchObject({ orderId: null, price: 10.0, qty: 60 });
+      expect(engine.realBooks.get('T1').asks[0].qty).toBe(40);
+    });
+
+    test('AI 市价单不吃合成深度（无真实挂单时返回 null）', () => {
+      const fill = engine.executeVirtualMarketOrder('T1', 'buy', 60);
+      expect(fill).toBeNull();
+    });
+
+    test('TTL 到期的虚拟挂单被清理，真实挂单保留', () => {
+      engine.placeVirtualOrder('T1', 'sell', 10.0, 100, 10);
+      engine.placeRestingOrder('T1', 'o1', 'A1', 'sell', 10.1, 50);
+      engine.pruneExpiredVirtualOrders(10);
+      const book = engine.realBooks.get('T1');
+      expect(book.asks.length).toBe(1);
+      expect(book.asks[0].orderId).toBe('o1');
+    });
+
+    test('用户市价单可吃掉 AI 虚拟深度，counterFills 含虚拟单（结算时跳过）', () => {
+      engine.placeVirtualOrder('T1', 'sell', 10.0, 80, 999999);
+      const fill = engine.executeMarketOrder('T1', 'buy', 50, 'BUYER');
+      expect(fill.filledQuantity).toBe(50);
+      expect(fill.counterFills.length).toBe(1);
+      expect(fill.counterFills[0].orderId).toBeNull();
+      expect(fill.avgPrice).toBeCloseTo(10.0, 4);
+    });
+  });
 });

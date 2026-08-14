@@ -234,6 +234,42 @@ export function isTradingTimeNow() {
     return (minutes >= 570 && minutes < 690) || (minutes >= 780 && minutes < 900);
 }
 
+// P1 各市场独立交易时段与节假日历（分钟制；weekdays 0=周日..6=周六；sessions 为 [开始分钟, 结束分钟) 区间）
+// 说明：美股时段按中国本地时间（21:30-24:00 + 00:00-04:00）；节假日为近似清单，可用真实交易日历替换
+export const MARKET_SESSIONS = {
+    CN: {
+        weekdays: [1, 2, 3, 4, 5],
+        sessions: [[570, 690], [780, 900]],
+        holidays: ['2026-01-01', '2026-01-02', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-04-06', '2026-05-01', '2026-05-04', '2026-05-05', '2026-06-19', '2026-09-25', '2026-10-01', '2026-10-02', '2026-10-05', '2026-10-06', '2026-10-07'],
+    },
+    HK: {
+        weekdays: [1, 2, 3, 4, 5],
+        sessions: [[570, 720], [780, 960]],
+        holidays: ['2026-01-01', '2026-02-16', '2026-02-17', '2026-02-18', '2026-04-03', '2026-04-06', '2026-05-01', '2026-06-19', '2026-07-01', '2026-10-01', '2026-12-25'],
+    },
+    US: {
+        weekdays: [1, 2, 3, 4, 5],
+        sessions: [[1290, 1440], [0, 240]],
+        holidays: ['2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25', '2026-06-19', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25'],
+    },
+};
+// P1: 按市场判断是否处于交易时段（mode: CN/HK/US；缺省 CN 保持向后兼容）
+export function isTradingTimeFor(mode, now?) {
+    const cfg = MARKET_SESSIONS[mode] || MARKET_SESSIONS.CN;
+    const d = now || new Date();
+    if (!cfg.weekdays.includes(d.getDay()))
+        return false;
+    const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    if (cfg.holidays.includes(dateStr))
+        return false;
+    const minutes = d.getHours() * 60 + d.getMinutes();
+    for (const s of cfg.sessions) {
+        if (minutes >= s[0] && minutes < s[1])
+            return true;
+    }
+    return false;
+}
+
 // B1 行业传导矩阵：行业间联动（源 → 目标: 关联度 0~1），每 5 tick 按动量传导
 export const INDUSTRY_LINKS: Record<string, Record<string, number>> = {
     半导体: { 人工智能: 0.5, 软件: 0.4, 消费电子: 0.4 },

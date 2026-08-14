@@ -26,6 +26,8 @@ import news_service_1 = require("./news.service");
 
 import config_1 = require("@nestjs/config");
 
+import constants_1 = require("../../common/constants");
+
 let MarketService = class MarketService {
     [key: string]: any;
     constructor(marketData, engine, gateway, newsService, riskManager, marketDataHK, marketDataUS, debugMode, config) {
@@ -59,9 +61,9 @@ let MarketService = class MarketService {
         const afternoon = minutes >= 13 * 60 && minutes < 15 * 60;
         return morning || afternoon;
     }
-    // S2 市场是否开市（供下单校验）
-    isMarketOpen() {
-        return this.isTradingTime();
+    // S2 市场是否开市（供下单校验）；P1 支持按市场判断独立时段
+    isMarketOpen(mode) {
+        return (0, constants_1.isTradingTimeFor)(mode || 'CN');
     }
     async onModuleInit() {
         await this.marketData.init();
@@ -98,7 +100,11 @@ let MarketService = class MarketService {
     async processMarket(market, marketData, counterKey) {
         let advanceCounter = false;
         try {
-            const ticks = marketData.generateTick();
+            // P1: 各市场独立时段——非本市场交易时段（且非调试模式）直接跳过，不生成行情
+            if (!this.debugMode.get() && !(0, constants_1.isTradingTimeFor)(market)) {
+                return;
+            }
+            const ticks = await marketData.generateTick();
             if (ticks.length === 0) return;
             advanceCounter = true;
             const prices = {};
@@ -216,11 +222,8 @@ let MarketService = class MarketService {
             if (this.processing) return;
             this.processing = true;
             try {
-                // S2 交易时段同步：休市不生成行情
-                if (!this.debugMode.get() && !this.isTradingTime()) {
-                    return;
-                }
-                // 三服务器：轮流处理 CN/HK/US（各自独立 gameDay/因子/事件）
+                // P1: 全局不再统一门控，由 processMarket 按各市场独立时段判断
+                // 三服务器：轮流处理 CN/HK/US（各自独立 gameDay/因子/事件/时段）
                 await this.processMarket('CN', this.marketData, 'tickCounter');
                 await this.processMarket('HK', this.marketDataHK, 'tickCounterHK');
                 await this.processMarket('US', this.marketDataUS, 'tickCounterUS');
