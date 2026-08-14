@@ -158,7 +158,6 @@ AccountService = __decorate(
     __param(0, (0, typeorm_1.InjectRepository)(account_entity_1.Account)),
     __param(1, (0, typeorm_1.InjectRepository)(position_entity_1.Position)),
     __param(2, (0, typeorm_1.InjectRepository)(transaction_entity_1.Transaction)),
-    __param(4, trading_engine_service_1.TradingEngineService),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,

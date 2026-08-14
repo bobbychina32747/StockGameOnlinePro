@@ -122,7 +122,6 @@ FundService = __decorate(
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(account_entity_1.Account)),
     __param(1, (0, typeorm_1.InjectRepository)(fund_holding_entity_1.FundHolding)),
-    __param(2, trading_engine_service_1.TradingEngineService),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,
         trading_engine_service_1.TradingEngineService])

@@ -408,7 +408,6 @@ MarketService = __decorate(
     __param(4, (0, common_1.Optional)()),
     __param(5, (0, common_1.Inject)('MarketDataHK')),
     __param(6, (0, common_1.Inject)('MarketDataUS')),
-    __param(8, config_1.ConfigService),
     __metadata("design:paramtypes", [market_data_service_1.MarketDataService,
         trading_engine_service_1.TradingEngineService,
         market_gateway_1.MarketGateway,
