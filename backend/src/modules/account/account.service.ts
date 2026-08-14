@@ -135,6 +135,42 @@ let AccountService = class AccountService {
             return { success: true, account };
         });
     }
+    // P3 跨市场资金划转：按汇率折算（CN/HK/US → 人民币 → 目标币种），收 0.1% 手续费
+    async transferCash(userId, fromMode, toMode, amount) {
+        const amt = Number(amount);
+        if (!Number.isFinite(amt) || amt <= 0) {
+            return { success: false, error: '划转金额必须为大于0的数字' };
+        }
+        if (!fromMode || !toMode || fromMode === toMode) {
+            return { success: false, error: '划转市场必须不同（CN/HK/US）' };
+        }
+        const fromRate = constants_1.FX_CNY_PER_UNIT[fromMode];
+        const toRate = constants_1.FX_CNY_PER_UNIT[toMode];
+        if (!fromRate || !toRate) {
+            return { success: false, error: '不支持的市场' };
+        }
+        if (!this.engine) {
+            return { success: false, error: '交易引擎不可用' };
+        }
+        return this.engine.runExclusive(async () => {
+            const from = await this.accountRepo.findOne({ where: { userId, marketMode: fromMode } });
+            if (!from)
+                return { success: false, error: '转出账户不存在' };
+            if (Number(from.cash) < amt)
+                return { success: false, error: '转出账户余额不足' };
+            const to = await this.accountRepo.findOne({ where: { userId, marketMode: toMode } });
+            if (!to)
+                return { success: false, error: '转入账户不存在' };
+            const cnyValue = amt * fromRate;
+            const received = (cnyValue / toRate) * (1 - constants_1.FX_TRANSFER_FEE_RATE);
+            from.cash = Math.round((Number(from.cash) - amt) * 100) / 100;
+            to.cash = Math.round((Number(to.cash) + received) * 100) / 100;
+            await this.accountRepo.save(from);
+            await this.accountRepo.save(to);
+            this.logger.log('跨市场划转 ' + userId + ': ' + fromMode + ' -' + amt.toFixed(2) + ' → ' + toMode + ' +' + received.toFixed(2) + '（手续费 ' + (constants_1.FX_TRANSFER_FEE_RATE * 100).toFixed(1) + '%）');
+            return { success: true, received: Number(received.toFixed(2)) };
+        });
+    }
     getModeInfo(mode) {
         const isCN = mode === 'CN';
         return {

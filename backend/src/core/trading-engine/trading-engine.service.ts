@@ -655,7 +655,8 @@ let TradingEngineService = class TradingEngineService {
             }
         }
         if (order.side === order_entity_1.OrderSide.SHORT) {
-            const margin = remainingQty * (order.price || currentPrice) * constants_1.RISK.marginShortRate;
+            // P3: 做空保证金率按个股折算（0.50~0.65）
+            const margin = remainingQty * (order.price || currentPrice) * (0, constants_1.shortMarginRateFor)(order.symbol);
             if (account.cash < margin) {
                 return { valid: false, error: `保证金不足，需要 ${margin.toFixed(2)}` };
             }
@@ -762,14 +763,14 @@ let TradingEngineService = class TradingEngineService {
             }
         }
         if (side === order_entity_1.OrderSide.SHORT) {
-            const margin = totalCost * constants_1.RISK.marginShortRate;
+            const margin = totalCost * (0, constants_1.shortMarginRateFor)(symbol);
             if (Number(account.cash) < margin) {
                 return { success: false, error: `保证金不足，需要 ${margin.toFixed(2)}` };
             }
         }
         if (side === order_entity_1.OrderSide.SHORT) {
-            // 卖出得现金，冻结 50% 保证金
-            const collateral = totalCost * constants_1.RISK.marginShortRate;
+            // 卖出得现金，冻结保证金（按个股折算率）
+            const collateral = totalCost * (0, constants_1.shortMarginRateFor)(symbol);
             account.cash = Number(account.cash) + totalCost - fees.totalFees - collateral;
             account.shortCollateral = Number(account.shortCollateral || 0) + collateral;
         } else if (side === order_entity_1.OrderSide.COVER) {
@@ -979,20 +980,23 @@ let TradingEngineService = class TradingEngineService {
             totalEquity += pos.longQty * price - pos.shortQty * price;
             // 多仓借入资金 = 持仓市值 × (1 - 1/杠杆倍数)
             totalBorrowed += pos.longQty * price * (1 - 1 / Number(account.leverage || 1));
-            // 做空保证金要求 = 做空市值 × 保证金率
-            totalBorrowed += pos.shortQty * price * constants_1.RISK.marginShortRate;
+            // 做空保证金要求 = 做空市值 × 个股保证金率
+            totalBorrowed += pos.shortQty * price * (0, constants_1.shortMarginRateFor)(pos.symbol);
         }
         // 无借入资金 = 安全
         if (totalBorrowed <= 0) {
             return { safe: true, action: 'ok', marginLevel: 999 };
         }
-        // 保证金率 = 总权益 / 借入资金
+        // 保证金率 = 总权益 / 借入资金；P3 三级阈值：<120% 强平全仓 / <130% 追保(部分平仓) / <140% 预警
         const marginLevel = totalEquity / totalBorrowed;
-        if (marginLevel < constants_1.RISK.forceLiquidationLevel) {
+        if (marginLevel < constants_1.RISK.marginLiquidateLevel) {
             return { safe: false, action: 'liquidate', marginLevel };
         }
-        if (marginLevel < constants_1.RISK.maintenanceMargin) {
+        if (marginLevel < constants_1.RISK.marginCallLevel) {
             return { safe: false, action: 'margin_call', marginLevel };
+        }
+        if (marginLevel < constants_1.RISK.marginWarningLevel) {
+            return { safe: true, action: 'warning', marginLevel };
         }
         return { safe: true, action: 'ok', marginLevel };
     }
@@ -1039,6 +1043,73 @@ let TradingEngineService = class TradingEngineService {
             return null;
         }
     }
+    // P3 部分强平（追保）：按市值从大到小每次卖出/回补持仓一半，直到保证金率恢复到目标水平
+    async forceLiquidateToTarget(account, targetLevel) {
+        const positions = await this.positionRepo.find({ where: { accountId: account.id } });
+        const priceOf = (symbol) => {
+            const p = this.prices.get(symbol);
+            return p === undefined || p === null ? null : p;
+        };
+        const evalMargin = () => {
+            let equity = Number(account.cash) + Number(account.shortCollateral || 0);
+            let borrowed = 0;
+            for (const pos of positions) {
+                const price = priceOf(pos.symbol);
+                if (price === null)
+                    continue;
+                equity += pos.longQty * price - pos.shortQty * price;
+                borrowed += pos.longQty * price * (1 - 1 / Number(account.leverage || 1));
+                borrowed += pos.shortQty * price * (0, constants_1.shortMarginRateFor)(pos.symbol);
+            }
+            return borrowed > 0 ? equity / borrowed : 999;
+        };
+        let netCash = 0;
+        const sorted = positions.slice().sort((a, b) => {
+            const pa = priceOf(a.symbol) ?? 0;
+            const pb = priceOf(b.symbol) ?? 0;
+            return (b.longQty * pb + b.shortQty * pb) - (a.longQty * pa + a.shortQty * pa);
+        });
+        let releasedCollateral = 0;
+        for (const pos of sorted) {
+            if (evalMargin() >= targetLevel)
+                break;
+            if (pos.longQty > 0) {
+                const qty = Math.ceil(Number(pos.longQty) * 0.5);
+                const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.SELL, qty);
+                if (fill) {
+                    const fees = this.calcFees(order_entity_1.OrderSide.SELL, fill.totalCost, fill.filledQuantity, account.marketMode).totalFees;
+                    netCash += fill.totalCost - fees;
+                    pos.longQty = Number(pos.longQty) - fill.filledQuantity;
+                    if (pos.longQty <= 0) {
+                        pos.longQty = 0;
+                        pos.longCost = 0;
+                    }
+                }
+            }
+            if (pos.shortQty > 0) {
+                const before = Number(pos.shortQty);
+                const qty = Math.ceil(before * 0.5);
+                const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.COVER, qty);
+                if (fill) {
+                    const fees = this.calcFees(order_entity_1.OrderSide.COVER, fill.totalCost, fill.filledQuantity, account.marketMode).totalFees;
+                    const released = Number(account.shortCollateral || 0) * (fill.filledQuantity / before);
+                    releasedCollateral += released;
+                    account.shortCollateral = Number(account.shortCollateral || 0) - released;
+                    netCash += released - fill.totalCost - fees;
+                    pos.shortQty = Number(pos.shortQty) - fill.filledQuantity;
+                    if (pos.shortQty <= 0) {
+                        pos.shortQty = 0;
+                        pos.shortCost = 0;
+                    }
+                }
+            }
+            await this.positionRepo.save(pos);
+        }
+        account.cash = Math.round((Number(account.cash) + netCash) * 100) / 100;
+        await this.accountRepo.save(account);
+        this.logger.warn('账户 ' + account.id + ' 追保部分平仓，现金净变动 ' + netCash.toFixed(2) + '，归还保证金 ' + releasedCollateral.toFixed(2) + '，当前保证金率 ' + evalMargin().toFixed(4));
+        return netCash;
+    }
     async forceLiquidateMarginalAccounts() {
         const accounts = await this.accountRepo.find();
         const priceObj = {};
@@ -1053,6 +1124,12 @@ let TradingEngineService = class TradingEngineService {
                     await this.forceLiquidate(account);
                     liquidated.push({ accountId: account.id, marginLevel: Number(margin.marginLevel.toFixed(4)) });
                     this.logger.warn(`账户 ${account.id} 爆仓强平，保证金率 ${margin.marginLevel.toFixed(4)}`);
+                }
+                else if (margin.action === 'margin_call') {
+                    // P3 追保：部分平仓恢复保证金率到目标水平
+                    await this.forceLiquidateToTarget(account, constants_1.RISK.marginCallTarget);
+                    liquidated.push({ accountId: account.id, marginLevel: Number(margin.marginLevel.toFixed(4)) });
+                    this.logger.warn(`账户 ${account.id} 触发追保，部分平仓至保证金率 ${constants_1.RISK.marginCallTarget}`);
                 }
             }
             catch (e) {

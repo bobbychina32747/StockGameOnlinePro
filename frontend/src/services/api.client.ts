@@ -52,6 +52,8 @@ export const accountApi = {
     api.post(`/account/leverage?mode=${mode}`, { leverage }).then((r) => r.data),
   reset: (mode: string, preset: string) =>
     api.post(`/account/reset?mode=${mode}`, { preset }).then((r) => r.data),
+  transfer: (fromMode: string, toMode: string, amount: number) =>
+    api.post(`/account/transfer?fromMode=${fromMode}&toMode=${toMode}`, { amount }).then((r) => r.data),
 };
 
 // ─── Trading (所有接口接受 mode 参数) ───

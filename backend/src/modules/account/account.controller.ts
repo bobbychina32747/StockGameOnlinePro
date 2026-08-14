@@ -46,6 +46,9 @@ let AccountController = class AccountController {
     async resetAccount(user, mode, preset) {
         return this.accountService.resetAccount(user.id, mode || 'US', preset);
     }
+    async transfer(user, fromMode, toMode, amount) {
+        return this.accountService.transferCash(user.id, fromMode, toMode, amount);
+    }
 };
 __decorate([
     (0, common_1.Get)(),
@@ -89,6 +92,16 @@ __decorate([
     __metadata("design:paramtypes", [user_entity_1.User, String, Number]),
     __metadata("design:returntype", Promise)
 ], AccountController.prototype, "setLeverage", null);
+__decorate([
+    (0, common_1.Post)('transfer'),
+    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)('fromMode')),
+    __param(2, (0, common_1.Query)('toMode')),
+    __param(3, (0, common_1.Body)('amount')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [user_entity_1.User, String, String, Number]),
+    __metadata("design:returntype", Promise)
+], AccountController.prototype, "transfer", null);
 __decorate([
     (0, common_1.Get)('reviews'),
     __param(0, (0, jwt_auth_guard_1.CurrentUser)()),

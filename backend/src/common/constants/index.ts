@@ -137,7 +137,25 @@ export const RISK = {
     marginInterestRate: 0.0002,
     initialCash: 100000,
     maxLeverage: 3,
+    // P3 两融细化：维持担保比例三级阈值（保证金率=总权益/借入资金）
+    marginWarningLevel: 1.4,
+    marginCallLevel: 1.3,
+    marginLiquidateLevel: 1.2,
+    marginCallTarget: 1.5,
 };
+
+// P3 个股折算率/保证金率：按股票代码稳定哈希在区间内取值（做空保证金率 0.5~0.65）
+export function shortMarginRateFor(symbol) {
+    let h = 0;
+    const s = String(symbol || '');
+    for (let i = 0; i < s.length; i++)
+        h = (h * 31 + s.charCodeAt(i)) % 100000;
+    return Number((0.5 + (h % 16) / 100).toFixed(2)); // 0.50 ~ 0.65
+}
+
+// P3 跨市场汇率（1 单位本币折合人民币）：CN=1，HK≈0.92，US≈7.12；划转手续费 0.1%
+export const FX_CNY_PER_UNIT = { CN: 1, HK: 0.92, US: 7.12 };
+export const FX_TRANSFER_FEE_RATE = 0.001;
 
 export const MARKET_STATES = ['bull', 'bear', 'sideways'];
 

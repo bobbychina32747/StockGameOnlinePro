@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { accountApi } from '../../services/api.client';
 import { useAccountStore, useMarketStore, useUIStore } from '../../store';
 import { CollapsibleCard } from './CollapsibleCard';
@@ -33,6 +33,34 @@ export function AccountPanel() {
     await accountApi.reset(mode, preset);
     await fetchAccount(mode);
     addNotification(`已重置为${preset}`, 'success');
+  };
+
+  // P3 跨市场划转：汇率折算 + 0.1% 手续费（服务端计算）
+  const [txFrom, setTxFrom] = useState('CN');
+  const [txTo, setTxTo] = useState('US');
+  const [txAmount, setTxAmount] = useState('');
+  const [txSubmitting, setTxSubmitting] = useState(false);
+  const doTransfer = async () => {
+    const amt = parseFloat(txAmount);
+    if (!(amt > 0)) {
+      addNotification('请输入大于 0 的划转金额', 'error');
+      return;
+    }
+    setTxSubmitting(true);
+    try {
+      const res = await accountApi.transfer(txFrom, txTo, amt);
+      if (res && res.success) {
+        addNotification(`划转成功：${txFrom} → ${txTo}，到账 ${Number(res.received).toLocaleString()}`, 'success');
+        setTxAmount('');
+        await fetchAccount(mode);
+      } else {
+        addNotification(`划转失败：${(res && res.error) || '未知错误'}`, 'error');
+      }
+    } catch (e: any) {
+      addNotification(`划转失败：${e?.response?.data?.message || '网络错误'}`, 'error');
+    } finally {
+      setTxSubmitting(false);
+    }
   };
 
   const holdValue = (positions as any[]).reduce((sum: number, p: any) =>
@@ -100,6 +128,35 @@ export function AccountPanel() {
     </CollapsibleCard>
 
       {/* 持仓明细（Q10：当日盈亏 + 多空浮盈 + 盈亏排行） */}
+      <CollapsibleCard title="🌐 跨市场划转（汇率折算·手续费0.1%）">
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          <select className="input" style={{ width: 70 }} value={txFrom} onChange={(e) => setTxFrom(e.target.value)}>
+            <option value="CN">A股¥</option>
+            <option value="HK">港股HK$</option>
+            <option value="US">美股$</option>
+          </select>
+          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>→</span>
+          <select className="input" style={{ width: 70 }} value={txTo} onChange={(e) => setTxTo(e.target.value)}>
+            <option value="CN">A股¥</option>
+            <option value="HK">港股HK$</option>
+            <option value="US">美股$</option>
+          </select>
+          <input
+            className="input"
+            style={{ width: 90 }}
+            placeholder="金额"
+            value={txAmount}
+            onChange={(e) => setTxAmount(e.target.value)}
+          />
+          <button className="btn btn-sm btn-primary" disabled={txSubmitting} onClick={doTransfer}>
+            {txSubmitting ? '划转中...' : '划转'}
+          </button>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+          汇率（折人民币）：CN=1 / HK≈0.92 / US≈7.12，服务端按此折算并收取 0.1% 手续费
+        </div>
+      </CollapsibleCard>
+
       <CollapsibleCard title="📊 持仓明细">
         {(positions as any[]).length === 0 ? (
           <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '8px 0' }}>暂无持仓</div>
