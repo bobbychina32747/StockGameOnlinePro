@@ -5,8 +5,8 @@
  * 演示：独立 AI/脚本如何完全通过 REST API 获取行情并下单
  *
  * 运行：node backend/scripts/quant-bot.js [username] [password] [mode]
- * 默认：Bobbychina / ThisIsTheBestProjectEver / US
- * 注意：这是教学示例，不构成投资建议；真实策略请先做回测。
+ * 参数：username 默认 Bobbychina，password 必填（环境变量 API_PASSWORD 或命令行第2参数），mode 默认 US
+ * 注意：这是教学示例，不构成投资建议；真实策略请先做回测。请勿在文档/脚本中存放真实口令。
  */
 const http = require('http');
 const BASE = process.env.API_BASE || 'http://localhost:8000/api';

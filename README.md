@@ -145,6 +145,10 @@ docs/
 
 **✅ 计划事项全部完成，功能完备。**
 
+### 🎯 真实性差距与路线图
+
+对照真实交易终端（同花顺级别）的差距清单与优先级路线，详见 **[docs/REALISM.md](docs/REALISM.md)**。
+
 ### 🚀 未来方向（规划中）
 
 - [ ] 接入真实行情源（模拟 → 真实数据可选）
@@ -157,9 +161,10 @@ docs/
 
 ### 🔐 部署安全提示
 
-- **JWT_SECRET**：生产环境必须在 `backend/.env` 配置强密钥（弱密钥会被启动校验拒绝，见 `jwt.strategy.ts`）
-- **默认账号**：管理员密码由 `ADMIN_PASSWORD` 环境变量决定；生产环境未设置强密码时后端**拒绝创建**默认管理员，部署公网前请务必配置
-- **数据库**：`backend/data/*.db` 为本地模拟数据，请勿提交到版本控制（已 gitignore）
+- **JWT_SECRET**：必须在 `backend/.env` 配置强密钥（弱密钥会被启动校验拒绝，见 `jwt.strategy.ts`）
+- **默认账号**：管理员密码由 `ADMIN_PASSWORD` 环境变量决定；仅开发环境（NODE_ENV=development）未设置时回退 `admin123`，其余环境未设置强密码（≥8 位）时后端**拒绝创建**默认管理员；`backend/src/infrastructure/database/seed.ts` 的演示账号（demo）同理，部署公网前务必配置
+- **WebSocket**：/market 网关强制 JWT 认证（握手 `auth.token`），未认证连接立即断开
+- **数据库**：`backend/data/*.db` 为本地模拟数据，请勿提交到版本控制（已 gitignore）；持久化采用定时导出+原子替换（默认 60s），强杀进程最多丢失约一分钟数据
 
 ---
 

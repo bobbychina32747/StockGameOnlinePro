@@ -39,6 +39,9 @@ let AdminController = class AdminController {
     async toggleUser(admin, userId, isActive) {
         if (admin.role !== user_entity_1.UserRole.ADMIN)
             throw new common_1.ForbiddenException('无权限');
+        // SECURITY(E): 禁止管理员禁用自己（避免失去管理入口）
+        if (isActive === false && userId === admin.id)
+            throw new common_1.BadRequestException('不能禁用当前登录的管理员账号');
         await this.adminService.setUserActive(userId, isActive);
         return { success: true };
     }
@@ -46,7 +49,15 @@ let AdminController = class AdminController {
     async setDebug(user, on) {
         if (user.role !== user_entity_1.UserRole.ADMIN)
             throw new common_1.ForbiddenException('无权限');
-        this.debugMode.set(on === true);
+        // SECURITY(D): 调试模式只对开启它的管理员生效（bypassUserIds 白名单），关闭时清空白名单并复位全局开关
+        if (on === true) {
+            this.debugMode.set(true);
+            this.debugMode.addBypassUser(user.id);
+        }
+        else {
+            this.debugMode.clearBypassUsers();
+            this.debugMode.set(false);
+        }
         return { success: true, debug: this.debugMode.get() };
     }
     async getDebug(user) {
@@ -75,7 +86,7 @@ __decorate([
     (0, common_1.Post)('users/:id/toggle'),
     __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
     __param(1, (0, common_1.Param)('id')),
-    __param(2, (0, common_1.Body)('isActive')),
+    __param(2, (0, common_1.Body)('isActive', common_1.ParseBoolPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [user_entity_1.User, String, Boolean]),
     __metadata("design:returntype", Promise)

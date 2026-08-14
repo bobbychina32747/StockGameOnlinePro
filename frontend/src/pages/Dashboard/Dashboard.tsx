@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { marketApi } from '../../services/api.client';
-import { useWebSocket } from '../../hooks/useWebSocket';
 import { useMarketStore, useUIStore } from '../../store';
 import { StockListPanel } from '../../components/Trading/StockListPanel';
 import { ChartPanel } from '../../components/Trading/ChartPanel';
@@ -13,14 +12,12 @@ import { TutorialOverlay } from '../../components/Tutorial/TutorialOverlay';
 
 // 主交易页（同花顺式三栏布局：股票列表 | 图表 | 盘口/账户/下单，两侧可拖拽调宽）
 export default function Dashboard() {
-  // 初始化 WebSocket（tick/成交/新闻推送）
-  useWebSocket();
-
   const selectedSymbol = useUIStore((s) => s.selectedSymbol);
   const selectedTimeframe = useUIStore((s) => s.selectedTimeframe);
   const setKlines = useMarketStore((s) => s.setKlines);
   const setOrderBook = useMarketStore((s) => s.setOrderBook);
   const setStocks = useMarketStore((s) => s.setStocks);
+  const setPrices = useMarketStore((s) => s.setPrices);
   const stocks = useMarketStore((s) => s.stocks);
   const setDetailSymbol = useUIStore((s) => s.setDetailSymbol);
   const setSelectedSymbol = useUIStore((s) => s.setSelectedSymbol);
@@ -65,13 +62,17 @@ export default function Dashboard() {
       const connected = socket?.connected ?? false;
       setWsConnected(connected);
       if (!connected) {
+        // 断线兜底：价格映射与 K 线一起拉，避免列表/盘口价格冻结
+        marketApi.prices().then((p) => {
+          if (p && typeof p === 'object') setPrices(p);
+        }).catch(() => {});
         marketApi.klines(selectedSymbol, selectedTimeframe).then((k) =>
           setKlines(selectedSymbol, selectedTimeframe, k)
         ).catch(() => {});
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [selectedSymbol, selectedTimeframe, setKlines]);
+  }, [selectedSymbol, selectedTimeframe, setKlines, setPrices]);
 
   // ─── S5 快捷键：数字选股 / T 切周期 / 上下键换股 / Enter 详情 ───
   useEffect(() => {
@@ -117,6 +118,9 @@ export default function Dashboard() {
   const [leftWidth, setLeftWidth] = useState(() => Number(localStorage.getItem('ss.leftW')) || 230);
   const [rightWidth, setRightWidth] = useState(() => Number(localStorage.getItem('ss.rightW')) || 330);
   const dragRef = useRef<{ side: 'left' | 'right'; startX: number; startW: number } | null>(null);
+  // 用 ref 保存最新宽度：onUp 闭包创建于挂载时，读 state 会拿到过期值
+  const leftWidthRef = useRef(leftWidth);
+  const rightWidthRef = useRef(rightWidth);
 
   const startDrag = (e: React.MouseEvent, side: 'left' | 'right') => {
     e.preventDefault();
@@ -131,14 +135,18 @@ export default function Dashboard() {
       if (!d) return;
       const dx = e.clientX - d.startX;
       if (d.side === 'left') {
-        setLeftWidth(Math.min(360, Math.max(150, d.startW + dx)));
+        const w = Math.min(360, Math.max(150, d.startW + dx));
+        setLeftWidth(w);
+        leftWidthRef.current = w;
       } else {
-        setRightWidth(Math.min(480, Math.max(250, d.startW - dx)));
+        const w = Math.min(480, Math.max(250, d.startW - dx));
+        setRightWidth(w);
+        rightWidthRef.current = w;
       }
     };
     const onUp = () => {
       if (dragRef.current) {
-        const w = dragRef.current.side === 'left' ? leftWidth : rightWidth;
+        const w = dragRef.current.side === 'left' ? leftWidthRef.current : rightWidthRef.current;
         localStorage.setItem(dragRef.current.side === 'left' ? 'ss.leftW' : 'ss.rightW', String(w));
       }
       dragRef.current = null;

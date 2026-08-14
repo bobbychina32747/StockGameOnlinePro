@@ -1,6 +1,15 @@
 import { create } from 'zustand';
 import api from '../services/api.client';
 
+// localStorage 安全解析：数据损坏时回退默认值，避免整站崩溃
+function safeParse<T>(raw: string | null, fallback: T): T {
+  try {
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 // ─── 用户/认证 Store ───
 interface AuthState {
   token: string | null;
@@ -11,7 +20,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
   token: localStorage.getItem('token'),
-  user: JSON.parse(localStorage.getItem('user') || 'null'),
+  user: safeParse<AuthState['user']>(localStorage.getItem('user'), null),
   setAuth: (token, user) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
@@ -21,6 +30,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     set({ token: null, user: null });
+    // 登出时重置账户/行情缓存，避免数据残留到下一个登录用户
+    useAccountStore.setState({ account: null, positions: [] });
+    useMarketStore.setState({ prices: {}, ticks: [], klines: {}, orderBook: {} });
   },
 }));
 
@@ -57,7 +69,15 @@ export const useMarketStore = create<MarketState>((set) => ({
   stocks: [],
   setStocks: (stocks) => set({ stocks }),
   setPrices: (prices) => set({ prices }),
-  addTick: (tick) =>
+  addTick: (tick) => {
+    // 防御：非法 tick（NaN/负数/异常大 timestamp）直接忽略，避免 Date 计算抛错
+    if (
+      typeof tick?.symbol !== 'string' ||
+      typeof tick?.price !== 'number' || !isFinite(tick.price) ||
+      typeof tick?.volume !== 'number' || !isFinite(tick.volume) ||
+      typeof tick?.timestamp !== 'number' || !isFinite(tick.timestamp) ||
+      tick.timestamp < 0 || tick.timestamp > 1e9
+    ) return;
     set((state) => {
       const prices = { ...state.prices, [tick.symbol]: tick.price };
       const ticks = [...state.ticks.slice(-100), tick];
@@ -89,7 +109,8 @@ export const useMarketStore = create<MarketState>((set) => ({
       symKlines['1min'] = arr;
       klines[tick.symbol] = symKlines;
       return { prices, ticks, klines };
-    }),
+    });
+  },
   setKlines: (symbol, tf, data) =>
     set((state) => ({
       klines: {
@@ -202,7 +223,7 @@ export const useUIStore = create<UIState>((set) => ({
   mobileTab: 'list',
   setMobileTab: (t) => set({ mobileTab: t }),
   // Q6 通知中心（localStorage 持久化，cap 50）
-  notices: JSON.parse(localStorage.getItem('ss.notices') || '[]'),
+  notices: safeParse<any[]>(localStorage.getItem('ss.notices'), []),
   addNotice: (item) =>
     set((s) => {
       const notices = [{ id: Date.now() + Math.random(), read: false, time: Date.now(), ...item }, ...s.notices].slice(0, 50);

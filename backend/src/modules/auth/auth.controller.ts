@@ -16,18 +16,34 @@ import class_validator_1 = require("class-validator");
 
 import auth_service_1 = require("./auth.service");
 
-class AuthDto {
+class RegisterDto {
 }
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MinLength)(2),
+    (0, class_validator_1.MaxLength)(50),
     __metadata("design:type", String)
-], AuthDto.prototype, "username", void 0);
+], RegisterDto.prototype, "username", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MinLength)(4),
+    (0, class_validator_1.MinLength)(8),
+    (0, class_validator_1.MaxLength)(72),
     __metadata("design:type", String)
-], AuthDto.prototype, "password", void 0);
+], RegisterDto.prototype, "password", void 0);
+class LoginDto {
+}
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MinLength)(2),
+    (0, class_validator_1.MaxLength)(50),
+    __metadata("design:type", String)
+], LoginDto.prototype, "username", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    // 登录仅要求非空：避免历史弱密码用户被锁死在登录外（注册侧已有 >=8 位强校验）
+    (0, class_validator_1.MinLength)(1),
+    __metadata("design:type", String)
+], LoginDto.prototype, "password", void 0);
 let AuthController = class AuthController {
     [key: string]: any;
     constructor(authService) {
@@ -44,7 +60,7 @@ __decorate([
     (0, common_1.Post)('register'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [AuthDto]),
+    __metadata("design:paramtypes", [RegisterDto]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "register", null);
 __decorate([
@@ -52,7 +68,7 @@ __decorate([
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [AuthDto]),
+    __metadata("design:paramtypes", [LoginDto]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "login", null);
 

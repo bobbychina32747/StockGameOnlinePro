@@ -40,7 +40,8 @@ AuthModule = __decorate(
                 imports: [config_1.ConfigModule],
                 inject: [config_1.ConfigService],
                 useFactory: (config) => ({
-                    secret: config.get('JWT_SECRET', 'dev-secret'),
+                    // SECURITY(I): 去掉默认 secret 回退；JWT_SECRET 缺失/过弱由 jwt.strategy 启动强校验兜底
+                    secret: config.get('JWT_SECRET'),
                     signOptions: { expiresIn: config.get('JWT_EXPIRES_IN', '24h') },
                 }),
             }),

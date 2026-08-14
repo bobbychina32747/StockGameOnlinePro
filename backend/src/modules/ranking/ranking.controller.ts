@@ -12,6 +12,8 @@ var __param = function (paramIndex, decorator) {
 };
 import common_1 = require("@nestjs/common");
 
+import jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
+
 import ranking_service_1 = require("./ranking.service");
 
 let RankingController = class RankingController {
@@ -38,6 +40,8 @@ export { RankingController };
 RankingController = __decorate(
 [
     (0, common_1.Controller)('ranking'),
+    // SECURITY(F): 排行榜需登录后才能访问（防止未认证访问用户排行数据）
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __metadata("design:paramtypes", [ranking_service_1.RankingService])
 ],
 RankingController

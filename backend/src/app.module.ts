@@ -54,14 +54,20 @@ AppModule = __decorate(
                 useFactory: (config) => {
                     const dbType = config.get('DB_TYPE', 'sqlite');
                     if (dbType === 'postgres') {
+                        const dbPassword = config.get('DB_PASSWORD');
+                        // SECURITY(G): 移除默认密码 stockgame_dev_2024，缺失时直接失败并提示配置
+                        if (!dbPassword) {
+                            throw new Error('postgres 模式必须配置 DB_PASSWORD 环境变量（已移除内置默认密码）');
+                        }
                         return {
                             type: 'postgres',
                             host: config.get('DB_HOST', 'localhost'),
                             port: config.get('DB_PORT', 5432),
                             username: config.get('DB_USERNAME', 'stockgame'),
-                            password: config.get('DB_PASSWORD', 'stockgame_dev_2024'),
+                            password: dbPassword,
                             database: config.get('DB_DATABASE', 'stockgame'),
                             autoLoadEntities: true,
+                            // TODO: 生产环境改用迁移（migrations），禁止长期使用 synchronize: true
                             synchronize: true,
                             logging: config.get('NODE_ENV') === 'development',
                         };
@@ -71,7 +77,8 @@ AppModule = __decorate(
                         location: config.get('SQLITE_PATH', './data/stockgame.db'),
                         autoLoadEntities: true,
                         synchronize: true,
-                        autoSave: true,
+                        // FIX(G): 关闭每次写盘全库序列化（性能），改由 main.ts 定时原子持久化
+                        autoSave: false,
                         logging: false,
                     };
                 },

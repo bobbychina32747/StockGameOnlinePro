@@ -12,9 +12,9 @@
 
 ### POST /auth/login
 ```json
-{ "username": "Bobbychina", "password": "ThisIsTheBestProjectEver" }
+{ "username": "你的用户名", "password": "你的密码" }
 ```
-返回：`{ "token": "..." }`
+返回：`{ "token": "..." }`（自行注册账户后使用，请勿使用任何文档或示例代码中的演示口令）
 
 ---
 
@@ -109,7 +109,19 @@ Body：
 
 ## 4. WebSocket 实时流
 
-地址: `ws://localhost:8000/market`（需 token query 或连接后认证）
+地址: `ws://localhost:8000/market`（命名空间 /market，socket.io 握手路径 /socket.io）
+
+**认证（必填）**：连接时通过 handshake auth 携带 JWT，未认证连接会被服务端立即断开：
+
+```js
+import { io } from 'socket.io-client';
+const socket = io('/market', {
+  transports: ['websocket'],
+  auth: { token: '登录接口返回的 token' },
+});
+```
+
+> 另外：GET /api/ranking（排行榜）同样需要 `Authorization: Bearer <token>`。
 
 事件：
 - `tick`：每 1 秒推送一次行情

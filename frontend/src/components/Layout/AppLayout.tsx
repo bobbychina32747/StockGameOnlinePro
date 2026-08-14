@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore, useMarketStore, useUIStore } from '../../store';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { NotificationContainer } from '../UI/Notification';
 import { MarketIndexBar } from '../Trading/MarketIndexBar';
 import { NoticeCenter } from './NoticeCenter';
 import { SettingsModal } from './SettingsModal';
 export function AppLayout() {
+  // WS 生命周期挂在布局顶层：路由切换不断线（全站只初始化一次）
+  useWebSocket();
+
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const prices = useMarketStore((s) => s.prices);

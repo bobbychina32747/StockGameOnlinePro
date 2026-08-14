@@ -104,10 +104,14 @@ let RiskManagerService = class RiskManagerService {
         account.tierScore = tierScore;
     }
     async dailySettlement(account, day) {
+        // SECURITY: 幂等保护——当日已结算的账户直接跳过（防出错重跑导致重复计息/重复快照）
+        if (Number(account.currentDay) === Number(day)) {
+            return account;
+        }
         const positions = await this.getPositionsValue(account);
         if (positions.marginUsed > 0) {
             const interest = positions.marginUsed * constants_1.RISK.marginInterestRate;
-            account.cash = Number(account.cash) - interest;
+            account.cash = Math.round((Number(account.cash) - interest) * 100) / 100;
         }
         account.totalEquity = Number(account.cash) + positions.holdValue;
         // 复盘：单日大亏损 >10% → 生成教训卡
@@ -155,9 +159,12 @@ let RiskManagerService = class RiskManagerService {
         let holdValue = 0;
         let marginUsed = 0;
         for (const pos of positions) {
-            const price = this.currentPrices[pos.symbol] || 0;
+            const price = this.currentPrices[pos.symbol];
+            if (price === undefined || price === null)
+                continue; // 无报价持仓跳过估值，避免按 0 计
             holdValue += (pos.longQty - pos.shortQty) * price;
-            marginUsed += (pos.longQty * price) / Number(account.leverage || 1);
+            // SECURITY: 保证金公式与引擎一致——借入资金 = 市值 × (1 - 1/杠杆)，杠杆1不借资不付息
+            marginUsed += pos.longQty * price * (1 - 1 / Number(account.leverage || 1));
             marginUsed += pos.shortQty * price * constants_1.RISK.marginShortRate;
         }
         return { holdValue, marginUsed };

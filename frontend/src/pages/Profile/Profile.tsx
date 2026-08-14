@@ -8,6 +8,8 @@ const TIER_ICON: Record<string, string> = { 王者: '🐉', 大师: '👑', 钻�
 
 export default function Profile() {
   const user = useAuthStore((s) => s.user);
+  // B1 多市场：绩效指标跟随当前市场模式
+  const marketMode = useUIStore((s) => s.marketMode);
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [debugOn, setDebugOn] = useState(false);
@@ -44,7 +46,7 @@ export default function Profile() {
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
-        const data = await accountApi.metrics();
+        const data = await accountApi.metrics(marketMode);
         setMetrics(data);
       } catch (e) {
         console.error('获取绩效失败', e);
@@ -53,7 +55,7 @@ export default function Profile() {
       }
     };
     fetchMetrics();
-  }, []);
+  }, [marketMode]);
 
   if (loading) {
     return (

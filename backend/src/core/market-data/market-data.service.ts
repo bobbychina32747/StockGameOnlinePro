@@ -24,6 +24,9 @@ import constants_1 = require("../../common/constants");
 
 import trading_engine_service_1 = require("../trading-engine/trading-engine.service");
 
+// SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
+let klineDedupDone = false;
+
 let MarketDataService = class MarketDataService {
     [key: string]: any;
     constructor(stockRepo, klineRepo, engine, market = 'CN') {
@@ -207,8 +210,26 @@ let MarketDataService = class MarketDataService {
             });
         }
         // S1 历史持久化：若 klines 表已有历史则恢复，否则生成 30 天初始历史并落库
-        const allHistory = await this.klineRepo.find({ order: { time: 'ASC' } });
-        // 三服务器：仅恢复本市场的 K 线（各实例 stocks 只含自己市场）
+        // SECURITY: 启动一次性去重（保留每个 symbol/timeframe/time 中 id 最大的一行），防止旧库重复行继续膨胀
+        if (!klineDedupDone) {
+            klineDedupDone = true;
+            try {
+                const dupCheck = await this.klineRepo.manager.query('SELECT COUNT(*) AS c FROM (SELECT 1 FROM klines GROUP BY symbol, timeframe, time HAVING COUNT(*) > 1)');
+                const dupCount = Number(dupCheck && dupCheck[0] && dupCheck[0].c) || 0;
+                if (dupCount > 0) {
+                    this.logger.warn('检测到 ' + dupCount + ' 组重复 K 线，开始去重（保留每组 id 最大行）...');
+                    await this.klineRepo.manager.query('DELETE FROM klines WHERE id NOT IN (SELECT MAX(id) FROM klines GROUP BY symbol, timeframe, time)');
+                    this.logger.log('K 线历史去重完成');
+                }
+            } catch (e) {
+                this.logger.warn('K 线去重跳过: ' + (e && e.message ? e.message : e));
+            }
+        }
+        // 三服务器：仅加载本市场的 K 线（原实现全表加载×3，277MB 库会产生数 GB 级瞬时内存峰值）
+        const ownSymbols = [...this.stocks.keys()];
+        const allHistory = ownSymbols.length > 0
+            ? await this.klineRepo.find({ where: { symbol: typeorm_2.In(ownSymbols) }, order: { time: 'ASC' } })
+            : [];
         const historyRows = allHistory.filter((r) => this.stocks.has(r.symbol));
         if (historyRows.length > 0) {
             this.restoreFromHistory(historyRows);
@@ -891,7 +912,14 @@ let MarketDataService = class MarketDataService {
         if (batchKlines.length > 0) {
             try {
                 await this.klineRepo.save(batchKlines);
-            } catch (e) { }
+            } catch (e) {
+                this.logger.error('K线落库失败（第1次）: ' + (e && e.message ? e.message : e));
+                try {
+                    await this.klineRepo.save(batchKlines);
+                } catch (e2) {
+                    this.logger.error('K线落库失败（重试仍失败，今日K线可能丢失）: ' + (e2 && e2.message ? e2.message : e2));
+                }
+            }
         }
         this.updateMarketRegime();
         this.decayFactors();
@@ -922,6 +950,16 @@ let MarketDataService = class MarketDataService {
             prices[sym] = state.price;
         }
         return prices;
+    }
+    // SECURITY: 全市场冲击写回引擎内部价格（原夜间事件只改 getPrices 返回副本，下一 tick 被覆盖失效）
+    applyMarketwideShock(pct) {
+        const factor = 1 + Number(pct);
+        for (const st of this.stocks.values()) {
+            st.price = Math.max(0.5, Number(st.price) * factor);
+            st.dayOpen = Math.max(0.5, Number(st.dayOpen) * factor);
+            st.prevClose = Math.max(0.5, Number(st.prevClose) * factor);
+        }
+        this.logger.log('🌙 隔夜事件冲击全市场 ' + (Number(pct) * 100).toFixed(2) + '%（已写回内部价格）');
     }
     // 股票列表：名称/行业/现价/涨跌幅/今开/高低/成交量（用于前端行情列表）
     getStockList() {
@@ -1080,10 +1118,10 @@ let MarketDataService = class MarketDataService {
         return symbol ? (this.reports.get(symbol) || []) : [...this.reports.values()].flat();
     }
     // ─── 玩法：每天开盘刷新（热点/IPO/黑天鹅），由 market.service 在 tickCounter===0 调用 ───
-    startNewDay() {
+    async startNewDay() {
         this.maybeBurstBubble();
         this.refreshHotTopics();
-        const ipo = this.maybeListIPO();
+        const ipo = await this.maybeListIPO();
         const swan = this.maybeBlackSwan();
         this.dayEvents = { ipo, swan };
     }
@@ -1117,7 +1155,7 @@ let MarketDataService = class MarketDataService {
         }
     }
     // IPO：每 30 天上市 1-2 只新股（首日高波动）
-    maybeListIPO() {
+    async maybeListIPO() {
         // 重启后清理已上市的（防止重复上市 UNIQUE 冲突）
         this.ipoQueue = this.ipoQueue.filter((cfg) => cfg && !this.stocks.has(cfg.symbol));
         if (this.ipoQueue.length === 0 || this.gameDay < this.nextIpoDay)
@@ -1129,7 +1167,13 @@ let MarketDataService = class MarketDataService {
             if (!cfg)
                 break;
             const price = Number(cfg.initialPrice);
-            this.createStockInMemory(cfg, price);
+            // SECURITY: 落库失败不能产生 unhandledRejection 崩进程，改为记录并继续
+            try {
+                await this.createStockInMemory(cfg, price);
+            } catch (e) {
+                this.logger.error('IPO 落库失败: ' + cfg.symbol + ' ' + (e && e.message ? e.message : e));
+                continue;
+            }
             // 首日高波动
             const st = this.stocks.get(cfg.symbol);
             if (st)

@@ -40,15 +40,16 @@ let AuthService = class AuthService {
             const existing = await this.userRepo.findOne({ where: { username: adminUsername } });
             if (!existing) {
                 const adminPassword = process.env.ADMIN_PASSWORD;
-                const isProd = process.env.NODE_ENV === 'production';
-                // SECURITY(C2): 生产环境必须设置强管理员密码，否则拒绝创建默认管理员（避免默认后门）
-                if (isProd && (!adminPassword || adminPassword.length < 8)) {
-                    console.error('[Seed] 生产环境未设置强 ADMIN_PASSWORD（>=8位），已拒绝创建默认管理员账号');
+                const isStrong = !!adminPassword && adminPassword.length >= 8;
+                const isDev = process.env.NODE_ENV === 'development';
+                // SECURITY(C2): 仅 development 环境允许回退默认密码；production/staging/未设置等环境必须提供强 ADMIN_PASSWORD（>=8位），否则拒绝创建（避免默认后门）
+                if (!isStrong && !isDev) {
+                    console.error('[Seed] 当前环境（' + (process.env.NODE_ENV || '未设置') + '）未设置强 ADMIN_PASSWORD（>=8位），已拒绝创建默认管理员账号');
                     return;
                 }
-                const passwordToUse = adminPassword && adminPassword.length >= 8 ? adminPassword : 'admin123';
-                if (!adminPassword || adminPassword.length < 8) {
-                    console.warn('[Seed] 使用默认管理员密码 admin123（仅限开发环境，生产请设置 ADMIN_PASSWORD 环境变量）');
+                const passwordToUse = isStrong ? adminPassword : 'admin123';
+                if (!isStrong) {
+                    console.warn('[Seed] 使用默认管理员密码 admin123（仅限 development 环境，其他环境请设置 ADMIN_PASSWORD 环境变量）');
                 }
                 const hashed = await bcrypt.hash(passwordToUse, 10);
                 const admin = this.userRepo.create({
@@ -71,6 +72,7 @@ let AuthService = class AuthService {
                 }
                 console.log('[Seed] 管理员账号已创建: ' + adminUsername);
             }
+            // 注：若 admin 用户已存在但密码较弱，此处不强制重置（避免影响既有登录会话），请运维手动轮换密码
         }
         catch (e) {
             console.error('[Seed] 管理员创建失败:', e.message);

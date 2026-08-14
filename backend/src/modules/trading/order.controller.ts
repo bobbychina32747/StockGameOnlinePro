@@ -27,6 +27,7 @@ class PlaceOrderDto {
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MinLength)(1),
+    (0, class_validator_1.MaxLength)(20),
     __metadata("design:type", String)
 ], PlaceOrderDto.prototype, "symbol", void 0);
 __decorate([
@@ -40,16 +41,19 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
+    (0, class_validator_1.Max)(1000000),
     __metadata("design:type", Number)
 ], PlaceOrderDto.prototype, "quantity", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsNumber)({ allowNaN: false, allowInfinity: false }),
+    (0, class_validator_1.Min)(0.01),
     __metadata("design:type", Number)
 ], PlaceOrderDto.prototype, "price", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsNumber)({ allowNaN: false, allowInfinity: false }),
+    (0, class_validator_1.Min)(0.01),
     __metadata("design:type", Number)
 ], PlaceOrderDto.prototype, "triggerPrice", void 0);
 let OrderController = class OrderController {

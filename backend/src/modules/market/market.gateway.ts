@@ -13,18 +13,42 @@ import socket_io_1 = require("socket.io");
 
 import common_1 = require("@nestjs/common");
 
+import jwt_1 = require("@nestjs/jwt");
+
 let MarketGateway = class MarketGateway {
     [key: string]: any;
-    constructor() {
+    constructor(jwtService) {
+        this.jwtService = jwtService;
         this.logger = new common_1.Logger(MarketGateway.name);
         this.clients = 0;
     }
     handleConnection(client) {
+        // SECURITY(C): WS 必须携带 JWT（前端 socket.io 使用 auth: { token } 传参），校验失败直接断开
+        try {
+            const token = client.handshake && client.handshake.auth ? client.handshake.auth.token : null;
+            if (!token) {
+                this.logger.warn(`WS 认证失败（缺少 token）: ${client.id}`);
+                client.disconnect(true);
+                return;
+            }
+            const payload = this.jwtService.verify(token);
+            if (!payload || !payload.sub) {
+                this.logger.warn(`WS 认证失败（token 载荷无效）: ${client.id}`);
+                client.disconnect(true);
+                return;
+            }
+        }
+        catch (e) {
+            this.logger.warn(`WS 认证失败: ${client.id} - ${e.message}`);
+            client.disconnect(true);
+            return;
+        }
         this.clients++;
         this.logger.log(`WS 客户端已连接: ${client.id} (在线: ${this.clients})`);
     }
     handleDisconnect(client) {
-        this.clients--;
+        // 认证失败的连接未计入 clients，避免计数变负
+        this.clients = Math.max(0, this.clients - 1);
         this.logger.log(`WS 客户端已断开: ${client.id} (在线: ${this.clients})`);
     }
     broadcastTick(ticks) {
@@ -46,11 +70,13 @@ export { MarketGateway };
 
 MarketGateway = __decorate(
 [
+    (0, common_1.Injectable)(),
     (0, websockets_1.WebSocketGateway)({
         // FIX(M5): 收紧 CORS 白名单（原 origin:'*' 为无差别放行）
         cors: { origin: ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000'], credentials: true },
         namespace: '/market',
-    })
+    }),
+    __metadata("design:paramtypes", [jwt_1.JwtService])
 ],
 MarketGateway
 );

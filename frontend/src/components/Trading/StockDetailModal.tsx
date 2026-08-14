@@ -10,11 +10,6 @@ export function StockDetailModal() {
   const stocks = useMarketStore((s) => s.stocks);
   const prices = useMarketStore((s) => s.prices);
 
-  if (!detailSymbol) return null;
-
-  const s = stocks.find((x: any) => x.symbol === detailSymbol);
-  if (!s) return null;
-
   // 真实财报（后端按财报季生成）
   const [reports, setReports] = useState<any[]>([]);
   useEffect(() => {
@@ -25,6 +20,11 @@ export function StockDetailModal() {
     }).catch(() => {});
     return () => { alive = false; };
   }, [detailSymbol]);
+
+  // 早退必须放在所有 hooks 之后，否则 detailSymbol 从 null 变为符号时 hook 数量变化会崩溃
+  if (!detailSymbol) return null;
+  const s = stocks.find((x: any) => x.symbol === detailSymbol);
+  if (!s) return null;
 
   const price = prices[s.symbol] ?? s.price;
   const changePct = s.changePct ?? 0;

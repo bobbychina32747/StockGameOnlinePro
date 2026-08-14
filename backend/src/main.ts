@@ -60,6 +60,8 @@ async function bootstrap() {
     if (corsOrigin) {
         corsOrigins = corsOrigin.split(',').map((s) => s.trim());
     }
+    // SECURITY(H): 信任代理层数（默认 0=直连；部署在反向代理后请设 TRUST_PROXY=1，否则限流/日志拿到的是代理 IP）
+    app.getHttpAdapter().getInstance().set('trust proxy', Number(config.get('TRUST_PROXY', '0')) || 0);
     app.enableCors({
         origin: corsOrigins,
         credentials: true,
@@ -67,6 +69,32 @@ async function bootstrap() {
     const port = config.get('PORT', 8000);
     await app.listen(port);
     logger.log(`应用已启动: http://localhost:${port}/api`);
+    // ─── FIX(G): sql.js 持久化（autoSave 已关闭，改为定时全库导出 + 原子落盘）───
+    const fs = require('fs');
+    const path = require('path');
+    const ds = app.get(typeorm_1.DataSource);
+    const dbPath = config.get('SQLITE_PATH', './data/stockgame.db');
+    const persistDatabase = () => {
+        try {
+            const conn = ds && ds.driver ? (ds.driver as any).databaseConnection : null; // sqljs 专有字段（类型未声明），用 as any 访问
+            if (!conn || typeof conn.export !== 'function')
+                return; // 非 sqljs 数据源（如 postgres）无需此持久化
+            const dir = path.dirname(dbPath);
+            if (!fs.existsSync(dir))
+                fs.mkdirSync(dir, { recursive: true });
+            const data = Buffer.from(conn.export());
+            // 先写同目录临时文件再 rename 原子替换，避免写一半损坏库文件
+            const tmpPath = dbPath + '.tmp';
+            fs.writeFileSync(tmpPath, data);
+            fs.renameSync(tmpPath, dbPath);
+        }
+        catch (e) {
+            logger.warn('数据库持久化失败: ' + (e && e.message ? e.message : e));
+        }
+    };
+    setInterval(() => persistDatabase(), 60 * 1000);
+    // 进程退出前同步写盘一次（beforeExit 只能使用同步 API）
+    process.on('beforeExit', () => persistDatabase());
 }
 bootstrap();
 

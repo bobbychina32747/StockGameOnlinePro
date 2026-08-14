@@ -95,6 +95,11 @@ export function OrderPanel() {
   // ─── 下单 ───
   const placeOrder = async () => {
     if (orderSubmitting) return;
+    // 限价/止损类订单必须填写 >0 的价格
+    if ((orderType === 'limit' || orderType === 'stop' || orderType === 'stop-limit') && !(parseFloat(orderPrice) > 0)) {
+      addNotification('请输入大于 0 的订单价格', 'error');
+      return;
+    }
     setOrderSubmitting(true);
     try {
       const result = await tradingApi.placeOrder(mode, {
@@ -121,7 +126,8 @@ export function OrderPanel() {
       const axiosErr = error as { response?: { data?: { message?: string } } };
       addNotification(`下单失败: ${axiosErr?.response?.data?.message || '网络错误'}`, 'error');
     } finally {
-      setTimeout(() => setOrderSubmitting(false), 800);
+      // 请求 settle 后立即解锁（orderSubmitting 已防重复提交，无需固定延时）
+      setOrderSubmitting(false);
     }
   };
 
@@ -153,8 +159,14 @@ export function OrderPanel() {
   };
 
   const cancelOrder = async (id: string) => {
-    await tradingApi.cancelOrder(mode, id);
-    loadOrders();
+    try {
+      await tradingApi.cancelOrder(mode, id);
+      loadOrders();
+    } catch (error) {
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      addNotification(`撤单失败: ${axiosErr?.response?.data?.message || '网络错误'}`, 'error');
+      loadOrders();
+    }
   };
 
   return (

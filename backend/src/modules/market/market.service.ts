@@ -91,9 +91,11 @@ let MarketService = class MarketService {
     }
     // 三服务器：单市场 tick 处理（行情生成/开盘事件/日终结算/挂单触发）
     async processMarket(market, marketData, counterKey) {
+        let advanceCounter = false;
         try {
             const ticks = marketData.generateTick();
             if (ticks.length === 0) return;
+            advanceCounter = true;
             const prices = {};
             ticks.forEach((t) => { prices[t.symbol] = t.price; });
             // 聚合到全局（风控需全市场价格）
@@ -101,6 +103,11 @@ let MarketService = class MarketService {
             this.engine.updatePrices(prices);
             this.engine.refreshOrderBooks(prices);
             this.gateway.broadcastTick(ticks);
+            const counter = this[counterKey] || 0;
+            if (counter === 0) {
+                // SECURITY: 日初先重置 T+1 再撮合挂单，避免首 tick 触发卖单被误判 T+1 取消
+                await this.engine.resetBoughtToday();
+            }
             const fills = await this.engine.checkPendingOrders();
             fills.forEach((f) => { this.gateway.broadcastFill(f); });
             // 经济泡沫破灭广播
@@ -118,10 +125,9 @@ let MarketService = class MarketService {
                     });
                 }
             }
-            const counter = this[counterKey] || 0;
             if (counter === 0) {
                 // 玩法：热点/IPO/黑天鹅（各市场独立）
-                marketData.startNewDay();
+                await marketData.startNewDay();
                 const events = marketData.getDayEvents();
                 if (events && events.ipo && events.ipo.listed) {
                     for (const n of events.ipo.listed) {
@@ -140,7 +146,6 @@ let MarketService = class MarketService {
                     else this.logger.warn(`🦊 黑天鹅: ${events.swan.desc}`);
                 }
                 this.engine.setDayOpen(prices);
-                await this.engine.resetBoughtToday();
                 const state = marketData.getState();
                 // 财报季
                 if (marketData.gameDay > 0 && marketData.gameDay % 7 === 0) {
@@ -158,11 +163,9 @@ let MarketService = class MarketService {
                 }
                 const nightEvent = this.newsService.processNightEvent();
                 if (nightEvent && nightEvent.impact !== 0) {
-                    const prices = marketData.getPrices();
-                    for (const sym of Object.keys(prices)) {
-                        prices[sym] *= (1 + nightEvent.impact);
-                    }
-                    this.engine.updatePrices(prices);
+                    // SECURITY: 冲击必须写回行情引擎内部价格（原实现只改返回副本，下一 tick 被覆盖失效）
+                    marketData.applyMarketwideShock(nightEvent.impact);
+                    this.engine.updatePrices(marketData.getPrices());
                 }
             }
             if (counter === 239) { // 日终结算
@@ -193,9 +196,14 @@ let MarketService = class MarketService {
                 }
                 this.logger.log(`📅 [` + market + `] 第 ${day} 个交易日结束`);
             }
-            this[counterKey] = (counter + 1) % 240;
         } catch (e) {
             this.logger.error(`[` + market + `] Tick处理异常: ${e.message}`);
+        } finally {
+            // SECURITY: tick 已生成时无论成功失败都推进计数，防止异常后重复触发日终结算/分红
+            if (advanceCounter) {
+                const c = this[counterKey] || 0;
+                this[counterKey] = (c + 1) % 240;
+            }
         }
     }
     async startTickLoop() {

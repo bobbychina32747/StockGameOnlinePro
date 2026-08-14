@@ -21,7 +21,10 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 api.interceptors.response.use(
   (res) => res,
   (err: AxiosError) => {
-    if (err.response?.status === 401) {
+    // 登录/注册接口的 401 由业务层处理（展示错误信息），不整页跳转
+    const url = err.config?.url || '';
+    const isAuthRequest = url.includes('/auth/login') || url.includes('/auth/register');
+    if (err.response?.status === 401 && !isAuthRequest) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';

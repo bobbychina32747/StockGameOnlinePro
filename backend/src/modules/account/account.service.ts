@@ -23,15 +23,18 @@ import transaction_entity_1 = require("../../infrastructure/database/entities/tr
 
 import risk_manager_service_1 = require("../../core/risk-manager/risk-manager.service");
 
+import trading_engine_service_1 = require("../../core/trading-engine/trading-engine.service");
+
 import constants_1 = require("../../common/constants");
 
 let AccountService = class AccountService {
     [key: string]: any;
-    constructor(accountRepo, positionRepo, transactionRepo, riskManager) {
+    constructor(accountRepo, positionRepo, transactionRepo, riskManager, engine) {
         this.accountRepo = accountRepo;
         this.positionRepo = positionRepo;
         this.transactionRepo = transactionRepo;
         this.riskManager = riskManager;
+        this.engine = engine;
     }
     async getAccount(userId, mode = 'US') {
         const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });
@@ -84,10 +87,12 @@ let AccountService = class AccountService {
     }
     async setLeverage(userId, mode, leverage) {
         const account = await this.getAccount(userId, mode);
-        if (leverage < 1 || leverage > 3) {
-            throw new common_1.BadRequestException('杠杆倍数必须在 1~3 之间');
+        // SECURITY: 非数字（NaN/Infinity/字符串）会绕过比较并污染保证金计算，必须先校验有限性
+        const lev = Number(leverage);
+        if (!Number.isFinite(lev) || lev < 1 || lev > 3) {
+            throw new common_1.BadRequestException('杠杆倍数必须是 1~3 之间的数字');
         }
-        account.leverage = leverage;
+        account.leverage = lev;
         return this.accountRepo.save(account);
     }
     // 交易复盘：个人 + 全局教训卡
@@ -103,18 +108,32 @@ let AccountService = class AccountService {
         const cfg = presets[preset];
         if (!cfg)
             throw new common_1.BadRequestException('未知的角色预设');
-        const account = await this.getAccount(userId, mode);
-        account.cash = cfg.cash;
-        account.leverage = cfg.leverage;
-        account.totalEquity = cfg.cash;
-        account.peakEquity = cfg.cash;
-        account.initialEquity = cfg.cash;
-        account.dayStartEquity = cfg.cash;
-        account.dailyPnl = 0;
-        account.totalPnl = 0;
-        account.marginUsed = 0;
-        await this.positionRepo.delete({ accountId: account.id });
-        return this.accountRepo.save(account);
+        // SECURITY: 重置必须走结算互斥队列，防止与成交结算交叉丢失更新
+        if (!this.engine) {
+            throw new common_1.ServiceUnavailableException('交易引擎不可用');
+        }
+        return this.engine.runExclusive(async () => {
+            const account = await this.getAccount(userId, mode);
+            // SECURITY: 有持仓时禁止重置（原实现直接删持仓=免费套利棘轮：赚了保留、亏了重置）
+            const positions = await this.positionRepo.find({ where: { accountId: account.id } });
+            if (positions.length > 0) {
+                return { success: false, error: '存在持仓，无法重置账户（请先平仓）' };
+            }
+            account.cash = cfg.cash;
+            account.leverage = cfg.leverage;
+            account.totalEquity = cfg.cash;
+            account.peakEquity = cfg.cash;
+            account.initialEquity = cfg.cash;
+            account.dayStartEquity = cfg.cash;
+            account.dailyPnl = 0;
+            account.totalPnl = 0;
+            account.marginUsed = 0;
+            // SECURITY: 冻结保证金必须归零（原实现遗留 shortCollateral 导致资金永久冻结）
+            account.shortCollateral = 0;
+            // 注：基金持仓（FundHolding）不在本服务管理范围，重置不涉及基金份额
+            await this.accountRepo.save(account);
+            return { success: true, account };
+        });
     }
     getModeInfo(mode) {
         const isCN = mode === 'CN';
@@ -139,10 +158,12 @@ AccountService = __decorate(
     __param(0, (0, typeorm_1.InjectRepository)(account_entity_1.Account)),
     __param(1, (0, typeorm_1.InjectRepository)(position_entity_1.Position)),
     __param(2, (0, typeorm_1.InjectRepository)(transaction_entity_1.Transaction)),
+    __param(4, trading_engine_service_1.TradingEngineService),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
-        risk_manager_service_1.RiskManagerService])
+        risk_manager_service_1.RiskManagerService,
+        trading_engine_service_1.TradingEngineService])
 ],
 AccountService
 );
