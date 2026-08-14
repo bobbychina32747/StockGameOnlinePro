@@ -88,6 +88,27 @@ export function ChartPanel() {
   const price = prices[selectedSymbol];
   const isIntraday = selectedTimeframe === 'intraday';
 
+  // P5 亮色主题适配：图表轴/网格/提示框/滑条颜色随主题切换
+  const theme = useUIStore((s) => s.theme);
+  const isLight = theme === 'light';
+  const CH = {
+    axisLine: isLight ? '#e0e5eb' : '#2e3240',
+    axisLabel: isLight ? '#5b6472' : '#6a6d78',
+    tooltipBg: isLight ? '#ffffff' : '#1e222d',
+    tooltipText: isLight ? '#101828' : '#d1d4dc',
+    crossLine: isLight ? '#9aa4b2' : '#556080',
+    crossStyle: isLight ? '#b6c0cd' : '#8a93a8',
+    crossLabelBg: isLight ? '#eef1f5' : '#3a3f4e',
+    legend: isLight ? '#5b6472' : '#9fa3b0',
+    sliderBg: isLight ? '#eef1f5' : '#171922',
+    sliderFiller: isLight ? 'rgba(29, 78, 216, 0.15)' : 'rgba(47,111,237,0.15)',
+    sliderHandle: isLight ? '#1d4ed8' : '#2f6fed',
+    up: isLight ? '#dc2626' : '#e03131',
+    down: isLight ? '#059669' : '#00c853',
+    volUp: isLight ? 'rgba(220, 38, 38, 0.4)' : 'rgba(224, 49, 49, 0.5)',
+    volDown: isLight ? 'rgba(5, 150, 105, 0.4)' : 'rgba(0, 200, 83, 0.5)',
+  };
+
   // ─── 休市超大遮罩（P1 按市场独立时段；调试模式下不显示） ───
   const [marketClosed, setMarketClosed] = useState(!isTradingTimeFor(marketMode));
   useEffect(() => {
@@ -160,7 +181,7 @@ export function ChartPanel() {
       const prevClose = stock?.dayOpen != null ? Number(stock.dayOpen) : (intradaySrc[0]?.open || closes[0] || 0);
       let cumVol = 0, cumAmt = 0;
       const avgLine = closes.map((c, i) => { cumVol += vols[i]; cumAmt += c * vols[i]; return cumVol ? cumAmt / cumVol : c; });
-      const lastColor = closes[closes.length - 1] >= prevClose ? '#e03131' : '#00c853';
+      const lastColor = closes[closes.length - 1] >= prevClose ? CH.up : CH.down;
       return {
         // merge 更新无动画（无感刷新 + 性能最优）
         animation: false, backgroundColor: 'transparent',
@@ -169,21 +190,21 @@ export function ChartPanel() {
           { left: '8%', right: '8%', top: '74%', bottom: 16 },
         ],
         xAxis: [
-          { type: 'category', data: times, axisLine: { lineStyle: { color: '#2e3240' } }, axisLabel: { color: '#6a6d78', fontSize: 10 } },
-          { type: 'category', data: times, gridIndex: 1, axisLine: { lineStyle: { color: '#2e3240' } }, axisLabel: { show: false } },
+          { type: 'category', data: times, axisLine: { lineStyle: { color: CH.axisLine } }, axisLabel: { color: CH.axisLabel, fontSize: 10 } },
+          { type: 'category', data: times, gridIndex: 1, axisLine: { lineStyle: { color: CH.axisLine } }, axisLabel: { show: false } },
         ],
         yAxis: [
-          { type: 'value', scale: true, splitLine: { lineStyle: { color: '#2e3240', type: 'dashed' } }, axisLabel: { color: '#6a6d78', fontSize: 10, formatter: (v: number) => v.toFixed(2) } },
+          { type: 'value', scale: true, splitLine: { lineStyle: { color: CH.axisLine, type: 'dashed' } }, axisLabel: { color: CH.axisLabel, fontSize: 10, formatter: (v: number) => v.toFixed(2) } },
           { type: 'value', gridIndex: 1, splitLine: { show: false }, axisLabel: { show: false }, max: volYMax(vols) },
         ],
         series: [
-          { type: 'line', data: closes, smooth: false, symbol: 'none', lineStyle: { width: 1.5, color: lastColor }, itemStyle: { color: lastColor }, areaStyle: { color: lastColor + '26' }, name: '价格', markLine: { silent: true, symbol: 'none', data: [{ yAxis: prevClose, lineStyle: { color: '#556080', type: 'dashed' } }], label: { show: false } } },
+          { type: 'line', data: closes, smooth: false, symbol: 'none', lineStyle: { width: 1.5, color: lastColor }, itemStyle: { color: lastColor }, areaStyle: { color: lastColor + '26' }, name: '价格', markLine: { silent: true, symbol: 'none', data: [{ yAxis: prevClose, lineStyle: { color: CH.crossLine, type: 'dashed' } }], label: { show: false } } },
           { type: 'line', data: avgLine, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#f59e0b', type: 'dashed' }, name: '均价' },
-          { type: 'bar', data: vols, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: (pp: any) => (closes[pp.dataIndex] >= prevClose ? 'rgba(224,49,49,0.5)' : 'rgba(0,200,83,0.5)') }, name: '成交量' },
+          { type: 'bar', data: vols, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: (pp: any) => (closes[pp.dataIndex] >= prevClose ? CH.volUp : CH.volDown) }, name: '成交量' },
         ],
         tooltip: {
-          trigger: 'axis', backgroundColor: '#1e222d', borderColor: '#2e3240', textStyle: { color: '#d1d4dc', fontSize: 12 },
-          axisPointer: { type: 'cross', lineStyle: { color: '#556080', type: 'dashed' }, label: { backgroundColor: '#3a3f4e' } },
+          trigger: 'axis', backgroundColor: CH.tooltipBg, borderColor: CH.axisLine, textStyle: { color: CH.tooltipText, fontSize: 12 },
+          axisPointer: { type: 'cross', lineStyle: { color: CH.crossLine, type: 'dashed' }, label: { backgroundColor: CH.crossLabelBg } },
           formatter: (params: any[]) => {
             if (!params || !params.length) return '';
             const t = params[0].axisValue;
@@ -267,34 +288,34 @@ export function ChartPanel() {
         { left: '8%', right: '8%', top: '74%', bottom: 20 },
       ],
       xAxis: [
-        { type: 'category', data: klineTimes, axisLine: { lineStyle: { color: '#2e3240' } }, axisLabel: { color: '#6a6d78', fontSize: 10 } },
-        { type: 'category', data: klineTimes, gridIndex: 1, axisLine: { lineStyle: { color: '#2e3240' } }, axisLabel: { color: '#6a6d78', fontSize: 9 } },
+        { type: 'category', data: klineTimes, axisLine: { lineStyle: { color: CH.axisLine } }, axisLabel: { color: CH.axisLabel, fontSize: 10 } },
+        { type: 'category', data: klineTimes, gridIndex: 1, axisLine: { lineStyle: { color: CH.axisLine } }, axisLabel: { color: CH.axisLabel, fontSize: 9 } },
       ],
       yAxis: [
-        { type: 'value', scale: true, splitLine: { lineStyle: { color: '#2e3240', type: 'dashed' } }, axisLabel: { color: '#6a6d78', fontSize: 10, formatter: (v: number) => v.toFixed(2) } },
-        { type: 'value', gridIndex: 1, splitLine: { show: false }, axisLabel: { color: '#6a6d78', fontSize: 9 }, min: 0, max: 100 },
+        { type: 'value', scale: true, splitLine: { lineStyle: { color: CH.axisLine, type: 'dashed' } }, axisLabel: { color: CH.axisLabel, fontSize: 10, formatter: (v: number) => v.toFixed(2) } },
+        { type: 'value', gridIndex: 1, splitLine: { show: false }, axisLabel: { color: CH.axisLabel, fontSize: 9 }, min: 0, max: 100 },
       ],
       series: [
         // A股：阳线红、阴线绿
-        { type: 'candlestick', data: candleData, itemStyle: { color: '#e03131', color0: '#00c853', borderColor: '#e03131', borderColor0: '#00c853' }, name: 'K线' },
+        { type: 'candlestick', data: candleData, itemStyle: { color: CH.up, color0: CH.down, borderColor: CH.up, borderColor0: CH.down }, name: 'K线' },
         { type: 'line', data: bb.upper, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#9c27b0', opacity: 0.4 }, name: 'BOLL上' },
         { type: 'line', data: bb.mid, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#9c27b0' }, name: 'BOLL中' },
         { type: 'line', data: bb.lower, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#9c27b0', opacity: 0.4 }, areaStyle: { color: 'rgba(156,39,176,0.05)' }, name: 'BOLL下' },
         { type: 'line', data: ma5, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#ffa726' }, name: 'MA5' },
         { type: 'line', data: ma10, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#42a5f5' }, name: 'MA10' },
         { type: 'line', data: ma20, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#ef5350' }, name: 'MA20' },
-        { type: 'line', data: rsi, smooth: true, symbol: 'none', xAxisIndex: 1, yAxisIndex: 1, lineStyle: { width: 1, color: '#ab47bc' }, name: 'RSI(14)', markLine: { silent: true, data: [{ yAxis: 70, lineStyle: { color: '#e03131', type: 'dashed' } }, { yAxis: 30, lineStyle: { color: '#00c853', type: 'dashed' } }] } },
+        { type: 'line', data: rsi, smooth: true, symbol: 'none', xAxisIndex: 1, yAxisIndex: 1, lineStyle: { width: 1, color: '#ab47bc' }, name: 'RSI(14)', markLine: { silent: true, data: [{ yAxis: 70, lineStyle: { color: CH.up, type: 'dashed' } }, { yAxis: 30, lineStyle: { color: CH.down, type: 'dashed' } }] } },
       ],
       tooltip: {
         trigger: 'axis',
-        backgroundColor: '#1e222d',
-        borderColor: '#2e3240',
-        textStyle: { color: '#d1d4dc', fontSize: 12 },
+        backgroundColor: CH.tooltipBg,
+        borderColor: CH.axisLine,
+        textStyle: { color: CH.tooltipText, fontSize: 12 },
         axisPointer: {
           type: 'cross',
-          lineStyle: { color: '#556080', type: 'dashed' },
-          crossStyle: { color: '#8a93a8' },
-          label: { backgroundColor: '#3a3f4e' },
+          lineStyle: { color: CH.crossLine, type: 'dashed' },
+          crossStyle: { color: CH.crossStyle },
+          label: { backgroundColor: CH.crossLabelBg },
         },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return '';
@@ -316,15 +337,15 @@ export function ChartPanel() {
           return `${title}<br/>${lines.join('<br/>')}`;
         },
       },
-      legend: { data: ['MA5', 'MA10', 'MA20', 'BOLL中', 'RSI(14)'], top: 2, textStyle: { color: '#9fa3b0', fontSize: 10 } },
+      legend: { data: ['MA5', 'MA10', 'MA20', 'BOLL中', 'RSI(14)'], top: 2, textStyle: { color: CH.legend, fontSize: 10 } },
       // 受控缩放：start/end 来自用户当前缩放（merge 更新不会重置）
       dataZoom: [
         { type: 'inside', ...zoom },
-        { type: 'slider', height: 14, bottom: 4, ...zoom, borderColor: '#2e3240', backgroundColor: '#171922', fillerColor: 'rgba(47,111,237,0.15)', handleStyle: { color: '#2f6fed' }, textStyle: { color: '#6a6d78', fontSize: 9 } },
+        { type: 'slider', height: 14, bottom: 4, ...zoom, borderColor: CH.axisLine, backgroundColor: CH.sliderBg, fillerColor: CH.sliderFiller, handleStyle: { color: CH.sliderHandle }, textStyle: { color: '#6a6d78', fontSize: 9 } },
       ],
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [klineData, selectedTimeframe, intradaySrc, isIntraday, zoom, containerWidth]);
+  }, [klineData, selectedTimeframe, intradaySrc, isIntraday, zoom, containerWidth, theme]);
 
   const prevClose = stock?.dayOpen != null ? Number(stock.dayOpen) : (stock?.price ?? price ?? 0);
   const changePct = prevClose > 0 && price != null ? ((price - prevClose) / prevClose) * 100 : 0;

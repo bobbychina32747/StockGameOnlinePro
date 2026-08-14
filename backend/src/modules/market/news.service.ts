@@ -127,7 +127,8 @@ let NewsService = class NewsService {
             stage,
             targetedSymbol: template.symbol ? filled.stock?.symbol : null,
             targetedIndustry: template.industry ? filled.stock?.industry : null,
-        };
+            insiderNews: null,
+        } as any;
         this.currentNews = news;
         // 宏观因子冲击
         for (const [factor, val] of Object.entries(news.impact)) {
@@ -137,8 +138,7 @@ let NewsService = class NewsService {
         if (news.targetedSymbol || news.targetedIndustry) {
             this.marketData.applyNewsImpact(news);
         }
-        this.gateway.broadcastNews(news);
-        // 内幕消息（低概率附加）
+        // 内幕消息（低概率附加）——由 market.service 错峰播报（不再即时广播，避免开盘新闻扎堆）
         if (Math.random() < 0.02) {
             const insider = this.insiderTemplates[Math.floor(Math.random() * this.insiderTemplates.length)];
             const ins = this.fill(insider);
@@ -154,8 +154,8 @@ let NewsService = class NewsService {
             };
             if (insiderNews.targetedSymbol)
                 this.marketData.applyNewsImpact(insiderNews);
-            this.gateway.broadcastNews(insiderNews);
-            this.logger.warn(`内幕消息: ${insiderNews.title}`);
+            news.insiderNews = insiderNews;
+            this.logger.warn('内幕消息: ' + insiderNews.title);
         }
         return news;
     }
@@ -167,13 +167,7 @@ let NewsService = class NewsService {
             if (rand <= cumulative) {
                 if (event.impact !== 0) {
                     this.logger.log(`夜间事件: ${event.name} (${(event.impact * 100).toFixed(1)}%)`);
-                    this.gateway.broadcastNews({
-                        title: `🌙 ${event.name}`,
-                        description: `隔夜影响: ${(event.impact * 100).toFixed(1)}%`,
-                        type: 'night',
-                        impact: {},
-                        duration: 1,
-                    });
+                    // 夜间事件新闻由 market.service 错峰播报
                 }
                 return event;
             }

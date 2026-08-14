@@ -130,21 +130,22 @@ export function AccountPanel() {
       {/* 持仓明细（Q10：当日盈亏 + 多空浮盈 + 盈亏排行） */}
       <CollapsibleCard title="🌐 跨市场划转（汇率折算·手续费0.1%）">
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <select className="input" style={{ width: 70 }} value={txFrom} onChange={(e) => setTxFrom(e.target.value)}>
-            <option value="CN">A股¥</option>
-            <option value="HK">港股HK$</option>
-            <option value="US">美股$</option>
+          <select className="input" style={{ width: 88, flexShrink: 0 }} value={txFrom} onChange={(e) => setTxFrom(e.target.value)}>
+            <option value="CN">A股 ¥</option>
+            <option value="HK">港股 $</option>
+            <option value="US">美股 $</option>
           </select>
-          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>→</span>
-          <select className="input" style={{ width: 70 }} value={txTo} onChange={(e) => setTxTo(e.target.value)}>
-            <option value="CN">A股¥</option>
-            <option value="HK">港股HK$</option>
-            <option value="US">美股$</option>
+          <span style={{ color: 'var(--text-muted)', fontSize: 12, flexShrink: 0 }}>→</span>
+          <select className="input" style={{ width: 88, flexShrink: 0 }} value={txTo} onChange={(e) => setTxTo(e.target.value)}>
+            <option value="CN">A股 ¥</option>
+            <option value="HK">港股 $</option>
+            <option value="US">美股 $</option>
           </select>
           <input
             className="input"
-            style={{ width: 90 }}
+            style={{ width: 120, flexShrink: 0 }}
             placeholder="金额"
+            title="转出币种金额"
             value={txAmount}
             onChange={(e) => setTxAmount(e.target.value)}
           />

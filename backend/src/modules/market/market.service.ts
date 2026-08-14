@@ -49,6 +49,8 @@ let MarketService = class MarketService {
         // P1 开盘竞价：各市场最近一次竞价开盘价（dayOpen 基准合并用）+ 每市场当日竞价已执行标记
         this.lastAuctionPrices = {};
         this.lastAuctionDay = {};
+        // P4 新闻错峰队列：开盘/收盘生成的新闻按 tick 逐条播报，避免同一时刻扎堆
+        this.newsQueue = { CN: [], HK: [], US: [] };
         // P0 时间尺度：TICK_INTERVAL_MS 控制每个行情 tick 的真实间隔（1000=高速回放 1秒1分钟，60000=实时分钟级），钳制 200~60000
         const rawInterval = Number(config && config.get ? config.get('TICK_INTERVAL_MS', 1000) : 1000);
         this.tickIntervalMs = Math.min(Math.max(Number.isFinite(rawInterval) ? rawInterval : 1000, 200), 60000);
@@ -161,7 +163,8 @@ let MarketService = class MarketService {
                 const events = marketData.getDayEvents();
                 if (events && events.ipo && events.ipo.listed) {
                     for (const n of events.ipo.listed) {
-                        this.gateway.broadcastNews({
+                        // P4 错峰播报：入队而非立即广播
+                        this.enqueueNews(market, {
                             title: `🚀 新股上市：${n.name}（${n.code}）`, description: `发行价 ${n.initialPrice} 元，所属行业 ${n.industry}，今日起可交易`, type: 'bullish', impact: {}, duration: 1,
                         });
                         this.logger.log(`🚀 新股上市: ${n.name}`);
@@ -169,7 +172,7 @@ let MarketService = class MarketService {
                 }
                 if (events && events.swan) {
                     const good = events.swan.direction === 'good';
-                    this.gateway.broadcastNews({
+                    this.enqueueNews(market, {
                         title: good ? `🎉 利好：${events.swan.desc}` : `🦊 黑天鹅：${events.swan.desc}`, description: `影响：${events.swan.type === 'market' ? '全市场' : events.swan.type === 'industry' ? events.swan.industry + '板块' : events.swan.name} 约 ${events.swan.impact}%`, type: good ? 'bullish' : 'bearish', impact: {}, duration: 2,
                     });
                     if (good) this.logger.log(`🎉 政策红包: ${events.swan.desc}`);
@@ -183,10 +186,21 @@ let MarketService = class MarketService {
                 // 财报季
                 if (marketData.gameDay > 0 && marketData.gameDay % 7 === 0) {
                     const n = marketData.generateReports();
-                    if (n > 0) this.logger.log(`📊 [` + market + `] 财报季: ${n} 家公司披露季度财报`);
+                    if (n > 0) {
+                        this.logger.log(`📊 [` + market + `] 财报季: ${n} 家公司披露季度财报`);
+                        this.enqueueNews(market, {
+                            title: `📊 财报季：${n} 家公司披露季度财报`, description: '业绩预期差将影响相关个股走势，注意持仓基本面变化', type: 'neutral', impact: {}, duration: 2,
+                        });
+                    }
                 }
+                // P4 日间新闻错峰播报（generateDailyNews 不再内部即时广播）
                 const news = this.newsService.generateDailyNews(state.marketRegime, marketData.gameDay);
-                if (news) this.logger.log(`📰 [` + market + `] ${news.title}`);
+                if (news) {
+                    this.logger.log(`📰 [` + market + `] ${news.title}`);
+                    this.enqueueNews(market, news);
+                    if (news.insiderNews)
+                        this.enqueueNews(market, news.insiderNews);
+                }
             }
             if (counter === 239) { // 分红/夜间事件
                 try {
@@ -199,7 +213,12 @@ let MarketService = class MarketService {
                     // SECURITY: 冲击必须写回行情引擎内部价格（原实现只改返回副本，下一 tick 被覆盖失效）
                     marketData.applyMarketwideShock(nightEvent.impact);
                     this.engine.updatePrices(marketData.getPrices());
+                    this.enqueueNews(market, {
+                        title: `🌙 ${nightEvent.name}`, description: `隔夜影响: ${(nightEvent.impact * 100).toFixed(1)}%`, type: 'night', impact: {}, duration: 1,
+                    });
                 }
+                // P4 错峰播报：每 tick 播报一条排队中的新闻（全天均匀铺开）
+                this.flushNewsQueue(market);
             }
             if (counter === 239) { // 日终结算
                 await marketData.endOfDay();
@@ -264,6 +283,25 @@ let MarketService = class MarketService {
             }
         };
         setTimeout(tick, this.tickIntervalMs);
+    }
+    // P4 新闻错峰：入队 + 每 tick 播报一条
+    enqueueNews(market, item) {
+        if (!item)
+            return;
+        const q = this.newsQueue[market] || (this.newsQueue[market] = []);
+        q.push(item);
+    }
+    flushNewsQueue(market) {
+        const q = this.newsQueue[market];
+        if (!q || q.length === 0)
+            return;
+        const item = q.shift();
+        try {
+            this.gateway.broadcastNews(item);
+        }
+        catch (e) {
+            this.logger.warn('新闻播报失败: ' + ((e && e.message) || e));
+        }
     }
     // P1 开盘集合竞价：对每只有挂单的股票按最大成交量原则定价并撮合，用户成交走真实结算
     async runOpeningAuctions(market, marketData) {

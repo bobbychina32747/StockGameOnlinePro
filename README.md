@@ -170,7 +170,7 @@ docs/
 
 ## 📦 版本与发布
 
-- **当前版本**：[v0.1.0](https://github.com/bobbychina32747/StockGameOnlinePro/releases)（BETA 首个正式版本）
+- **当前版本**：[v0.2.0](https://github.com/bobbychina32747/StockGameOnlinePro/releases)（BETA，真实订单簿/集合竞价/复权/多市场时段/两融三级强平等全拟真升级）
 - **更新日志**：所有变更记录在 [CHANGELOG.md](CHANGELOG.md)（Keep a Changelog 格式，Unreleased 区块记录进行中的迭代）
 - **版本号**：遵循语义化版本（SemVer）——`v0.x.y`，`git tag` 打标签后推送，GitHub Releases 发布
 - **查看历史版本**：[Releases 页面](https://github.com/bobbychina32747/StockGameOnlinePro/releases) 查看每个版本的发布说明与可下载代码包

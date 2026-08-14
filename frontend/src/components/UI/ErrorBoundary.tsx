@@ -26,7 +26,7 @@ export default class ErrorBoundary extends Component<Props, State> {
         <div
           style={{
             padding: 20,
-            color: '#e03131',
+            color: 'var(--color-up)',
             fontFamily: 'monospace',
             fontSize: 12,
             whiteSpace: 'pre-wrap',
@@ -36,14 +36,14 @@ export default class ErrorBoundary extends Component<Props, State> {
           <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>
             ⚠️ 界面渲染出错（{this.props.label || 'unknown'}）
           </div>
-          <div style={{ color: '#d1d4dc', marginBottom: 12 }}>{String(this.state.error?.message || this.state.error)}</div>
+          <div style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>{String(this.state.error?.message || this.state.error)}</div>
           <button
             onClick={() => this.setState({ error: null })}
             style={{
               padding: '6px 16px',
               borderRadius: 6,
-              border: '1px solid #2e3240',
-              background: '#2f6fed',
+              border: '1px solid var(--border-default)',
+              background: 'var(--color-brand)',
               color: '#fff',
               cursor: 'pointer',
             }}

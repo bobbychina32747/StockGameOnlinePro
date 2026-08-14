@@ -1019,11 +1019,14 @@ select.input {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow-y: auto;
+  padding: 4vh 0;
 }
 .modal {
   width: min(520px, 92vw);
   max-height: 86vh;
   overflow-y: auto;
+  margin: auto;
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
@@ -1148,25 +1151,28 @@ select.input {
 
 /* ═══ C3 浅色主题 ═══ */
 body.theme-light {
-  --color-brand: #2563eb;
-  --color-brand-hover: #3b82f6;
-  --color-brand-light: #60a5fa;
-  --color-brand-subtle: rgba(37, 99, 235, 0.12);
-  --bg-primary: #f5f6f8;
-  --bg-secondary: #eef0f3;
+  --color-brand: #1d4ed8;
+  --color-brand-hover: #2563eb;
+  --color-brand-light: #2563eb;
+  --color-brand-subtle: rgba(29, 78, 216, 0.10);
+  --bg-primary: #f6f7f9;
+  --bg-secondary: #eef1f5;
   --bg-elevated: #ffffff;
-  --bg-card: #f8f9fb;
-  --bg-hover: #e9edf2;
-  --bg-active: #e0e6ee;
-  --text-primary: #1c2333;
-  --text-secondary: #4a5568;
-  --text-muted: #8492a6;
-  --text-disabled: #b6c0ce;
-  --color-up: #e03131;
-  --color-down: #00a050;
-  --border-subtle: hsla(220, 20%, 45%, 0.12);
-  --border-default: hsla(220, 20%, 45%, 0.2);
-  --border-strong: hsla(220, 20%, 45%, 0.3);
+  --bg-card: #ffffff;
+  --bg-hover: #e8edf3;
+  --bg-active: #dbe3ec;
+  --text-primary: #101828;
+  --text-secondary: #475467;
+  --text-muted: #8a94a6;
+  --text-disabled: #b8c1cf;
+  --color-up: #dc2626;
+  --color-down: #059669;
+  --border-subtle: #e7ebf0;
+  --border-default: #d3dae3;
+  --border-strong: #b7c1cd;
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.10);
+  --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.16);
 }
 .theme-toggle-btn { cursor: pointer; font-size: 14px; }
 
