@@ -254,6 +254,8 @@ let MarketDataService = class MarketDataService {
             // 注意：不重置 gameDay，历史 30 天用 0..29，实时从 30 开始，避免 K 线时间戳重叠
             this.logger.log(`市场数据已初始化(首次): ${dbStocks.length} 只股票, 30天历史已生成并落库`);
         }
+        // P1 全生命周期历史：补齐上市日至 30 天窗口前的日线历史（周/月线由日线聚合，只落库一次）
+        await this.generatePreHistoryForAll();
         // 恢复/生成后：确保最新价格作为开盘基准
         for (const st of this.stocks.values()) {
             const last = st.klineDaily[st.klineDaily.length - 1];
@@ -821,6 +823,97 @@ let MarketDataService = class MarketDataService {
         }
     }
     // S1 从 klines 表恢复历史（1min/5min/daily + gameDay + 价格）
+    // P1 全生命周期历史：按上市日补齐 2024-01-01（游戏纪元）之前的日线历史
+    // 随机游走 + 漂移校准到既有首根日线开盘价，保证与游戏内历史无缝衔接；只落库一次（存在即跳过）
+    async generatePreHistoryForAll() {
+        const BASE = new Date(2024, 0, 1).getTime();
+        const batch = [];
+        let total = 0;
+        for (const stock of this.stocks.values()) {
+            if (!stock.klineDaily || stock.klineDaily.length === 0)
+                continue;
+            const oldest = new Date(stock.klineDaily[0].time).getTime();
+            const listYear = parseInt((stock.listDate || '2010').slice(0, 4), 10) || 2010;
+            // 上市日到 2024-01-01 的交易日数（跳过周末，上限 9000 天≈34 年）
+            let tradingDays = 0;
+            for (let t = new Date(listYear, 0, 1); t.getTime() < BASE; t.setDate(t.getDate() + 1)) {
+                const wd = t.getDay();
+                if (wd !== 0 && wd !== 6)
+                    tradingDays++;
+            }
+            if (tradingDays <= 0)
+                continue;
+            tradingDays = Math.min(tradingDays, 9000);
+            // 从 2024-01-01 向前回推 tradingDays 个交易日（跳过周末）
+            const dates = [];
+            const cursor = new Date(2023, 11, 31);
+            while (dates.length < tradingDays) {
+                const wd = cursor.getDay();
+                if (wd !== 0 && wd !== 6)
+                    dates.push(new Date(cursor));
+                cursor.setDate(cursor.getDate() - 1);
+            }
+            dates.reverse();
+            if (oldest <= dates[0].getTime())
+                continue; // 已有更早历史
+            const needDates = dates.filter((x) => x.getTime() < oldest);
+            if (needDates.length === 0)
+                continue;
+            const target = Number(stock.klineDaily[0].open) || Number(stock.price);
+            const cfg = this.poolBySymbol.get(stock.symbol);
+            const startPrice = Number(cfg && cfg.initialPrice) || Number(stock.price) || target;
+            const n = needDates.length;
+            const drift = n > 0 ? Math.pow(Math.max(0.05, target) / Math.max(0.05, startPrice), 1 / n) - 1 : 0;
+            const sigmaDaily = Math.min(0.05, Math.max(0.008, Number(cfg && cfg.sigma || 0.02) * 3));
+            let prev = startPrice;
+            const bars = [];
+            for (const dt of needDates) {
+                const ret = drift + sigmaDaily * this.randn();
+                const open = prev;
+                const close = Math.max(0.1, open * (1 + ret));
+                const high = Math.max(open, close) * (1 + Math.abs(this.randn()) * sigmaDaily * 0.5);
+                const low = Math.min(open, close) * (1 - Math.abs(this.randn()) * sigmaDaily * 0.5);
+                const vol = Math.round((stock.baseVolume || 8000) * (0.5 + Math.random()));
+                bars.push({ time: dt, open: Number(open.toFixed(2)), high: Number(high.toFixed(2)), low: Number(low.toFixed(2)), close: Number(close.toFixed(2)), volume: vol });
+                prev = close;
+            }
+            // 无缝衔接：整体缩放使末根 close = 既有首根 open
+            if (bars.length > 0) {
+                const lastClose = bars[bars.length - 1].close;
+                const firstOpen = Number(stock.klineDaily[0].open);
+                if (lastClose > 0 && firstOpen > 0) {
+                    const scale = firstOpen / lastClose;
+                    for (const b of bars) {
+                        b.open = Number((b.open * scale).toFixed(2));
+                        b.high = Number((b.high * scale).toFixed(2));
+                        b.low = Number((b.low * scale).toFixed(2));
+                        b.close = Number((b.close * scale).toFixed(2));
+                    }
+                }
+                stock.klineDaily = [...bars, ...stock.klineDaily];
+                for (const b of bars) {
+                    try {
+                        batch.push(this.klineRepo.create({
+                            symbol: stock.symbol, timeframe: 'daily',
+                            time: b.time, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume,
+                        }));
+                    }
+                    catch (e) { }
+                }
+                total += bars.length;
+                this.logger.log('全生命周期历史: ' + stock.symbol + ' 补 ' + bars.length + ' 根日线（自 ' + (stock.listDate || '上市') + '）');
+            }
+        }
+        if (batch.length > 0) {
+            try {
+                await this.klineRepo.save(batch);
+            }
+            catch (e) {
+                this.logger.error('全生命周期日线落库失败: ' + (e && e.message ? e.message : e));
+            }
+        }
+        this.logger.log('全生命周期历史补齐完成，共 ' + total + ' 根日线');
+    }
     restoreFromHistory(rows) {
         const BASE = new Date(2024, 0, 1).getTime();
         const DAY_MS = 86400000;

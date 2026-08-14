@@ -162,6 +162,16 @@ export default function Profile() {
             <span className="label">卡玛比率</span>
             <span className="value">{perf.calmarRatio}</span>
           </div>
+          <div className="info-row">
+            <span className="label">盈利日占比</span>
+            <span className={Number(perf.winRate) >= 0.5 ? 'value up' : 'value down'}>
+              {perf.winRate != null ? (Number(perf.winRate) * 100).toFixed(1) + '%' : '---'}
+            </span>
+          </div>
+          <div className="info-row">
+            <span className="label">累计成交笔数</span>
+            <span className="value">{perf.totalTrades != null ? perf.totalTrades : '---'}</span>
+          </div>
         </div>
       )}
 
