@@ -28,6 +28,10 @@ import config_1 = require("@nestjs/config");
 
 import constants_1 = require("../../common/constants");
 
+import market_utils_1 = require("../../common/market-utils");
+
+const { symbolMarket } = market_utils_1;
+
 let MarketService = class MarketService {
     [key: string]: any;
     constructor(marketData, engine, gateway, newsService, riskManager, marketDataHK, marketDataUS, debugMode, config) {
@@ -162,6 +166,14 @@ let MarketService = class MarketService {
             catch (e) { }
             this.engine.refreshOrderBooks(prices);
             this.gateway.broadcastTick(ticks);
+            // P5 性能：价格先广播，AI 对手盘/行业传导/做市商等重计算随后串行执行
+            // （不阻塞 WebSocket 推送；仍在 tick 循环内 await，与下一 tick 不交叠）
+            try {
+                await marketData.postTickProcessing();
+            }
+            catch (e) {
+                this.logger.warn(`[` + market + `] 行情后处理异常: ` + (e && e.message ? e.message : e));
+            }
             const counter = this[counterKey] || 0;
             if (counter === 0) {
                 // SECURITY: 日初先重置 T+1 再撮合挂单，避免首 tick 触发卖单被误判 T+1 取消
@@ -396,11 +408,7 @@ let MarketService = class MarketService {
     }
     // 三服务器路由：按股票代码前缀选择对应市场实例（H→HK，U→US，其他→CN）
     marketDataFor(symbol) {
-        if (/^H/.test(symbol || ''))
-            return this.marketDataHK;
-        if (/^U/.test(symbol || ''))
-            return this.marketDataUS;
-        return this.marketData;
+        return symbolMarket(symbol) === 'HK' ? this.marketDataHK : symbolMarket(symbol) === 'US' ? this.marketDataUS : this.marketData;
     }
     getKlines(symbol, timeframe) {
         return this.marketDataFor(symbol).getKlines(symbol, timeframe);

@@ -124,4 +124,11 @@ describe('P4 行情引擎集成（AI 对手盘绩效与订单流信号）', () =
     expect(typeof sig.ofi).toBe('number');
     expect(['买压', '卖压', '均衡']).toContain(sig.label);
   });
+
+  test('P5 行情后处理拆分：postTickProcessing 独立可执行（不依赖 generateTick）', async () => {
+    const s = makeService();
+    s.hotTopics = [{ industry: '银行', day: 0, duration: 2, strength: 0.1 }];
+    await s.postTickProcessing(); // null 引擎下不崩溃（AI 挂单/做市商均守卫）
+    expect(Number.isFinite(s.stocks.get('T1').price)).toBe(true);
+  });
 });

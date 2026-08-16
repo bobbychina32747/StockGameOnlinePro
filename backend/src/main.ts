@@ -14,6 +14,8 @@ import stock_entity_1 = require("./infrastructure/database/entities/stock.entity
 
 import constants_1 = require("./common/constants");
 
+import swagger_1 = require("@nestjs/swagger");
+
 async function autoSeed(ds) {
     const logger = new common_1.Logger('Seed');
     const stockRepo = ds.getRepository(stock_entity_1.Stock);
@@ -67,6 +69,20 @@ async function bootstrap() {
         credentials: true,
     });
     const port = config.get('PORT', 8000);
+    // P5 工程化：Swagger API 文档（/api/docs；无装饰器也能列出全部路由，量化接入见 docs/API.md）
+    try {
+        const swaggerConfig = new swagger_1.DocumentBuilder()
+            .setTitle('StockSim Pro API')
+            .setDescription('模拟炒股平台接口文档：行情/交易/账户/量化接入（模拟数据仅供学习，不构成投资建议）')
+            .setVersion('0.2.0')
+            .addBearerAuth()
+            .build();
+        const document = swagger_1.SwaggerModule.createDocument(app, swaggerConfig);
+        swagger_1.SwaggerModule.setup('api/docs', app, document);
+    }
+    catch (e) {
+        logger.warn('Swagger 文档初始化失败: ' + (e && e.message ? e.message : e));
+    }
     await app.listen(port);
     logger.log(`应用已启动: http://localhost:${port}/api`);
     // ─── FIX(G): sql.js 持久化（autoSave 已关闭，改为定时全库导出 + 原子落盘）───

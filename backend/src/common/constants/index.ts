@@ -245,11 +245,8 @@ export const US_POOL = [
 ];
 
 export function isTradingTimeNow() {
-    const now = new Date();
-    const day = now.getDay();
-    if (day === 0 || day === 6) return false;
-    const minutes = now.getHours() * 60 + now.getMinutes();
-    return (minutes >= 570 && minutes < 690) || (minutes >= 780 && minutes < 900);
+    // P5 去重：统一走日历驱动的 isTradingTimeFor（本函数为兼容保留，勿再使用）
+    return isTradingTimeFor('CN');
 }
 
 // P1 各市场独立交易时段与节假日历（分钟制；weekdays 0=周日..6=周六；sessions 为 [开始分钟, 结束分钟) 区间）

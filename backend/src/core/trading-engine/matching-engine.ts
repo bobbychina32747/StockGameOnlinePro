@@ -4,10 +4,42 @@
 // TradingEngineService 持有本类实例并全部委托（maps 以别名共享，旧代码/测试无需改动）。
 import order_entity_1 = require("../../infrastructure/database/entities/order.entity");
 
+import market_utils_1 = require("../../common/market-utils");
+
+// P5 类型安全：盘口条目 / 成交明细 / 盘口结构接口（替换裸 any）
+export interface BookEntry {
+    orderId: string | null;
+    accountId: string | null;
+    side: string;
+    price: number;
+    qty: number;
+    displayQty?: number;
+    hiddenQty?: number;
+    time: number;
+    virtual?: boolean;
+    expiresAtTick?: number;
+    mmId?: string | null;
+}
+export interface Fill {
+    orderId: string | null;
+    accountId: string | null;
+    side: string;
+    price: number;
+    qty: number;
+    virtual: boolean;
+    mmId?: string | null;
+}
+export interface OrderBook {
+    bids: BookEntry[];
+    asks: BookEntry[];
+    sealedUp?: boolean;
+    sealedDown?: boolean;
+}
+
 export class MatchingEngine {
     [key: string]: any;
     orderBooks: Map<string, any>;
-    realBooks: Map<string, any>;
+    realBooks: Map<string, OrderBook>;
     prices: Map<string, any>;
     dayOpenPrices: Map<string, any>;
     volatilities: Map<string, any>;
@@ -170,7 +202,7 @@ export class MatchingEngine {
         let asks = [];
         let bids = [];
         // P0 涨跌停封板（仅 A 股，以今开为基准 ±10%）：涨停时合成卖盘清空（只能排队买入）、跌停时合成买盘清空
-        const isCN = !/^H/.test(symbol) && !/^U/.test(symbol);
+        const isCN = market_utils_1.isCnSymbol(symbol);
         const limitUp = isCN && dayOpen && dayOpen > 0 ? Number(dayOpen) * 1.10 : null;
         const limitDown = isCN && dayOpen && dayOpen > 0 ? Number(dayOpen) * 0.90 : null;
         const sealedUp = limitUp !== null && midPrice >= limitUp - 1e-6;
@@ -359,7 +391,7 @@ export class MatchingEngine {
         const asks = book.asks.slice();
         if (bids.length === 0 || asks.length === 0)
             return { auctionPrice: Number(prevClose) || 0, fills: [] };
-        const isCN = !/^H/.test(symbol) && !/^U/.test(symbol);
+        const isCN = market_utils_1.isCnSymbol(symbol);
         const base = Number(prevClose) || Number(bids[0].price) || 1;
         const limitUp = isCN ? base * 1.10 : Infinity;
         const limitDown = isCN ? base * 0.90 : 0;

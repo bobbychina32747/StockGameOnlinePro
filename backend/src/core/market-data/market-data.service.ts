@@ -509,6 +509,13 @@ let MarketDataService = class MarketDataService {
                 timestamp: this.tickCount,
             });
         }
+        this.tickCount++;
+        return results;
+    }
+    // ─── P5 性能：行情后处理（宏观反馈/行业传导/AI 对手盘/做市商/指数反馈）移出价格广播热路径 ───
+    // 价格 tick 生成后先广播给前端，重计算在广播之后串行执行（await，不与下一 tick 交叠），
+    // 避免 AI 对手盘下单/行业传导的 CPU 计算与 WebSocket 推送争抢事件循环。
+    async postTickProcessing() {
         // 宏观反馈回路：个股表现 → 宏观因子（股票成为影响金融体系的真实嵌入体）
         this.updateMacroFeedback();
         // B1 复合反应 LoD：平稳期每 5 分钟传导，剧烈波动（黑天鹅等）立即传导
@@ -522,8 +529,6 @@ let MarketDataService = class MarketDataService {
             this.refreshMarketMakers();
         }
         this.updateIndexFeedback();
-        this.tickCount++;
-        return results;
     }
     // ─── 经济泡沫：行业泡沫度 = 行业均价 / 行业内在价值 ───
     computeIndustryBubble() {

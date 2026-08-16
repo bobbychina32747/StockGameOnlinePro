@@ -6,6 +6,14 @@
 
 ## [Unreleased] - Phase 4 AI 对手盘生态
 
+### 工程化与代码质量（回应外部评审）
+- **Swagger API 文档**：新增 @nestjs/swagger，`GET /api/docs` 交互式文档（全部路由自动列出 + Bearer 认证）
+- **去重**：A股/港股/美股判定统一到 `common/market-utils.ts`（`symbolMarket`/`isCnSymbol`，替换 3 处复制粘贴的正则）；`isTradingTimeNow` 收敛为日历驱动的 `isTradingTimeFor('CN')` 兼容委托
+- **类型安全**：MatchingEngine 新增 `BookEntry/Fill/OrderBook` 接口（盘口与成交结构告别裸 any）
+- **性能（事件循环争抢修复）**：tick 流水线拆分——价格/K线生成后**立即广播 WS**，宏观反馈/行业传导/AI 对手盘/做市商/指数反馈移入 `postTickProcessing()` 在广播后串行执行；AI 下单的 CPU 与 DB 等待不再阻塞前端推送（实时档与 1s 高速回放均受益）
+- **并发设计文档**：`docs/CONCURRENCY.md`——说明为何用串行结算队列而非 @VersionColumn（单进程内存盘口，队列=事实互斥，队列内二次复核资金/持仓/T+1）、为何不引入 BullMQ（本地内存世界、无跨进程任务，真实瓶颈用流水线拆分解决）、多实例部署的升级路径（盘口外置→DB 行锁/分布式锁→再加版本列）
+- 新增测试：postTickProcessing 独立可执行；后端 145→146
+
 ### Fixed
 - **调试模式（无视限制）休市期失效**：修复三处根因——① tick 循环动态节奏：调试开启且全市场休市时走 1s/tick 高速回放（原按配置 60s 才一格，市场看似"死"）；② 自适应调度：休眠期每 ≤5s 重算节奏，调试开关/开盘时刻切换后 5s 内生效（原要等满上一个 60s 定时器）；③ 启动预热：最新价/波动率/合成盘口在 onModuleInit 直接注入撮合引擎（原休市重启后引擎无价格无盘口，市价单报"市场深度不足"）
 - 关闭调试模式时同步复位全服休市交易开关（与注释承诺一致）；前端 Profile 同步刷新两个开关状态；state 接口的 tickIntervalMs 反映实际生效节奏（休市调试=1000）
