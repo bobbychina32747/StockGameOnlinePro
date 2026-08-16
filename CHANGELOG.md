@@ -4,6 +4,19 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase 0 工程底座
+
+### Added
+- **CI（GitHub Actions）**：push/PR 触发后端（npm ci → tsc → 76 项测试 → 启动冒烟 /api/market/stocks）与前端（npm ci → eslint → tsc → jest → vite build）
+- **前端测试基建**：Jest + babel-jest + jsdom + Testing Library（Vitest 因本地沙箱禁止 esbuild 子进程管道而改用进程内转译的 Jest，CI 不受影响）；新增 utils/quote、utils/marketSessions、store（行情 tick 合并 / UI 持久化）、PriceText 组件共 4 组测试
+- **数据库迁移脚本**：`backend/scripts/migrate-sqljs-to-better-sqlite3.mjs`（备份 → integrity_check → 逐表行数核对 → 切换 WAL），npm 脚本 `db:migrate`
+- **pre-commit 快速门禁**：`.githooks/pre-commit`（backend build+tests / frontend lint+tsc）
+
+### Changed
+- **数据库默认驱动 sql.js → better-sqlite3**：DB_TYPE=sqlite 时使用原生驱动（WAL 增量写盘 + busy_timeout，启动时 PRAGMA 初始化），消除 277MB 全库定时导出造成的秒级主线程阻塞；数据文件格式兼容，存量 `data/stockgame.db` 无需转换；DB_TYPE=sqljs 保留为兼容模式
+- **lint 修复**：ESLint 配置移至 `frontend/.eslintrc.cjs`（解析器依赖在 frontend/node_modules，原仓库根配置无法解析）；frontend 补充 eslint/@typescript-eslint/@types/jest 等 devDependencies；`npm test` 脚本新增
+- 仓库卫生：删除 9 个 3 字节空壳文件与 6 个百度云盘上传残留 `.cfg`
+
 ## [0.2.0] - 2026-08-14
 
 ### Fixed（体验）

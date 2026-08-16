@@ -29,7 +29,6 @@ export function AchievementBoard({ perf }: { perf: any }) {
     const map: Record<string, boolean> = {};
     for (const a of ACHIEVEMENTS) map[a.id] = a.check(perf);
     return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perf]);
 
   useEffect(() => {

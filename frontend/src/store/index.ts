@@ -73,8 +73,8 @@ export const useMarketStore = create<MarketState>((set) => ({
     // 防御：非法 tick（NaN/负数/异常大 timestamp）直接忽略，避免 Date 计算抛错
     if (
       typeof tick?.symbol !== 'string' ||
-      typeof tick?.price !== 'number' || !isFinite(tick.price) ||
-      typeof tick?.volume !== 'number' || !isFinite(tick.volume) ||
+      typeof tick?.price !== 'number' || !isFinite(tick.price) || tick.price < 0 ||
+      typeof tick?.volume !== 'number' || !isFinite(tick.volume) || tick.volume < 0 ||
       typeof tick?.timestamp !== 'number' || !isFinite(tick.timestamp) ||
       tick.timestamp < 0 || tick.timestamp > 1e9
     ) return;

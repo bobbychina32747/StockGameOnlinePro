@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  backend:
+    name: 后端（tsc + jest + 启动冒烟）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: development
+      JWT_SECRET: ci-only-secret-9f3a2c1b
+      ADMIN_PASSWORD: admin123456
+      PORT: '8000'
+      SQLITE_PATH: ./data/ci-smoke.db
+      TICK_INTERVAL_MS: '1000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: 安装依赖
+        run: npm ci
+      - name: TypeScript 构建
+        run: npm run build
+      - name: 单元测试（--runInBand）
+        run: npm test -- --runInBand
+      - name: 启动冒烟（等待 /api/market/stocks 返回 200）
+        run: |
+          mkdir -p data
+          node dist/src/main.js &
+          SERVER_PID=$!
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8000/api/market/stocks >/dev/null; then
+              echo "SMOKE OK (attempt $i)"
+              kill $SERVER_PID
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "SMOKE FAILED"
+          kill $SERVER_PID
+          exit 1
+
+  frontend:
+    name: 前端（eslint + tsc + vite build + jest）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: 安装依赖
+        run: npm ci
+      - name: ESLint
+        run: npm run lint
+      - name: TypeScript 类型检查
+        run: npx tsc -b
+      - name: 单元测试（jest --runInBand）
+        run: npm test -- --runInBand
+      - name: 生产构建
+        run: npm run build

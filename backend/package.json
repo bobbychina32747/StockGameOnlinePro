@@ -7,6 +7,7 @@
     "start": "node dist/src/main.js",
     "start:dev": "node --watch dist/src/main.js",
     "test": "jest --config jest.config.js",
+    "db:migrate": "node scripts/migrate-sqljs-to-better-sqlite3.mjs",
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json"
   },
   "devDependencies": {
@@ -25,6 +26,7 @@
     "@nestjs/typeorm": "^10.0.2",
     "@nestjs/websockets": "^10.3.0",
     "bcrypt": "^5.1.1",
+    "better-sqlite3": "^12.4.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "express-rate-limit": "^8.6.1",

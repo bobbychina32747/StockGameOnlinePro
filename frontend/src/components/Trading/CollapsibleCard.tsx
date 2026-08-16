@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 // 可折叠卡片：点击标题收起/展开（右侧面板手风琴式）
 export function CollapsibleCard({
@@ -7,7 +7,7 @@ export function CollapsibleCard({
   defaultOpen = true,
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);

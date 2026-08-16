@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { marketApi } from '../../services/api.client';
 import { useMarketStore, useUIStore } from '../../store';
 import { StockListPanel } from '../../components/Trading/StockListPanel';
@@ -122,7 +123,7 @@ export default function Dashboard() {
   const leftWidthRef = useRef(leftWidth);
   const rightWidthRef = useRef(rightWidth);
 
-  const startDrag = (e: React.MouseEvent, side: 'left' | 'right') => {
+  const startDrag = (e: ReactMouseEvent, side: 'left' | 'right') => {
     e.preventDefault();
     dragRef.current = { side, startX: e.clientX, startW: side === 'left' ? leftWidth : rightWidth };
     document.body.style.cursor = 'col-resize';

@@ -1,0 +1,20 @@
+#!/bin/sh
+# Phase 0 提交前检查（快速门禁）：backend tsc + 全量测试，frontend eslint。
+# 重型检查（vite 生产构建、smoke）由 GitHub Actions CI 承担，不在本地提交路径重复。
+set -e
+
+if [ -d backend/node_modules ]; then
+  echo "[pre-commit] backend build..."
+  (cd backend && npm run build --silent) || { echo "[pre-commit] backend build FAILED"; exit 1; }
+  echo "[pre-commit] backend tests..."
+  (cd backend && npm test -- --runInBand --silent) || { echo "[pre-commit] backend tests FAILED"; exit 1; }
+fi
+
+if [ -d frontend/node_modules ]; then
+  echo "[pre-commit] frontend lint..."
+  (cd frontend && npm run lint --silent) || { echo "[pre-commit] frontend lint FAILED"; exit 1; }
+  echo "[pre-commit] frontend typecheck..."
+  (cd frontend && npx tsc -b) || { echo "[pre-commit] frontend typecheck FAILED"; exit 1; }
+fi
+
+exit 0

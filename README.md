@@ -86,6 +86,23 @@ npm run dev
 
 浏览器访问 http://localhost:3000 ，随便注册一个账户
 
+### 开发与质量门禁
+
+```bash
+# 后端：类型构建 + 单元测试（76 例）+ 数据库迁移校验（sql.js → better-sqlite3）
+cd backend
+npm run build && npm test -- --runInBand
+npm run db:migrate          # 备份 + integrity_check + 逐表行数核对 + 切换 WAL
+
+# 前端：lint + 类型检查 + 单元测试（Jest + Testing Library）
+cd frontend
+npm run lint && npx tsc -b && npm test -- --runInBand
+```
+
+- **CI**：push/PR 自动触发 `.github/workflows/ci.yml`（后端构建/测试/启动冒烟 + 前端 lint/tsc/jest/vite build）
+- **pre-commit 门禁**：`git config core.hooksPath .githooks` 后，提交时自动跑后端 build+tests、前端 lint+tsc
+- **数据库驱动**：默认 `DB_TYPE=sqlite` 走 better-sqlite3（WAL 增量写盘）；旧 `sqljs` 内存驱动仍可用（`DB_TYPE=sqljs`）；两种驱动数据文件格式兼容，切换前建议先跑 `npm run db:migrate` 校验
+
 > 首次启动会生成全生命周期日线历史（约 25 万根，视机器需要 1~2 分钟），此后启动秒开。行情档位由 `backend/.env` 的 `TICK_INTERVAL_MS` 控制（1000=高速回放，60000=真实分钟级，默认 60000）。
 
 ### 默认账号（演示）

@@ -72,6 +72,19 @@ AppModule = __decorate(
                             logging: config.get('NODE_ENV') === 'development',
                         };
                     }
+                    // P0 数据库持久化改造：默认 sqlite 走 better-sqlite3（原生驱动，WAL 增量写盘，
+                    // 消除 sql.js 定时全库导出导致的秒级主线程阻塞）；sql.js 文件格式与
+                    // better-sqlite3 完全兼容，现有 data/stockgame.db 可直接复用（见 scripts/migrate-sqljs-to-better-sqlite3.mjs）
+                    if (dbType === 'sqlite' || dbType === 'better-sqlite3') {
+                        return {
+                            type: 'better-sqlite3',
+                            database: config.get('SQLITE_PATH', './data/stockgame.db'),
+                            autoLoadEntities: true,
+                            synchronize: true,
+                            logging: false,
+                        };
+                    }
+                    // 兼容旧驱动：DB_TYPE=sqljs（内存库 + main.ts 定时全库导出）
                     return {
                         type: 'sqljs',
                         location: config.get('SQLITE_PATH', './data/stockgame.db'),

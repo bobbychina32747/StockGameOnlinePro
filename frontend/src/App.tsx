@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { useAuthStore } from './store';
 import { AppLayout } from './components/Layout/AppLayout';
 import ErrorBoundary from './components/UI/ErrorBoundary';
@@ -9,7 +10,7 @@ import Profile from './pages/Profile/Profile';
 import Backtest from './pages/Backtest/Backtest';
 import Transactions from './pages/Transactions/Transactions';
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = useAuthStore((s) => s.token);
   if (!token) return <Navigate to="/login" replace />;
   return <>{children}</>;

@@ -74,6 +74,15 @@ async function bootstrap() {
     const path = require('path');
     const ds = app.get(typeorm_1.DataSource);
     const dbPath = config.get('SQLITE_PATH', './data/stockgame.db');
+    // P0: better-sqlite3 启动时启用 WAL + busy_timeout（sqljs 内存库下该 PRAGMA 返回 memory，无害）
+    try {
+        await ds.query('PRAGMA journal_mode = WAL');
+        await ds.query('PRAGMA busy_timeout = 5000');
+        await ds.query('PRAGMA synchronous = NORMAL');
+    }
+    catch (e) {
+        logger.warn('SQLite PRAGMA 初始化跳过: ' + (e && e.message ? e.message : e));
+    }
     const persistDatabase = () => {
         try {
             const conn = ds && ds.driver ? (ds.driver as any).databaseConnection : null; // sqljs 专有字段（类型未声明），用 as any 访问
