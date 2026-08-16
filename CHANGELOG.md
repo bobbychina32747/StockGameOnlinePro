@@ -4,6 +4,22 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase 1 行情真实性
+
+### Added
+- **统一交易日历数据源**：`backend/src/common/data/trading-calendar.ts` 与 `frontend/src/data/trading-calendar.ts`（字节级一致，pre-commit 钩子防漂移）——CN/HK/US 节假日清单按年份组织（2026 权威在库，2025/2027 可整体替换）；新增 `isMarketHoliday` / `marketDateFor` / `isUsDaylightSaving` / `usSessionsFor`
+- **美股夏令时**：北京时间开盘 21:30（EDT 夏令时）/ 22:30（EST 冬令时），随 3 月第二个周日/11 月第一个周日自动切换；跨午夜交易日（0:00-5:00）按美东日期判定节假日
+- **隔夜跳空模型**：替代原 2% 概率均匀随机黑天鹅——每市场每夜一次市场级冲击（含 4% 概率崩盘夜）×个股 β + 个股级厚尾冲击；CN 缺口钳制 ±10%（涨停/跌停开盘打标），HK/US ±25%；昨收/今开语义修正（prevClose=真实昨收），缺口写入 GARCH lastReturn
+- **厚尾跳跃（跳跃扩散升级）**：保留高频小跳，新增低频大跳（crashIntensity 0.0015，波动率升高时概率放大至 3 倍，负向偏斜 60%），大跳不受单 tick ±2% 连续项限幅
+- **A股三阶段集合竞价**：9:15-9:20 可申报可撤单 / 9:20-9:25 可申报不可撤（服务端拒绝撤单）/ 9:25-9:30 撮合中不接受申报（服务端拒绝下单）；竞价由 9:15 移到 9:25 执行；前端下单按钮按阶段显示「竞价申报中/竞价撮合中」
+- **盘后回放加速器**：分时图一键回放历史交易日（1x/4x/16x 倍速、暂停/续播、播放进度 HH:MM），纯逻辑抽入 `utils/replay.ts` 单测
+- 新增测试：后端 `phase1-market.test.js`（夏令时/三阶段竞价/隔夜跳空/厚尾跳跃 17 例）+ 前端 `replay.test.ts` / `marketSessions` 夏令时与竞价用例；后端 94/94、前端 36/36
+- 开发工具：`backend/scripts/phase1-integration-smoke.mjs`（null 依赖构造引擎，实测 generateTick/endOfDay 数值合理）
+
+### Changed
+- `isTradingTimeFor` 未知市场回退 CN 且不再索引越界（前后端同步修复）
+- 前端 `sessionLabel('US')` 与休市遮罩「下次开盘」文案随夏令时动态计算
+
 ## [Unreleased] - Phase 0 工程底座
 
 ### Added

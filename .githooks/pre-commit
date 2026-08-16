@@ -3,6 +3,12 @@
 # 重型检查（vite 生产构建、smoke）由 GitHub Actions CI 承担，不在本地提交路径重复。
 set -e
 
+# P1: 交易日历前后端副本必须字节级一致（防止漂移）
+if ! cmp -s backend/src/common/data/trading-calendar.ts frontend/src/data/trading-calendar.ts; then
+  echo "[pre-commit] 交易日历前后端副本不一致: backend/src/common/data/trading-calendar.ts vs frontend/src/data/trading-calendar.ts"
+  exit 1
+fi
+
 if [ -d backend/node_modules ]; then
   echo "[pre-commit] backend build..."
   (cd backend && npm run build --silent) || { echo "[pre-commit] backend build FAILED"; exit 1; }

@@ -24,6 +24,8 @@ import constants_1 = require("../../common/constants");
 
 import trading_engine_service_1 = require("../trading-engine/trading-engine.service");
 
+import market_math_1 = require("./market-math");
+
 // SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
 let klineDedupDone = false;
 
@@ -313,12 +315,10 @@ let MarketDataService = class MarketDataService {
         newVar = Math.max(1e-8, newVar);
         stock.volatility = this.clamp(Math.sqrt(newVar), 0.008, 0.8);
     }
-    // ─── 私有辅助函数：跳跃扩散 ───
-    calcJump(dt) {
-        if (Math.random() < constants_1.OU_PARAMS.jumpIntensity * dt * 240 * 1.5) {
-            return (Math.random() > 0.5 ? 1 : -1) * constants_1.OU_PARAMS.jumpStd * 1.5 * this.randn();
-        }
-        return 0;
+    // ─── 私有辅助函数：跳跃扩散（P1 厚尾升级：高频小跳并入连续项 + 低频大跳单独叠加） ───
+    calcJump(dt, stock) {
+        const stress = 1 + Math.min(2, Math.max(0, (stock.volatility - 0.03) * 15));
+        return market_math_1.drawJump(dt, { ...constants_1.OU_PARAMS, stress }, undefined, this.randn.bind(this));
     }
     // ─── 私有辅助函数：因子影响 ───
     calcFactorImpact(stock) {
@@ -409,7 +409,7 @@ let MarketDataService = class MarketDataService {
             const mu = Number(cfg.mu ?? 100);
             this.updateVolatility(stock);
             const shock = stock.volatility * params.volMult * this.randn() * Math.sqrt(dt) * 1.5 + industryShocks[stock.industry];
-            const jump = this.calcJump(dt);
+            const { small: smallJump, big: bigJump } = this.calcJump(dt, stock);
             const factorImpact = this.calcFactorImpact(stock);
             const ofiImpact = this.calcOFIImpact(stock);
             const drift = params.driftBase;
@@ -438,9 +438,11 @@ let MarketDataService = class MarketDataService {
                     this.logger.log('🧊 泡沫出清: ' + stock.industry + ' 回归内在价值');
                 }
             }
-            let priceChange = drift + shock + jump + factorImpact * dt * 5 + ofiImpact + meanReversion + momentumBoost + burstDrift;
+            let priceChange = drift + shock + smallJump + factorImpact * dt * 5 + ofiImpact + meanReversion + momentumBoost + burstDrift;
             // 收紧单 tick 波动 ±2%：保证相邻 K 线价格区间贴近（消除图表割裂）
             priceChange = this.clamp(priceChange, -0.02, 0.02);
+            // P1 厚尾：低频大跳（崩盘/脉冲）不受 ±2% 连续项限幅，在限幅后叠加（真实极端行情形态）
+            priceChange += bigJump;
             let newPrice = stock.price * (1 + priceChange);
             if (isNaN(newPrice) || !isFinite(newPrice))
                 newPrice = stock.price;
@@ -1019,6 +1021,8 @@ let MarketDataService = class MarketDataService {
             st.intrinsic = (Number(st.intrinsic) || Number(st.price)) * 1.001;
         }
         const batchKlines = [];
+        // P1 隔夜跳空：每市场每夜一次的市场级冲击（先于个股循环计算，全市场共享）
+        const overnightMarketShock = market_math_1.drawOvernightMarketShock(undefined, this.randn.bind(this));
         for (const stock of this.stocks.values()) {
             // S1 持久化：1min / 5min / daily 全部落库（重启可恢复历史）
             const persistBar = (timeframe, bar) => {
@@ -1050,21 +1054,28 @@ let MarketDataService = class MarketDataService {
                     persistBar('daily', stock.currentDaily);
                 stock.currentDaily = null;
             }
-            if (Math.random() < constants_1.BLACK_SWAN.probability) {
-                const [minGap, maxGap] = constants_1.BLACK_SWAN.gapRange;
-                const gap = minGap + Math.random() * (maxGap - minGap);
-                stock.price = Math.max(0.5, stock.price * (1 + gap));
-                stock.dayOpen = stock.price;
-                this.logger.warn(`[黑天鹅] ${stock.symbol} 隔夜跳空 ${(gap * 100).toFixed(2)}%`);
-            }
-            else {
-                stock.dayOpen = stock.price;
+            // P1 隔夜跳空模型：昨收=今日收盘，开盘=昨收×(1+缺口)；缺口写入 lastReturn 让 GARCH 感知隔夜冲击
+            // 市场级冲击×个股β + 个股级厚尾冲击；CN 受 ±10% 涨跌停约束（涨停/跌停开盘标记）
+            const lastClose = stock.price;
+            stock.prevClose = lastClose;
+            const overnightCfg = this.poolBySymbol.get(stock.symbol) || {};
+            const overnight = market_math_1.drawOvernightGap({
+                symbol: stock.symbol,
+                market: overnightCfg.market || this.market,
+                beta: Math.max(0.4, Math.min(2.5, (Number(overnightCfg.sigma) || 0.02) / 0.02)),
+            }, overnightMarketShock, undefined, this.randn.bind(this));
+            const gappedOpen = Math.max(0.5, lastClose * (1 + overnight.gap));
+            stock.price = gappedOpen;
+            stock.dayOpen = gappedOpen;
+            stock.lastReturn = overnight.gap;
+            stock.prevTickPrice = gappedOpen;
+            if (overnight.tag) {
+                this.logger.warn(`[隔夜] ${stock.symbol} ${overnight.tag} ${(overnight.gap * 100).toFixed(2)}%`);
             }
             stock.dayHigh = stock.price;
             stock.dayLow = stock.price;
             stock.dayVolume = 0;
             stock.minuteCounter = 0;
-            stock.prevClose = stock.price;
             stock.isTrending = false;
             stock.trendCounter = 0;
             stock.trendDirection = 0;

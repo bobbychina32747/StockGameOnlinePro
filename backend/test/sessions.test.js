@@ -14,8 +14,10 @@ describe('P1 各市场独立交易时段', () => {
     expect(isTradingTimeFor('US', new Date(2026, 0, 1, 10, 0))).toBe(false);
   });
 
-  test('美股中国时间晚间开市：周二 22:00 美股开、A股休', () => {
-    expect(isTradingTimeFor('US', new Date(2026, 0, 6, 22, 0))).toBe(true);
+  test('美股中国时间晚间开市（冬令时 22:30 / 夏令时 21:30）', () => {
+    expect(isTradingTimeFor('US', new Date(2026, 0, 6, 22, 0))).toBe(false); // 1 月冬令时 22:30 开盘
+    expect(isTradingTimeFor('US', new Date(2026, 0, 6, 22, 30))).toBe(true);
+    expect(isTradingTimeFor('US', new Date(2026, 6, 7, 21, 30))).toBe(true); // 7 月夏令时
     expect(isTradingTimeFor('CN', new Date(2026, 0, 6, 22, 0))).toBe(false);
   });
 

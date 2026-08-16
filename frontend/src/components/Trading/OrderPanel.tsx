@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { tradingApi } from '../../services/api.client';
 import { useAccountStore, useMarketStore, useUIStore } from '../../store';
 import { CollapsibleCard } from './CollapsibleCard';
-import { isTradingTimeFor, sessionLabel } from '../../utils/marketSessions';
+import { auctionStageFor, isTradingTimeFor, sessionLabel } from '../../utils/marketSessions';
 
 interface OrderEntry {
   id?: string;
@@ -83,12 +83,19 @@ export function OrderPanel() {
   const debugMode = useUIStore((s) => s.debugMode);
   const debugGlobal = useUIStore((s) => s.debugGlobal);
   const [marketOpen, setMarketOpen] = useState(isTradingTimeFor(mode));
+  // P1 三阶段竞价：9:15-9:20 可申报可撤 / 9:20-9:25 可申报不可撤 / 9:25-9:30 撮合中不可申报
+  const [auctionStage, setAuctionStage] = useState(auctionStageFor(mode));
   useEffect(() => {
     setMarketOpen(isTradingTimeFor(mode));
-    const id = setInterval(() => setMarketOpen(isTradingTimeFor(mode)), 10000);
+    setAuctionStage(auctionStageFor(mode));
+    const id = setInterval(() => {
+      setMarketOpen(isTradingTimeFor(mode));
+      setAuctionStage(auctionStageFor(mode));
+    }, 10000);
     return () => clearInterval(id);
   }, [mode]);
-  const canSubmit = !orderSubmitting && !invalidQty && !overBudget && effPrice > 0 && (marketOpen || debugMode || debugGlobal);
+  const canPlaceAuction = auctionStage === 'cancelable' || auctionStage === 'locked';
+  const canSubmit = !orderSubmitting && !invalidQty && !overBudget && effPrice > 0 && (marketOpen || canPlaceAuction || debugMode || debugGlobal);
 
   // ─── 下单 ───
   const placeOrder = async () => {
@@ -230,7 +237,11 @@ export function OrderPanel() {
           )}
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn btn-primary" style={{ flex: 1 }} onClick={placeOrder} disabled={!canSubmit}>
-              {!marketOpen && !debugMode && !debugGlobal ? `休市中（${sessionLabel(mode)}）` : orderSubmitting ? '提交中...' : '确认下单'}
+              {!marketOpen && !debugMode && !debugGlobal
+                ? (auctionStage === 'matching' ? '竞价撮合中（9:25-9:30）'
+                  : canPlaceAuction ? '竞价申报中（9:25 撮合）'
+                  : `休市中（${sessionLabel(mode)}）`)
+                : orderSubmitting ? '提交中...' : '确认下单'}
             </button>
             <button className="btn btn-danger btn-sm" onClick={quickClear}>清仓</button>
           </div>

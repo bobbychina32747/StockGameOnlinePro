@@ -105,12 +105,16 @@ let MarketService = class MarketService {
     async processMarket(market, marketData, counterKey) {
         let advanceCounter = false;
         try {
-            // P2: A 股盘前集合竞价申报窗口（9:15-9:25）：窗口内不生成行情只撮合一次竞价
-            if (!this.debugMode.isMarketActive() && (0, constants_1.isAuctionTimeFor)(market)) {
-                const todayKey = new Date().toDateString();
-                if (this.lastAuctionDay[market] !== todayKey) {
-                    this.lastAuctionDay[market] = todayKey;
-                    await this.runOpeningAuctions(market, marketData);
+            // P1 三阶段集合竞价（仅 A 股 9:15-9:30）：整个窗口不生成连续行情
+            // 9:15-9:20 可申报可撤单 / 9:20-9:25 可申报不可撤 / 9:25-9:30 撮合（每天仅一次，9:25 起执行）
+            const auctionStage = (0, constants_1.auctionStageFor)(market);
+            if (!this.debugMode.isMarketActive() && auctionStage) {
+                if (auctionStage === 'matching') {
+                    const todayKey = new Date().toDateString();
+                    if (this.lastAuctionDay[market] !== todayKey) {
+                        this.lastAuctionDay[market] = todayKey;
+                        await this.runOpeningAuctions(market, marketData);
+                    }
                 }
                 return;
             }

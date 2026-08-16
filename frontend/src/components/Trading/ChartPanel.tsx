@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactEChartsCore from 'echarts-for-react';
 import { useMarketStore, useUIStore } from '../../store';
 import { PriceText } from './PriceText';
-import { isTradingTimeFor } from '../../utils/marketSessions';
+import { isTradingTimeFor, usSessionsFor } from '../../utils/marketSessions';
+import { barsForDay, nextReplaySpeed, replayDaysOf, replayTimeLabelOf } from '../../utils/replay';
 
 interface KlineData {
   time: Date;
@@ -89,6 +90,34 @@ export function ChartPanel() {
   const price = prices[selectedSymbol];
   const isIntraday = selectedTimeframe === 'intraday';
 
+  // ─── P1 盘后回放加速器：分时图按历史交易日倍速重放（1x/4x/16x，模拟盘中逐步揭示） ───
+  const [replay, setReplay] = useState({ enabled: false, playing: true, day: '', index: 0, speed: 4 });
+  const replayDays = useMemo(() => replayDaysOf(intradaySrc), [intradaySrc]);
+  // 数据变化时：默认回放日 = 最近一个交易日，游标归零
+  useEffect(() => {
+    if (replayDays.length && !replayDays.includes(replay.day)) {
+      setReplay((r) => ({ ...r, day: replayDays[replayDays.length - 1], index: 0 }));
+    }
+  }, [replayDays, replay.day]);
+  const activeReplayBars = useMemo(
+    () => (replay.enabled && replay.day ? barsForDay(intradaySrc, replay.day) : []),
+    [intradaySrc, replay.enabled, replay.day],
+  );
+  // 播放推进：每 250ms 推进 speed 根（1x=4根/秒≈完整交易日 60 秒；4x≈15 秒；16x≈4 秒）
+  useEffect(() => {
+    if (!replay.enabled || !replay.playing) return;
+    const id = setInterval(() => {
+      setReplay((r) => {
+        const dayBars = barsForDay(intradaySrc, r.day);
+        if (dayBars.length === 0) return { ...r, playing: false };
+        const next = Math.min(dayBars.length - 1, r.index + r.speed);
+        return { ...r, index: next, playing: next < dayBars.length - 1 };
+      });
+    }, 250);
+    return () => clearInterval(id);
+  }, [replay.enabled, replay.playing, replay.speed, replay.day, intradaySrc]);
+  const replayTimeLabel = replayTimeLabelOf(activeReplayBars, replay.index);
+
   // P5 亮色主题适配：图表轴/网格/提示框/滑条颜色随主题切换
   const theme = useUIStore((s) => s.theme);
   const isLight = theme === 'light';
@@ -123,7 +152,11 @@ export function ChartPanel() {
     const day = now.getDay();
     const minutes = now.getHours() * 60 + now.getMinutes();
     if (m === 'US') {
-      return (day === 0 || day === 6 || (minutes >= 240 && minutes < 1290)) ? '下次开盘：今日 21:30' : '下次开盘：明日 21:30';
+      // P1 美股夏令时/冬令时：开盘分钟动态计算（1290=21:30 夏令时 / 1350=22:30 冬令时）
+      const openMin = usSessionsFor(now)[0][0];
+      const hh = String(Math.floor(openMin / 60)).padStart(2, '0');
+      const mm = String(openMin % 60).padStart(2, '0');
+      return (day === 0 || day === 6 || (minutes >= 240 && minutes < openMin)) ? `下次开盘：今日 ${hh}:${mm}` : `下次开盘：明日 ${hh}:${mm}`;
     }
     if (day === 0 || day === 6 || minutes >= (m === 'HK' ? 960 : 900)) return '下次开盘：明日 9:30';
     if (minutes < 570) return '下次开盘：今日 9:30';
@@ -165,11 +198,15 @@ export function ChartPanel() {
   const chartOption = useMemo(() => {
   // ─── 分时图（S1）：当日 1min（均匀时间轴，不合并 → 无跨天断裂/分层） ───
     if (isIntraday) {
-      // 只取最近一天（按模拟日期），消除跨天价格跳空导致的断裂
+      // 取所选交易日（回放模式 = 用户选择的回放日；常规模式 = 最近一天），消除跨天价格跳空导致的断裂
       let bars = intradaySrc;
       if (bars.length > 0) {
-        const lastDay = new Date(bars[bars.length - 1].time).toDateString();
-        bars = bars.filter((k) => new Date(k.time).toDateString() === lastDay);
+        const activeDay = replay.enabled && replay.day
+          ? replay.day
+          : new Date(bars[bars.length - 1].time).toDateString();
+        bars = bars.filter((k) => new Date(k.time).toDateString() === activeDay);
+        // 回放：只揭示到当前游标为止的 K 线（逐步播放效果）
+        if (replay.enabled) bars = bars.slice(0, Math.min(replay.index + 1, bars.length));
       }
       // 分时：当天数据不合并（≤390 点直接画，保持均匀时间轴）
       if (bars.length === 0) return {};
@@ -346,7 +383,7 @@ export function ChartPanel() {
       ],
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [klineData, selectedTimeframe, intradaySrc, isIntraday, zoom, containerWidth, theme]);
+  }, [klineData, selectedTimeframe, intradaySrc, isIntraday, zoom, containerWidth, theme, replay.enabled, replay.day, replay.index]);
 
   const prevClose = stock?.dayOpen != null ? Number(stock.dayOpen) : (stock?.price ?? price ?? 0);
   const changePct = prevClose > 0 && price != null ? ((price - prevClose) / prevClose) * 100 : 0;
@@ -418,6 +455,50 @@ export function ChartPanel() {
           <>
             <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>昨收 <b className="up" style={{ marginLeft: 4, fontFamily: 'var(--font-mono)' }}>{intradaySrc[0] ? Number(intradaySrc[0].open).toFixed(2) : '-'}</b></span>
             <span className="chart-listdate">黄色虚线为当日均价线</span>
+            {/* P1 盘后回放加速器：分时图倍速回看历史交易日 */}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: 11, padding: '1px 8px' }}
+                title={replay.enabled ? '退出回放，恢复实时分时' : '按历史交易日倍速回放分时走势'}
+                onClick={() => setReplay((r) => ({ ...r, enabled: !r.enabled, index: 0, playing: true }))}
+              >
+                {replay.enabled ? '⏹ 退出回放' : '▶ 盘后回放'}
+              </button>
+              {replay.enabled && replayDays.length > 0 && (
+                <>
+                  <select
+                    value={replay.day}
+                    onChange={(e) => setReplay((r) => ({ ...r, day: e.target.value, index: 0, playing: true }))}
+                    style={{ fontSize: 11, padding: '0 2px', background: 'var(--panel-bg, #171922)', color: 'var(--text, #d1d4dc)', border: '1px solid var(--border, #2e3240)', borderRadius: 4 }}
+                  >
+                    {replayDays.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    style={{ fontSize: 11, padding: '0 6px' }}
+                    title="切换回放倍速"
+                    onClick={() => setReplay((r) => ({ ...r, speed: nextReplaySpeed(r.speed) }))}
+                  >
+                    {replay.speed}x
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    style={{ fontSize: 11, padding: '0 6px' }}
+                    title="暂停/继续（播完后再点重新开始）"
+                    onClick={() => setReplay((r) => {
+                      const done = activeReplayBars.length > 0 && r.index >= activeReplayBars.length - 1;
+                      return done ? { ...r, index: 0, playing: true } : { ...r, playing: !r.playing };
+                    })}
+                  >
+                    {replay.playing ? '⏸' : '▶'}
+                  </button>
+                  <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                    {Math.min(replay.index + 1, activeReplayBars.length)}/{activeReplayBars.length} {replayTimeLabel}
+                  </span>
+                </>
+              )}
+            </span>
           </>
         ) : (
           <>

@@ -177,14 +177,14 @@ export const OU_PARAMS = {
     garchOmega: 0.0001,
     jumpIntensity: 0.02,
     jumpStd: 0.02,
+    // P1 厚尾：低频大跳（崩盘/脉冲），每 tick 基准概率 0.0015（约每 3 个交易日 1 次/股），
+    // 波动率升高时概率放大；负向偏斜 60%（真实市场下跌跳更常见）
+    crashIntensity: 0.0015,
+    crashStd: 0.05,
+    crashSkew: 0.6,
     trendPersistence: 0.85,
     trendDetectionBars: 3,
     trendDetectionThreshold: 0.005,
-};
-
-export const BLACK_SWAN = {
-    probability: 0.02,
-    gapRange: [-0.15, 0.20],
 };
 
 export const FACTOR_NAMES = [
@@ -253,48 +253,84 @@ export function isTradingTimeNow() {
 }
 
 // P1 各市场独立交易时段与节假日历（分钟制；weekdays 0=周日..6=周六；sessions 为 [开始分钟, 结束分钟) 区间）
-// 说明：美股时段按中国本地时间（21:30-24:00 + 00:00-04:00）；节假日为近似清单，可用真实交易日历替换
+// 数据源：src/common/data/trading-calendar.ts（唯一权威副本，含美股夏令时与跨午夜交易日归属）
+// 兼容保留 MARKET_SESSIONS 导出（holidays 为全部年份扁平合并，便于旧代码/测试直接 contains）
+import calendar_1 = require("../data/trading-calendar");
+const CAL = calendar_1.TRADING_CALENDAR;
+const flatHolidays = (m: 'CN' | 'HK' | 'US'): string[] => Object.values(CAL[m].holidays).reduce<string[]>((a, arr) => a.concat(arr), []);
 export const MARKET_SESSIONS = {
     CN: {
-        weekdays: [1, 2, 3, 4, 5],
-        sessions: [[570, 690], [780, 900]],
-        holidays: ['2026-01-01', '2026-01-02', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-04-06', '2026-05-01', '2026-05-04', '2026-05-05', '2026-06-19', '2026-09-25', '2026-10-01', '2026-10-02', '2026-10-05', '2026-10-06', '2026-10-07'],
+        weekdays: CAL.CN.weekdays,
+        sessions: CAL.CN.sessions,
+        holidays: flatHolidays('CN'),
     },
     HK: {
-        weekdays: [1, 2, 3, 4, 5],
-        sessions: [[570, 720], [780, 960]],
-        holidays: ['2026-01-01', '2026-02-16', '2026-02-17', '2026-02-18', '2026-04-03', '2026-04-06', '2026-05-01', '2026-06-19', '2026-07-01', '2026-10-01', '2026-12-25'],
+        weekdays: CAL.HK.weekdays,
+        sessions: CAL.HK.sessions,
+        holidays: flatHolidays('HK'),
     },
     US: {
-        weekdays: [1, 2, 3, 4, 5],
-        sessions: [[1290, 1440], [0, 240]],
-        holidays: ['2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25', '2026-06-19', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25'],
+        weekdays: CAL.US.weekdays,
+        sessions: CAL.US.sessions,
+        holidays: flatHolidays('US'),
     },
 };
+
+export function isHolidayFor(mode, date) {
+    if (!CAL[mode])
+        return false;
+    return calendar_1.isMarketHoliday(mode, date);
+}
+
+export function usSessionsFor(date) {
+    return calendar_1.usSessionsFor(date || new Date());
+}
+
+export function isUsDaylightSaving(date) {
+    return calendar_1.isUsDaylightSaving(date || new Date());
+}
+
 // P2: 盘前集合竞价申报窗口（仅 A 股 9:15-9:30，其中 9:15-9:25 可申报、9:25 撮合）
 export function isAuctionTimeFor(mode, now?) {
-    if (mode !== 'CN')
-        return false;
-    const d = now || new Date();
-    if (!MARKET_SESSIONS.CN.weekdays.includes(d.getDay()))
-        return false;
-    const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    if (MARKET_SESSIONS.CN.holidays.includes(dateStr))
-        return false;
-    const minutes = d.getHours() * 60 + d.getMinutes();
-    return minutes >= 555 && minutes < 570;
+    return auctionStageFor(mode, now) !== null;
 }
-// P1: 按市场判断是否处于交易时段（mode: CN/HK/US；缺省 CN 保持向后兼容）
-export function isTradingTimeFor(mode, now?) {
-    const cfg = MARKET_SESSIONS[mode] || MARKET_SESSIONS.CN;
+
+// P1 三阶段竞价规则（仅 A 股）：
+// - 'cancelable' 9:15-9:20  可申报、可撤单
+// - 'locked'     9:20-9:25  可申报、不可撤单
+// - 'matching'   9:25-9:30  撮合阶段：不可申报、不可撤单
+export function auctionStageFor(mode, now?) {
+    if (mode !== 'CN')
+        return null;
     const d = now || new Date();
+    if (!CAL.CN.weekdays.includes(d.getDay()))
+        return null;
+    if (calendar_1.isMarketHoliday('CN', d))
+        return null;
+    const minutes = d.getHours() * 60 + d.getMinutes();
+    if (minutes >= 555 && minutes < 560)
+        return 'cancelable';
+    if (minutes >= 560 && minutes < 565)
+        return 'locked';
+    if (minutes >= 565 && minutes < 570)
+        return 'matching';
+    return null;
+}
+
+// P1: 按市场判断是否处于交易时段（mode: CN/HK/US；未知/缺省回退 CN 保持向后兼容）
+// 美股：夏令时/冬令时动态时段 + 跨午夜交易日按美东日期判节假日
+export function isTradingTimeFor(mode, now?) {
+    const m = (mode && CAL[mode] ? mode : 'CN');
+    const cfg = MARKET_SESSIONS[m];
+    const raw = now || new Date();
+    const d = calendar_1.marketDateFor(m, raw);
     if (!cfg.weekdays.includes(d.getDay()))
         return false;
-    const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    if (cfg.holidays.includes(dateStr))
+    if (calendar_1.isMarketHoliday(m, raw))
         return false;
-    const minutes = d.getHours() * 60 + d.getMinutes();
-    for (const s of cfg.sessions) {
+    const minutes = raw.getHours() * 60 + raw.getMinutes();
+    const sessions = m === 'US' ? calendar_1.usSessionsFor(raw) : cfg.sessions;
+    for (const s of sessions) {
         if (minutes >= s[0] && minutes < s[1])
             return true;
     }

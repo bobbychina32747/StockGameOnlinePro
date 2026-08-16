@@ -45,9 +45,13 @@ let OrderService = class OrderService {
     async placeOrder(userId, mode, symbol, type, side, quantity, price, triggerPrice) {
         // S2 休市校验：非交易时段拒绝下单
         // 调试模式仅对开启它的管理员（canBypassHours 白名单）跳过休市检查
-        // P2: 盘前集合竞价窗口（A股 9:15-9:25）内允许挂单申报，9:25 竞价撮合
-        const inAuction = (0, constants_1.isAuctionTimeFor)(mode);
-        if (!this.debugMode.canBypassHours(userId) && !(0, constants_1.isTradingTimeFor)(mode) && !inAuction) {
+        // P1 三阶段竞价（A股）：9:15-9:20 可申报可撤 / 9:20-9:25 可申报不可撤 / 9:25-9:30 撮合中不接受申报
+        const auctionStage = (0, constants_1.auctionStageFor)(mode);
+        if (!this.debugMode.canBypassHours(userId) && auctionStage === 'matching') {
+            throw new common_1.BadRequestException('集合竞价撮合中（9:25-9:30），暂不接受申报');
+        }
+        const canPlaceInAuction = auctionStage === 'cancelable' || auctionStage === 'locked';
+        if (!this.debugMode.canBypassHours(userId) && !(0, constants_1.isTradingTimeFor)(mode) && !canPlaceInAuction) {
             throw new common_1.BadRequestException('休市中，当前市场不在交易时段，无法下单');
         }
         const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });
@@ -67,6 +71,11 @@ let OrderService = class OrderService {
         return { success: true, order: result.order };
     }
     async cancelOrder(userId, orderId, mode) {
+        // P1 三阶段竞价：9:20-9:25 申报锁定不可撤单，9:25-9:30 撮合阶段不可撤单（真实规则）
+        const stage = (0, constants_1.auctionStageFor)(mode);
+        if (!this.debugMode.canBypassHours(userId) && (stage === 'locked' || stage === 'matching')) {
+            throw new common_1.BadRequestException('集合竞价 9:20-9:25 申报不可撤单（9:25 起进入撮合），请在开盘后撤单');
+        }
         const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });
         if (!account)
             throw new common_1.NotFoundException('账户不存在');
