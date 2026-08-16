@@ -286,6 +286,14 @@ export function usSessionsFor(date) {
     return calendar_1.usSessionsFor(date || new Date());
 }
 
+// P4 修复：调试模式（无视限制）休市期的 tick 节奏——高速回放 1s/tick，
+// 否则按配置 TICK_INTERVAL_MS（1000 高速 / 60000 真实分钟级）
+export function tickDelayMs(isMarketActive, anyTrading, configuredMs) {
+    if (isMarketActive && !anyTrading)
+        return 1000;
+    return configuredMs;
+}
+
 export function isUsDaylightSaving(date) {
     return calendar_1.isUsDaylightSaving(date || new Date());
 }

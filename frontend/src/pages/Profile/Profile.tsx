@@ -43,6 +43,9 @@ export default function Profile() {
       const r = await adminApi.debug(next);
       setDebugOn(!!r?.debug);
       setDebugMode(!!r?.debug);
+      // P4 修复：调试模式关闭会同步复位全服休市交易，前端状态一并刷新，避免残留遮罩解锁
+      setDebugGlobalOn(!!r?.globalBypass);
+      useUIStore.setState({ debugGlobal: !!r?.globalBypass });
     } catch (e) {
       console.error('切换调试模式失败', e);
     }

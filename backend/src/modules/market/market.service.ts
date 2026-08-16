@@ -70,6 +70,26 @@ let MarketService = class MarketService {
     isMarketOpen(mode) {
         return (0, constants_1.isTradingTimeFor)(mode || 'CN');
     }
+    // P4 修复：启动预热——把行情引擎内部价格/波动率/合成盘口立即同步到最新状态
+    warmUpMarket(marketData) {
+        if (!marketData)
+            return;
+        try {
+            const prices = marketData.getPrices();
+            if (!prices || Object.keys(prices).length === 0)
+                return;
+            this.engine.updatePrices(prices);
+            this.engine.setDayOpen(prices);
+            try {
+                this.engine.setVolatilities(marketData.getVolatilities());
+            }
+            catch (e) { }
+            this.engine.refreshOrderBooks(prices);
+        }
+        catch (e) {
+            this.logger.warn('行情引擎预热失败: ' + (e && e.message ? e.message : e));
+        }
+    }
     async onModuleInit() {
         await this.marketData.init();
         // 三服务器：HK/US 实例手动初始化（factory 创建不触发生命周期钩子）
@@ -79,6 +99,11 @@ let MarketService = class MarketService {
         if (this.marketDataUS) {
             await this.marketDataUS.init();
         }
+        // P4 修复：引擎预热（最新价/波动率/合成盘口）——休市启动或调试模式开启后，订单与盘口立即可用，
+        // 不再等第一个 tick（此前实时档首个 tick 需等 60s，市价单报"市场深度不足"）
+        this.warmUpMarket(this.marketData);
+        this.warmUpMarket(this.marketDataHK);
+        this.warmUpMarket(this.marketDataUS);
         // S2 启动校准：交易中启动时 tickCounter 对齐当前真实时段分钟数（避免误触发开盘/日终）
         const now = new Date();
         const minutes = now.getHours() * 60 + now.getMinutes();
@@ -265,10 +290,30 @@ let MarketService = class MarketService {
             }
         }
     }
+    // P4 修复：tick 节奏——调试模式（无视限制）休市期走 1s/tick 高速回放，
+    // 正常交易时段按配置 TICK_INTERVAL_MS（1000 高速 / 60000 真实分钟级）
+    tickDelay() {
+        const anyTrading = (0, constants_1.isTradingTimeFor)('CN') || (0, constants_1.isTradingTimeFor)('HK') || (0, constants_1.isTradingTimeFor)('US');
+        return (0, constants_1.tickDelayMs)(this.debugMode.isMarketActive(), anyTrading, this.tickIntervalMs);
+    }
     async startTickLoop() {
+        this.lastTickAt = Date.now();
         const tick = async () => {
-            if (this.processing) return;
+            // P4 修复：动态节奏——到点才跑；休眠期最多每 5s 重算一次 delay，
+            // 调试模式开关/开盘时刻切换后 5s 内生效（旧实现要等满上一个 60s 定时器）
+            const delay = this.tickDelay();
+            const elapsed = Date.now() - this.lastTickAt;
+            if (elapsed < delay) {
+                const wait = Math.min(Math.max(delay - elapsed, 500), 5000);
+                setTimeout(tick, wait);
+                return;
+            }
+            if (this.processing) {
+                setTimeout(tick, 500);
+                return;
+            }
             this.processing = true;
+            this.lastTickAt = Date.now();
             try {
                 // P1: 全局不再统一门控，由 processMarket 按各市场独立时段判断
                 // 三服务器：轮流处理 CN/HK/US（各自独立 gameDay/因子/事件/时段）
@@ -286,10 +331,12 @@ let MarketService = class MarketService {
             finally {
                 this.processing = false;
                 // 递归必须在 finally 内：try 内 return（休市）会跳过其后的 setTimeout
-                setTimeout(tick, this.tickIntervalMs);
+                setTimeout(tick, 500);
             }
         };
-        setTimeout(tick, this.tickIntervalMs);
+        // P4 修复：初始调度同样以 5s 为上限——实时档（60s）休眠期每 5s 醒来检查一次节奏，
+        // 调试模式开启后首个 tick 在 5s 内生效（旧实现要等满第一个 60s 定时器）
+        setTimeout(tick, Math.min(this.tickDelay(), 5000));
     }
     // P4 新闻错峰：入队 + 每 tick 播报一条
     enqueueNews(market, item) {
@@ -392,7 +439,9 @@ let MarketService = class MarketService {
         // 合并：当前市场用 CN（前端市场切换时按各自 state 展示）
         const cn = this.marketData.getState();
         // P0: 暴露 tick 间隔，前端据此标注「高速回放」或「实时行情」
-        cn.tickIntervalMs = this.tickIntervalMs;
+        // P4 修复：调试模式休市期为 1s/tick 高速回放（与 tickDelay() 一致）
+        const anyTradingNow = (0, constants_1.isTradingTimeFor)('CN') || (0, constants_1.isTradingTimeFor)('HK') || (0, constants_1.isTradingTimeFor)('US');
+        cn.tickIntervalMs = (0, constants_1.tickDelayMs)(this.debugMode.isMarketActive(), anyTradingNow, this.tickIntervalMs);
         // P6: 全服休市交易状态（所有客户端据此解锁休市下单）
         cn.offHoursTrading = !!this.debugMode.getGlobalBypass();
         // 浅拷贝避免循环引用（markets.CN 不能引用 cn 自身）

@@ -57,8 +57,10 @@ let AdminController = class AdminController {
         else {
             this.debugMode.clearBypassUsers();
             this.debugMode.set(false);
+            // P4 修复：关闭调试模式时同步复位全服休市交易（与注释承诺一致，避免遗留全局旁路）
+            this.debugMode.setGlobalBypass(false);
         }
-        return { success: true, debug: this.debugMode.get() };
+        return { success: true, debug: this.debugMode.get(), globalBypass: this.debugMode.getGlobalBypass() };
     }
     async getDebug(user) {
         if (user.role !== user_entity_1.UserRole.ADMIN)
