@@ -34,6 +34,12 @@ let MarketController = class MarketController {
     getReports(symbol) {
         return this.marketService.getReports(symbol);
     }
+    getAiOpponents() {
+        return this.marketService.getAiOpponents();
+    }
+    getFlowSignals(symbol) {
+        return this.marketService.getFlowSignals(symbol);
+    }
     backtest(symbol, fast, slow, timeframe) {
         return this.marketService.backtest(symbol, fast, slow, timeframe);
     }
@@ -69,6 +75,19 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], MarketController.prototype, "getReports", null);
+__decorate([
+    (0, common_1.Get)('ai-opponents'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], MarketController.prototype, "getAiOpponents", null);
+__decorate([
+    (0, common_1.Get)('flow-signals'),
+    __param(0, (0, common_1.Query)('symbol')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], MarketController.prototype, "getFlowSignals", null);
 __decorate([
     (0, common_1.Get)('state'),
     __metadata("design:type", Function),

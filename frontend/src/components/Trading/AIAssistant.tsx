@@ -1,15 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useMarketStore, useUIStore } from '../../store';
+import { marketApi } from '../../services/api.client';
+import { useAccountStore, useMarketStore, useUIStore } from '../../store';
 import { CollapsibleCard } from './CollapsibleCard';
 
-// C4 AI 助手：基于行情/K线/新闻生成交易建议 + C2 语音涨跌提醒
+// C4 AI 助手：基于行情/K线/新闻生成交易建议 + C2 语音涨跌提醒 + P4 AI 对手盘排行榜
 export function AIAssistant() {
   const stocks = useMarketStore((s) => s.stocks);
   const prices = useMarketStore((s) => s.prices);
   const klines = useMarketStore((s) => s.klines);
   const latestNews = useUIStore((s) => s.latestNews);
   const selectedSymbol = useUIStore((s) => s.selectedSymbol);
+  const account = useAccountStore((s) => s.account);
   const [voiceOn, setVoiceOn] = useState(() => localStorage.getItem('ss.voice') === '1');
+  // P4 AI 对手盘排行榜（完全本地：策略 + 随机森林，零外部 API）
+  const [opponents, setOpponents] = useState<any[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      marketApi.aiOpponents().then((list) => {
+        if (alive && Array.isArray(list)) setOpponents(list);
+      }).catch(() => {});
+    };
+    load();
+    const t = setInterval(load, 20000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
 
   const price = prices[selectedSymbol];
   const stock = stocks.find((s: any) => s.symbol === selectedSymbol);
@@ -47,6 +63,14 @@ export function AIAssistant() {
     if (tips.length === 0) tips.push('📊 行情平稳，建议观望，等待明确信号');
     return tips;
   }, [bars, stock, latestNews]);
+
+  // P4 与 AI 对手盘对比（跑赢中位数才有资格说话）
+  const userReturn = account?.initialEquity > 0 && account?.totalEquity != null
+    ? ((Number(account.totalEquity) - Number(account.initialEquity)) / Number(account.initialEquity)) * 100
+    : null;
+  const medianAi = opponents.length ? opponents[Math.floor(opponents.length / 2)]?.pnlPct : null;
+  const topAi = opponents[0];
+  const beaten = userReturn != null && medianAi != null && userReturn > medianAi;
 
   // C2 语音提醒：价格相对昨收波动超 1% 播报
   const prevPriceRef = useRef(price);
@@ -90,6 +114,40 @@ export function AIAssistant() {
         </button>
         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>价格波动 ≥1% 自动播报</span>
       </div>
+      {/* P4 AI 对手盘排行榜：本地策略 + 随机森林，零外部 API */}
+      {opponents.length > 0 && (
+        <div style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+            🤖 AI 对手盘
+            <span style={{ fontWeight: 400, fontSize: 10, color: 'var(--text-muted)', marginLeft: 6 }}>
+              （本地策略+随机森林，零 API）
+            </span>
+          </div>
+          {opponents.slice(0, 5).map((o, i) => (
+            <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0' }}>
+              <span>
+                #{i + 1} {o.name}
+                <span style={{ color: 'var(--text-muted)', marginLeft: 6, fontSize: 10 }}>{o.strategyName}</span>
+              </span>
+              <span className={o.pnlPct >= 0 ? 'up' : 'down'} style={{ fontFamily: 'var(--font-mono)' }}>
+                {o.pnlPct >= 0 ? '+' : ''}{o.pnlPct}% · {o.tier}
+              </span>
+            </div>
+          ))}
+          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--color-warning)' }}>
+            {beaten
+              ? `🏆 你的收益 ${userReturn!.toFixed(2)}% 已跑赢 AI 中位数 ${medianAi!.toFixed(2)}%，继续保持！`
+              : userReturn != null
+                ? `🤖 你的收益 ${userReturn.toFixed(2)}%，连 AI 中位数 ${medianAi!.toFixed(2)}% 都没跑赢——AI 都打不过还想炒股赚钱？`
+                : '🤖 AI 都打不过还想炒股赚钱？先跑赢 AI 中位数再说。'}
+          </div>
+          {topAi && (
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+              「{topAi.name}」：{topAi.taunt}
+            </div>
+          )}
+        </div>
+      )}
     </CollapsibleCard>
   );
 }

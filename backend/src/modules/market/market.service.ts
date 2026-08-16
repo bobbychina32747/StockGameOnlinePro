@@ -406,6 +406,19 @@ let MarketService = class MarketService {
     getReports(symbol) {
         return this.marketDataFor(symbol).getReports(symbol);
     }
+    // P4 AI 对手盘：三服务器合并排名（完全本地策略，零外部 API）
+    getAiOpponents() {
+        const all = [];
+        for (const md of [this.marketData, this.marketDataHK, this.marketDataUS]) {
+            if (md)
+                all.push(...(md.getAiOpponents() || []));
+        }
+        return all.sort((a, b) => b.pnlPct - a.pnlPct);
+    }
+    // P4 订单流信号：OFI + 机构/游资大单净流入（按股票所属市场路由）
+    getFlowSignals(symbol) {
+        return this.marketDataFor(symbol).getFlowSignals(symbol);
+    }
     // ─── B2 回测：MA 交叉策略（返回结果 + 收益曲线抽样 40 点） ───
     backtest(symbol, fast = 5, slow = 20, timeframe = '1min') {
         const klines = this.marketDataFor(symbol).getKlines(symbol, timeframe);

@@ -30,6 +30,8 @@ import market_maker_1 = require("./market-maker");
 
 import fundamentals_1 = require("./fundamentals");
 
+import ai_opponents_1 = require("./ai-opponents");
+
 // SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
 let klineDedupDone = false;
 
@@ -63,24 +65,20 @@ let MarketDataService = class MarketDataService {
         this.burstingIndustries = new Set();
         this.burstEvents = [];
         this.industryBubbleMap = {};
-        // AI 对手盘：机构/游资/散户市场参与者（每服务器独立）
-        // P3 AI 资金账户账本：现金/持仓/未平挂单市值（行为树资金约束）
+        // AI 对手盘：机构/游资/散户市场参与者（每服务器独立，完全本地：规则策略 + 本地随机森林，零 API）
+        // P4 具名对手盘 + 策略 + 绩效记账（净值/胜率/段位）
         this.aiLedger = [];
-        this.aiAgents = [
-            { type: '机构', activity: 0.25, scale: 25000 },
-            { type: '机构', activity: 0.2, scale: 30000 },
-            { type: '游资', activity: 0.45, scale: 9000 },
-            { type: '游资', activity: 0.4, scale: 7000 },
-            { type: '游资', activity: 0.35, scale: 6000 },
-            { type: '散户', activity: 0.7, scale: 2500 },
-            { type: '散户', activity: 0.6, scale: 1800 },
-            { type: '散户', activity: 0.55, scale: 1500 },
-            { type: '散户', activity: 0.5, scale: 1200 },
-            { type: '散户', activity: 0.45, scale: 900 },
-        ];
-        for (let i = 0; i < this.aiAgents.length; i++) {
-            this.aiLedger.push({ cash: 20000000, positions: new Map<string, { qty: number, cost: number }>(), restingValue: 0 });
+        this.aiAgents = ai_opponents_1.AI_OPPONENT_DEFS.map((d) => ({ ...d }));
+        for (const def of ai_opponents_1.AI_OPPONENT_DEFS) {
+            this.aiLedger.push({
+                cash: def.cash, initialCash: def.cash,
+                positions: new Map<string, { qty: number, cost: number }>(),
+                restingValue: 0, trades: 0, wins: 0, losses: 0, realizedPnl: 0,
+                equityHistory: [],
+            });
         }
+        // P4 订单流信号：机构/游资大单净流入（股数，逐日清零）
+        this.bigOrderFlow = new Map<string, number>();
         this.intervalHandle = null;
         // 性能优化：股票池配置缓存（消除每 tick 的 find O(n)）
         this.poolBySymbol = new Map<string, any>();
@@ -660,8 +658,9 @@ let MarketDataService = class MarketDataService {
             }
         }
     }
-    // ─── AI 对手盘（P2 订单流化）：机构/游资/散户向真实盘口挂限价单/发市价单 ───
-    // 市价单吃掉真实挂单（AI 虚拟挂单 + 用户挂单），用户挂单触发真实结算；价格冲击与成交量走 applyUserFill
+    // ─── AI 对手盘（P4）：具名对手 + 本地策略（趋势/均值回归/动量/羊群/反转/噪声）+ 本地随机森林 ───
+    // 完全本地运行，零外部 API。市价单吃掉真实挂单（AI 虚拟挂单 + 用户挂单），用户挂单触发真实结算；
+    // 价格冲击与成交量走 applyUserFill；机构/游资成交计入大单净流入（订单流信号）。
     async applyAiTrading() {
         const arr = [...this.stocks.values()];
         if (arr.length === 0)
@@ -673,6 +672,16 @@ let MarketDataService = class MarketDataService {
             }
             catch (e) { }
         }
+        // 每 tick 特征缓存（所有对手盘共用）：日内涨幅/波动率/OFI/行业周期/市场情绪
+        const features = new Map<string, any>();
+        for (const st of arr) {
+            const rawOfi = this.engine ? this.calcOFIImpact(st) / 0.002 : 0;
+            features.set(st.symbol, ai_opponents_1.aiFeatures(
+                st, rawOfi,
+                this.industryCycles.get(st.industry) || 'expansion',
+                this.factors['市场情绪'] ?? 0,
+            ));
+        }
         for (let ai = 0; ai < this.aiAgents.length; ai++) {
             const agent = this.aiAgents[ai];
             if (Math.random() > agent.activity)
@@ -680,34 +689,34 @@ let MarketDataService = class MarketDataService {
             const ledger = this.aiLedger[ai];
             // 未平挂单市值指数衰减（近似 TTL 到期释放预算）
             ledger.restingValue = (ledger.restingValue || 0) * 0.97;
-            // 选股：游资追热点行业，机构/散户随机
+            // 选股：羊群/动量策略追热点行业；均值回归选超跌；其余随机
             let target;
-            if (agent.type === '游资' && this.hotTopics.length > 0) {
+            if ((agent.strategy === 'herd' || agent.strategy === 'momentum') && this.hotTopics.length > 0) {
                 const hotIndustry = this.hotTopics[0].industry;
-                target = arr.find((st) => st.industry === hotIndustry && Math.random() < 0.4) || arr[Math.floor(Math.random() * arr.length)];
+                target = arr.find((st) => st.industry === hotIndustry && Math.random() < 0.5) || arr[Math.floor(Math.random() * arr.length)];
+            }
+            else if (agent.strategy === 'meanrev') {
+                target = arr.reduce((a, b) => {
+                    const fa = features.get(a.symbol);
+                    const fb = features.get(b.symbol);
+                    return (fa.ret < fb.ret ? a : b);
+                });
             }
             else {
                 target = arr[Math.floor(Math.random() * arr.length)];
             }
-            // 方向：机构/散户追涨杀跌；游资低吸高抛（反转）
-            const base = Number(target.dayOpen) || 1;
-            const ret = (target.price - base) / base;
-            let dir;
-            if (agent.type === '游资') {
-                dir = ret > 0.015 ? -1 : ret < -0.015 ? 1 : (Math.random() < 0.5 ? 1 : -1);
-            }
-            else {
-                // 防自激：已大涨(>3%)不再追买、大跌(<-3%)不再追卖
-                dir = ret > 0.03 ? 0 : ret < -0.03 ? 0 : (ret >= 0 ? 1 : -1);
-            }
-            // P3 行为树：游资持仓止盈(+5%)/止损(-3%)；机构持仓过重(>现金60%)再平衡卖出
+            const feats = features.get(target.symbol);
+            // 羊群效应：热点行业 → 追涨正反馈（策略信号 + RF 融合）
+            const hotFlag = this.hotTopics.length > 0 && this.hotTopics[0].industry === target.industry;
+            let dir = ai_opponents_1.decideDirection(agent.strategy, feats, hotFlag);
+            // P3 行为树：游资/散户持仓止盈(+5%)/止损(-3%)；机构持仓过重(>现金60%)再平衡卖出
             const priceNow = Number(target.price);
             const held = ledger.positions.get(target.symbol);
             const heldQty = held ? held.qty : 0;
             const heldCost = held ? held.cost : 0;
             if (heldQty > 0 && heldCost > 0) {
                 const pnl = (priceNow - heldCost) / heldCost;
-                if (agent.type === '游资' && (pnl > 0.05 || pnl < -0.03))
+                if ((agent.type === '游资' || agent.type === '散户') && (pnl > 0.05 || pnl < -0.03))
                     dir = -1;
             }
             if (agent.type === '机构' && heldQty * priceNow > ledger.cash * 0.6)
@@ -728,6 +737,7 @@ let MarketDataService = class MarketDataService {
             if (!this.engine)
                 continue;
             const isCN = target.market !== 'HK' && target.market !== 'US';
+            const base = Number(target.dayOpen) || 1;
             const limitUp = isCN && base > 0 ? base * 1.10 : null;
             const limitDown = isCN && base > 0 ? base * 0.90 : null;
             if (Math.random() < 0.67) {
@@ -760,7 +770,7 @@ let MarketDataService = class MarketDataService {
                     }
                     // 价格冲击 + 成交量并入 K 线（与用户成交同一路径，AI 抛售可戳破泡沫）
                     this.applyUserFill({ symbol: target.symbol, side, filledQuantity: fill.filledQuantity, avgPrice: fill.avgPrice });
-                    // P3 更新资金/持仓账本
+                    // P3 更新资金/持仓账本；P4 平仓记入绩效（已实现盈亏/胜率）
                     if (side === 'buy') {
                         ledger.cash -= fill.filledQuantity * fill.avgPrice;
                         const pos = ledger.positions.get(target.symbol) || { qty: 0, cost: 0 };
@@ -773,6 +783,8 @@ let MarketDataService = class MarketDataService {
                         ledger.cash += fill.filledQuantity * fill.avgPrice;
                         const pos = ledger.positions.get(target.symbol);
                         if (pos) {
+                            // 平仓盈亏入账（平均成本法）
+                            ai_opponents_1.recordAiTrade(ledger, (fill.avgPrice - pos.cost) * fill.filledQuantity);
                             pos.qty -= fill.filledQuantity;
                             if (pos.qty <= 0)
                                 ledger.positions.delete(target.symbol);
@@ -780,12 +792,85 @@ let MarketDataService = class MarketDataService {
                                 ledger.positions.set(target.symbol, pos);
                         }
                     }
+                    // P4 订单流信号：机构/游资大单净流入（股数）
+                    if (agent.type === '机构' || agent.type === '游资') {
+                        const cur = this.bigOrderFlow.get(target.symbol) || 0;
+                        this.bigOrderFlow.set(target.symbol, cur + (side === 'buy' ? fill.filledQuantity : -fill.filledQuantity));
+                    }
                 }
                 catch (e) {
                     this.logger.warn('AI 市价单执行失败: ' + (e && e.message ? e.message : e));
                 }
             }
         }
+    }
+    // ─── P4 AI 对手盘绩效：每日净值快照（endOfDay 调用） ───
+    markAiEquityDaily() {
+        const day = this.gameDay;
+        for (let i = 0; i < this.aiAgents.length; i++) {
+            const ledger = this.aiLedger[i];
+            let holdingsValue = 0;
+            for (const [sym, pos] of ledger.positions.entries()) {
+                const st = this.stocks.get(sym);
+                holdingsValue += pos.qty * (st ? Number(st.price) : pos.cost);
+            }
+            const equity = Number(ledger.cash) + holdingsValue;
+            ledger.equityHistory = (ledger.equityHistory || []).slice(-60);
+            ledger.equityHistory.push({ day, equity: Math.round(equity) });
+        }
+    }
+    // ─── P4 AI 对手盘排名（玩家可挑战的对手） ───
+    getAiOpponents() {
+        const out = [];
+        for (let i = 0; i < this.aiAgents.length; i++) {
+            const agent = this.aiAgents[i];
+            const ledger = this.aiLedger[i];
+            let holdingsValue = 0;
+            for (const [sym, pos] of ledger.positions.entries()) {
+                const st = this.stocks.get(sym);
+                holdingsValue += pos.qty * (st ? Number(st.price) : pos.cost);
+            }
+            const equity = Number(ledger.cash) + holdingsValue;
+            const initial = Number(ledger.initialCash) || Number(agent.cash) || 1;
+            const equityReturn = (equity - initial) / initial;
+            const winRate = ai_opponents_1.winRateOf(ledger);
+            const perf = ai_opponents_1.tierFor(equityReturn, winRate, Number(ledger.trades) || 0);
+            out.push({
+                id: agent.id,
+                name: agent.name,
+                type: agent.type,
+                strategy: agent.strategy,
+                strategyName: ai_opponents_1.STRATEGY_NAMES[agent.strategy] || agent.strategy,
+                taunt: agent.taunt || '',
+                equity: Math.round(equity),
+                pnlPct: Number((equityReturn * 100).toFixed(2)),
+                winRate: Number((winRate * 100).toFixed(1)),
+                trades: Number(ledger.trades) || 0,
+                tier: perf.tier,
+                score: Number(perf.score.toFixed(1)),
+                positions: ledger.positions.size,
+                equityHistory: ledger.equityHistory || [],
+            });
+        }
+        return out.sort((a, b) => b.pnlPct - a.pnlPct);
+    }
+    // ─── P4 订单流信号公开化：OFI + 机构/游资大单净流入 ───
+    getFlowSignals(symbol) {
+        const book = this.engine ? this.engine.getOrderBook(symbol) : null;
+        let ofi = 0;
+        if (book && book.bids[0] && book.asks[0]) {
+            const total = Number(book.bids[0].size) + Number(book.asks[0].size);
+            if (total > 0)
+                ofi = (Number(book.bids[0].size) - Number(book.asks[0].size)) / total;
+        }
+        const net = Math.round(this.bigOrderFlow.get(symbol) || 0);
+        return {
+            symbol,
+            ofi: Number(ofi.toFixed(3)),
+            bigNetFlow: net,
+            bigNetFlowWan: Number((net / 10000).toFixed(1)),
+            label: ofi > 0.15 ? '买压' : ofi < -0.15 ? '卖压' : '均衡',
+        };
     }
     // ─── B1 指数影响全局：跨市场指数平均变化 → 市场情绪因子（指数涨 → 情绪升 → 全市场偏多） ───
     updateIndexFeedback() {
@@ -1164,6 +1249,9 @@ let MarketDataService = class MarketDataService {
         this.evolveFundamentalsDaily();
         this.runMacroCalendar();
         this.applyPersistentNewsImpacts();
+        // ─── P4 AI 对手盘：每日净值快照 + 大单净流入清零（次日重新统计） ───
+        this.markAiEquityDaily();
+        this.bigOrderFlow.clear();
         this.updateMarketRegime();
         this.decayFactors();
         this.gameDay++;
