@@ -130,14 +130,8 @@ let NewsService = class NewsService {
             insiderNews: null,
         } as any;
         this.currentNews = news;
-        // 宏观因子冲击
-        for (const [factor, val] of Object.entries(news.impact)) {
-            this.marketData.applyFactorImpulse(factor, val);
-        }
-        // 定向个股/行业价格冲击（真实嵌入）
-        if (news.targetedSymbol || news.targetedIndustry) {
-            this.marketData.applyNewsImpact(news);
-        }
+        // P3 新闻因果链：因子冲击 + 定向个股/行业冲击 + 持久衰减档案（数日定价过程）由 applyNewsImpact 统一处理
+        this.marketData.applyNewsImpact(news);
         // 内幕消息（低概率附加）——由 market.service 错峰播报（不再即时广播，避免开盘新闻扎堆）
         if (Math.random() < 0.02) {
             const insider = this.insiderTemplates[Math.floor(Math.random() * this.insiderTemplates.length)];

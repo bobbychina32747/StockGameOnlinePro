@@ -192,15 +192,13 @@ let MarketService = class MarketService {
                 Object.assign(openBase, this.lastAuctionPrices[market] || {});
                 this.engine.setDayOpen(openBase);
                 const state = marketData.getState();
-                // 财报季
-                if (marketData.gameDay > 0 && marketData.gameDay % 7 === 0) {
-                    const n = marketData.generateReports();
-                    if (n > 0) {
-                        this.logger.log(`📊 [` + market + `] 财报季: ${n} 家公司披露季度财报`);
-                        this.enqueueNews(market, {
-                            title: `📊 财报季：${n} 家公司披露季度财报`, description: '业绩预期差将影响相关个股走势，注意持仓基本面变化', type: 'neutral', impact: {}, duration: 2,
-                        });
-                    }
+                // P3 财报披露：按个股披露日历（nextReportDay 错峰）触发
+                const n = marketData.generateReports();
+                if (n > 0) {
+                    this.logger.log(`📊 [` + market + `] 财报季: ${n} 家公司披露季度财报`);
+                    this.enqueueNews(market, {
+                        title: `📊 财报季：${n} 家公司披露季度财报`, description: '业绩预期差将影响相关个股走势，注意持仓基本面变化', type: 'neutral', impact: {}, duration: 2,
+                    });
                 }
                 // P4 日间新闻错峰播报（generateDailyNews 不再内部即时广播）
                 const news = this.newsService.generateDailyNews(state.marketRegime, marketData.gameDay);

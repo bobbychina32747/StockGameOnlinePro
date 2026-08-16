@@ -121,17 +121,20 @@ export function StockDetailModal() {
           {reports.length > 0 ? (
             <>
               <div className="modal-stats" style={{ borderTop: 'none', paddingTop: 0 }}>
-                <div className="modal-stat"><span className="label">营业收入</span><span className="value">{reports[0].revenue} 亿</span></div>
-                <div className="modal-stat"><span className="label">营收同比</span><span className={`value ${reports[0].revenueYoy >= 0 ? 'up' : 'down'}`}>{reports[0].revenueYoy >= 0 ? '+' : ''}{reports[0].revenueYoy}%</span></div>
-                <div className="modal-stat"><span className="label">净利润</span><span className="value">{reports[0].netProfit} 亿</span></div>
+                <div className="modal-stat"><span className="label">营收同比</span><span className={`value ${reports[0].revenueGrowth >= 0 ? 'up' : 'down'}`}>{reports[0].revenueGrowth >= 0 ? '+' : ''}{reports[0].revenueGrowth}%</span></div>
+                <div className="modal-stat"><span className="label">分析师一致预期</span><span className="value">{reports[0].consensusGrowth >= 0 ? '+' : ''}{reports[0].consensusGrowth}%</span></div>
                 <div className="modal-stat"><span className="label">净利率</span><span className="value">{reports[0].netMargin}%</span></div>
+                <div className="modal-stat"><span className="label">ROE</span><span className="value">{reports[0].roe}%</span></div>
+                {reports[0].industryPhase && (
+                  <div className="modal-stat"><span className="label">行业周期</span><span className="value">{({ expansion: '📈 扩张', peak: '🔝 顶峰', contraction: '📉 收缩', trough: '🧊 谷底' } as Record<string, string>)[reports[0].industryPhase] || reports[0].industryPhase}</span></div>
+                )}
                 {reports[0].dividend > 0 && (
                   <div className="modal-stat"><span className="label">每股分红</span><span className="value up">{reports[0].dividend} 元（已除权）</span></div>
                 )}
               </div>
               <div style={{ fontSize: 11, marginTop: 6 }}>
-                <span className={reports[0].surprise === 1 ? 'up' : reports[0].surprise === -1 ? 'down' : ''}>
-                  {reports[0].surprise === 1 ? '✅ 业绩超预期（财报公布后股价上涨）' : reports[0].surprise === -1 ? '⚠️ 业绩不及预期（财报公布后股价承压）' : '➖ 业绩符合预期'}
+                <span className={reports[0].surpriseClass > 0 ? 'up' : reports[0].surpriseClass < 0 ? 'down' : ''}>
+                  {reports[0].surpriseClass > 0 ? `✅ ${reports[0].surpriseLabel}（披露后数日持续漂移）` : reports[0].surpriseClass < 0 ? `⚠️ ${reports[0].surpriseLabel}（披露后数日持续承压）` : '➖ 业绩符合预期'}
                 </span>
               </div>
               {reports.length > 1 && (
@@ -139,7 +142,7 @@ export function StockDetailModal() {
                   财报历史：
                   {reports.slice(0, 4).map((r, i) => (
                     <span key={i} style={{ marginRight: 10, fontFamily: 'var(--font-mono)' }}>
-                      {r.quarter} {r.revenueYoy >= 0 ? '+' : ''}{r.revenueYoy}%
+                      {r.quarter} {r.revenueGrowth >= 0 ? '+' : ''}{r.revenueGrowth}%·{r.surpriseLabel}
                     </span>
                   ))}
                 </div>

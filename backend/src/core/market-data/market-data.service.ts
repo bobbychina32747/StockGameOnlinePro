@@ -28,6 +28,8 @@ import market_math_1 = require("./market-math");
 
 import market_maker_1 = require("./market-maker");
 
+import fundamentals_1 = require("./fundamentals");
+
 // SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
 let klineDedupDone = false;
 
@@ -88,6 +90,11 @@ let MarketDataService = class MarketDataService {
             { id: 'MM2', inventory: new Map<string, number>() },
         ];
         this.mmHookRegistered = false;
+        // P3 基本面：行业景气周期（四阶段马尔可夫）、新闻持久影响档案、宏观数据日历
+        this.industryCycles = new Map<string, string>();
+        this.newsImpacts = [];
+        this.macroEvents = [];
+        this.macroHistory = [];
     }
     async init() {
         for (const f of constants_1.FACTOR_NAMES) {
@@ -184,6 +191,10 @@ let MarketDataService = class MarketDataService {
                     dayOpen: ipoPrice, dayHigh: ipoPrice, dayLow: ipoPrice, dayVolume: 0, minuteCounter: 0,
                     kline1min: [], kline5min: [], klineDaily: [], current1min: null, current5min: null, currentDaily: null,
                     trendCounter: 0, trendDirection: 0, trendAccumulated: 0, isTrending: false,
+                    // P3 基本面：财报状态（营收增速/净利率/ROE/一致预期）+ 披露日历 + 财报后漂移
+                    fund: fundamentals_1.initFundamentals(),
+                    nextReportDay: 5 + Math.floor(Math.random() * 30),
+                    pead: null,
                 });
                 this.logger.log('📌 已加载已上市 IPO: ' + cfg.name);
             }
@@ -224,7 +235,18 @@ let MarketDataService = class MarketDataService {
                 trendDirection: 0,
                 trendAccumulated: 0,
                 isTrending: false,
+                // P3 基本面：财报状态 + 披露日历 + 财报后漂移；行业景气周期注册
+                fund: fundamentals_1.initFundamentals(),
+                nextReportDay: 5 + Math.floor(Math.random() * 30),
+                pead: null,
             });
+            if (!this.industryCycles.has(s.industry || '综合')) {
+                this.industryCycles.set(s.industry || '综合', fundamentals_1.randomCyclePhase());
+            }
+        }
+        // P3 宏观数据日历：按各事件 offset 排布首个披露日
+        for (const def of fundamentals_1.MACRO_EVENT_DEFS) {
+            this.macroEvents.push({ ...def, dueDay: def.offset + Math.floor(Math.random() * 5) });
         }
         // S1 历史持久化：若 klines 表已有历史则恢复，否则生成 30 天初始历史并落库
         // SECURITY: 启动一次性去重（保留每个 symbol/timeframe/time 中 id 最大的一行），防止旧库重复行继续膨胀
@@ -415,8 +437,11 @@ let MarketDataService = class MarketDataService {
         for (const stock of stocksArr) {
             const cfg = cfgBySymbol.get(stock.symbol) || {};
             const mu = Number(cfg.mu ?? 100);
+            // P3 行业景气周期：估值中枢随阶段上下移，波动率随阶段放大（收缩期最动荡）
+            const cycle = fundamentals_1.cycleEffects(this.industryCycles.get(stock.industry) || 'expansion');
+            const effMu = mu * (1 + cycle.valuationBias);
             this.updateVolatility(stock);
-            const shock = stock.volatility * params.volMult * this.randn() * Math.sqrt(dt) * 1.5 + industryShocks[stock.industry];
+            const shock = stock.volatility * params.volMult * cycle.volMul * this.randn() * Math.sqrt(dt) * 1.5 + industryShocks[stock.industry];
             const { small: smallJump, big: bigJump } = this.calcJump(dt, stock);
             const factorImpact = this.calcFactorImpact(stock);
             const ofiImpact = this.calcOFIImpact(stock);
@@ -424,7 +449,7 @@ let MarketDataService = class MarketDataService {
             let meanReversion = 0;
             let momentumBoost = 0;
             if (!stock.isTrending) {
-                meanReversion = Number(cfg.theta ?? 0.15) * (mu - stock.price) * dt;
+                meanReversion = Number(cfg.theta ?? 0.15) * (effMu - stock.price) * dt;
             } else {
                 momentumBoost = 0.2 * dt * 1.5;
                 // 经济泡沫积累：行业泡沫度越高追涨越强（受控）
@@ -446,7 +471,9 @@ let MarketDataService = class MarketDataService {
                     this.logger.log('🧊 泡沫出清: ' + stock.industry + ' 回归内在价值');
                 }
             }
-            let priceChange = drift + shock + smallJump + factorImpact * dt * 5 + ofiImpact + meanReversion + momentumBoost + burstDrift;
+            // P3 财报后漂移（PEAD）：披露后数日同向漂移，摊到每 tick
+            const peadDrift = stock.pead && stock.pead.daysLeft > 0 ? Number(stock.pead.mag) / constants_1.MARKET.TICKS_PER_DAY : 0;
+            let priceChange = drift + shock + smallJump + factorImpact * dt * 5 + ofiImpact + meanReversion + momentumBoost + burstDrift + peadDrift;
             // 收紧单 tick 波动 ±2%：保证相邻 K 线价格区间贴近（消除图表割裂）
             priceChange = this.clamp(priceChange, -0.02, 0.02);
             // P1 厚尾：低频大跳（崩盘/脉冲）不受 ±2% 连续项限幅，在限幅后叠加（真实极端行情形态）
@@ -1132,6 +1159,11 @@ let MarketDataService = class MarketDataService {
                 }
             }
         }
+        // ─── P3 每日基本面管线：行业周期演化 → 基本面演化/PEAD 递减 → 宏观日历 → 新闻持久影响衰减 ───
+        this.evolveIndustryCycles();
+        this.evolveFundamentalsDaily();
+        this.runMacroCalendar();
+        this.applyPersistentNewsImpacts();
         this.updateMarketRegime();
         this.decayFactors();
         this.gameDay++;
@@ -1154,6 +1186,107 @@ let MarketDataService = class MarketDataService {
             this.factors[f] += (Math.random() - 0.5) * 0.008;
             this.factors[f] = this.clamp(this.factors[f], -0.2, 0.2);
         }
+    }
+    // ─── P3 每日基本面管线（endOfDay 调用） ───
+    evolveIndustryCycles() {
+        for (const [industry, phase] of this.industryCycles.entries()) {
+            this.industryCycles.set(industry, fundamentals_1.nextCyclePhase(phase));
+        }
+    }
+    evolveFundamentalsDaily() {
+        for (const st of this.stocks.values()) {
+            if (!st.fund)
+                st.fund = fundamentals_1.initFundamentals();
+            fundamentals_1.evolveFundamentals(st.fund, this.industryCycles.get(st.industry) || 'expansion', this.randn.bind(this));
+            // 财报后漂移递减
+            if (st.pead && st.pead.daysLeft > 0)
+                st.pead.daysLeft--;
+        }
+    }
+    // 宏观数据日历：CPI/PMI/议息/就业 定时披露，surprise 传导（市场因子 + 行业敏感度 + 数日持续）
+    runMacroCalendar() {
+        const day = this.gameDay;
+        for (const ev of this.macroEvents) {
+            if (ev.dueDay > day)
+                continue;
+            const roll = fundamentals_1.rollMacroEvent(ev, this.randn.bind(this));
+            const surprise = roll.surprise;
+            const bearishBoost = surprise < 0 ? 1.2 : 1.0;
+            // 市场级因子：立即冲击 + 持久衰减（4 日几何衰减）
+            this.applyFactorImpulse(ev.marketFactor, surprise * 0.02 * bearishBoost);
+            this.newsImpacts.push({
+                label: roll.name, mode: 'factor', factor: ev.marketFactor,
+                initial: surprise * 0.012 * bearishBoost, daysLeft: 4, decay: 0.7,
+            });
+            // 行业敏感度传导：立即冲击 + 持久衰减
+            let touched = 0;
+            for (const st of this.stocks.values()) {
+                const sens = ev.industries[st.industry];
+                if (!sens)
+                    continue;
+                st.price = Math.max(0.5, st.price * (1 + surprise * 0.004 * sens));
+                st.lastReturn = surprise * 0.004 * sens;
+                touched++;
+            }
+            this.newsImpacts.push({
+                label: roll.name + '·行业传导', mode: 'macro-industries',
+                industries: ev.industries, initial: surprise * 0.0025 * bearishBoost, daysLeft: 4, decay: 0.7,
+            });
+            this.macroHistory.unshift({ ...roll, day });
+            this.macroHistory = this.macroHistory.slice(0, 30);
+            this.logger.warn(`🏛 [宏观] ${roll.name}: 预期 ${roll.expected} 实际 ${roll.actual}（surprise ${roll.surprise}，波及 ${touched} 只股票）`);
+            ev.dueDay = day + ev.cadence;
+        }
+    }
+    // 新闻因果链：持久影响档案按几何衰减逐日注入（利好利空的定价过程持续数日）
+    applyPersistentNewsImpacts() {
+        const totalDays = (imp) => Math.max(1, (Number(imp.totalDays) || Number(imp.daysLeft)));
+        const keep = [];
+        for (const imp of this.newsImpacts) {
+            const total = totalDays(imp);
+            const t = total - imp.daysLeft;
+            const factor = imp.initial * fundamentals_1.newsDecayFactor(t, total, imp.decay);
+            if (imp.mode === 'factor') {
+                this.applyFactorImpulse(imp.factor, factor);
+            }
+            else if (imp.mode === 'industry' || imp.mode === 'macro-industries') {
+                for (const st of this.stocks.values()) {
+                    const sens = imp.mode === 'macro-industries' ? (imp.industries[st.industry] || 0) : (st.industry === imp.industry ? 1 : 0);
+                    if (!sens)
+                        continue;
+                    st.price = Math.max(0.5, st.price * (1 + factor * sens));
+                }
+            }
+            else if (imp.mode === 'symbol' && imp.symbol) {
+                const st = this.stocks.get(imp.symbol);
+                if (st)
+                    st.price = Math.max(0.5, st.price * (1 + factor));
+            }
+            imp.daysLeft--;
+            if (imp.daysLeft > 0)
+                keep.push(imp);
+        }
+        this.newsImpacts = keep;
+    }
+    // P3 注册持久新闻影响：首日 40% 已即时冲击，剩余 60% 按几何衰减分摊到 duration 天
+    registerNewsImpact(news, mode, target, initialDailyBase) {
+        const duration = Math.max(1, Number(news.duration) || 1);
+        const norm = (1 - 0.7) / (1 - Math.pow(0.7, duration)); // 每日首日归一化
+        const entry: any = {
+            label: news.title || '新闻',
+            mode,
+            initial: initialDailyBase * norm * 0.6,
+            daysLeft: duration,
+            totalDays: duration,
+            decay: 0.7,
+        };
+        if (mode === 'industry')
+            entry.industry = target;
+        if (mode === 'symbol')
+            entry.symbol = target;
+        if (mode === 'factor')
+            entry.factor = target;
+        this.newsImpacts.push(entry);
     }
     getPrices() {
         const prices = {};
@@ -1343,6 +1476,9 @@ let MarketDataService = class MarketDataService {
             marketRegime: this.marketRegime,
             factors: { ...this.factors },
             hotTopics: [...this.hotTopics],
+            // P3: 宏观数据日历（最近 30 条披露）与行业景气周期（供前端展示）
+            macroHistory: [...this.macroHistory],
+            industryCycles: { ...Object.fromEntries(this.industryCycles.entries()) },
             // P1: 本市场实时开市状态（含节假日历判断），供前端休市遮罩/下单禁用使用
             isTradingTime: constants_1.isTradingTimeFor(this.market),
         };
@@ -1353,44 +1489,47 @@ let MarketDataService = class MarketDataService {
             this.factors[factor] = this.clamp(this.factors[factor], -0.2, 0.2);
         }
     }
-    // ─── 财报真实化：每 20 个交易日一个财报季，随机 30% 股票披露 ───
+    // ─── P3 财报基本面模型：按个股披露日历触发；surprise = 披露增速 vs 分析师一致预期 ───
+    // 五档分级（大超/略超/符合/略低/大低）→ 披露日跳空 + 财报后漂移(PEAD 5日) + 一致预期修正
     generateReports() {
-        const arr = [...this.stocks.values()];
-        const due = arr.filter(() => Math.random() < 0.3);
+        const due = [];
+        for (const st of this.stocks.values()) {
+            if (!st.fund)
+                st.fund = fundamentals_1.initFundamentals();
+            if (st.nextReportDay === undefined || st.nextReportDay === null || st.nextReportDay > this.gameDay)
+                continue;
+            due.push(st);
+        }
         for (const st of due) {
-            // 动量决定预期差：近期涨多的公司易超预期，跌多的易不及预期
-            const momentum = (st.lastReturn ?? 0) * 60 + (Math.random() - 0.5) * 0.1;
-            const surprise = momentum > 0.015 ? 1 : momentum < -0.015 ? -1 : 0;
-            const revBase = 5 + Math.random() * 15;
-            const revenue = revBase * 1e8;
-            const revGrowth = surprise === 1 ? 8 + Math.random() * 22 : surprise === -1 ? -15 + Math.random() * 20 : -3 + Math.random() * 12;
-            const netMargin = 0.04 + Math.random() * 0.12;
-            const report = {
-                day: this.gameDay,
-                symbol: st.symbol,
-                company: st.name,
-                code: st.code,
-                revenue: Number((revenue / 1e8).toFixed(1)),
-                revenueYoy: Number(revGrowth.toFixed(1)),
-                netProfit: Number((revenue * netMargin / 1e8).toFixed(2)),
-                netMargin: Number((netMargin * 100).toFixed(1)),
-                surprise,
-                quarter: 'Q' + (1 + Math.floor(Math.random() * 4)),
-                dividend: 0,
-            };
-            // 财报冲击股价：超预期 +2.5%，不及预期 -2.5%，符合 ±0.5%
-            const shock = surprise === 1 ? 0.025 : surprise === -1 ? -0.025 : (Math.random() > 0.5 ? 1 : -1) * 0.005;
+            const quarter = 'Q' + (1 + (Math.floor(this.gameDay / 45) % 4));
+            const report: any = fundamentals_1.makeEarningsReport(st.fund, this.gameDay, quarter, this.randn.bind(this));
+            const cls = report.surpriseClass;
+            // 披露日跳空（分级）+ 财报后漂移 + 一致预期修正
+            const shock = fundamentals_1.earningsShock(cls);
             st.price = Math.max(0.5, st.price * (1 + shock));
-            // 玩法：分红（30% 概率，每股 0.3~1.5 元，当日除权，持仓者日终现金到账）
-            if (Math.random() < 0.3) {
-                const perShare = Number((0.3 + Math.random() * 1.2).toFixed(2));
+            st.lastReturn = shock;
+            st.pead = { mag: fundamentals_1.peadDaily(cls), daysLeft: 5 };
+            fundamentals_1.reviseConsensus(st.fund, cls);
+            // 分红与盈利能力挂钩：高净利率公司更大概率派现，派现额随利润放大
+            const dividendProb = st.fund.netMargin > 0.10 ? 0.5 : st.fund.netMargin > 0.05 ? 0.3 : 0.12;
+            if (Math.random() < dividendProb) {
+                const perShare = Number(Math.max(0.1, 0.3 + st.fund.netMargin * 8).toFixed(2));
                 this.recordDividend(st.symbol, perShare, this.gameDay);
                 report.dividend = perShare;
             }
-            st.lastReturn = shock;
+            else {
+                report.dividend = 0;
+            }
+            report.company = st.name;
+            report.code = st.code;
+            report.symbol = st.symbol;
+            report.industryPhase = this.industryCycles.get(st.industry) || 'expansion';
+            // 下一披露日：约一个季度（45±随机游戏日，错峰披露）
+            st.nextReportDay = this.gameDay + 45 + Math.floor(Math.random() * 25);
             const list = this.reports.get(st.symbol) || [];
             list.push(report);
             this.reports.set(st.symbol, list);
+            this.logger.log(`📊 [财报] ${st.symbol} ${report.surpriseLabel}（增速 ${(report.revenueGrowth * 100).toFixed(1)}% vs 预期 ${(report.consensusGrowth * 100).toFixed(1)}%，冲击 ${(shock * 100).toFixed(2)}%）`);
         }
         return due.length;
     }
@@ -1536,7 +1675,14 @@ let MarketDataService = class MarketDataService {
             dayOpen: price, dayHigh: price, dayLow: price, dayVolume: 0, minuteCounter: 0,
             kline1min: [], kline5min: [], klineDaily: [], current1min: null, current5min: null, currentDaily: null,
             trendCounter: 0, trendDirection: 0, trendAccumulated: 0, isTrending: false,
+            // P3 基本面：IPO 新股财报状态
+            fund: fundamentals_1.initFundamentals(),
+            nextReportDay: this.gameDay + 40 + Math.floor(Math.random() * 20),
+            pead: null,
         });
+        if (!this.industryCycles.has(cfg.industry)) {
+            this.industryCycles.set(cfg.industry, fundamentals_1.randomCyclePhase());
+        }
     }
     // 分红：财报季记录（除权 + 持仓现金到账）
     recordDividend(symbol, perShare, day) {
@@ -1572,18 +1718,42 @@ let MarketDataService = class MarketDataService {
         const arr = [...this.stocks.values()];
         return arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
     }
-    // 新闻定向冲击：对指定个股/行业施加一次性价格波动（真实嵌入金融体系）
+    // P3 新闻因果链：首日即时冲击（40%）+ 持久影响档案（60% 按几何衰减分摊数日）
+    // 新闻 → 因子冲击 + 定向个股/行业价格冲击，利好利空的定价过程持续数日（不再一次性打完）
     applyNewsImpact(news) {
         const bullish = news.type !== 'bearish';
         const strength = 0.5 + Math.random() * 0.6; // 0.5%~1.1%
-        for (const st of this.stocks.values()) {
-            if (news.targetedSymbol && st.symbol === news.targetedSymbol) {
-                st.price = Math.max(0.5, st.price * (1 + (bullish ? 1 : -1) * strength * 0.01));
-                st.lastReturn = (bullish ? 1 : -1) * strength * 0.01;
+        // 1) 宏观因子：立即冲击（与旧行为一致）
+        if (news.impact) {
+            for (const [factor, val] of Object.entries(news.impact)) {
+                this.applyFactorImpulse(factor, val);
             }
-            else if (news.targetedIndustry && st.industry === news.targetedIndustry) {
-                st.price = Math.max(0.5, st.price * (1 + (bullish ? 1 : -1) * strength * 0.004));
-                st.lastReturn = (bullish ? 1 : -1) * strength * 0.004;
+        }
+        // 2) 定向个股/行业：首日 40% 即时 + 60% 持久衰减
+        if (news.targetedSymbol) {
+            const immediate = (bullish ? 1 : -1) * strength * 0.01 * 0.4;
+            const st = this.stocks.get(news.targetedSymbol);
+            if (st) {
+                st.price = Math.max(0.5, st.price * (1 + immediate));
+                st.lastReturn = immediate;
+            }
+            this.registerNewsImpact(news, 'symbol', news.targetedSymbol, (bullish ? 1 : -1) * strength * 0.01);
+        }
+        else if (news.targetedIndustry) {
+            const immediate = (bullish ? 1 : -1) * strength * 0.004 * 0.4;
+            for (const st of this.stocks.values()) {
+                if (st.industry === news.targetedIndustry) {
+                    st.price = Math.max(0.5, st.price * (1 + immediate));
+                    st.lastReturn = immediate;
+                }
+            }
+            this.registerNewsImpact(news, 'industry', news.targetedIndustry, (bullish ? 1 : -1) * strength * 0.004);
+        }
+        // 3) 纯因子新闻（无定向目标）：因子冲击的持久衰减部分
+        if (!news.targetedSymbol && !news.targetedIndustry && news.impact) {
+            const factor = Object.keys(news.impact)[0];
+            if (factor) {
+                this.registerNewsImpact(news, 'factor', factor, Number(news.impact[factor] || 0) * 0.4);
             }
         }
     }
