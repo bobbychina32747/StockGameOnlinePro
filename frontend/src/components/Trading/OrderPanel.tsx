@@ -40,6 +40,7 @@ export function OrderPanel() {
   const [orderQty, setOrderQty] = useState(100);
   const [orderPrice, setOrderPrice] = useState('');
   const [orderTriggerPrice, setOrderTriggerPrice] = useState('');
+  const [orderDisplayQty, setOrderDisplayQty] = useState('');
   const [pendingOrders, setPendingOrders] = useState<OrderEntry[]>([]);
   const [tradeHistory, setTradeHistory] = useState<TradeEntry[]>([]);
   const [orderSubmitting, setOrderSubmitting] = useState(false);
@@ -68,7 +69,7 @@ export function OrderPanel() {
   // ─── Q8 实时校验：资金预算 / 数量 / 价格 ───
   const livePrice = prices[selectedSymbol] ?? 0;
   const effPrice =
-    (orderType === 'limit' || orderType === 'stop-limit' || orderType === 'fok' || orderType === 'ioc') && parseFloat(orderPrice)
+    (orderType === 'limit' || orderType === 'stop-limit' || orderType === 'fok' || orderType === 'ioc' || orderType === 'iceberg') && parseFloat(orderPrice)
       ? parseFloat(orderPrice)
       : livePrice;
   const feeRate = 0.0008; // 综合费率估算（佣金+印花税）
@@ -101,9 +102,17 @@ export function OrderPanel() {
   const placeOrder = async () => {
     if (orderSubmitting) return;
     // 限价/止损类订单必须填写 >0 的价格
-    if ((orderType === 'limit' || orderType === 'stop' || orderType === 'stop-limit' || orderType === 'fok' || orderType === 'ioc') && !(parseFloat(orderPrice) > 0)) {
+    if ((orderType === 'limit' || orderType === 'stop' || orderType === 'stop-limit' || orderType === 'fok' || orderType === 'ioc' || orderType === 'iceberg') && !(parseFloat(orderPrice) > 0)) {
       addNotification('请输入大于 0 的订单价格', 'error');
       return;
+    }
+    // P2 冰山单：显示量必须为 1~(总数量-1) 的整数
+    if (orderType === 'iceberg') {
+      const dq = parseInt(orderDisplayQty) || 0;
+      if (dq <= 0 || dq >= orderQty) {
+        addNotification('冰山单显示量必须为 1~(总数量-1) 的整数', 'error');
+        return;
+      }
     }
     setOrderSubmitting(true);
     try {
@@ -114,6 +123,7 @@ export function OrderPanel() {
         quantity: orderQty,
         price: orderPrice ? parseFloat(orderPrice) : undefined,
         triggerPrice: orderTriggerPrice ? parseFloat(orderTriggerPrice) : undefined,
+        displayQty: orderType === 'iceberg' ? parseInt(orderDisplayQty) : undefined,
       });
       if (result.success) {
         const filledQty = result.fill?.quantity;
@@ -185,6 +195,7 @@ export function OrderPanel() {
             <option value="stop-limit">止损限价单</option>
             <option value="fok">FOK（全成或撤）</option>
             <option value="ioc">IOC（即成余撤）</option>
+            <option value="iceberg">冰山单（隐藏大单）</option>
           </select>
           <div style={{ display: 'flex', gap: 6 }}>
           <select className="input" value={orderSide} onChange={(e) => setOrderSide(e.target.value)}>
@@ -209,6 +220,15 @@ export function OrderPanel() {
               className="input" type="number" placeholder="触发价" value={orderTriggerPrice}
               onChange={(e) => setOrderTriggerPrice(e.target.value)} step="0.01"
             />
+          )}
+          {orderType === 'iceberg' && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input
+                className="input" type="number" placeholder="显示量（隐藏=总量-显示）" value={orderDisplayQty}
+                onChange={(e) => setOrderDisplayQty(e.target.value)} min={1} step={100}
+              />
+              <button className="btn btn-sm btn-ghost" title="显示量=总量的 1/5" onClick={() => setOrderDisplayQty(String(Math.max(1, Math.floor(orderQty / 5))))}>1/5</button>
+            </div>
           )}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <span style={{ color: 'var(--text-secondary)', fontSize: 12, whiteSpace: 'nowrap' }}>数量:</span>

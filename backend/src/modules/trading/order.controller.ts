@@ -56,13 +56,19 @@ __decorate([
     (0, class_validator_1.Min)(0.01),
     __metadata("design:type", Number)
 ], PlaceOrderDto.prototype, "triggerPrice", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    __metadata("design:type", Number)
+], PlaceOrderDto.prototype, "displayQty", void 0);
 let OrderController = class OrderController {
     [key: string]: any;
     constructor(orderService) {
         this.orderService = orderService;
     }
     placeOrder(user, dto, mode) {
-        return this.orderService.placeOrder(user.id, mode || 'US', dto.symbol, dto.type, dto.side, dto.quantity, dto.price, dto.triggerPrice);
+        return this.orderService.placeOrder(user.id, mode || 'US', dto.symbol, dto.type, dto.side, dto.quantity, dto.price, dto.triggerPrice, dto.displayQty);
     }
     cancelOrder(user, id, mode) {
         return this.orderService.cancelOrder(user.id, id, mode || 'US');

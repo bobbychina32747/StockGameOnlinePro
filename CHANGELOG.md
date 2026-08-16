@@ -4,6 +4,21 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase 2 撮合与订单系统
+
+### Added
+- **撮合引擎独立成类**：盘口/撮合/竞价纯逻辑整体抽取为 `backend/src/core/trading-engine/matching-engine.ts`（`MatchingEngine` 无 Nest/TypeORM 依赖，可直接单测），TradingEngineService 全部委托；maps 别名共享，旧代码与既有测试零改动
+- **冰山单（ICE）**：显示量+隐藏量；显示量被吃尽后自动从隐藏量逐档补量（同价队尾，价格-时间优先）；首轮交叉撮合只针对显示量；撤单清除盘口全部补量切片；前端下单面板新增「冰山单」类型与显示量输入（1/5 快捷）
+- **动态冲击成本**：市价/限价滑点由固定"每 500 股恶化 0.1%"改为 OFI（订单流不平衡）×波动率模型——逆风最高放大 3.2 倍、顺风收窄 50%，步长 [0.02%, 0.4%]，总滑点上限 2%（触顶后剩余不成交）；波动率由行情引擎每 tick 同步
+- **做市商模型**：每市场 2 个做市商（MM1/MM2）双边报价——价差 = 0.12% + 波动率×8，库存偏斜报价中心（多头→下移主动卖/空头→上移主动买），仓位越重报量越窄（下限 20%），每 10 tick 撤换单 + TTL 兜底；成交经虚拟成交回调实时更新库存（`market-maker.ts` 纯函数可单测）
+- **止损单簿记**：orders 表新增 triggerLog（JSON 审计：triggered/转换模式/converted-no-liquidity/filled/settle-failed-retry/cancelled）与 triggerRetries——触发后无流动性保留重试、结算失败回滚对手方并保活，10 次上限后取消；限价单保持原排队语义不受重试计数影响
+- 新增测试 `phase2-matching.test.js`（MatchingEngine 行为保持 / 冰山补量队尾 / OFI 步长与上限 / mmQuote 库存偏斜 / 做市商回调 / 止损审计与重试取消共 21 例），后端 94→115；前端 36 例全绿
+- orders 表自动迁移：displayQty/hiddenQty/triggerLog/triggerRetries 列（TypeORM synchronize 启动时 ALTER，实测真实库升级成功）
+
+### Changed
+- placeVirtualOrder 支持 orderId/mmId（做市商报价撤换与库存回调）；removeRestingOrder 支持清除同 orderId 的全部冰山切片
+- checkPendingOrders 不再直拍冰山单（由盘口撮合驱动，避免隐藏量提前暴露）
+
 ## [Unreleased] - Phase 1 行情真实性
 
 ### Added

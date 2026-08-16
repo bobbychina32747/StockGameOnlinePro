@@ -42,7 +42,7 @@ let OrderService = class OrderService {
         this.dataSource = dataSource;
         this.logger = new common_1.Logger(OrderService.name);
     }
-    async placeOrder(userId, mode, symbol, type, side, quantity, price, triggerPrice) {
+    async placeOrder(userId, mode, symbol, type, side, quantity, price, triggerPrice, displayQty) {
         // S2 休市校验：非交易时段拒绝下单
         // 调试模式仅对开启它的管理员（canBypassHours 白名单）跳过休市检查
         // P1 三阶段竞价（A股）：9:15-9:20 可申报可撤 / 9:20-9:25 可申报不可撤 / 9:25-9:30 撮合中不接受申报
@@ -60,7 +60,7 @@ let OrderService = class OrderService {
         if (account.marketMode === 'CN' && (side === order_entity_1.OrderSide.SHORT || side === order_entity_1.OrderSide.COVER)) {
             return { success: false, error: 'A股模式不支持做空/融券' };
         }
-        const result = await this.engine.submitOrder({ userId, accountId: account.id, symbol, type, side, quantity, price, triggerPrice }, account);
+        const result = await this.engine.submitOrder({ userId, accountId: account.id, symbol, type, side, quantity, price, triggerPrice, displayQty }, account);
         if (!result.success) {
             return { success: false, error: result.error };
         }

@@ -20,6 +20,7 @@ export enum OrderType {
     STOP_LIMIT = "stop-limit",
     FOK = "fok",
     IOC = "ioc",
+    ICEBERG = "iceberg",
 }
 export enum OrderSide {
     BUY = "buy",
@@ -99,6 +100,22 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'text', nullable: true }),
     __metadata("design:type", String)
 ], Order.prototype, "rejectReason", void 0);
+__decorate([
+    (0, typeorm_1.Column)('float', { nullable: true }),
+    __metadata("design:type", Number)
+], Order.prototype, "displayQty", void 0);
+__decorate([
+    (0, typeorm_1.Column)('float', { nullable: true }),
+    __metadata("design:type", Number)
+], Order.prototype, "hiddenQty", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], Order.prototype, "triggerLog", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ default: 0 }),
+    __metadata("design:type", Number)
+], Order.prototype, "triggerRetries", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

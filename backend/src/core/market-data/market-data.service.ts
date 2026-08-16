@@ -26,6 +26,8 @@ import trading_engine_service_1 = require("../trading-engine/trading-engine.serv
 
 import market_math_1 = require("./market-math");
 
+import market_maker_1 = require("./market-maker");
+
 // SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
 let klineDedupDone = false;
 
@@ -80,6 +82,12 @@ let MarketDataService = class MarketDataService {
         this.intervalHandle = null;
         // 性能优化：股票池配置缓存（消除每 tick 的 find O(n)）
         this.poolBySymbol = new Map<string, any>();
+        // P2 做市商：每市场 2 个，双边报价 + 库存管理（mmQuote 定价，虚拟挂单进真实盘口）
+        this.marketMakers = [
+            { id: 'MM1', inventory: new Map<string, number>() },
+            { id: 'MM2', inventory: new Map<string, number>() },
+        ];
+        this.mmHookRegistered = false;
     }
     async init() {
         for (const f of constants_1.FACTOR_NAMES) {
@@ -484,6 +492,10 @@ let MarketDataService = class MarketDataService {
         }
         // AI 对手盘：机构/游资/散户交易行为（多空博弈，P2 订单流化）
         await this.applyAiTrading();
+        // P2 做市商：每 refreshTicks 撤换双边报价（库存/波动率自适应）
+        if (this.tickCount % market_maker_1.MM_PARAMS.refreshTicks === 0) {
+            this.refreshMarketMakers();
+        }
         this.updateIndexFeedback();
         this.tickCount++;
         return results;
@@ -1149,6 +1161,53 @@ let MarketDataService = class MarketDataService {
             prices[sym] = state.price;
         }
         return prices;
+    }
+    // P2 滑点模型用：每 tick 同步个股波动率给撮合引擎
+    getVolatilities() {
+        const out = {};
+        for (const [sym, state] of this.stocks) {
+            out[sym] = state.volatility;
+        }
+        return out;
+    }
+    // ─── P2 做市商：双边报价 + 库存管理 + 波动率自适应价差，每 refreshTicks 撤换一次 ───
+    refreshMarketMakers() {
+        if (!this.engine)
+            return;
+        if (!this.mmHookRegistered) {
+            try {
+                this.engine.setVirtualFillHook((f) => this.onMmFill(f));
+                this.mmHookRegistered = true;
+            }
+            catch (e) {
+                this.logger.warn('做市商成交回调注册失败: ' + (e && e.message ? e.message : e));
+            }
+        }
+        const currentTick = this.tickCount;
+        const p = market_maker_1.MM_PARAMS;
+        for (const mm of this.marketMakers) {
+            for (const stock of this.stocks.values()) {
+                const inv = Number(mm.inventory.get(stock.symbol)) || 0;
+                const q = market_maker_1.mmQuote(stock.price, stock.volatility, inv, p);
+                const bidId = `MMB-${mm.id}-${stock.symbol}`;
+                const askId = `MMA-${mm.id}-${stock.symbol}`;
+                // 撤旧报价 → 挂新报价（TTL 到期由引擎 prune 兜底）
+                this.engine.removeRestingOrder(stock.symbol, bidId);
+                this.engine.removeRestingOrder(stock.symbol, askId);
+                this.engine.placeVirtualOrder(stock.symbol, 'buy', q.bid, q.size, currentTick + p.ttlTicks, { orderId: bidId, mmId: mm.id });
+                this.engine.placeVirtualOrder(stock.symbol, 'sell', q.ask, q.size, currentTick + p.ttlTicks, { orderId: askId, mmId: mm.id });
+            }
+        }
+    }
+    onMmFill(f) {
+        for (const mm of this.marketMakers) {
+            if (mm.id !== f.mmId)
+                continue;
+            const cur = Number(mm.inventory.get(f.symbol)) || 0;
+            // MM 挂 sell 被吃 → 库存减少；挂 buy 被吃 → 库存增加
+            mm.inventory.set(f.symbol, cur + (f.side === 'sell' ? -Number(f.qty) : Number(f.qty)));
+            return;
+        }
     }
     // P1: 昨收价映射（开盘集合竞价的参考基准）
     getPrevCloses() {

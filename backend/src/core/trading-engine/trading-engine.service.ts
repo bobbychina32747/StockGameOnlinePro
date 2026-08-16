@@ -26,6 +26,8 @@ import transaction_entity_1 = require("../../infrastructure/database/entities/tr
 
 import constants_1 = require("../../common/constants");
 
+import matching_engine_1 = require("./matching-engine");
+
 let TradingEngineService = class TradingEngineService {
     [key: string]: any;
     constructor(orderRepo, accountRepo, positionRepo, txRepo) {
@@ -34,9 +36,14 @@ let TradingEngineService = class TradingEngineService {
         this.positionRepo = positionRepo;
         this.txRepo = txRepo;
         this.logger = new common_1.Logger(TradingEngineService.name);
-        this.orderBooks = new Map<string, any>();
-        this.prices = new Map<string, any>();
-        this.dayOpenPrices = new Map<string, any>();
+        // P2 撮合引擎独立成类：盘口/撮合/竞价纯逻辑全部在 MatchingEngine（可直接单测）
+        this.matching = new matching_engine_1.MatchingEngine();
+        // maps 别名共享：旧代码（行情引擎/风控/测试）直接访问 this.orderBooks/realBooks/prices 不受影响
+        this.orderBooks = this.matching.orderBooks;
+        this.realBooks = this.matching.realBooks;
+        this.prices = this.matching.prices;
+        this.dayOpenPrices = this.matching.dayOpenPrices;
+        this.volatilities = this.matching.volatilities;
         // F4 修复：成交结算串行队列，防止并发下单导致读-改-写竞态（超买/超卖）
         this.settlementQueue = Promise.resolve();
         this.userFillHook = null; // B1 用户成交 → 行情引擎（价格冲击/成交量纳入）
@@ -46,18 +53,55 @@ let TradingEngineService = class TradingEngineService {
         }
         // 用户限价挂单（真实盘口：进入 orderBooks 深度）
         this.userOrders = new Map<string, any[]>();
-        // P0 真实订单簿：用户限价单常驻盘口队列（价格-时间优先），合成深度仅作流动性补充
-        this.realBooks = new Map<string, { bids: any[], asks: any[] }>();
     }
+    // ─── P2 委托 MatchingEngine 的撮合纯逻辑 ───
     updatePrices(prices) {
-        for (const [sym, price] of Object.entries(prices)) {
-            this.prices.set(sym, price);
-        }
+        this.matching.updatePrices(prices);
     }
     setDayOpen(prices) {
-        for (const [sym, price] of Object.entries(prices)) {
-            this.dayOpenPrices.set(sym, price);
-        }
+        this.matching.setDayOpen(prices);
+    }
+    setVolatilities(vols) {
+        this.matching.setVolatilities(vols);
+    }
+    setVirtualFillHook(fn) {
+        this.matching.setVirtualFillHook(fn);
+    }
+    refreshOrderBooks(prices) {
+        this.matching.refreshOrderBooks(prices);
+    }
+    refreshOrderBook(symbol, midPrice) {
+        this.matching.refreshOrderBook(symbol, midPrice);
+    }
+    getOrderBook(symbol) {
+        return this.matching.getOrderBook(symbol);
+    }
+    placeRestingOrder(symbol, orderId, accountId, side, price, qty, opts?) {
+        this.matching.placeRestingOrder(symbol, orderId, accountId, side, price, qty, opts);
+    }
+    removeRestingOrder(symbol, orderId, qty?) {
+        this.matching.removeRestingOrder(symbol, orderId, qty);
+    }
+    matchAgainstBook(symbol, side, quantity, limitPrice, excludeAccountId) {
+        return this.matching.matchAgainstBook(symbol, side, quantity, limitPrice, excludeAccountId);
+    }
+    executeMarketOrder(symbol, side, quantity, excludeAccountId?) {
+        return this.matching.executeMarketOrder(symbol, side, quantity, excludeAccountId);
+    }
+    executeMarketOrderLimited(symbol, side, quantity, limitPrice, excludeAccountId?) {
+        return this.matching.executeMarketOrderLimited(symbol, side, quantity, limitPrice, excludeAccountId);
+    }
+    placeVirtualOrder(symbol, side, price, qty, expiresAtTick, opts?) {
+        this.matching.placeVirtualOrder(symbol, side, price, qty, expiresAtTick, opts);
+    }
+    pruneExpiredVirtualOrders(currentTick) {
+        this.matching.pruneExpiredVirtualOrders(currentTick);
+    }
+    executeVirtualMarketOrder(symbol, side, quantity) {
+        return this.matching.executeVirtualMarketOrder(symbol, side, quantity);
+    }
+    runOpeningAuction(symbol, prevClose) {
+        return this.matching.runOpeningAuction(symbol, prevClose);
     }
     // B1 用户成交回调：成交后通知行情引擎（价格冲击 + 成交量并入当前K线）
     setUserFillHook(fn) {
@@ -76,396 +120,14 @@ let TradingEngineService = class TradingEngineService {
             }
         }
     }
-    refreshOrderBooks(prices) {
-        for (const [sym, price] of Object.entries(prices)) {
-            this.refreshOrderBook(sym, price);
-        }
-    }
     addUserOrder(symbol, order) {
         this.placeRestingOrder(symbol, order.orderId, order.accountId, order.side, order.price, order.quantity);
     }
     removeUserOrder(symbol, orderId) {
         this.removeRestingOrder(symbol, orderId);
     }
-    // P0 真实订单簿：限价单挂入盘口队列（bids/asks 按价格-时间优先排序）
-    placeRestingOrder(symbol, orderId, accountId, side, price, qty) {
-        if (!Number.isFinite(Number(price)) || Number(price) <= 0 || !Number.isFinite(Number(qty)) || Number(qty) <= 0)
-            return;
-        let book = this.realBooks.get(symbol);
-        if (!book) {
-            book = { bids: [], asks: [] };
-            this.realBooks.set(symbol, book);
-        }
-        const isBid = side === 'buy' || side === 'cover';
-        const list = isBid ? book.bids : book.asks;
-        list.push({ orderId, accountId, side, price: Number(price), qty: Number(qty), time: Date.now() });
-        list.sort((a, b) => isBid ? (b.price - a.price) || (a.time - b.time) : (a.price - b.price) || (a.time - b.time));
-    }
-    // P0: 从盘口移除挂单（qty 缺省=整单移除；给定 qty=扣减部分数量）
-    removeRestingOrder(symbol, orderId, qty?) {
-        const book = this.realBooks.get(symbol);
-        if (!book)
-            return;
-        for (const sideKey of ['bids', 'asks']) {
-            const arr = book[sideKey];
-            for (let i = 0; i < arr.length; i++) {
-                if (arr[i].orderId === orderId) {
-                    if (qty === undefined || qty >= arr[i].qty) {
-                        arr.splice(i, 1);
-                    }
-                    else {
-                        arr[i].qty -= qty;
-                    }
-                    return;
-                }
-            }
-        }
-    }
-    // P0 真实订单簿撮合：按价格-时间优先吃对手方真实挂单；返回对手方成交明细与剩余量
-    matchAgainstBook(symbol, side, quantity, limitPrice, excludeAccountId) {
-        const book = this.realBooks.get(symbol);
-        if (!book)
-            return { fills: [], remaining: quantity };
-        const isBuy = side === 'buy' || side === 'cover';
-        const list = isBuy ? book.asks : book.bids;
-        const fills = [];
-        let remaining = quantity;
-        let i = 0;
-        while (remaining > 0 && i < list.length) {
-            const entry = list[i];
-            // 自成交防护：不与自己账户的挂单撮合（真实交易所规则）
-            if (excludeAccountId !== undefined && excludeAccountId !== null && entry.accountId === excludeAccountId) {
-                i++;
-                continue;
-            }
-            const priceOk = (limitPrice === undefined || limitPrice === null)
-                ? true
-                : (isBuy ? entry.price <= limitPrice : entry.price >= limitPrice);
-            if (!priceOk)
-                break; // 按价格有序，后续档位只会更差
-            const fillQty = Math.min(remaining, entry.qty);
-            fills.push({ orderId: entry.orderId, accountId: entry.accountId, side: entry.side, price: entry.price, qty: fillQty, virtual: !!entry.virtual });
-            if (fillQty >= entry.qty) {
-                list.splice(i, 1);
-            }
-            else {
-                entry.qty -= fillQty;
-                i++;
-            }
-            remaining -= fillQty;
-        }
-        return { fills, remaining };
-    }
-    refreshOrderBook(symbol, midPrice) {
-        const levels = 5;
-        const baseSpread = 0.001;
-        const baseSize = 500;
-        // 盘口不存在则动态创建（支持新增股票）
-        let book = this.orderBooks.get(symbol);
-        if (!book) {
-            book = { bids: [], asks: [] };
-            this.orderBooks.set(symbol, book);
-        }
-        let liquidityMul = 1.0;
-        const dayOpen = this.dayOpenPrices.get(symbol);
-        if (dayOpen && dayOpen > 0) {
-            const dayChange = (midPrice - dayOpen) / dayOpen;
-            if (dayChange < -0.05) {
-                liquidityMul = 0.2;
-            }
-        }
-        let asks = [];
-        let bids = [];
-        // P0 涨跌停封板（仅 A 股，以今开为基准 ±10%）：涨停时合成卖盘清空（只能排队买入）、跌停时合成买盘清空
-        const isCN = !/^H/.test(symbol) && !/^U/.test(symbol);
-        const limitUp = isCN && dayOpen && dayOpen > 0 ? Number(dayOpen) * 1.10 : null;
-        const limitDown = isCN && dayOpen && dayOpen > 0 ? Number(dayOpen) * 0.90 : null;
-        const sealedUp = limitUp !== null && midPrice >= limitUp - 1e-6;
-        const sealedDown = limitDown !== null && midPrice <= limitDown + 1e-6;
-        for (let i = 0; i < levels; i++) {
-            const spreadMult = (i + 1) * baseSpread;
-            const askPrice = midPrice * (1 + spreadMult);
-            const bidPrice = midPrice * (1 - spreadMult);
-            const size = Math.floor(baseSize * liquidityMul * (1 + Math.random()) * (1 - i * 0.12));
-            if (!sealedUp && (limitUp === null || askPrice <= limitUp))
-                asks.push({ price: Number(askPrice.toFixed(2)), size: Math.max(1, size) });
-            if (!sealedDown && (limitDown === null || bidPrice >= limitDown))
-                bids.push({ price: Number(bidPrice.toFixed(2)), size: Math.max(1, size) });
-        }
-        book.asks = asks;
-        book.bids = bids;
-        book.sealedUp = !!sealedUp;
-        book.sealedDown = !!sealedDown;
-        // P0 真实盘口：合并真实挂单队列（用户限价单常驻盘口，按价格聚合，最多 10 档）
-        const realBook = this.realBooks.get(symbol);
-        if (realBook) {
-            const mergeAll = (levels, realList, side) => {
-                const map = new Map();
-                for (const l of levels)
-                    map.set(l.price, l.size);
-                for (const o of realList) {
-                    map.set(o.price, (map.get(o.price) || 0) + o.qty);
-                }
-                return [...map.entries()]
-                    .map(([price, size]) => ({ price: Number(price), size }))
-                    .sort((a, b) => (side === 'bid' ? b.price - a.price : a.price - b.price))
-                    .slice(0, 10);
-            };
-            book.bids = mergeAll(book.bids, realBook.bids, 'bid');
-            book.asks = mergeAll(book.asks, realBook.asks, 'ask');
-        }
-    }
-    getOrderBook(symbol) {
-        const book = this.orderBooks.get(symbol);
-        const price = this.prices.get(symbol) ?? 100;
-        if (!book || book.asks.length === 0 || book.bids.length === 0) {
-            return { symbol, asks: [], bids: [], spread: 0 };
-        }
-        return {
-            symbol,
-            asks: book.asks,
-            bids: book.bids,
-            spread: Number((book.asks[0].price - book.bids[0].price).toFixed(2)),
-        };
-    }
-    executeMarketOrder(symbol, side, quantity, excludeAccountId?) {
-        // P0: 先撮合真实挂单（价格-时间优先），剩余量再吃合成深度
-        const real = this.matchAgainstBook(symbol, side, quantity, undefined, excludeAccountId);
-        const isBuy = side === order_entity_1.OrderSide.BUY || side === order_entity_1.OrderSide.COVER;
-        let totalCost = 0;
-        let totalQty = 0;
-        for (const f of real.fills) {
-            totalCost += f.qty * f.price;
-            totalQty += f.qty;
-        }
-        let remaining = real.remaining;
-        const book = this.orderBooks.get(symbol);
-        const levels = book ? (isBuy ? book.asks : book.bids) : [];
-        for (const level of levels) {
-            if (remaining <= 0)
-                break;
-            const fill = Math.min(remaining, level.size);
-            totalCost += fill * level.price;
-            totalQty += fill;
-            remaining -= fill;
-        }
-        // P2 滑点模型：剩余量按逐级恶化价格成交（每 500 股恶化 0.1%，上限 2%）；封板/无报价时不适用
-        if (remaining > 0) {
-            const knownPrice = this.prices.get(symbol);
-            const sealed = book && (isBuy ? book.sealedUp : book.sealedDown);
-            if (!sealed && knownPrice !== undefined && knownPrice !== null) {
-                const dirMul = isBuy ? 1 : -1;
-                let slip = 0;
-                const anchor = levels.length > 0 ? levels[levels.length - 1].price : Number(knownPrice);
-                while (remaining > 0 && slip < 0.02) {
-                    slip = Math.min(0.02, slip + 0.001);
-                    const tranche = Math.min(remaining, 500);
-                    totalCost += tranche * anchor * (1 + dirMul * slip);
-                    totalQty += tranche;
-                    remaining -= tranche;
-                }
-            }
-        }
-        if (totalQty === 0)
-            return null;
-        const avgPrice = totalCost / totalQty;
-        return {
-            symbol,
-            side,
-            filledQuantity: totalQty,
-            avgPrice: Number(avgPrice.toFixed(4)),
-            totalCost: Number(totalCost.toFixed(2)),
-            counterFills: real.fills,
-        };
-    }
-    // P2: AI 虚拟限价挂单（进入盘口排队，TTL tick 到期自动撤单，无账户不结算）
-    placeVirtualOrder(symbol, side, price, qty, expiresAtTick) {
-        if (!Number.isFinite(Number(price)) || Number(price) <= 0 || !Number.isFinite(Number(qty)) || Number(qty) <= 0)
-            return;
-        let book = this.realBooks.get(symbol);
-        if (!book) {
-            book = { bids: [], asks: [] };
-            this.realBooks.set(symbol, book);
-        }
-        const isBid = side === 'buy' || side === 'cover';
-        const list = isBid ? book.bids : book.asks;
-        list.push({ orderId: null, accountId: null, side, price: Number(price), qty: Number(qty), time: Date.now(), virtual: true, expiresAtTick });
-        list.sort((a, b) => isBid ? (b.price - a.price) || (a.time - b.time) : (a.price - b.price) || (a.time - b.time));
-    }
-    // P2: 清理到期的 AI 虚拟挂单（每 tick 由行情引擎调用）
-    pruneExpiredVirtualOrders(currentTick) {
-        for (const book of this.realBooks.values()) {
-            for (const sideKey of ['bids', 'asks']) {
-                const arr = book[sideKey];
-                for (let i = arr.length - 1; i >= 0; i--) {
-                    if (arr[i].virtual && arr[i].expiresAtTick <= currentTick) {
-                        arr.splice(i, 1);
-                    }
-                }
-            }
-        }
-    }
-    // P2: AI 虚拟市价单——只吃真实盘口（AI 虚拟挂单 + 用户挂单），不吃合成深度
-    executeVirtualMarketOrder(symbol, side, quantity) {
-        const real = this.matchAgainstBook(symbol, side, quantity, undefined, undefined);
-        if (real.fills.length === 0)
-            return null;
-        let totalCost = 0;
-        let totalQty = 0;
-        for (const f of real.fills) {
-            totalCost += f.qty * f.price;
-            totalQty += f.qty;
-        }
-        const avgPrice = totalCost / totalQty;
-        return {
-            symbol,
-            side,
-            filledQuantity: totalQty,
-            avgPrice: Number(avgPrice.toFixed(4)),
-            totalCost: Number(totalCost.toFixed(2)),
-            counterFills: real.fills,
-        };
-    }
-    // P1 开盘集合竞价：按最大成交量原则形成开盘价，交叉挂单以开盘价撮合（用户订单走真实结算）
-    // 返回 { auctionPrice, fills }；fills 中买卖双方各一条（virtual 标记区分 AI 虚拟挂单）
-    runOpeningAuction(symbol, prevClose) {
-        const book = this.realBooks.get(symbol);
-        if (!book)
-            return { auctionPrice: Number(prevClose) || 0, fills: [] };
-        const bids = book.bids.slice();
-        const asks = book.asks.slice();
-        if (bids.length === 0 || asks.length === 0)
-            return { auctionPrice: Number(prevClose) || 0, fills: [] };
-        const isCN = !/^H/.test(symbol) && !/^U/.test(symbol);
-        const base = Number(prevClose) || Number(bids[0].price) || 1;
-        const limitUp = isCN ? base * 1.10 : Infinity;
-        const limitDown = isCN ? base * 0.90 : 0;
-        // 候选价：盘口所有价位 + 昨收（A 股限制在涨跌停区间内）
-        const candidates = new Set<number>();
-        for (const e of [...bids, ...asks]) {
-            const p = Number(e.price);
-            if (isCN && (p > limitUp || p < limitDown))
-                continue;
-            candidates.add(p);
-        }
-        candidates.add(Math.min(Math.max(base, limitDown), limitUp));
-        const volumeAt = (p) => {
-            let bidVol = 0;
-            for (const e of bids)
-                if (e.price >= p)
-                    bidVol += e.qty;
-            let askVol = 0;
-            for (const e of asks)
-                if (e.price <= p)
-                    askVol += e.qty;
-            return Math.min(bidVol, askVol);
-        };
-        let best = null;
-        for (const p of [...candidates].sort((a, b) => a - b)) {
-            const v = volumeAt(p);
-            if (best === null || v > best.volume || (v === best.volume && Math.abs(p - base) < Math.abs(best.price - base))) {
-                best = { price: p, volume: v };
-            }
-        }
-        const auctionPrice = best ? best.price : base;
-        const bidQueue = bids.filter((e) => e.price >= auctionPrice);
-        const askQueue = asks.filter((e) => e.price <= auctionPrice);
-        const fills = [];
-        const removeEntry = (arr, entry, qty) => {
-            const idx = arr.indexOf(entry);
-            if (idx < 0)
-                return;
-            if (qty >= entry.qty)
-                arr.splice(idx, 1);
-            else
-                arr[idx].qty -= qty;
-        };
-        // 用独立剩余计数器撮合（removeEntry 已同步扣减盘口数量，避免双扣减）
-        let i = 0;
-        let j = 0;
-        let bidLeft = bidQueue.length > 0 ? bidQueue[0].qty : 0;
-        let askLeft = askQueue.length > 0 ? askQueue[0].qty : 0;
-        while (i < bidQueue.length && j < askQueue.length) {
-            const b = bidQueue[i];
-            const a = askQueue[j];
-            const qty = Math.min(bidLeft, askLeft);
-            fills.push({ orderId: b.orderId, accountId: b.accountId, side: b.side, price: Number(Number(auctionPrice).toFixed(2)), qty, virtual: !!b.virtual });
-            fills.push({ orderId: a.orderId, accountId: a.accountId, side: a.side, price: Number(Number(auctionPrice).toFixed(2)), qty, virtual: !!a.virtual });
-            removeEntry(book.bids, b, qty);
-            removeEntry(book.asks, a, qty);
-            bidLeft -= qty;
-            askLeft -= qty;
-            if (bidLeft <= 0) {
-                i++;
-                if (i < bidQueue.length)
-                    bidLeft = bidQueue[i].qty;
-            }
-            if (askLeft <= 0) {
-                j++;
-                if (j < askQueue.length)
-                    askLeft = askQueue[j].qty;
-            }
-        }
-        return { auctionPrice: Number(Number(auctionPrice).toFixed(2)), fills };
-    }
-    // SECURITY: 限价单按限价封顶撮合——买入只吃价格<=限价的档位，卖出相反；不足则部分成交
-    executeMarketOrderLimited(symbol, side, quantity, limitPrice, excludeAccountId?) {
-        // P0: 先撮合真实挂单（限价内），剩余量再吃合成深度
-        const real = this.matchAgainstBook(symbol, side, quantity, limitPrice, excludeAccountId);
-        const isBuy = side === order_entity_1.OrderSide.BUY || side === order_entity_1.OrderSide.COVER;
-        let totalCost = 0;
-        let totalQty = 0;
-        for (const f of real.fills) {
-            totalCost += f.qty * f.price;
-            totalQty += f.qty;
-        }
-        let remaining = real.remaining;
-        const book = this.orderBooks.get(symbol);
-        const levels = book ? (isBuy ? book.asks : book.bids) : [];
-        for (const level of levels) {
-            if (remaining <= 0)
-                break;
-            const acceptable = isBuy ? level.price <= limitPrice : level.price >= limitPrice;
-            if (!acceptable)
-                break;
-            const fill = Math.min(remaining, level.size);
-            totalCost += fill * level.price;
-            totalQty += fill;
-            remaining -= fill;
-        }
-        // P2 滑点模型（限价约束内）：剩余量按逐级恶化价格成交；封板/无报价时不适用
-        if (remaining > 0) {
-            const knownPrice = this.prices.get(symbol);
-            const sealed = book && (isBuy ? book.sealedUp : book.sealedDown);
-            if (!sealed && knownPrice !== undefined && knownPrice !== null) {
-                const dirMul = isBuy ? 1 : -1;
-                let slip = 0;
-                const anchor = levels.length > 0 ? levels[levels.length - 1].price : Number(knownPrice);
-                while (remaining > 0 && slip < 0.02) {
-                    const price = anchor * (1 + dirMul * slip);
-                    if (isBuy ? price > limitPrice : price < limitPrice)
-                        break; // 超出限价不再成交
-                    const tranche = Math.min(remaining, 500);
-                    totalCost += tranche * price;
-                    totalQty += tranche;
-                    remaining -= tranche;
-                    slip = Math.min(0.02, slip + 0.001);
-                }
-            }
-        }
-        if (totalQty === 0)
-            return null;
-        const avgPrice = totalCost / totalQty;
-        return {
-            symbol,
-            side,
-            filledQuantity: totalQty,
-            avgPrice: Number(avgPrice.toFixed(4)),
-            totalCost: Number(totalCost.toFixed(2)),
-            counterFills: real.fills,
-        };
-    }
-    // P0: 结算对手方真实挂单成交（对方账户走统一结算队列，并同步订单实体的 filledQty/status）
+    // ─── 撮合/盘口逻辑已迁移至 MatchingEngine（见上方委托区与 matching-engine.ts） ───
+// P0: 结算对手方真实挂单成交（对方账户走统一结算队列，并同步订单实体的 filledQty/status）
     async settleCounterFills(symbol, mode, counterFills) {
         for (const cf of counterFills) {
             // P2: AI 虚拟挂单（virtual 标记或 orderId=null）无账户，跳过结算
@@ -559,6 +221,9 @@ let TradingEngineService = class TradingEngineService {
             await this.orderRepo.save(order);
             return { success: true, fill, settle };
         }
+        const isIceberg = orderData.type === order_entity_1.OrderType.ICEBERG;
+        const displayQty = isIceberg ? Number(orderData.displayQty) : Number(orderData.quantity);
+        const hiddenQty = isIceberg ? Number(orderData.quantity) - displayQty : 0;
         const order = this.orderRepo.create({
             userId: orderData.userId,
             accountId: orderData.accountId,
@@ -569,13 +234,18 @@ let TradingEngineService = class TradingEngineService {
             triggerPrice: orderData.triggerPrice,
             quantity: orderData.quantity,
             status: order_entity_1.OrderStatus.PENDING,
+            displayQty: isIceberg ? displayQty : null,
+            hiddenQty: isIceberg ? hiddenQty : null,
         });
         const saved = await this.orderRepo.save(order);
         // P0 真实盘口：限价单挂入盘口队列（价格-时间优先）
         if (orderData.price) {
-            this.placeRestingOrder(orderData.symbol, saved.id, orderData.accountId, orderData.side, orderData.price, orderData.quantity);
+            // P2 冰山单：仅显示量上盘口，隐藏量在显示量成交后由撮合引擎逐档补量（同价队尾）
+            this.placeRestingOrder(orderData.symbol, saved.id, orderData.accountId, orderData.side, orderData.price, orderData.quantity, isIceberg ? { displayQty, hiddenQty } : undefined);
             // 立即尝试撮合：挂单价与对手方真实挂单交叉时按对手价成交（价格改善）
-            const crossed = this.matchAgainstBook(orderData.symbol, orderData.side, orderData.quantity, Number(orderData.price), orderData.accountId);
+            // 冰山单首轮撮合只针对显示量（隐藏量不提前暴露）
+            const crossQty = isIceberg ? displayQty : Number(orderData.quantity);
+            const crossed = this.matchAgainstBook(orderData.symbol, orderData.side, crossQty, Number(orderData.price), orderData.accountId);
             if (crossed.fills.length > 0) {
                 const filledQty = Number(orderData.quantity) - crossed.remaining;
                 this.removeRestingOrder(orderData.symbol, saved.id, filledQty);
@@ -627,9 +297,15 @@ let TradingEngineService = class TradingEngineService {
         if (!this.prices.has(order.symbol) && !this.orderBooks.has(order.symbol)) {
             return { valid: false, error: '股票不存在，请检查代码' };
         }
-        const needsPrice = order.type === order_entity_1.OrderType.LIMIT || order.type === order_entity_1.OrderType.FOK || order.type === order_entity_1.OrderType.IOC;
+        const needsPrice = order.type === order_entity_1.OrderType.LIMIT || order.type === order_entity_1.OrderType.FOK || order.type === order_entity_1.OrderType.IOC || order.type === order_entity_1.OrderType.ICEBERG;
         if (needsPrice && (!Number.isFinite(Number(order.price)) || Number(order.price) <= 0 || Number(order.price) > 1000000)) {
-            return { valid: false, error: '限价/FOK/IOC 指令需要有效价格（0~1000000）' };
+            return { valid: false, error: '限价/FOK/IOC/冰山单指令需要有效价格（0~1000000）' };
+        }
+        if (order.type === order_entity_1.OrderType.ICEBERG) {
+            const dq = Number(order.displayQty);
+            if (!Number.isInteger(dq) || dq <= 0 || dq >= Number(order.quantity)) {
+                return { valid: false, error: '冰山单显示量必须为 1~(总数量-1) 的整数' };
+            }
         }
         if (order.type === order_entity_1.OrderType.STOP && (!Number.isFinite(Number(order.triggerPrice)) || Number(order.triggerPrice) <= 0 || Number(order.triggerPrice) > 1000000)) {
             return { valid: false, error: '止损单需要有效触发价（0~1000000）' };
@@ -857,10 +533,31 @@ let TradingEngineService = class TradingEngineService {
                     continue;
                 // SECURITY: 限价/止损限价按限价封顶撮合，避免成交价突破限价；自成交排除
                 const isPriced = order.type === order_entity_1.OrderType.LIMIT || order.type === order_entity_1.OrderType.STOP_LIMIT;
+                const isStopType = order.type === order_entity_1.OrderType.STOP || order.type === order_entity_1.OrderType.STOP_LIMIT;
+                // P2 止损单簿记：首次触发记录审计（转换模式/触发价/现价）
+                if (isStopType && !order.triggerLog) {
+                    this.appendTriggerLog(order, {
+                        action: 'triggered', triggerPrice: Number(order.triggerPrice), currentPrice: Number(currentPrice),
+                        convertTo: isPriced ? 'limit' : 'market', limitPrice: isPriced ? Number(order.price) : null,
+                    });
+                }
                 const fill = isPriced
                     ? this.executeMarketOrderLimited(order.symbol, order.side, remainingQty, Number(order.price), order.accountId)
                     : this.executeMarketOrder(order.symbol, order.side, remainingQty, order.accountId);
                 if (!fill) {
+                    // P2 止损单簿记：触发后无流动性 → 记录重试，超限取消（限价单保持排队语义，不做重试计数）
+                    if (isStopType) {
+                        const retries = (Number(order.triggerRetries) || 0) + 1;
+                        order.triggerRetries = retries;
+                        this.appendTriggerLog(order, { action: 'converted-no-liquidity', currentPrice: Number(currentPrice), retries });
+                        if (retries >= 10) {
+                            order.status = order_entity_1.OrderStatus.CANCELLED;
+                            order.rejectReason = '止损触发后 10 次尝试均无流动性，已取消';
+                            this.appendTriggerLog(order, { action: 'cancelled', reason: order.rejectReason });
+                            this.logger.warn(`止损单 ${order.id} 触发后无流动性已取消`);
+                        }
+                        await this.orderRepo.save(order);
+                    }
                     continue;
                 }
                 // 重新加载账户：资金/持仓可能在挂单期间已变化
@@ -886,6 +583,10 @@ let TradingEngineService = class TradingEngineService {
                     }
                     order.filledQty = Number(order.filledQty || 0) + fill.filledQuantity;
                     order.avgFillPrice = fill.avgPrice;
+                    // P2 止损单簿记：成交结果审计
+                    if (isStopType) {
+                        this.appendTriggerLog(order, { action: 'filled', qty: fill.filledQuantity, price: fill.avgPrice });
+                    }
                     if (Number(order.filledQty) >= Number(order.quantity)) {
                         order.status = order_entity_1.OrderStatus.FILLED;
                         this.removeUserOrder(order.symbol, order.id);
@@ -898,17 +599,28 @@ let TradingEngineService = class TradingEngineService {
                     fills.push({ ...fill, side: order.side, fees: settle.fees });
                     this.logger.log(`挂单成交: ${order.symbol} ${order.side} ${fill.filledQuantity}股 @ ${fill.avgPrice}`);
                 } else {
-                    // 结算失败 → 对手方订单放回盘口、本方订单取消，避免每 tick 重复尝试
+                    // 结算失败 → 对手方订单放回盘口
                     if (fill.counterFills && fill.counterFills.length > 0) {
                         for (const cf of fill.counterFills) {
                             this.placeRestingOrder(order.symbol, cf.orderId, cf.accountId, cf.side, cf.price, cf.qty);
                         }
                     }
-                    order.status = order_entity_1.OrderStatus.CANCELLED;
-                    order.rejectReason = settle.error;
-                    await this.orderRepo.save(order);
-                    this.removeUserOrder(order.symbol, order.id);
-                    this.logger.warn(`挂单 ${order.id} 结算失败已取消: ${settle.error}`);
+                    // P2 止损单簿记：转换失败回滚保活（重试上限 10 次后取消），避免每 tick 重复尝试坏账
+                    if (isStopType && (Number(order.triggerRetries) || 0) < 10) {
+                        order.triggerRetries = (Number(order.triggerRetries) || 0) + 1;
+                        this.appendTriggerLog(order, { action: 'settle-failed-retry', error: settle.error, retries: order.triggerRetries });
+                        await this.orderRepo.save(order);
+                        this.logger.warn(`止损单 ${order.id} 结算失败保留重试(${order.triggerRetries}/10): ${settle.error}`);
+                    }
+                    else {
+                        order.status = order_entity_1.OrderStatus.CANCELLED;
+                        order.rejectReason = settle.error;
+                        if (isStopType)
+                            this.appendTriggerLog(order, { action: 'cancelled', reason: settle.error });
+                        await this.orderRepo.save(order);
+                        this.removeUserOrder(order.symbol, order.id);
+                        this.logger.warn(`挂单 ${order.id} 结算失败已取消: ${settle.error}`);
+                    }
                 }
             }
         }
@@ -924,6 +636,21 @@ let TradingEngineService = class TradingEngineService {
         await this.orderRepo.save(order);
         this.removeUserOrder(order.symbol, order.id);
         return true;
+    }
+    // P2 止损单簿记：审计日志追加（JSON 数组，最多保留 20 条，倒序无关——append 追加）
+    appendTriggerLog(order, entry) {
+        let log = [];
+        try {
+            if (order.triggerLog)
+                log = JSON.parse(order.triggerLog);
+            if (!Array.isArray(log))
+                log = [];
+        }
+        catch (e) {
+            log = [];
+        }
+        log.push({ ...entry, at: new Date().toISOString() });
+        order.triggerLog = JSON.stringify(log.slice(-20));
     }
     // 玩法：分红现金到账（日终结算，按持仓数量发放）
     async payDividends(dividends) {

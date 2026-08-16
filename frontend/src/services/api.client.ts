@@ -59,7 +59,7 @@ export const accountApi = {
 // ─── Trading (所有接口接受 mode 参数) ───
 export const tradingApi = {
   placeOrder: (mode: string, data: {
-    symbol: string; type: string; side: string; quantity: number; price?: number; triggerPrice?: number;
+    symbol: string; type: string; side: string; quantity: number; price?: number; triggerPrice?: number; displayQty?: number;
   }) => api.post(`/trading/order?mode=${mode}`, data).then((r) => r.data),
   cancelOrder: (mode: string, id: string) =>
     api.delete(`/trading/order/${id}?mode=${mode}`).then((r) => r.data),

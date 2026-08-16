@@ -130,6 +130,11 @@ let MarketService = class MarketService {
             // 聚合到全局（风控需全市场价格）
             Object.assign(this.allPrices, prices);
             this.engine.updatePrices(prices);
+            // P2 滑点模型：同步个股波动率（OFI+波动率动态冲击成本）
+            try {
+                this.engine.setVolatilities(marketData.getVolatilities());
+            }
+            catch (e) { }
             this.engine.refreshOrderBooks(prices);
             this.gateway.broadcastTick(ticks);
             const counter = this[counterKey] || 0;
