@@ -4,6 +4,20 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase 5 账户/风控/多市场
+
+### Added
+- **配对级绩效（REALISM #18）**：`core/risk-manager/perf.ts` FIFO 流水配对（多空各自配对）→ 真实胜率/盈亏因子/月度收益热力图；`/account/metrics` 返回 pairedWinRate/pairedTrades/profitFactor/monthlyPnl，Profile 绩效卡新增展示
+- **融券券源池（REALISM #15）**：每只股票可融券数量与券源年化费率（哈希稳定 3~12.5 万股、4%~9.9%/年），做空校验券源、成交扣券、平空还券（上限=初始）；`/market/flow-signals` 返回 shortAvailable/shortFeeRate，盘口面板显示「可融券」
+- **担保品折算率动态化**：shortMarginRateFor 增加波动率参数——高波动个股保证金率上浮（风险敏感），仍钳制 [0.5, 0.65]
+- **动态汇率（REALISM #16）**：HK/US 汇率逐日随机游走（±3% 波动带），跨市场划转用实时汇率；`/market/state` 暴露 fxRates；账户面板新增「合并资产(¥)」三市场实时折合
+- **A股新股首日规则（REALISM #19）**：挂牌当日涨跌幅放宽为 最高+44%/最低-36%（发行价口径，合成盘口与集合竞价同口径），次日自动恢复 ±10%
+- **后复权 + 成本复权口径（REALISM #13）**：图表复权三档切换（前复权/后复权/不复权）；持仓「多仓成本」按前复权口径显示（`utils/adjust.ts` 纯函数 + 单测）
+- 新增测试 `phase5-account-risk.test.js`（配对绩效 4 例/折算率/汇率钳带/券源池/新股带宽 9 例），后端 146→155；前端 41 例
+
+### Changed
+- account.service 划转改用 `getFxRates()` 实时汇率；engine 保证金计算 5 处接入波动率动态折算率
+
 ## [Unreleased] - Phase 4 AI 对手盘生态
 
 ### 工程化与代码质量（回应外部评审）

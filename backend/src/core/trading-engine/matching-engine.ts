@@ -51,6 +51,39 @@ export class MatchingEngine {
         this.dayOpenPrices = new Map();
         this.volatilities = new Map();
         this.virtualFillHook = null;
+        // P5 融券券源池：每只股票可融券数量（股）与券源年化费率（按代码哈希稳定生成）
+        this.shortPool = new Map();
+        // P5 A股新股首日集合：首日涨跌幅 最高+44%/最低-36%（发行价口径）替代 ±10%
+        this.ipoFirstDay = new Set();
+    }
+    initShortPool(symbol) {
+        if (this.shortPool.has(symbol))
+            return;
+        let h = 0;
+        const s = String(symbol || '');
+        for (let i = 0; i < s.length; i++)
+            h = (h * 31 + s.charCodeAt(i)) % 100000;
+        const available = 30000 + (h % 20) * 5000;
+        this.shortPool.set(symbol, { available, initial: available, feeRate: Number((0.04 + (h % 60) / 1000).toFixed(4)) });
+    }
+    getShortPool(symbol) {
+        this.initShortPool(symbol);
+        return { ...this.shortPool.get(symbol) };
+    }
+    consumeShort(symbol, qty) {
+        this.initShortPool(symbol);
+        const p = this.shortPool.get(symbol);
+        p.available = Math.max(0, p.available - Number(qty));
+        return p.available;
+    }
+    returnShort(symbol, qty) {
+        this.initShortPool(symbol);
+        const p = this.shortPool.get(symbol);
+        p.available = Math.min(p.initial, p.available + Number(qty));
+        return p.available;
+    }
+    setIpoFirstDays(symbols) {
+        this.ipoFirstDay = new Set(Array.isArray(symbols) ? symbols : []);
     }
     // 合成深度（5 档，按 mid 生成）
     updatePrices(prices) {
@@ -201,10 +234,13 @@ export class MatchingEngine {
         }
         let asks = [];
         let bids = [];
-        // P0 涨跌停封板（仅 A 股，以今开为基准 ±10%）：涨停时合成卖盘清空（只能排队买入）、跌停时合成买盘清空
+        // P0 涨跌停封板（仅 A 股，以今开为基准）：常规 ±10%；P5 新股首日 最高+44%/最低-36%（发行价口径）
         const isCN = market_utils_1.isCnSymbol(symbol);
-        const limitUp = isCN && dayOpen && dayOpen > 0 ? Number(dayOpen) * 1.10 : null;
-        const limitDown = isCN && dayOpen && dayOpen > 0 ? Number(dayOpen) * 0.90 : null;
+        const firstDay = this.ipoFirstDay.has(symbol);
+        const upMul = firstDay ? 1.44 : 1.10;
+        const dnMul = firstDay ? 0.64 : 0.90;
+        const limitUp = isCN && dayOpen && dayOpen > 0 ? Number(dayOpen) * upMul : null;
+        const limitDown = isCN && dayOpen && dayOpen > 0 ? Number(dayOpen) * dnMul : null;
         const sealedUp = limitUp !== null && midPrice >= limitUp - 1e-6;
         const sealedDown = limitDown !== null && midPrice <= limitDown + 1e-6;
         for (let i = 0; i < levels; i++) {
@@ -393,8 +429,10 @@ export class MatchingEngine {
             return { auctionPrice: Number(prevClose) || 0, fills: [] };
         const isCN = market_utils_1.isCnSymbol(symbol);
         const base = Number(prevClose) || Number(bids[0].price) || 1;
-        const limitUp = isCN ? base * 1.10 : Infinity;
-        const limitDown = isCN ? base * 0.90 : 0;
+        // P5 新股首日竞价区间同样放宽到 +44%/-36%
+        const firstDay = this.ipoFirstDay.has(symbol);
+        const limitUp = isCN ? base * (firstDay ? 1.44 : 1.10) : Infinity;
+        const limitDown = isCN ? base * (firstDay ? 0.64 : 0.90) : 0;
         const candidates = new Set<number>();
         for (const e of [...bids, ...asks]) {
             const p = Number(e.price);

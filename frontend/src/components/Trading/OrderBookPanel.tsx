@@ -83,6 +83,14 @@ export function OrderBookPanel() {
                 {flow.bigNetFlow >= 0 ? '+' : ''}{flow.bigNetFlowWan} 万股
               </b>
             </span>
+            {flow.shortAvailable != null && (
+              <span>
+                可融券:
+                <b style={{ marginLeft: 4, fontFamily: 'var(--font-mono)' }}>
+                  {(flow.shortAvailable / 10000).toFixed(1)}万股·费率 {((flow.shortFeeRate || 0) * 100).toFixed(2)}%/年
+                </b>
+              </span>
+            )}
           </div>
         )}
         <div style={{ marginTop: 4 }}>

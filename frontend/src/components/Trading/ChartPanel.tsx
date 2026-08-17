@@ -67,13 +67,14 @@ export function ChartPanel() {
   const marketMode = useUIStore((s) => s.marketMode);
 
   const stock = stocks.find((s: any) => s.symbol === selectedSymbol);
-  // P1 复权：前复权模式下按各 bar 时点因子折算历史价格（消除分红跳空）
-  const [adjMode, setAdjMode] = useState<'none' | 'forward'>('forward');
+  // P1 复权：前复权（默认）/ 后复权 / 不复权 三档；P5 后复权 = 前复权价 ÷ 最新因子
+  const [adjMode, setAdjMode] = useState<'none' | 'forward' | 'backward'>('forward');
   const applyAdjustment = (bars: KlineData[]): KlineData[] => {
-    if (adjMode !== 'forward') return bars;
+    if (adjMode === 'none') return bars;
     const series: { day: number; factor: number }[] = (stock as any)?.adjustmentSeries || [];
     if (!series || series.length === 0) return bars;
     const base = new Date(2024, 0, 1).getTime();
+    const fNow = series[series.length - 1].factor || 1;
     return bars.map((b) => {
       const day = Math.floor((new Date(b.time).getTime() - base) / 86400000);
       let f = 1;
@@ -81,7 +82,8 @@ export function ChartPanel() {
         if (s.day <= day) f = s.factor;
         else break;
       }
-      return f === 1 ? b : { ...b, open: b.open * f, high: b.high * f, low: b.low * f, close: b.close * f };
+      const mul = adjMode === 'backward' ? f / fNow : f;
+      return mul === 1 ? b : { ...b, open: b.open * mul, high: b.high * mul, low: b.low * mul, close: b.close * mul };
     });
   };
   const klineData: KlineData[] = useMemo(() => applyAdjustment((klines[selectedSymbol]?.[selectedTimeframe] || []) as KlineData[]), [klines, selectedSymbol, selectedTimeframe, adjMode, stock]);
@@ -521,10 +523,10 @@ export function ChartPanel() {
           <button
             className="btn btn-ghost btn-sm"
             style={{ fontSize: 11, padding: '1px 6px' }}
-            title="前复权：历史价格按分红折算，消除除权跳空"
-            onClick={() => setAdjMode(adjMode === 'forward' ? 'none' : 'forward')}
+            onClick={() => setAdjMode(adjMode === 'forward' ? 'backward' : adjMode === 'backward' ? 'none' : 'forward')}
+            title="前复权：历史价格按分红折算；后复权：保留除权前名义价；不复权：原始价格"
           >
-            {adjMode === 'forward' ? '前复权' : '不复权'}
+            {adjMode === 'forward' ? '前复权' : adjMode === 'backward' ? '后复权' : '不复权'}
           </button>
         )}
       </div>

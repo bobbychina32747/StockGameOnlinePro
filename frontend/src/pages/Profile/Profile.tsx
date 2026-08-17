@@ -208,6 +208,30 @@ export default function Profile() {
             <span className="label">累计成交笔数</span>
             <span className="value">{perf.totalTrades != null ? perf.totalTrades : '---'}</span>
           </div>
+          {/* P5 配对级绩效：真实盈亏配对胜率/盈亏因子/月度收益 */}
+          <div className="info-row">
+            <span className="label">配对胜率</span>
+            <span className={Number(perf.pairedWinRate) >= 0.5 ? 'value up' : 'value down'}>
+              {perf.pairedWinRate != null ? (Number(perf.pairedWinRate) * 100).toFixed(1) + '%' : '---'}
+              {perf.pairedTrades != null && <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 4 }}>（{perf.pairedTrades} 次配对）</span>}
+            </span>
+          </div>
+          <div className="info-row">
+            <span className="label">盈亏因子</span>
+            <span className="value">{perf.profitFactor != null ? perf.profitFactor : '---'}</span>
+          </div>
+          {perf.monthlyPnl?.length > 0 && (
+            <div className="info-row" style={{ alignItems: 'flex-start' }}>
+              <span className="label">月度收益</span>
+              <span className="value" style={{ fontSize: 11, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {perf.monthlyPnl.slice(-6).map((m: any) => (
+                  <span key={m.month} className={m.pnl >= 0 ? 'up' : 'down'} style={{ fontFamily: 'var(--font-mono)' }}>
+                    {m.month}: {m.pnl >= 0 ? '+' : ''}{m.pnl}
+                  </span>
+                ))}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

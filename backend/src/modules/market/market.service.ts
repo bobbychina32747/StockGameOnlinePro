@@ -206,6 +206,11 @@ let MarketService = class MarketService {
             if (counter === 0) {
                 // 玩法：热点/IPO/黑天鹅（各市场独立）
                 await marketData.startNewDay();
+                // P5 新股首日 ±44% 带宽（挂牌当日生效，次日自动恢复 ±10%）
+                try {
+                    this.engine.setIpoFirstDays(marketData.getIpoFirstDaySymbols());
+                }
+                catch (e) { }
                 const events = marketData.getDayEvents();
                 if (events && events.ipo && events.ipo.listed) {
                     for (const n of events.ipo.listed) {

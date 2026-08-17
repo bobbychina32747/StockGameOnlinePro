@@ -24,6 +24,8 @@ import daily_snapshot_entity_1 = require("../../infrastructure/database/entities
 
 import constants_1 = require("../../common/constants");
 
+import perf_1 = require("./perf");
+
 let RiskManagerService = class RiskManagerService {
     [key: string]: any;
     constructor(accountRepo, snapshotRepo, positionRepo) {
@@ -169,8 +171,10 @@ let RiskManagerService = class RiskManagerService {
         }
         return { holdValue, marginUsed };
     }
-    async calculateMetrics(account) {
+    async calculateMetrics(account, txs) {
         const history = this.equityHistory.get(account.id) || [];
+        // P5 配对级绩效：FIFO 流水配对 → 真实胜率/盈亏因子/月度收益
+        const paired = perf_1.pairedMetrics(Array.isArray(txs) ? txs : []);
         if (history.length < 2) {
             return {
                 totalReturn: 0,
@@ -181,6 +185,10 @@ let RiskManagerService = class RiskManagerService {
                 winRate: 0,
                 totalTrades: Number(account.totalTrades) || 0,
                 volatility: 0,
+                pairedTrades: paired.pairedTrades,
+                pairedWinRate: Number(paired.pairedWinRate.toFixed(4)),
+                profitFactor: paired.profitFactor === Infinity ? 0 : Number(paired.profitFactor.toFixed(2)),
+                monthlyPnl: paired.monthlyPnl,
             };
         }
         const returns = history.map((h) => h.return);
@@ -209,6 +217,11 @@ let RiskManagerService = class RiskManagerService {
             winRate: Number((returns.length ? winDays / returns.length : 0).toFixed(4)),
             totalTrades: Number(account.totalTrades) || 0,
             volatility: Number(volatility.toFixed(4)),
+            // P5 配对级绩效（真实盈亏配对，而非盈利交易日占比）
+            pairedTrades: paired.pairedTrades,
+            pairedWinRate: Number(paired.pairedWinRate.toFixed(4)),
+            profitFactor: paired.profitFactor === Infinity ? 0 : Number(paired.profitFactor.toFixed(2)),
+            monthlyPnl: paired.monthlyPnl,
         };
     }
     calculateVaR(accountId, confidence = 0.95, days = 20) {

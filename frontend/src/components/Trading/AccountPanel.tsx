@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { accountApi } from '../../services/api.client';
+import { accountApi, marketApi } from '../../services/api.client';
 import { useAccountStore, useMarketStore, useUIStore } from '../../store';
 import { CollapsibleCard } from './CollapsibleCard';
 import { PriceText } from './PriceText';
+import { adjustedCost } from '../../utils/adjust';
 
-// 右侧账户面板：总览 + 模式切换 + 角色预设 + 持仓明细
+// 右侧账户面板：总览 + 模式切换 + 角色预设 + 持仓明细（P5：合并资产 + 复权成本口径）
 export function AccountPanel() {
   const { account, positions } = useAccountStore();
   const fetchAccount = useAccountStore((s) => s.fetchAccount);
@@ -15,6 +16,27 @@ export function AccountPanel() {
   const addNotification = useUIStore((s) => s.addNotification);
 
   const isCN = mode === 'CN';
+
+  // P5 合并资产：三市场总资产按实时汇率折合人民币
+  const [mergedEquity, setMergedEquity] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const state = await marketApi.state();
+        const fx = state?.fxRates || { CN: 1, HK: 0.92, US: 7.12 };
+        const results = await Promise.all(['CN', 'HK', 'US'].map((m) => accountApi.get(m).catch(() => null)));
+        const sum = results.reduce((acc, r, i) => {
+          const a = r?.account;
+          return acc + (a ? Number(a.totalEquity) * (fx[['CN', 'HK', 'US'][i]] || 1) : 0);
+        }, 0);
+        if (alive) setMergedEquity(sum);
+      } catch (e) { /* 合并资产失败静默 */ }
+    };
+    load();
+    const t = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
 
   useEffect(() => {
     fetchAccount(mode);
@@ -84,6 +106,12 @@ export function AccountPanel() {
           <span className="label">总资产</span>
           <span className="value"><PriceText value={totalEquity} /></span>
         </div>
+        {mergedEquity != null && (
+          <div className="info-row">
+            <span className="label">合并资产(¥)</span>
+            <span className="value"><PriceText value={mergedEquity} /></span>
+          </div>
+        )}
         <div className="info-row">
           <span className="label">杠杆</span>
           <span className="value">{account ? `${account.leverage}x` : '---'}</span>
@@ -202,8 +230,10 @@ export function AccountPanel() {
                 </div>
                 {pos.longCost > 0 && (
                   <div className="info-row">
-                    <span className="label">多仓成本</span>
-                    <span className="value">{Number(pos.longCost).toFixed(2)}</span>
+                    <span className="label">多仓成本{(() => { const st: any = stocks.find((x: any) => x.symbol === pos.symbol); return st?.adjustmentSeries?.length ? '（前复权）' : ''; })()}</span>
+                    <span className="value">
+                      {(() => { const st: any = stocks.find((x: any) => x.symbol === pos.symbol); return adjustedCost(Number(pos.longCost), st?.adjustmentSeries || [], Number(pos.lockDay) || 0, 'forward').toFixed(2); })()}
+                    </span>
                   </div>
                 )}
                 {pos.shortCost > 0 && (

@@ -103,6 +103,18 @@ let TradingEngineService = class TradingEngineService {
     runOpeningAuction(symbol, prevClose) {
         return this.matching.runOpeningAuction(symbol, prevClose);
     }
+    setIpoFirstDays(symbols) {
+        this.matching.setIpoFirstDays(symbols);
+    }
+    getShortPool(symbol) {
+        return this.matching.getShortPool(symbol);
+    }
+    consumeShort(symbol, qty) {
+        return this.matching.consumeShort(symbol, qty);
+    }
+    returnShort(symbol, qty) {
+        return this.matching.returnShort(symbol, qty);
+    }
     // B1 用户成交回调：成交后通知行情引擎（价格冲击 + 成交量并入当前K线）
     setUserFillHook(fn) {
         this.userFillHook = fn;
@@ -331,10 +343,15 @@ let TradingEngineService = class TradingEngineService {
             }
         }
         if (order.side === order_entity_1.OrderSide.SHORT) {
-            // P3: 做空保证金率按个股折算（0.50~0.65）
-            const margin = remainingQty * (order.price || currentPrice) * (0, constants_1.shortMarginRateFor)(order.symbol);
+            // P3: 做空保证金率按个股折算（0.50~0.65）；P5 波动率升高上浮（风险敏感）
+            const margin = remainingQty * (order.price || currentPrice) * (0, constants_1.shortMarginRateFor)(order.symbol, this.volatilities.get(order.symbol));
             if (account.cash < margin) {
                 return { valid: false, error: `保证金不足，需要 ${margin.toFixed(2)}` };
+            }
+            // P5 券源池：可融券数量校验（耗尽则无法开空，真实市场融券收紧）
+            const pool = this.getShortPool(order.symbol);
+            if (pool.available < remainingQty) {
+                return { valid: false, error: `券源不足：${order.symbol} 仅剩 ${pool.available} 股可融（费率 ${(pool.feeRate * 100).toFixed(2)}%/年）` };
             }
         }
         if (order.side === order_entity_1.OrderSide.SELL || order.side === order_entity_1.OrderSide.COVER) {
@@ -439,14 +456,14 @@ let TradingEngineService = class TradingEngineService {
             }
         }
         if (side === order_entity_1.OrderSide.SHORT) {
-            const margin = totalCost * (0, constants_1.shortMarginRateFor)(symbol);
+            const margin = totalCost * (0, constants_1.shortMarginRateFor)(symbol, this.volatilities.get(symbol));
             if (Number(account.cash) < margin) {
                 return { success: false, error: `保证金不足，需要 ${margin.toFixed(2)}` };
             }
         }
         if (side === order_entity_1.OrderSide.SHORT) {
             // 卖出得现金，冻结保证金（按个股折算率）
-            const collateral = totalCost * (0, constants_1.shortMarginRateFor)(symbol);
+            const collateral = totalCost * (0, constants_1.shortMarginRateFor)(symbol, this.volatilities.get(symbol));
             account.cash = Number(account.cash) + totalCost - fees.totalFees - collateral;
             account.shortCollateral = Number(account.shortCollateral || 0) + collateral;
         } else if (side === order_entity_1.OrderSide.COVER) {
@@ -485,6 +502,16 @@ let TradingEngineService = class TradingEngineService {
             catch (e) { }
         }
         this.logger.log(`成交: ${symbol} ${side} ${fill.filledQuantity}股 @ ${fill.avgPrice}`);
+        // P5 券源池：做空扣券、平空还券（失败不影响结算，仅告警）
+        try {
+            if (side === order_entity_1.OrderSide.SHORT)
+                this.consumeShort(symbol, fill.filledQuantity);
+            else if (side === order_entity_1.OrderSide.COVER)
+                this.returnShort(symbol, fill.filledQuantity);
+        }
+        catch (e) {
+            this.logger.warn('券源池更新失败: ' + (e && e.message ? e.message : e));
+        }
         return {
             success: true,
             fill: { symbol: fill.symbol, side, quantity: fill.filledQuantity, price: fill.avgPrice, totalCost, fees },
@@ -708,7 +735,7 @@ let TradingEngineService = class TradingEngineService {
             // 多仓借入资金 = 持仓市值 × (1 - 1/杠杆倍数)
             totalBorrowed += pos.longQty * price * (1 - 1 / Number(account.leverage || 1));
             // 做空保证金要求 = 做空市值 × 个股保证金率
-            totalBorrowed += pos.shortQty * price * (0, constants_1.shortMarginRateFor)(pos.symbol);
+            totalBorrowed += pos.shortQty * price * (0, constants_1.shortMarginRateFor)(pos.symbol, this.volatilities.get(pos.symbol));
         }
         // 无借入资金 = 安全
         if (totalBorrowed <= 0) {
@@ -786,7 +813,7 @@ let TradingEngineService = class TradingEngineService {
                     continue;
                 equity += pos.longQty * price - pos.shortQty * price;
                 borrowed += pos.longQty * price * (1 - 1 / Number(account.leverage || 1));
-                borrowed += pos.shortQty * price * (0, constants_1.shortMarginRateFor)(pos.symbol);
+                borrowed += pos.shortQty * price * (0, constants_1.shortMarginRateFor)(pos.symbol, this.volatilities.get(pos.symbol));
             }
             return borrowed > 0 ? equity / borrowed : 999;
         };

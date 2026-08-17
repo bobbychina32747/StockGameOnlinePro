@@ -83,7 +83,13 @@ let AccountService = class AccountService {
     }
     async getMetrics(userId, mode) {
         const account = await this.getAccount(userId, mode);
-        const metrics = await this.riskManager.calculateMetrics(account);
+        // P5 配对级绩效：取最近 500 笔流水（升序）做 FIFO 配对
+        const txs = await this.transactionRepo.find({
+            where: { accountId: account.id },
+            order: { createdAt: 'ASC' },
+            take: 500,
+        });
+        const metrics = await this.riskManager.calculateMetrics(account, txs);
         return { account, metrics };
     }
     async setLeverage(userId, mode, leverage) {
@@ -145,8 +151,10 @@ let AccountService = class AccountService {
         if (!fromMode || !toMode || fromMode === toMode) {
             return { success: false, error: '划转市场必须不同（CN/HK/US）' };
         }
-        const fromRate = constants_1.FX_CNY_PER_UNIT[fromMode];
-        const toRate = constants_1.FX_CNY_PER_UNIT[toMode];
+        // P5 动态汇率：用实时汇率（行情引擎每日演化）而非固定基准
+        const fx = (0, constants_1.getFxRates)();
+        const fromRate = fx[fromMode];
+        const toRate = fx[toMode];
         if (!fromRate || !toRate) {
             return { success: false, error: '不支持的市场' };
         }

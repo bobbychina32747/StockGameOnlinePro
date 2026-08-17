@@ -145,17 +145,35 @@ export const RISK = {
 };
 
 // P3 个股折算率/保证金率：按股票代码稳定哈希在区间内取值（做空保证金率 0.5~0.65）
-export function shortMarginRateFor(symbol) {
+// P5 动态折算：波动率升高 → 保证金率上浮（风险敏感），仍钳制在 [0.5, 0.65]
+export function shortMarginRateFor(symbol, volatility) {
     let h = 0;
     const s = String(symbol || '');
     for (let i = 0; i < s.length; i++)
         h = (h * 31 + s.charCodeAt(i)) % 100000;
-    return Number((0.5 + (h % 16) / 100).toFixed(2)); // 0.50 ~ 0.65
+    const base = 0.5 + (h % 16) / 100; // 0.50 ~ 0.65
+    const vol = Number.isFinite(Number(volatility)) ? Number(volatility) : 0.02;
+    const adjusted = base + Math.max(0, vol - 0.02) * 0.5;
+    return Number(Math.min(0.65, Math.max(0.5, adjusted)).toFixed(2));
 }
 
 // P3 跨市场汇率（1 单位本币折合人民币）：CN=1，HK≈0.92，US≈7.12；划转手续费 0.1%
 export const FX_CNY_PER_UNIT = { CN: 1, HK: 0.92, US: 7.12 };
 export const FX_TRANSFER_FEE_RATE = 0.001;
+
+// P5 动态汇率：HK/US 由行情引擎每日演化（±3% 波动带内随机游走），CN 恒为 1
+let _fxRates = { ...FX_CNY_PER_UNIT };
+export function getFxRates() {
+    return { ..._fxRates };
+}
+export function setFxRates(rates) {
+    for (const k of ['HK', 'US']) {
+        const v = Number(rates[k]);
+        if (!Number.isFinite(v) || v <= 0)
+            continue;
+        _fxRates[k] = Math.max(FX_CNY_PER_UNIT[k] * 0.97, Math.min(FX_CNY_PER_UNIT[k] * 1.03, v));
+    }
+}
 
 export const MARKET_STATES = ['bull', 'bear', 'sideways'];
 

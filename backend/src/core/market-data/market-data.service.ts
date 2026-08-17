@@ -859,7 +859,7 @@ let MarketDataService = class MarketDataService {
         }
         return out.sort((a, b) => b.pnlPct - a.pnlPct);
     }
-    // ─── P4 订单流信号公开化：OFI + 机构/游资大单净流入 ───
+    // ─── P4 订单流信号公开化：OFI + 机构/游资大单净流入 + P5 券源池 ───
     getFlowSignals(symbol) {
         const book = this.engine ? this.engine.getOrderBook(symbol) : null;
         let ofi = 0;
@@ -869,13 +869,35 @@ let MarketDataService = class MarketDataService {
                 ofi = (Number(book.bids[0].size) - Number(book.asks[0].size)) / total;
         }
         const net = Math.round(this.bigOrderFlow.get(symbol) || 0);
+        // P5 券源池：可融券数量与费率（做空博弈信号）
+        let shortPool = null;
+        try {
+            if (this.engine)
+                shortPool = this.engine.getShortPool(symbol);
+        }
+        catch (e) { }
         return {
             symbol,
             ofi: Number(ofi.toFixed(3)),
             bigNetFlow: net,
             bigNetFlowWan: Number((net / 10000).toFixed(1)),
             label: ofi > 0.15 ? '买压' : ofi < -0.15 ? '卖压' : '均衡',
+            shortAvailable: shortPool ? shortPool.available : null,
+            shortFeeRate: shortPool ? shortPool.feeRate : null,
         };
+    }
+    // P5 动态汇率：HK/US 每日随机游走（±3% 波动带内），CN 恒为 1
+    updateFxRate() {
+        if (this.market !== 'HK' && this.market !== 'US')
+            return;
+        const rates = (0, constants_1.getFxRates)();
+        const base = constants_1.FX_CNY_PER_UNIT[this.market];
+        rates[this.market] = Math.max(base * 0.97, Math.min(base * 1.03, Number(rates[this.market]) + (Math.random() - 0.5) * base * 0.006));
+        (0, constants_1.setFxRates)(rates);
+    }
+    // P5 A股新股首日集合（挂牌当日 ±44% 带宽，次日自然出集合）
+    getIpoFirstDaySymbols() {
+        return [...this.stocks.values()].filter((s) => s.listedDay === this.gameDay).map((s) => s.symbol);
     }
     // ─── B1 指数影响全局：跨市场指数平均变化 → 市场情绪因子（指数涨 → 情绪升 → 全市场偏多） ───
     updateIndexFeedback() {
@@ -1257,6 +1279,8 @@ let MarketDataService = class MarketDataService {
         // ─── P4 AI 对手盘：每日净值快照 + 大单净流入清零（次日重新统计） ───
         this.markAiEquityDaily();
         this.bigOrderFlow.clear();
+        // ─── P5 动态汇率：HK/US 每日随机游走（±3% 波动带） ───
+        this.updateFxRate();
         this.updateMarketRegime();
         this.decayFactors();
         this.gameDay++;
@@ -1572,6 +1596,8 @@ let MarketDataService = class MarketDataService {
             // P3: 宏观数据日历（最近 30 条披露）与行业景气周期（供前端展示）
             macroHistory: [...this.macroHistory],
             industryCycles: { ...Object.fromEntries(this.industryCycles.entries()) },
+            // P5: 动态汇率（HK/US 逐日演化，划转即时使用）
+            fxRates: (0, constants_1.getFxRates)(),
             // P1: 本市场实时开市状态（含节假日历判断），供前端休市遮罩/下单禁用使用
             isTradingTime: constants_1.isTradingTimeFor(this.market),
         };
@@ -1768,10 +1794,11 @@ let MarketDataService = class MarketDataService {
             dayOpen: price, dayHigh: price, dayLow: price, dayVolume: 0, minuteCounter: 0,
             kline1min: [], kline5min: [], klineDaily: [], current1min: null, current5min: null, currentDaily: null,
             trendCounter: 0, trendDirection: 0, trendAccumulated: 0, isTrending: false,
-            // P3 基本面：IPO 新股财报状态
+            // P3 基本面：IPO 新股财报状态；P5 挂牌日（首日 ±44% 带宽标记）
             fund: fundamentals_1.initFundamentals(),
             nextReportDay: this.gameDay + 40 + Math.floor(Math.random() * 20),
             pead: null,
+            listedDay: this.gameDay,
         });
         if (!this.industryCycles.has(cfg.industry)) {
             this.industryCycles.set(cfg.industry, fundamentals_1.randomCyclePhase());
