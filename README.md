@@ -11,6 +11,8 @@
 > 使用Deepseek-v4-pro构建，ReadMe也是ai写的LOL
 
 > 唯一的Contributor是AI操控的账户，没错我给他开了一个账户嘻嘻
+
+> OMFG我无语了为什么commit还是跟着我的主账号。。。
 ---
 
 ## ✨ 功能特性
