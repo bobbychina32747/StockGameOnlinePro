@@ -63,6 +63,21 @@
 { "T1": 45.3, "T2": 120.49, ... }
 ```
 
+### GET /market/backtest?symbol=T1&strategy=ma_cross&fast=5&slow=20&timeframe=1min&slippageBps=0 — 策略回测（Phase 6）
+- strategy: `ma_cross`（MA金叉/死叉，参数 fast/slow）/ `rsi_reversal`（RSI超卖30买超买70卖，参数 period）/ `momentum`（N日动量转正买转负卖，参数 momentumN）
+- slippageBps: 单边滑点基点，0=按市场默认（A股·港股 5bp / 美股 3bp）
+- 手续费与实盘同口径（佣金最低/印花税/征费），基准=买入持有；无需 token
+```json
+{
+  "symbol": "T1", "timeframe": "1min", "strategy": "ma_cross", "feeMode": "CN", "slippageBps": 5,
+  "bars": 720, "initialCash": 100000, "finalEquity": 102350.11,
+  "totalReturn": 2.35, "annualizedReturn": 41.2, "maxDrawdown": 3.4, "sharpe": 1.25,
+  "profitFactor": 1.8, "trades": 6, "winRate": 66.7, "fees": 156.2, "slippageCost": 43.5,
+  "benchmarkReturn": 1.1, "equityCurve": [100000, ...], "equityCurveBench": [100000, ...]
+}
+```
+> CLI 版：`node backend/scripts/backtest.js T1 rsi_reversal 14 60min`（策略/参数/周期）
+
 ---
 
 ## 3. 交易（需 token）

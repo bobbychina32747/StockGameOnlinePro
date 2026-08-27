@@ -4,6 +4,22 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase 6 回测平台升级
+
+### Added
+- **回测引擎独立成类（REALISM #24）**：`core/backtest/backtest-engine.ts` 纯逻辑零 Nest 依赖（同 MatchingEngine 可直接单测），market.service 委托调用
+- **真实手续费模型**：回测费率与实盘 `calcFees` 同口径（A股佣金最低5元+印花税0.1%卖+过户费 / 港股佣金最低50+印花税0.13%卖+征费 / 美股零佣金+SEC费+TAF费），按股票所属市场自动路由
+- **滑点模型**：单边滑点基点可配置（默认 A股·港股 5bp / 美股 3bp，`slippageBps` 查询参数覆盖），买卖双向计入成本并单独汇总滑点成本
+- **多策略回测**：MA 金叉/死叉（fast/slow）之外新增 RSI 超卖30买超买70卖（period，首根即超卖/超买可触发）、N 日动量转正买转负卖（momentumN，窗口前动量视为 0）
+- **基准对比**：等额买入持有同期收益（同样计费+滑点），策略跑赢基准才算真策略；资金曲线双线（策略/基准）同图
+- **绩效指标**：年化收益（按周期折算 252 交易日）/ 最大回撤 / 夏普（年化）/ 盈亏因子 / 手续费总额 / 滑点成本
+- **CLI 升级**：`node scripts/backtest.js [symbol] [strategy] [p1] [p2] [timeframe]` 输出年化/回撤/夏普/盈亏因子/基准对比与建议
+- 新增测试 `phase6-backtest.test.js`（费率模型 3 例/滑点与费用拖累 2 例/策略信号 3 例/基准与指标 3 例），后端 155→166；前端 41 例
+
+### Changed
+- `/market/backtest` 新增 strategy/slippageBps/period/momentumN 查询参数（旧参数完全兼容）；前端回测页策略选择 + 指标卡 + 双线资金曲线
+- docs/API.md 新增回测端点文档（参数/返回字段/CLI 用法）
+
 ## [Unreleased] - Phase 5 账户/风控/多市场
 
 ### Added

@@ -76,7 +76,7 @@
 
 ### 🤖 量化接入
 - 完整 REST API + WebSocket 流（见 [docs/API.md](docs/API.md)）
-- 回测工具（内置 MA 交叉策略）+ 策略回测页面
+- 回测平台（**与实盘同口径的手续费 + 可调滑点 + 三策略**：MA交叉/RSI反转/动量，买入持有基准对比 + 年化/回撤/夏普/盈亏因子）+ 策略回测页面 + CLI（`node backend/scripts/backtest.js`）
 - `backend/scripts/quant-bot.js`：可运行的量化机器人示例（已实测自动下单）
 
 ---
@@ -108,7 +108,7 @@ npm run dev
 ### 开发与质量门禁
 
 ```bash
-# 后端：类型构建 + 单元测试（76 例）+ 数据库迁移校验（sql.js → better-sqlite3）
+# 后端：类型构建 + 单元测试（166 例）+ 数据库迁移校验（sql.js → better-sqlite3）
 cd backend
 npm run build && npm test -- --runInBand
 npm run db:migrate          # 备份 + integrity_check + 逐表行数核对 + 切换 WAL
@@ -197,6 +197,7 @@ docs/
 - [x] 行情档位可调（高速回放 / 真实分钟级）+ 市价滑点模型
 - [x] 新闻错峰播报 + AI 行为树资金账户
 - [x] 绩效归因（夏普/回撤/胜率/波动率）+ 管理员全服休市交易开关
+- [x] 回测平台升级（实盘同口径手续费 + 滑点模型 + MA/RSI/动量三策略 + 买入持有基准 + 年化/回撤/夏普/盈亏因子）
 
 **✅ 0.2.0 计划事项全部完成。**
 

@@ -30,6 +30,8 @@ import constants_1 = require("../../common/constants");
 
 import market_utils_1 = require("../../common/market-utils");
 
+import backtest_engine_1 = require("../../core/backtest/backtest-engine");
+
 const { symbolMarket } = market_utils_1;
 
 let MarketService = class MarketService {
@@ -481,59 +483,22 @@ let MarketService = class MarketService {
     getFlowSignals(symbol) {
         return this.marketDataFor(symbol).getFlowSignals(symbol);
     }
-    // ─── B2 回测：MA 交叉策略（返回结果 + 收益曲线抽样 40 点） ───
-    backtest(symbol, fast = 5, slow = 20, timeframe = '1min') {
+    // ─── B2 回测：多策略 + 真实手续费 + 滑点 + 基准（Phase 6 委托纯引擎） ───
+    backtest(symbol, fast = 5, slow = 20, timeframe = '1min', strategy = 'ma_cross', slippageBps = 0, period = 14, momentumN = 10) {
         const klines = this.marketDataFor(symbol).getKlines(symbol, timeframe);
-        const closes = klines.map((k) => Number(k.close));
-        const fastN = Number(fast) || 5;
-        const slowN = Number(slow) || 20;
-        if (closes.length < slowN + 5) {
-            return { error: '历史数据不足，请稍后再试' };
-        }
-        const sma = (closes, period) => {
-            const out = new Array(closes.length).fill(null);
-            let sum = 0;
-            for (let i = 0; i < closes.length; i++) {
-                sum += closes[i];
-                if (i >= period) sum -= closes[i - period];
-                if (i >= period - 1) out[i] = sum / period;
-            }
-            return out;
-        };
-        const maF = sma(closes, fastN);
-        const maS = sma(closes, slowN);
-        let cash = 100000, shares = 0, buyPrice = 0, trades = 0, wins = 0;
-        const equityCurve = [];
-        for (let i = slowN; i < closes.length; i++) {
-            const pf = maF[i - 1], ps = maS[i - 1], f = maF[i], sl = maS[i];
-            if (pf == null || ps == null) continue;
-            if (pf <= ps && f > sl && shares === 0) {
-                shares = Math.floor(cash / closes[i] / 100) * 100;
-                if (shares > 0) { cash -= shares * closes[i]; buyPrice = closes[i]; }
-            }
-            else if (pf >= ps && f < sl && shares > 0) {
-                if (closes[i] > buyPrice) wins++;
-                trades++;
-                cash += shares * closes[i];
-                shares = 0;
-            }
-            if (i % Math.max(1, Math.floor(closes.length / 40)) === 0) {
-                equityCurve.push(Number((cash + shares * closes[i]).toFixed(0)));
-            }
-        }
-        if (shares > 0) { cash += shares * closes[closes.length - 1]; trades++; }
-        const finalEquity = cash;
-        const totalReturn = (finalEquity - 100000) / 100000 * 100;
-        return {
+        const mode = symbolMarket(symbol);
+        // 引擎只用 close 序列；费率/滑点口径与实盘一致（回测≈实盘）
+        const bars = klines.map((k) => ({ open: 0, high: 0, low: 0, close: Number(k.close) }));
+        return backtest_engine_1.runBacktest(bars, {
             symbol,
             timeframe,
-            bars: closes.length,
-            finalEquity: Number(finalEquity.toFixed(2)),
-            totalReturn: Number(totalReturn.toFixed(2)),
-            trades,
-            winRate: trades ? Number((wins / trades * 100).toFixed(0)) : 0,
-            equityCurve,
-        };
+            strategy: ((['ma_cross', 'rsi_reversal', 'momentum'].includes(strategy) ? strategy : 'ma_cross') as any), // 白名单校验后传入引擎
+            fast: Number(fast), slow: Number(slow),
+            rsiPeriod: Number(period), momentumN: Number(momentumN),
+            feeMode: mode,
+            slippageBps: Number(slippageBps) > 0 ? Number(slippageBps) : undefined, // 0=按市场默认滑点
+            lotSize: mode === 'US' ? 1 : 100,
+        });
     }
 };
 

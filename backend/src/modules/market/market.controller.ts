@@ -40,8 +40,8 @@ let MarketController = class MarketController {
     getFlowSignals(symbol) {
         return this.marketService.getFlowSignals(symbol);
     }
-    backtest(symbol, fast, slow, timeframe) {
-        return this.marketService.backtest(symbol, fast, slow, timeframe);
+    backtest(symbol, fast, slow, timeframe, strategy, slippageBps, period, momentumN) {
+        return this.marketService.backtest(symbol, fast, slow, timeframe, strategy, slippageBps, period, momentumN);
     }
     getKlines(symbol, timeframe) {
         return this.marketService.getKlines(symbol || 'A', timeframe || '1min');
@@ -100,8 +100,12 @@ __decorate([
     __param(1, (0, common_1.Query)('fast')),
     __param(2, (0, common_1.Query)('slow')),
     __param(3, (0, common_1.Query)('timeframe')),
+    __param(4, (0, common_1.Query)('strategy')),
+    __param(5, (0, common_1.Query)('slippageBps')),
+    __param(6, (0, common_1.Query)('period')),
+    __param(7, (0, common_1.Query)('momentumN')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String, String]),
+    __metadata("design:paramtypes", [String, String, String, String, String, String, String, String]),
     __metadata("design:returntype", void 0)
 ], MarketController.prototype, "backtest", null);
 __decorate([
