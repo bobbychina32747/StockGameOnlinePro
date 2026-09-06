@@ -130,7 +130,9 @@ export { Order };
 
 Order = __decorate(
 [
-    (0, typeorm_1.Entity)('orders')
+    (0, typeorm_1.Entity)('orders'),
+    // Phase D: 账户维订单查询索引（getPendingOrders/账户重置查挂单/订单历史页）
+    (0, typeorm_1.Index)(['accountId', 'status'])
 ],
 Order
 );

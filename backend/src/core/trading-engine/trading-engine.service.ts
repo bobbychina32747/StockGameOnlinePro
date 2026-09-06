@@ -575,6 +575,26 @@ let TradingEngineService = class TradingEngineService {
             fees,
         };
     }
+    // Phase D：抽纯函数——现价是否将触发成交（预扫与执行共用同一判断，防两遍逻辑漂移）
+    shouldFillNow(order, currentPrice) {
+        if (order.type === order_entity_1.OrderType.LIMIT) {
+            return (order.side === order_entity_1.OrderSide.BUY && currentPrice <= order.price) ||
+                (order.side === order_entity_1.OrderSide.SELL && currentPrice >= order.price);
+        }
+        if (order.type === order_entity_1.OrderType.STOP) {
+            return (order.side === order_entity_1.OrderSide.BUY && currentPrice >= order.triggerPrice) ||
+                (order.side === order_entity_1.OrderSide.SELL && currentPrice <= order.triggerPrice);
+        }
+        if (order.type === order_entity_1.OrderType.STOP_LIMIT) {
+            const triggered = (order.side === order_entity_1.OrderSide.BUY && currentPrice >= order.triggerPrice) ||
+                (order.side === order_entity_1.OrderSide.SELL && currentPrice <= order.triggerPrice);
+            if (!triggered)
+                return false;
+            return (order.side === order_entity_1.OrderSide.BUY && currentPrice <= order.price) ||
+                (order.side === order_entity_1.OrderSide.SELL && currentPrice >= order.price);
+        }
+        return false;
+    }
     async checkPendingOrders() {
         const pending = await this.orderRepo.find({
             where: [
@@ -583,33 +603,30 @@ let TradingEngineService = class TradingEngineService {
                 { status: order_entity_1.OrderStatus.PENDING, type: order_entity_1.OrderType.STOP_LIMIT, postClose: false },
             ],
         });
+        // ── Phase D 批量预载：按「当前价将成交」预扫，收集 accountId 一次 In 查询（原每单 findOne 的 N+1）──
+        const willFillAccountIds = new Set();
+        for (const order of pending) {
+            const p = this.prices.get(order.symbol);
+            if (p === undefined || p === null)
+                continue;
+            const remaining = Number(order.quantity) - Number(order.filledQty || 0);
+            if (remaining > 0 && this.shouldFillNow(order, p))
+                willFillAccountIds.add(order.accountId);
+        }
+        const accountsById = new Map(); // accountId -> 批量预载账户
+        if (willFillAccountIds.size > 0) {
+            const list = await this.accountRepo.find({ where: { id: (0, typeorm_2.In)([...willFillAccountIds]) } });
+            for (const a of list)
+                accountsById.set(a.id, a);
+        }
+        const dirtyAccountIds = new Set(); // 本轮已尝试结算的 accountId（Map 条目已过期，使用前单查刷新）
         const fills = [];
         for (const order of pending) {
             // SECURITY: 无报价的 symbol 跳过（缺失价格不能当 0 处理，否则误触发成交）
             const currentPrice = this.prices.get(order.symbol);
             if (currentPrice === undefined || currentPrice === null)
                 continue;
-            let shouldFill = false;
-            if (order.type === order_entity_1.OrderType.LIMIT) {
-                if (order.side === order_entity_1.OrderSide.BUY && currentPrice <= order.price)
-                    shouldFill = true;
-                if (order.side === order_entity_1.OrderSide.SELL && currentPrice >= order.price)
-                    shouldFill = true;
-            }
-            else if (order.type === order_entity_1.OrderType.STOP) {
-                if (order.side === order_entity_1.OrderSide.BUY && currentPrice >= order.triggerPrice)
-                    shouldFill = true;
-                if (order.side === order_entity_1.OrderSide.SELL && currentPrice <= order.triggerPrice)
-                    shouldFill = true;
-            }
-            else if (order.type === order_entity_1.OrderType.STOP_LIMIT) {
-                const triggered = (order.side === order_entity_1.OrderSide.BUY && currentPrice >= order.triggerPrice) ||
-                    (order.side === order_entity_1.OrderSide.SELL && currentPrice <= order.triggerPrice);
-                if (triggered) {
-                    shouldFill = (order.side === order_entity_1.OrderSide.BUY && currentPrice <= order.price) ||
-                        (order.side === order_entity_1.OrderSide.SELL && currentPrice >= order.price);
-                }
-            }
+            const shouldFill = this.shouldFillNow(order, currentPrice);
             if (shouldFill) {
                 // P0: 部分成交的挂单按剩余数量继续撮合（真实订单簿支持排队部分成交）
                 const remainingQty = Number(order.quantity) - Number(order.filledQty || 0);
@@ -644,8 +661,15 @@ let TradingEngineService = class TradingEngineService {
                     }
                     continue;
                 }
-                // 重新加载账户：资金/持仓可能在挂单期间已变化
-                const account = await this.accountRepo.findOne({ where: { id: order.accountId } });
+                // Phase D: 批量 Map 取值；已结算过的账户（脏）与缺失条目在 validateOrder 前单查刷新
+                let account = accountsById.get(order.accountId);
+                if (dirtyAccountIds.has(order.accountId) || !account) {
+                    account = await this.accountRepo.findOne({ where: { id: order.accountId } });
+                    if (account) {
+                        accountsById.set(order.accountId, account);
+                        dirtyAccountIds.delete(order.accountId);
+                    }
+                }
                 if (!account) {
                     continue;
                 }
@@ -661,9 +685,15 @@ let TradingEngineService = class TradingEngineService {
                 }
                 const settle = await this.settleFill(order.accountId, order.symbol, order.side, fill, account.marketMode);
                 if (settle.success) {
+                    // Phase D: 本方账户资金/持仓已变 → 标脏（同账户后续挂单 validateOrder 前重读）；
+                    // 结算正确性不依赖 Map（settleFillInner 内部自查），脏标记只保证预校验新鲜
+                    dirtyAccountIds.add(order.accountId);
                     // P0: 先结算本方，成功后结算对手方真实挂单并同步其订单实体
                     if (fill.counterFills && fill.counterFills.length > 0) {
                         await this.settleCounterFills(order.symbol, account.marketMode, fill.counterFills);
+                        // 对手方账户同样作废 Map 条目（其结算走 settleFillInner 自查，此处仅为预校验新鲜度）
+                        for (const cf of fill.counterFills)
+                            dirtyAccountIds.add(cf.accountId);
                     }
                     order.filledQty = Number(order.filledQty || 0) + fill.filledQuantity;
                     order.avgFillPrice = fill.avgPrice;
@@ -683,10 +713,14 @@ let TradingEngineService = class TradingEngineService {
                     fills.push({ ...fill, side: order.side, fees: settle.fees });
                     this.logger.log(`挂单成交: ${order.symbol} ${order.side} ${fill.filledQuantity}股 @ ${fill.avgPrice}`);
                 } else {
+                    // Phase D: 结算失败也标脏（teams 定稿：读路径不容忍脏数据——失败路径虽未改账户，
+                    // 但保守作废 Map 条目，避免与结算队列内部状态出现任何不一致窗口）
+                    dirtyAccountIds.add(order.accountId);
                     // 结算失败 → 对手方订单放回盘口
                     if (fill.counterFills && fill.counterFills.length > 0) {
                         for (const cf of fill.counterFills) {
                             this.placeRestingOrder(order.symbol, cf.orderId, cf.accountId, cf.side, cf.price, cf.qty);
+                            dirtyAccountIds.add(cf.accountId);
                         }
                     }
                     // P2 止损单簿记：转换失败回滚保活（重试上限 10 次后取消），避免每 tick 重复尝试坏账

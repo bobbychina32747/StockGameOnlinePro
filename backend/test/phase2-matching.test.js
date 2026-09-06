@@ -6,7 +6,11 @@ const { mmQuote, MM_PARAMS } = require('../dist/src/core/market-data/market-make
 // 简易内存仓库（checkPendingOrders/submitOrder 流程测试用）
 function matchesWhere(r, where) {
   if (Array.isArray(where)) return where.some((w) => matchesWhere(r, w));
-  return Object.entries(where || {}).every(([k, v]) => String(r[k]) === String(v));
+  return Object.entries(where || {}).every(([k, v]) => {
+    // Phase D: TypeORM FindOperator（In 批量查询）支持
+    if (v && typeof v === 'object' && v._type === 'in') return (v.value || []).map(String).includes(String(r[k]));
+    return String(r[k]) === String(v);
+  });
 }
 function fakeRepo(seed = []) {
   const rows = [...seed];

@@ -14,6 +14,8 @@ import position_entity_1 = require("../../infrastructure/database/entities/posit
 
 import daily_snapshot_entity_1 = require("../../infrastructure/database/entities/daily-snapshot.entity");
 
+import transaction_entity_1 = require("../../infrastructure/database/entities/transaction.entity");
+
 import risk_manager_service_1 = require("./risk-manager.service");
 
 let RiskManagerModule = class RiskManagerModule {
@@ -26,7 +28,7 @@ RiskManagerModule = __decorate(
 [
     (0, common_1.Global)(),
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([account_entity_1.Account, position_entity_1.Position, daily_snapshot_entity_1.DailySnapshot])],
+        imports: [typeorm_1.TypeOrmModule.forFeature([account_entity_1.Account, position_entity_1.Position, daily_snapshot_entity_1.DailySnapshot, transaction_entity_1.Transaction])],
         providers: [risk_manager_service_1.RiskManagerService],
         exports: [risk_manager_service_1.RiskManagerService],
     })

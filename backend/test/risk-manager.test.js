@@ -4,7 +4,7 @@ describe('RiskManagerService 风控逻辑', () => {
   let rm;
 
   beforeEach(() => {
-    rm = new RiskManagerService(null, null, null);
+    rm = new RiskManagerService(null, null, null, null);
   });
 
   describe('kellyCriterion 凯利公式', () => {
@@ -47,17 +47,19 @@ describe('RiskManagerService 风控逻辑', () => {
     });
   });
 
-  describe('computeTier 段位评分', () => {
-    test('满收益+无回撤+活跃 → 王者', () => {
+  describe('computeTier 段位评分（Phase D 数据驱动：收益30/回撤20/盈亏因子20/胜率20/活跃10）', () => {
+    test('满分边界 → 王者 100 分', () => {
       const account = { initialEquity: 100000, totalEquity: 150000, peakEquity: 150000, totalTrades: 50 };
-      rm.computeTier(account);
+      rm.computeTier(account, { totalReturn: 0.5, maxDrawdown: 0, profitFactor: 2, winRate: 1, totalTrades: 50 });
       expect(account.tier).toBe('王者');
+      expect(account.tierScore).toBe(100);
     });
 
-    test('零收益零交易 → 白银（风控满分 30 分）', () => {
+    test('零流水账户 → 白银 23 分（回撤保底 0.7 + 活跃保底 0.3，不掉出白银）', () => {
       const account = { initialEquity: 100000, totalEquity: 100000, peakEquity: 100000, totalTrades: 0 };
-      rm.computeTier(account);
+      rm.computeTier(account, { totalReturn: 0, maxDrawdown: 0, profitFactor: 0, winRate: 0, totalTrades: 0 });
       expect(account.tier).toBe('白银');
+      expect(account.tierScore).toBe(23);
     });
   });
 });

@@ -69,7 +69,9 @@ export { Transaction };
 
 Transaction = __decorate(
 [
-    (0, typeorm_1.Entity)('transactions')
+    (0, typeorm_1.Entity)('transactions'),
+    // Phase D: 流水按账户查询/日终批量指标计算索引
+    (0, typeorm_1.Index)(['accountId'])
 ],
 Transaction
 );

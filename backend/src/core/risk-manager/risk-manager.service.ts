@@ -26,12 +26,17 @@ import constants_1 = require("../../common/constants");
 
 import perf_1 = require("./perf");
 
+import tier_1 = require("./tier");
+
+import transaction_entity_1 = require("../../infrastructure/database/entities/transaction.entity");
+
 let RiskManagerService = class RiskManagerService {
     [key: string]: any;
-    constructor(accountRepo, snapshotRepo, positionRepo) {
+    constructor(accountRepo, snapshotRepo, positionRepo, txRepo) {
         this.accountRepo = accountRepo;
         this.snapshotRepo = snapshotRepo;
         this.positionRepo = positionRepo;
+        this.txRepo = txRepo;
         this.logger = new common_1.Logger(RiskManagerService.name);
         this.equityHistory = new Map<string, any>();
         this.currentPrices = {};
@@ -81,36 +86,36 @@ let RiskManagerService = class RiskManagerService {
         const mine = userId ? (this.reviews.get(userId) || []) : [];
         return [...mine, ...this.globalReviews].slice(0, 20);
     }
-    // 段位评分：收益(总收益归一化) + 风控(回撤) + 活跃(交易次数)
-    computeTier(account) {
+    // Phase D：真实指标聚合（settleAllAccounts 批量拉取流水后逐账户调用；perf.ts 配对输入须时间升序）
+    buildTierMetrics(account, txs) {
         const initial = Number(account.initialEquity) || 1;
         const totalReturn = (Number(account.totalEquity) - initial) / initial;
-        const retScore = Math.max(0, Math.min(1, totalReturn / 0.5)) * 100;
         const peak = Number(account.peakEquity) || Number(account.totalEquity);
-        const drawdown = peak > 0 ? Math.max(0, (peak - Number(account.totalEquity)) / peak) : 0;
-        const riskScore = Math.max(0, Math.min(1, 1 - drawdown / 0.5)) * 100;
-        const trades = Number(account.totalTrades) || 0;
-        const actScore = Math.max(0, Math.min(1, trades / 50)) * 100;
-        const tierScore = Math.round(retScore * 0.4 + riskScore * 0.3 + actScore * 0.3);
-        const tiers = [
-            { min: 92, name: '王者', icon: '🐉' },
-            { min: 82, name: '大师', icon: '👑' },
-            { min: 70, name: '钻石', icon: '🔷' },
-            { min: 55, name: '铂金', icon: '💎' },
-            { min: 35, name: '黄金', icon: '🥇' },
-            { min: 15, name: '白银', icon: '🥈' },
-            { min: 0, name: '青铜', icon: '🥉' },
-        ];
-        const tier = tiers.find((t) => tierScore >= t.min) || tiers[tiers.length - 1];
-        account.tier = tier.name;
-        account.tierScore = tierScore;
+        const maxDrawdown = peak > 0 ? Math.max(0, (peak - Number(account.totalEquity)) / peak) : 0;
+        const paired = perf_1.pairedMetrics(Array.isArray(txs) ? txs : []);
+        return {
+            totalReturn,
+            maxDrawdown,
+            profitFactor: paired.profitFactor,
+            winRate: paired.pairedWinRate,
+            totalTrades: Number(account.totalTrades) || 0,
+        };
     }
-    async dailySettlement(account, day) {
+    // Phase D 数据驱动段位（销 tech-debt 主观 40/30/30 公式）：metrics 由 settleAllAccounts 提供；
+    // 无参调用降级为空流水口径（兼容存量测试构造）
+    computeTier(account, metrics) {
+        const m = metrics || this.buildTierMetrics(account, []);
+        const score = tier_1.computeTierScore(m);
+        const tier = tier_1.tierOf(score);
+        account.tier = tier.name;
+        account.tierScore = score;
+    }
+    async dailySettlement(account, day, preloadedPositions) {
         // SECURITY: 幂等保护——当日已结算的账户直接跳过（防出错重跑导致重复计息/重复快照）
         if (Number(account.currentDay) === Number(day)) {
             return account;
         }
-        const positions = await this.getPositionsValue(account);
+        const positions = await this.getPositionsValue(account, preloadedPositions);
         // Phase B P1#9: 利息基数 = 融资负债（真杠杆记账）+ 空头冻结保证金（杠杆1不借资不付息语义保留）
         const interestBase = Number(account.borrowed || 0) + Number(account.shortCollateral || 0);
         if (interestBase > 0) {
@@ -155,11 +160,48 @@ let RiskManagerService = class RiskManagerService {
     async settleAllAccounts(day) {
         const accounts = await this.accountRepo.find();
         const settled = [];
+        if (accounts.length === 0)
+            return settled;
+        const ids = accounts.map((a) => a.id);
+        // Phase D 批量 2：持仓（原逐账户 positionRepo.find → 1 次 In；只读，结算不回写 positions）
+        let positionsByAccount = new Map();
+        try {
+            const posRows = await this.positionRepo.find({ where: { accountId: (0, typeorm_2.In)(ids) } });
+            for (const p of posRows) {
+                const arr = positionsByAccount.get(p.accountId) || [];
+                arr.push(p);
+                positionsByAccount.set(p.accountId, arr);
+            }
+        }
+        catch (e) {
+            this.logger.warn('日终批量预载持仓失败，退回逐账户查询: ' + e.message);
+            positionsByAccount = null; // null → getPositionsValue 走原逐账户查询
+        }
+        // Phase D 批量 3：流水（1 次全局 ASC 拉取 + JS 分组截最近 500；
+        // 不用 find({take})：better-sqlite3 下 take 生成全局 LIMIT，按 uuid 排序靠后账户会拿不满）
+        const txsByAccount = new Map();
+        try {
+            const txRows = await this.txRepo.find({ order: { createdAt: 'ASC' } });
+            const byAcct = new Map();
+            for (const t of txRows) {
+                const arr = byAcct.get(t.accountId) || [];
+                arr.push(t);
+                byAcct.set(t.accountId, arr);
+            }
+            for (const [acid, arr] of byAcct) {
+                txsByAccount.set(acid, arr.length > 500 ? arr.slice(-500) : arr); // 最近 500 且保持升序
+            }
+        }
+        catch (e) {
+            this.logger.warn('日终批量预载流水失败，段位指标按 0 流水口径: ' + e.message);
+        }
         for (const account of accounts) {
             try {
-                settled.push(await this.dailySettlement(account, day));
-                // 段位系统：收益40% + 风控30% + 活跃30%
-                this.computeTier(account);
+                const posRows = positionsByAccount ? positionsByAccount.get(account.id) : undefined;
+                settled.push(await this.dailySettlement(account, day, posRows));
+                // Phase D：数据驱动段位（收益/回撤/盈亏因子/胜率/活跃）
+                const metrics = this.buildTierMetrics(account, txsByAccount.get(account.id) || []);
+                this.computeTier(account, metrics);
                 await this.accountRepo.save(account);
             }
             catch (e) {
@@ -172,8 +214,8 @@ let RiskManagerService = class RiskManagerService {
     getEquityHistory(accountId) {
         return (this.equityHistory.get(accountId) || []).slice();
     }
-    async getPositionsValue(account) {
-        const positions = await this.positionRepo.find({ where: { accountId: account.id } });
+    async getPositionsValue(account, preloaded) {
+        const positions = preloaded || await this.positionRepo.find({ where: { accountId: account.id } });
         let holdValue = 0;
         let marginUsed = 0;
         let maxSingle = 0;
@@ -274,7 +316,9 @@ RiskManagerService = __decorate(
     __param(0, (0, typeorm_1.InjectRepository)(account_entity_1.Account)),
     __param(1, (0, typeorm_1.InjectRepository)(daily_snapshot_entity_1.DailySnapshot)),
     __param(2, (0, typeorm_1.InjectRepository)(position_entity_1.Position)),
+    __param(3, (0, typeorm_1.InjectRepository)(transaction_entity_1.Transaction)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository])
 ],

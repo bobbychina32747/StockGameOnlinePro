@@ -6,7 +6,11 @@ const { AccountService } = require('../dist/src/modules/account/account.service'
 // 简易内存仓库（与 phase2 同款）
 function matchesWhere(r, where) {
   if (Array.isArray(where)) return where.some((w) => matchesWhere(r, w));
-  return Object.entries(where || {}).every(([k, v]) => String(r[k]) === String(v));
+  return Object.entries(where || {}).every(([k, v]) => {
+    // Phase D: TypeORM FindOperator（In 批量查询）支持
+    if (v && typeof v === 'object' && v._type === 'in') return (v.value || []).map(String).includes(String(r[k]));
+    return String(r[k]) === String(v);
+  });
 }
 function fakeRepo(seed = []) {
   const rows = [...seed];
