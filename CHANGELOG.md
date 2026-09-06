@@ -4,6 +4,33 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase D 工程化收口
+
+### Security
+- **Swagger 仅 development 挂载**：`/api/docs` 生产环境 404（不暴露接口清单与 schema）（`main.ts`）
+- **backtest 限流**：`/api/market/backtest` 挂 express-rate-limit 20 次/分/IP（无认证公共计算接口防滥用）
+- **登录账号级防爆破**：内存 Map 5 次失败锁 10 分钟（trim 规范化、成功清零、锁定前置短路省 bcrypt）；不存在用户名同样计数（锁定键为惰性键对真实用户无影响，枚举威胁由 IP 层 10 次/分限流兜底——teams 二档方案「锁 IP」需控制器传 req.ip 且 NAT 下误伤，故统一按名计数，取舍记录在案）
+- **WS 握手校验 isActive**：JWT verify 后查 User repo，用户禁用后其存量 WS 立即断开（与 HTTP 侧 JwtStrategy 对称；`market.module` 补 `forFeature([User])`）
+- **fill 广播脱敏**：`sanitizeFill` 剥离 counterFills 中对手方 accountId/orderId/mmId（保留 side/price/qty/virtual），顶层 filledQuantity/avgPrice 契约不变（`market-utils.ts`）
+
+### Changed
+- **API.md 按实现重写**：纠正漂移（撤单 `DELETE /trading/order/:id`、历史 `GET /trading/history`、fok/ioc/iceberg/stop-limit 语义、盘后固定价格 15:00-15:30、赛季四端点、真杠杆 cash×leverage/borrowed/维持担保比三级、红利税二档、基金费率三档、涨跌停昨收基准+新股首日 +44%/-36%、WS 事件真实形态）；新增 `phase10-api-doc-routes` 路由抽查（MUST_HAVE/MUST_NOT）防文档再腐烂
+- **段位数据驱动**（销 tech-debt 主观 40/30/30 公式）：`tier.ts` 纯函数单一来源，权重 收益30/回撤20(peakEquity)/盈亏因子20/胜率20(perf.ts FIFO 配对)/活跃10(对数归一)；teams 定稿回撤保底 0.7 + 活跃保底 0.3（0 流水账户 23 分不掉出白银；副作用：最低分 17 → 青铜段仅表保留不可达）
+- **settleAllAccounts 批量化**：纯读 N+1→3 次批量（账户/持仓 In/流水一次全局 ASC + JS 分组截最近 500），全部 try/catch 降级回退原路径；段位不再依赖内存历史（重启后口径一致）
+- **checkPendingOrders 批量化**：预扫 willFill → 一次 `In` 预载账户 Map → dirty 标记延迟刷新（结算成功与回滚路径均标脏，读路径不容忍脏数据；`shouldFillNow` 纯函数抽离防两遍逻辑漂移）
+- **实体索引**：orders(accountId,status)、transactions(accountId)（synchronize 首启自动落库）；positions 冗余索引按 teams 定稿砍除（Unique 左前缀已覆盖）
+
+### Added
+- **Docker 修复与容器化**：Dockerfile.backend 两阶段补 package-lock.json + CMD 改 `dist/src/main.js`；新增 frontend/Dockerfile（node 构建 + nginx 托管）、frontend/nginx.conf（SPA fallback + /api、/socket.io 反代含 Upgrade 头）、backend/docker/docker-compose.yml（sgp-data 卷挂 /app/data、env_file、TRUST_PROXY=1、8000/3000 端口、healthcheck 用公开 `GET /api/market/prices`——teams 定稿，Swagger 仅 dev 挂载不可依赖）、前后端 .dockerignore
+- **PWA 离线支持**：manifest.webmanifest（Standalone、主题色 #0e1013 与深色主题同值）、手写 sw.js（预缓存 5 项离线壳 + 静态 stale-while-revalidate + 导航 network-first；**/api 与 /socket.io 一律不缓存纯直连**——teams 最安全解释，行情陈旧=误导决策）、仅 `import.meta.env.PROD` 注册 SW（dev 零影响）、零依赖 gen-icons.mjs 生成 192/512/180 图标
+- 新增测试 `phase10-security`(14) / `phase10-api-doc-routes`(56) / `phase10-tier`(11) / `phase10-docker`(6) / 前端 `pwa/offline-assets`(11)，后端 217→304、前端 41→52
+
+### 取舍说明
+- 防爆破「锁 IP」二档方案未采纳：需控制器传 req.ip + 每 IP Map，NAT 下误伤正常用户，且 express IP 限流（10 次/分）已承担该层——按名统一计数实现更简、无信息泄露差异
+- 青铜段位在新公式下不可达（保底系数使最低分=17=白银门槛上方）：teams 定稿参数权衡，阈值表保留兼容
+- 段位流水配对窗口截断 500 笔（与 /account/metrics UI 口径一致）；快照表无 accountId 维度故回撤不用快照批量方案
+- PWA 升级边界（发版后新 hash 资产未被离线访问过）与 nginx TLS 记为 P2（见方案 02 §10）
+
 ## [Unreleased] - Phase C 规则补全 + 前端体验 + 模拟大赛 V1
 
 ### Added
