@@ -6,6 +6,9 @@ import order_entity_1 = require("../../infrastructure/database/entities/order.en
 
 import market_utils_1 = require("../../common/market-utils");
 
+// Phase B: 动态滑点唯一实现（实盘/回测共用）
+import slippage_1 = require("./slippage");
+
 // P5 类型安全：盘口条目 / 成交明细 / 盘口结构接口（替换裸 any）
 export interface BookEntry {
     orderId: string | null;
@@ -42,6 +45,8 @@ export class MatchingEngine {
     realBooks: Map<string, OrderBook>;
     prices: Map<string, any>;
     dayOpenPrices: Map<string, any>;
+    // Phase B: 昨收价（涨跌停统一基准，market.service 每 tick 同步）
+    prevCloses: Map<string, any>;
     volatilities: Map<string, any>;
     virtualFillHook: ((fill: any) => void) | null;
     constructor() {
@@ -49,6 +54,7 @@ export class MatchingEngine {
         this.realBooks = new Map();
         this.prices = new Map();
         this.dayOpenPrices = new Map();
+        this.prevCloses = new Map();
         this.volatilities = new Map();
         this.virtualFillHook = null;
         // P5 融券券源池：每只股票可融券数量（股）与券源年化费率（按代码哈希稳定生成）
@@ -94,6 +100,13 @@ export class MatchingEngine {
     setDayOpen(prices) {
         for (const [sym, price] of Object.entries(prices)) {
             this.dayOpenPrices.set(sym, price);
+        }
+    }
+    // Phase B: 昨收同步（涨跌停/委托价校验基准）
+    setPrevCloses(prevCloses) {
+        for (const [sym, price] of Object.entries(prevCloses || {})) {
+            if (Number(price) > 0)
+                this.prevCloses.set(sym, Number(price));
         }
     }
     // P2 波动率供滑点模型使用（由行情引擎每 tick 同步）
@@ -234,13 +247,14 @@ export class MatchingEngine {
         }
         let asks = [];
         let bids = [];
-        // P0 涨跌停封板（仅 A 股，以今开为基准）：常规 ±10%；P5 新股首日 最高+44%/最低-36%（发行价口径）
+        // Phase B: 涨跌停统一基准=昨收（真实涨停价=昨收×1.1 全天固定），新股首日 +44%/-36%（发行价口径）
+        // prevClose 由 market.service 通过 setPrevCloses 同步（竞价前刷新）
         const isCN = market_utils_1.isCnSymbol(symbol);
         const firstDay = this.ipoFirstDay.has(symbol);
-        const upMul = firstDay ? 1.44 : 1.10;
-        const dnMul = firstDay ? 0.64 : 0.90;
-        const limitUp = isCN && dayOpen && dayOpen > 0 ? Number(dayOpen) * upMul : null;
-        const limitDown = isCN && dayOpen && dayOpen > 0 ? Number(dayOpen) * dnMul : null;
+        const base = isCN ? ((this.prevCloses.get(symbol) && Number(this.prevCloses.get(symbol)) > 0) ? Number(this.prevCloses.get(symbol)) : (dayOpen && Number(dayOpen) > 0 ? Number(dayOpen) : null)) : null;
+        const band = isCN && base ? market_utils_1.cnPriceLimits(base, firstDay) : null;
+        const limitUp = band ? band.up : null;
+        const limitDown = band ? band.down : null;
         const sealedUp = limitUp !== null && midPrice >= limitUp - 1e-6;
         const sealedDown = limitDown !== null && midPrice <= limitDown + 1e-6;
         for (let i = 0; i < levels; i++) {
@@ -253,65 +267,69 @@ export class MatchingEngine {
             if (!sealedDown && (limitDown === null || bidPrice >= limitDown))
                 bids.push({ price: Number(bidPrice.toFixed(2)), size: Math.max(1, size) });
         }
+        // Phase B P1#6: 显示与撮合分离——orderBooks 只存纯合成深度，真实挂单在 getOrderBook 输出层动态合并，
+        // 彻底消除"真实挂单先被 matchAgainstBook 吃掉、又被合成档二次撮合"的幻影流动性
         book.asks = asks;
         book.bids = bids;
         book.sealedUp = !!sealedUp;
         book.sealedDown = !!sealedDown;
-        // P0 真实盘口：合并真实挂单队列（用户限价单常驻盘口，按价格聚合，最多 10 档）
+    }
+    // Phase B: 输出层动态合并真实挂单（按价格聚合，同价先合成后真实，最多 10 档）
+    mergeReal(symbol, synthetic, side) {
         const realBook = this.realBooks.get(symbol);
+        const map = new Map();
+        for (const l of synthetic)
+            map.set(l.price, l.size);
         if (realBook) {
-            const mergeAll = (levels, realList, side) => {
-                const map = new Map();
-                for (const l of levels)
-                    map.set(l.price, l.size);
-                for (const o of realList) {
-                    map.set(o.price, (map.get(o.price) || 0) + o.qty);
-                }
-                return [...map.entries()]
-                    .map(([price, size]) => ({ price: Number(price), size }))
-                    .sort((a, b) => (side === 'bid' ? b.price - a.price : a.price - b.price))
-                    .slice(0, 10);
-            };
-            book.bids = mergeAll(book.bids, realBook.bids, 'bid');
-            book.asks = mergeAll(book.asks, realBook.asks, 'ask');
+            const realList = side === 'bid' ? realBook.bids : realBook.asks;
+            for (const o of realList) {
+                map.set(o.price, (map.get(o.price) || 0) + o.qty);
+            }
         }
+        return [...map.entries()]
+            .map(([price, size]) => ({ price: Number(price), size }))
+            .sort((a, b) => (side === 'bid' ? b.price - a.price : a.price - b.price))
+            .slice(0, 10);
     }
     getOrderBook(symbol) {
         const book = this.orderBooks.get(symbol);
         const price = this.prices.get(symbol) ?? 100;
-        if (!book || book.asks.length === 0 || book.bids.length === 0) {
+        if (!book || (book.asks.length === 0 && book.bids.length === 0 && !this.realBooks.has(symbol))) {
             return { symbol, asks: [], bids: [], spread: 0 };
+        }
+        const asks = this.mergeReal(symbol, book.asks, 'ask');
+        const bids = this.mergeReal(symbol, book.bids, 'bid');
+        if (asks.length === 0 || bids.length === 0) {
+            return { symbol, asks, bids, spread: 0 };
         }
         return {
             symbol,
-            asks: book.asks,
-            bids: book.bids,
-            spread: Number((book.asks[0].price - book.bids[0].price).toFixed(2)),
+            asks,
+            bids,
+            spread: Number((asks[0].price - bids[0].price).toFixed(2)),
         };
     }
-    // P2 订单流不平衡：OFI = (买一量 - 卖一量) / (买一量 + 卖一量)，∈ [-1, 1]
-    calcBookOFI(book) {
-        if (!book || !book.asks.length || !book.bids.length)
+    // P2 订单流不平衡：OFI = (买一量 - 卖一量) / (买一量 + 卖一量)，∈ [-1, 1]（Phase B: 含真实量的合并视图）
+    calcBookOFI(symbol) {
+        const book = this.orderBooks.get(symbol);
+        if (!book)
             return 0;
-        const bid = Number(book.bids[0].size);
-        const ask = Number(book.asks[0].size);
+        const asks = this.mergeReal(symbol, book.asks, 'ask');
+        const bids = this.mergeReal(symbol, book.bids, 'bid');
+        if (!asks.length || !bids.length)
+            return 0;
+        const bid = Number(bids[0].size);
+        const ask = Number(asks[0].size);
         const total = bid + ask;
         if (!Number.isFinite(total) || total <= 0)
             return 0;
         return (bid - ask) / total;
     }
-    // P2 动态冲击成本：每 500 股一档的恶化步长 = 基准 × 波动率压力 × 订单流不平衡
-    // 逆风（买方遇到买压/卖方遇到卖压）冲击放大；顺风收窄；步长与总滑点均设上下界
+    // P2 动态冲击成本（Phase B: 公式迁移至 slippage.ts 单一实现，实盘/回测共用）
     slipStepFor(symbol, side) {
-        const book = this.orderBooks.get(symbol);
-        const ofi = this.calcBookOFI(book);
+        const ofi = this.calcBookOFI(symbol);
         const vol = Number(this.volatilities.get(symbol)) || 0.02;
-        const volMul = 1 + Math.min(2, Math.max(0, (vol - 0.02) * 25));
-        const dir = (side === order_entity_1.OrderSide.BUY || side === order_entity_1.OrderSide.COVER) ? 1 : -1;
-        const adverse = Math.max(0, dir * ofi);
-        const favorable = Math.max(0, -dir * ofi);
-        const step = 0.0008 * volMul * (1 + 2.2 * adverse) * (1 - 0.5 * favorable);
-        return { step: Math.min(0.004, Math.max(0.0002, step)), ofi };
+        return { step: slippage_1.slipStepFor(vol, ofi, side), ofi };
     }
     executeMarketOrder(symbol, side, quantity, excludeAccountId?) {
         // P0: 先撮合真实挂单（价格-时间优先），剩余量再吃合成深度
@@ -339,24 +357,15 @@ export class MatchingEngine {
             const knownPrice = this.prices.get(symbol);
             const sealed = book && (isBuy ? book.sealedUp : book.sealedDown);
             if (!sealed && knownPrice !== undefined && knownPrice !== null) {
-                const dirMul = isBuy ? 1 : -1;
-                let slip = 0;
                 const anchor = levels.length > 0 ? levels[levels.length - 1].price : Number(knownPrice);
-                const { step } = this.slipStepFor(symbol, side);
-                while (remaining > 0 && slip < 0.02) {
-                    const tranche = Math.min(remaining, 500);
-                    totalCost += tranche * anchor * (1 + dirMul * slip);
-                    totalQty += tranche;
-                    remaining -= tranche;
-                    slip = Math.min(0.02, slip + step);
-                }
-                // Phase A P0#5: 滑点触顶后剩余量按触顶价兜底成交（真实交易所市价单不计价格全部成交），
-                // 杜绝"剩余量静默丢弃"叠加强平清零持仓导致的资产蒸发
-                if (remaining > 0) {
-                    totalCost += remaining * anchor * (1 + dirMul * 0.02);
-                    totalQty += remaining;
-                    remaining = 0;
-                }
+                const { step, ofi } = this.slipStepFor(symbol, side);
+                void step;
+                const vol = Number(this.volatilities.get(symbol)) || 0.02;
+                // Phase B: 滑点唯一实现（slippage.ts），触顶兜底与限价语义与回测共用
+                const lp = slippage_1.liveFillPrice(anchor, remaining, side, vol, ofi, undefined);
+                totalCost += lp.totalCost;
+                totalQty += lp.totalQty;
+                remaining = lp.remaining;
             }
         }
         if (totalQty === 0)
@@ -535,29 +544,14 @@ export class MatchingEngine {
             const knownPrice = this.prices.get(symbol);
             const sealed = book && (isBuy ? book.sealedUp : book.sealedDown);
             if (!sealed && knownPrice !== undefined && knownPrice !== null) {
-                const dirMul = isBuy ? 1 : -1;
-                let slip = 0;
                 const anchor = levels.length > 0 ? levels[levels.length - 1].price : Number(knownPrice);
-                const { step } = this.slipStepFor(symbol, side);
-                while (remaining > 0 && slip < 0.02) {
-                    const price = anchor * (1 + dirMul * slip);
-                    if (isBuy ? price > limitPrice : price < limitPrice)
-                        break; // 超出限价不再成交
-                    const tranche = Math.min(remaining, 500);
-                    totalCost += tranche * price;
-                    totalQty += tranche;
-                    remaining -= tranche;
-                    slip = Math.min(0.02, slip + step);
-                }
-                // Phase A P0#5: 滑点触顶后剩余量按触顶价兜底成交（仍受限价约束，FOK/IOC 语义不变）
-                if (remaining > 0) {
-                    const capPrice = anchor * (1 + dirMul * 0.02);
-                    if (isBuy ? capPrice <= limitPrice : capPrice >= limitPrice) {
-                        totalCost += remaining * capPrice;
-                        totalQty += remaining;
-                        remaining = 0;
-                    }
-                }
+                const { ofi } = this.slipStepFor(symbol, side);
+                const vol = Number(this.volatilities.get(symbol)) || 0.02;
+                // Phase B: 滑点唯一实现（slippage.ts），限价约束 + 触顶兜底与回测共用
+                const lp = slippage_1.liveFillPrice(anchor, remaining, side, vol, ofi, limitPrice);
+                totalCost += lp.totalCost;
+                totalQty += lp.totalQty;
+                remaining = lp.remaining;
             }
         }
         if (totalQty === 0)

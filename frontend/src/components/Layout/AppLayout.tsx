@@ -28,6 +28,8 @@ export function AppLayout() {
       if (s && Number.isFinite(Number(s.tickIntervalMs))) setTickIntervalMs(Number(s.tickIntervalMs));
       // P6 全服休市交易：公开状态同步全局（管理员开启后所有客户端解锁休市下单）
       if (s) useUIStore.setState({ debugGlobal: !!s.offHoursTrading });
+      // Phase B: 盘后固定价格交易窗口（CN 15:00-15:30）
+      if (s) useUIStore.setState({ postCloseTrading: !!(s.CN && s.CN.isPostCloseTrading) });
     }).catch(() => {});
     sync();
     const id = setInterval(sync, 30000);

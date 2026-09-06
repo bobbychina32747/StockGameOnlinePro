@@ -340,6 +340,21 @@ export function auctionStageFor(mode, now?) {
     return null;
 }
 
+// Phase B P1: 盘后固定价格交易窗口（仅 A 股 15:00-15:30，收盘价申报撮合）
+export function afterHoursStageFor(mode, now?) {
+    if (mode !== 'CN')
+        return null;
+    const d = now || new Date();
+    if (!CAL.CN.weekdays.includes(d.getDay()))
+        return null;
+    if (calendar_1.isMarketHoliday('CN', d))
+        return null;
+    const minutes = d.getHours() * 60 + d.getMinutes();
+    if (minutes >= 900 && minutes < 930)
+        return 'fixedPrice';
+    return null;
+}
+
 // P1: 按市场判断是否处于交易时段（mode: CN/HK/US；未知/缺省回退 CN 保持向后兼容）
 // 美股：夏令时/冬令时动态时段 + 跨午夜交易日按美东日期判节假日
 export function isTradingTimeFor(mode, now?) {

@@ -111,11 +111,13 @@ let RiskManagerService = class RiskManagerService {
             return account;
         }
         const positions = await this.getPositionsValue(account);
-        if (positions.marginUsed > 0) {
-            const interest = positions.marginUsed * constants_1.RISK.marginInterestRate;
+        // Phase B P1#9: 利息基数 = 融资负债（真杠杆记账）+ 空头冻结保证金（杠杆1不借资不付息语义保留）
+        const interestBase = Number(account.borrowed || 0) + Number(account.shortCollateral || 0);
+        if (interestBase > 0) {
+            const interest = interestBase * constants_1.RISK.marginInterestRate;
             account.cash = Math.round((Number(account.cash) - interest) * 100) / 100;
         }
-        account.totalEquity = Number(account.cash) + positions.holdValue;
+        account.totalEquity = Number(account.cash) + positions.holdValue + Number(account.shortCollateral || 0) - Number(account.borrowed || 0);
         // 复盘：单日大亏损 >10% → 生成教训卡
         if (Number(account.dayStartEquity) > 0) {
             const dayRet = (Number(account.totalEquity) - Number(account.dayStartEquity)) / Number(account.dayStartEquity);
@@ -165,8 +167,8 @@ let RiskManagerService = class RiskManagerService {
             if (price === undefined || price === null)
                 continue; // 无报价持仓跳过估值，避免按 0 计
             holdValue += (pos.longQty - pos.shortQty) * price;
-            // SECURITY: 保证金公式与引擎一致——借入资金 = 市值 × (1 - 1/杠杆)，杠杆1不借资不付息
-            marginUsed += pos.longQty * price * (1 - 1 / Number(account.leverage || 1));
+            // Phase B P1#9: 多头全额现金买入对应的借入部分已记账在 account.borrowed，不再由持仓市值推导；
+            // marginUsed 仅保留空头保证金（兼容字段，利息基数已改用 borrowed+shortCollateral）
             marginUsed += pos.shortQty * price * constants_1.RISK.marginShortRate;
         }
         return { holdValue, marginUsed };

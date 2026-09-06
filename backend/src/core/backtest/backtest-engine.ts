@@ -5,6 +5,10 @@
  */
 import { CN_FEES, HK_FEES, US_FEES } from "../../common/constants";
 
+// Phase B: 涨跌停统一区间 + 滑点唯一实现（实盘/回测共用）
+import { isCnSymbol, cnPriceLimits } from "../../common/market-utils";
+import { liveFillPrice } from "../trading-engine/slippage";
+
 export type BacktestStrategy = 'ma_cross' | 'rsi_reversal' | 'momentum';
 export type FeeMode = 'CN' | 'HK' | 'US';
 
@@ -135,7 +139,49 @@ export function runBacktest(klines: BacktestKline[], opts: BacktestOptions): any
     }
     const signals = buildSignals(closes, params);
 
-    // ── 策略模拟（满仓/空仓，成交价按收盘价 + 滑点，买卖双边计费） ──
+    // Phase B P1#12: 滑点与实盘同模型（slippage.ts 唯一实现）——滚动 20 根 bar 收益率标准差估波动率、
+    // OFI=0 保守口径；slippageBps>0 时保留旧固定基点显式覆盖；CN 成交价按昨收涨跌停带钳制
+    const explicitBps = Number(opts.slippageBps) || 0;
+    const useLive = explicitBps <= 0;
+    const isCN = opts.symbol ? isCnSymbol(String(opts.symbol)) : feeMode === 'CN';
+    const volAt = (i: number): number => {
+        const arr: number[] = [];
+        for (let j = Math.max(1, i - 19); j <= i; j++) arr.push(closes[j] / closes[j - 1] - 1);
+        if (arr.length < 2) return 0.02;
+        const m = arr.reduce((a, b) => a + b, 0) / arr.length;
+        const s = Math.sqrt(arr.reduce((a, b) => a + (b - m) ** 2, 0) / arr.length);
+        return Math.max(0.02, s); // 与实盘波动率基线对齐（下限 0.02）
+    };
+    const bandAnchor = (px: number, i: number): number => {
+        if (!isCN) return px;
+        const prev = i > 0 ? closes[i - 1] : px;
+        const band = cnPriceLimits(prev, false);
+        return band ? Math.min(Math.max(px, band.down), band.up) : px;
+    };
+    const execBuy = (i: number, budget: number) => {
+        const px = bandAnchor(closes[i], i);
+        const vol = useLive ? volAt(i) : 0.02;
+        const lp = liveFillPrice(px, budget / px, 'buy', vol, 0, undefined);
+        const est = lp.totalCost / lp.totalQty;
+        const qty = Math.floor(budget / est / lot) * lot;
+        if (qty <= 0) return null;
+        const l2 = useLive ? liveFillPrice(px, qty, 'buy', vol, 0, undefined) : null;
+        const fill = useLive ? l2.totalCost / l2.totalQty : px * (1 + slip);
+        const turnover = qty * fill;
+        const f = calcBacktestFees('BUY', turnover, qty, feeMode);
+        return { qty, fill, turnover, f, slipCost: useLive ? (l2.totalCost - qty * px) : qty * px * slip };
+    };
+    const execSell = (i: number, qty: number) => {
+        const px = bandAnchor(closes[i], i);
+        const vol = useLive ? volAt(i) : 0.02;
+        const l2 = useLive ? liveFillPrice(px, qty, 'sell', vol, 0, undefined) : null;
+        const fill = useLive ? l2.totalCost / l2.totalQty : px * (1 - slip);
+        const turnover = qty * fill;
+        const f = calcBacktestFees('SELL', turnover, qty, feeMode);
+        return { fill, turnover, f, slipCost: useLive ? (qty * px - l2.totalCost) : qty * px * slip };
+    };
+
+    // ── 策略模拟（满仓/空仓，成交价按收盘价 + 实盘同模型滑点，买卖双边计费） ──
     let cash = initialCash, shares = 0, buyPrice = 0, trades = 0, wins = 0;
     let fees = 0, slippageCost = 0;
     const grossWins = [], grossLosses = [];
@@ -143,38 +189,31 @@ export function runBacktest(klines: BacktestKline[], opts: BacktestOptions): any
     for (let i = 0; i < closes.length; i++) {
         const px = closes[i];
         if (signals[i] === 1 && shares === 0) {
-            const fill = px * (1 + slip);
-            const qty = Math.floor(cash / fill / lot) * lot;
-            if (qty > 0) {
-                const turnover = qty * fill;
-                const f = calcBacktestFees('BUY', turnover, qty, feeMode);
-                cash -= turnover + f;
-                shares = qty; buyPrice = fill;
-                fees += f; slippageCost += qty * px * slip;
+            const ex = execBuy(i, cash);
+            if (ex) {
+                cash -= ex.turnover + ex.f;
+                shares = ex.qty; buyPrice = ex.fill;
+                fees += ex.f; slippageCost += ex.slipCost;
             }
         } else if (signals[i] === -1 && shares > 0) {
-            const fill = px * (1 - slip);
-            const turnover = shares * fill;
-            const f = calcBacktestFees('SELL', turnover, shares, feeMode);
-            const pnl = (fill - buyPrice) * shares - f;
-            cash += turnover - f;
+            const ex = execSell(i, shares);
+            const pnl = (ex.fill - buyPrice) * shares - ex.f;
+            cash += ex.turnover - ex.f;
             if (pnl >= 0) { wins++; grossWins.push(pnl); } else grossLosses.push(pnl);
             trades++;
-            fees += f; slippageCost += shares * px * slip;
+            fees += ex.f; slippageCost += ex.slipCost;
             shares = 0;
         }
         equity.push(cash + shares * px);
     }
     if (shares > 0) { // 期末强制平仓结算
         const px = closes[closes.length - 1];
-        const fill = px * (1 - slip);
-        const turnover = shares * fill;
-        const f = calcBacktestFees('SELL', turnover, shares, feeMode);
-        const pnl = (fill - buyPrice) * shares - f;
-        cash += turnover - f;
+        const ex = execSell(closes.length - 1, shares);
+        const pnl = (ex.fill - buyPrice) * shares - ex.f;
+        cash += ex.turnover - ex.f;
         if (pnl >= 0) { wins++; grossWins.push(pnl); } else grossLosses.push(pnl);
         trades++;
-        fees += f; slippageCost += shares * px * slip;
+        fees += ex.f; slippageCost += ex.slipCost;
         shares = 0;
         equity[equity.length - 1] = cash;
     }
@@ -182,19 +221,18 @@ export function runBacktest(klines: BacktestKline[], opts: BacktestOptions): any
     // ── 基准：首根有效 bar 收盘买入持有到期末（同样计费+滑点） ──
     let equityCurveBench: number[] = [];
     const baseStart = Math.max(0, Math.floor(need / 2)); // 与策略可交易起点对齐，避免头几天数据偏差
-    const bPx = closes[baseStart] * (1 + slip);
-    const bQty = Math.floor(initialCash / bPx / lot) * lot;
+    const bEx = execBuy(baseStart, initialCash);
     let benchEquity = initialCash, benchReturn = 0;
-    if (bQty > 0) {
-        const bTurnover = bQty * bPx;
-        const bFeeIn = calcBacktestFees('BUY', bTurnover, bQty, feeMode);
-        const bShares = bQty;
+    if (bEx) {
+        const bTurnover = bEx.turnover;
+        const bFeeIn = bEx.f;
+        const bShares = bEx.qty;
         const bCash = initialCash - bTurnover - bFeeIn;
         const bCurve: number[] = [];
         for (let i = baseStart; i < closes.length; i++) bCurve.push(bCash + bShares * closes[i]);
-        const bLast = closes[closes.length - 1] * (1 - slip);
-        const bFeeOut = calcBacktestFees('SELL', bShares * bLast, bShares, feeMode);
-        benchEquity = bCash + bShares * bLast - bFeeOut;
+        const bSell = execSell(closes.length - 1, bShares);
+        const bFeeOut = bSell.f;
+        benchEquity = bCash + bSell.turnover - bFeeOut;
         benchReturn = (benchEquity - initialCash) / initialCash * 100;
         equityCurveBench = sampleCurve(bCurve, 40);
     }

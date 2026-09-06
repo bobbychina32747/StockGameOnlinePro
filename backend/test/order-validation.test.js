@@ -41,7 +41,7 @@ describe('TradingEngineService.validateOrder 订单校验', () => {
 
   test('持仓不足拒绝', async () => {
     positionRepo.findOne.mockResolvedValue({ longQty: 10, boughtToday: 0 });
-    const r = await engine.validateOrder({ quantity: 50, type: 'market', side: 'sell', symbol: 'T1' }, { id: 'a', cash: 100000, marketMode: 'US' });
+    const r = await engine.validateOrder({ quantity: 50, type: 'market', side: 'sell', symbol: 'T1' }, { id: 'a', cash: 100000, marketMode: 'CN' });
     expect(r.valid).toBe(false);
     expect(r.error).toContain('持仓不足');
   });

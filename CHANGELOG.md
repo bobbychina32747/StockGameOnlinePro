@@ -4,6 +4,21 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase B 交易规则补全与盘后交易（评审 P1 全量，teams 协商定稿）
+
+### Fixed
+- **幻影流动性双计**：合成盘口每 tick 合并真实挂单用于展示，市价/FOK/IOC 先吃真实挂单再吃含旧真实数量的合成档=同一挂单被吃两次（实测真实 100 股被买走 150）。改为"显示与撮合分离"——orderBooks 只存纯合成深度，getOrderBook 输出层动态合并真实档（≤10 档），整类 bug 结构性消除（`matching-engine.ts`）
+- **跨市场费率/T+1 绕过**：费率与 T+1 按账户 marketMode 判定（US 账户买 A 股零佣金无 T+1）。现在下单校验账户与股票市场一致（禁止跨市场，服务层 400 + 引擎层兜底），settleFill 内部按 symbolMarket 路由费率（不信任调用方 mode）（`order.service.ts` + `trading-engine.service.ts`）
+- **A股涨跌停未落地**：生成端只逐 tick ±10% 可累计突破当日带宽、委托价无涨跌停校验。现在统一基准=昨收（真实涨停价=昨收×1.1 全天固定，新股首日 +44%/-36%）：生成端全天钳制、委托价校验（含边界价浮点容差）、盘口封板与竞价共用 `cnPriceLimits` 单一实现（`market-utils.ts` + `market-data.service.ts` + `matching-engine.ts`）
+- **中性新闻必涨**：`bullish = type!=='bearish'` 令 neutral/insider 全按利好；现在仅 bullish/insider 上涨、bearish 下跌、其余方向 0（`market-data.service.ts`）
+- **集合竞价成交从未结算（参数错位）**：`settleCounterFills(market, realFills)` 参数错位令 mode=数组、counterFills=undefined → 竞价成交挂单从盘口消失而 DB 永留 PENDING。现在按 symbol 两阶段结算：全量预校验→队列内逐条结算+订单 FILLED，任一失败全部挂单放回盘口恢复 PENDING（`market.service.ts` + `settleAuctionFills`）
+- **多头杠杆语义矛盾**：买入强制全额现金却按杠杆推导借入计息/强平。现在为真杠杆（teams 裁剪版）：购买力=cash×杠杆、`accounts.borrowed` 记账（买入借入/卖出按比例偿还/重置清零）、日终按 borrowed+shortCollateral 计息、维持担保比强平基于记账负债（存量账户 borrowed 默认 0，零成本迁移）
+
+### Added
+- **盘后固定价格交易（A股 15:00-15:30）**：仅限价单且价格=当日收盘价；独立盘后队列同价时间优先撮合（不互吃连续竞价遗留挂单）；15:30 未成交自动撤销（rejectReason）；`orders.postClose` 标记 + `state.isPostCloseTrading` + 前端窗口内强制限价/锁定收盘价；15:30 后 `cancelAfterHoursOrders` 按 gameDay 防重入（`constants.afterHoursStageFor` + `submitClosingOrder` + `order.service.ts` + `OrderPanel.tsx`）
+- **滑点唯一实现**：`slippage.ts`（slipStepFor/liveFillPrice，实盘与回测共用）；回测改用滚动 20 根 bar 收益率标准差估波动率、OFI=0 保守口径、CN 成交价按昨收涨跌停带钳制；slippageBps 保留显式覆盖
+- 新增测试 `phase8-trading-rules.test.js`（幻影流动性 4 例/跨市场与涨跌停 7 例/中性新闻/盘后交易 3 例/竞价两阶段 2 例/真杠杆 4 例/滑点 3 例共 23 例），后端 181→204
+
 ## [Unreleased] - Phase A 资金与正确性修复（评审 P0 全量）
 
 ### Fixed

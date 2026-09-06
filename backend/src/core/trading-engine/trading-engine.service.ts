@@ -29,6 +29,9 @@ import dividend_snapshot_entity_1 = require("../../infrastructure/database/entit
 
 import constants_1 = require("../../common/constants");
 
+// Phase B: 跨市场校验与涨跌停统一区间
+import market_utils_1 = require("../../common/market-utils");
+
 import matching_engine_1 = require("./matching-engine");
 
 let TradingEngineService = class TradingEngineService {
@@ -57,6 +60,12 @@ let TradingEngineService = class TradingEngineService {
         }
         // 用户限价挂单（真实盘口：进入 orderBooks 深度）
         this.userOrders = new Map<string, any[]>();
+        // Phase B: 盘后固定价格交易独立队列（不互吃连续竞价遗留挂单，15:30 未成交自动撤销）
+        this.closingBook = new Map<string, { bids: any[]; asks: any[] }>();
+        // Phase B: 昨收同步代理（涨跌停基准）
+        this.prevCloses = this.matching.prevCloses;
+        // Phase B: 新股首日集合代理（委托价带宽）
+        this.ipoFirstDay = this.matching.ipoFirstDay;
     }
     // ─── P2 委托 MatchingEngine 的撮合纯逻辑 ───
     updatePrices(prices) {
@@ -64,6 +73,10 @@ let TradingEngineService = class TradingEngineService {
     }
     setDayOpen(prices) {
         this.matching.setDayOpen(prices);
+    }
+    // Phase B: 昨收同步（涨跌停/委托价校验基准）
+    setPrevCloses(prevCloses) {
+        this.matching.setPrevCloses(prevCloses);
     }
     setVolatilities(vols) {
         this.matching.setVolatilities(vols);
@@ -252,6 +265,7 @@ let TradingEngineService = class TradingEngineService {
             status: order_entity_1.OrderStatus.PENDING,
             displayQty: isIceberg ? displayQty : null,
             hiddenQty: isIceberg ? hiddenQty : null,
+            postClose: false,
         });
         const saved = await this.orderRepo.save(order);
         // P0 真实盘口：限价单挂入盘口队列（价格-时间优先）
@@ -315,6 +329,11 @@ let TradingEngineService = class TradingEngineService {
         if (!this.prices.has(order.symbol) && !this.orderBooks.has(order.symbol)) {
             return { valid: false, error: '股票不存在，请检查代码' };
         }
+        // Phase B P1#7: 禁止跨市场交易——账户与股票必须同市场（费率/T+1/账户隔离一致性的前提）
+        const symbolMode = market_utils_1.symbolMarket(order.symbol);
+        if (symbolMode !== (account.marketMode || 'CN')) {
+            return { valid: false, error: `禁止跨市场交易：${account.marketMode} 账户不能交易 ${order.symbol}（${symbolMode}）` };
+        }
         const needsPrice = order.type === order_entity_1.OrderType.LIMIT || order.type === order_entity_1.OrderType.FOK || order.type === order_entity_1.OrderType.IOC || order.type === order_entity_1.OrderType.ICEBERG;
         if (needsPrice && (!Number.isFinite(Number(order.price)) || Number(order.price) <= 0 || Number(order.price) > 1000000)) {
             return { valid: false, error: '限价/FOK/IOC/冰山单指令需要有效价格（0~1000000）' };
@@ -341,11 +360,31 @@ let TradingEngineService = class TradingEngineService {
             order.price = Math.round(Number(order.price) * 100) / 100;
         if (order.triggerPrice)
             order.triggerPrice = Math.round(Number(order.triggerPrice) * 100) / 100;
+        // Phase B P1#8: A股委托价涨跌停校验——基准=昨收（真实涨停价全天固定），新股首日 +44%/-36%
+        if (symbolMode === 'CN' && (order.price || order.triggerPrice)) {
+            const firstDay = this.ipoFirstDay.has(order.symbol);
+            const prev = this.prevCloses.get(order.symbol);
+            const base = prev && Number(prev) > 0 ? Number(prev)
+                : (this.dayOpenPrices.get(order.symbol) && Number(this.dayOpenPrices.get(order.symbol)) > 0 ? Number(this.dayOpenPrices.get(order.symbol))
+                    : (this.prices.get(order.symbol) || null));
+            const band = market_utils_1.cnPriceLimits(base, firstDay);
+            if (band) {
+                const outOfRange = [Number(order.price), Number(order.triggerPrice)].filter((p) => Number.isFinite(p) && p > 0);
+                for (const p of outOfRange) {
+                    // 1e-9 容差：10×1.44=14.3999… 浮点，边界价（如恰好涨停价）不应误拒
+                    if (p < band.down - 1e-9 || p > band.up + 1e-9) {
+                        return { valid: false, error: `A股涨跌停限制：委托价 ${p.toFixed(2)} 超出当日允许区间 [${band.down.toFixed(2)}, ${band.up.toFixed(2)}]${firstDay ? '（新股首日 +44%/-36%）' : ''}` };
+                    }
+                }
+            }
+        }
         const currentPrice = this.prices.get(order.symbol) ?? 0;
         if (order.side === order_entity_1.OrderSide.BUY) {
             const estimatedCost = remainingQty * (order.price || currentPrice);
-            if (account.cash < estimatedCost) {
-                return { valid: false, error: `资金不足，需要 ${estimatedCost.toFixed(2)}` };
+            // Phase B P1#9: 真杠杆——购买力 = 现金 × 杠杆倍数（借入部分记入账户负债，日终计息）
+            const buyingPower = Number(account.cash) * (Number(account.leverage) || 1);
+            if (buyingPower < estimatedCost) {
+                return { valid: false, error: `资金不足，需要 ${estimatedCost.toFixed(2)}（购买力 ${buyingPower.toFixed(2)}，杠杆 ${Number(account.leverage) || 1}x）` };
             }
         }
         if (order.side === order_entity_1.OrderSide.SHORT) {
@@ -432,20 +471,22 @@ let TradingEngineService = class TradingEngineService {
         return run;
     }
     async settleFillInner(accountId, symbol, side, fill, mode) {
+        // Phase B P1#7: 费率按股票所属市场路由（mode 参数仅兼容保留，不信任调用方账户模式）
+        const feeMode = market_utils_1.symbolMarket(symbol);
         const account = await this.accountRepo.findOne({ where: { id: accountId } });
         if (!account) {
             return { success: false, error: '账户不存在' };
         }
         let pos = await this.positionRepo.findOne({ where: { accountId: account.id, symbol } });
         const totalCost = fill.filledQuantity * fill.avgPrice;
-        const fees = this.calcFees(side, fill.totalCost, fill.filledQuantity, mode);
+        const fees = this.calcFees(side, fill.totalCost, fill.filledQuantity, feeMode);
         // SECURITY: 结算队列内复核持仓与T+1（validateOrder 在队列外执行，并发下会双卖/双平空刷钱）
         if (side === order_entity_1.OrderSide.SELL) {
             const longQty = pos ? Number(pos.longQty) : 0;
             if (longQty < fill.filledQuantity) {
                 return { success: false, error: `持仓不足，当前可卖 ${longQty} 股` };
             }
-            if (mode === 'CN' && pos && fill.filledQuantity > longQty - (pos.boughtToday || 0)) {
+            if (feeMode === 'CN' && pos && fill.filledQuantity > longQty - (pos.boughtToday || 0)) {
                 return { success: false, error: `A股T+1规则：当日买入 ${pos.boughtToday || 0} 股需次日方可卖出` };
             }
         }
@@ -455,10 +496,11 @@ let TradingEngineService = class TradingEngineService {
                 return { success: false, error: `空头持仓不足，当前可平 ${shortQty} 股` };
             }
         }
-        // 结算时二次校验（防并发下单超买）
+        // 结算时二次校验（防并发下单超买）——Phase B P1#9: 真杠杆购买力 = 现金 × 杠杆
         if (side === order_entity_1.OrderSide.BUY) {
-            if (Number(account.cash) < totalCost + fees.totalFees) {
-                return { success: false, error: `资金不足，需要 ${(totalCost + fees.totalFees).toFixed(2)}` };
+            const buyingPower = Number(account.cash) * (Number(account.leverage) || 1);
+            if (buyingPower < totalCost + fees.totalFees) {
+                return { success: false, error: `资金不足，需要 ${(totalCost + fees.totalFees).toFixed(2)}（购买力 ${buyingPower.toFixed(2)}）` };
             }
         }
         if (side === order_entity_1.OrderSide.SHORT) {
@@ -484,9 +526,18 @@ let TradingEngineService = class TradingEngineService {
             account.cash = Number(account.cash) - totalCost - fees.totalFees + released;
             account.shortCollateral = collateralBefore - released;
         } else if (side === order_entity_1.OrderSide.BUY) {
-            account.cash = Number(account.cash) - totalCost - fees.totalFees;
+            // Phase B P1#9: 真杠杆——自有资金 = 全额/杠杆，差额记入融资负债（borrowed），日终计息、维持担保比强平
+            const ownCash = totalCost / (Number(account.leverage) || 1);
+            const borrow = totalCost - ownCash;
+            account.cash = Number(account.cash) - ownCash - fees.totalFees;
+            account.borrowed = Number(account.borrowed || 0) + borrow;
         } else {
-            // SELL
+            // SELL：卖出回笼现金，并按持仓原始负债比例偿还融资
+            const borrowBefore = Number(account.borrowed || 0);
+            if (borrowBefore > 0) {
+                const repay = Math.min(borrowBefore, totalCost * (1 - 1 / (Number(account.leverage) || 1)));
+                account.borrowed = borrowBefore - repay;
+            }
             account.cash = Number(account.cash) + totalCost - fees.totalFees;
         }
         // FIX(H4): 现金规范化到分，减少浮点累积误差
@@ -527,9 +578,9 @@ let TradingEngineService = class TradingEngineService {
     async checkPendingOrders() {
         const pending = await this.orderRepo.find({
             where: [
-                { status: order_entity_1.OrderStatus.PENDING, type: order_entity_1.OrderType.LIMIT },
-                { status: order_entity_1.OrderStatus.PENDING, type: order_entity_1.OrderType.STOP },
-                { status: order_entity_1.OrderStatus.PENDING, type: order_entity_1.OrderType.STOP_LIMIT },
+                { status: order_entity_1.OrderStatus.PENDING, type: order_entity_1.OrderType.LIMIT, postClose: false },
+                { status: order_entity_1.OrderStatus.PENDING, type: order_entity_1.OrderType.STOP, postClose: false },
+                { status: order_entity_1.OrderStatus.PENDING, type: order_entity_1.OrderType.STOP_LIMIT, postClose: false },
             ],
         });
         const fills = [];
@@ -667,6 +718,20 @@ let TradingEngineService = class TradingEngineService {
             return false;
         order.status = order_entity_1.OrderStatus.CANCELLED;
         await this.orderRepo.save(order);
+        if (order.postClose) {
+            // Phase B: 盘后申报从独立队列移除
+            const book = this.closingBook.get(order.symbol);
+            if (book) {
+                for (const sideKey of ['bids', 'asks']) {
+                    const arr = book[sideKey];
+                    for (let i = arr.length - 1; i >= 0; i--) {
+                        if (arr[i].orderId === orderId)
+                            arr.splice(i, 1);
+                    }
+                }
+            }
+            return true;
+        }
         this.removeUserOrder(order.symbol, order.id);
         return true;
     }
@@ -789,6 +854,214 @@ let TradingEngineService = class TradingEngineService {
             return created;
         });
     }
+    // ─── Phase B P1#11: 集合竞价两阶段结算 ───
+    // 修复根因：原 market.service 以 settleCounterFills(market, realFills) 调用，参数错位（mode=数组、counterFills=undefined）
+    // → 竞价成交从未结算（挂单从盘口消失而 DB 仍 PENDING）。现改为按 symbol 分组两阶段提交：
+    // 阶段1 全量预校验（资金/持仓/T+1/保证金），任一失败 → 全部挂单放回盘口恢复 PENDING（不产生半套结算）；
+    // 阶段2 通过后进结算队列逐条结算（settleFillInner 确定性执行），订单实体同步 FILLED。
+    async precheckFill(accountId, symbol, side, fill) {
+        const account = await this.accountRepo.findOne({ where: { id: accountId } });
+        if (!account)
+            return { success: false, error: '账户不存在' };
+        const pos = await this.positionRepo.findOne({ where: { accountId, symbol } });
+        const totalCost = fill.filledQuantity * fill.avgPrice;
+        const feeMode = market_utils_1.symbolMarket(symbol);
+        const fees = this.calcFees(side, fill.totalCost, fill.filledQuantity, feeMode);
+        if (side === order_entity_1.OrderSide.SELL) {
+            const longQty = pos ? Number(pos.longQty) : 0;
+            if (longQty < fill.filledQuantity)
+                return { success: false, error: `持仓不足，当前可卖 ${longQty} 股` };
+            if (feeMode === 'CN' && pos && fill.filledQuantity > longQty - (pos.boughtToday || 0))
+                return { success: false, error: `A股T+1规则：当日买入 ${pos.boughtToday || 0} 股需次日方可卖出` };
+        }
+        if (side === order_entity_1.OrderSide.COVER) {
+            const shortQty = pos ? Number(pos.shortQty) : 0;
+            if (shortQty < fill.filledQuantity)
+                return { success: false, error: `空头持仓不足，当前可平 ${shortQty} 股` };
+        }
+        if (side === order_entity_1.OrderSide.BUY) {
+            const buyingPower = Number(account.cash) * (Number(account.leverage) || 1);
+            if (buyingPower < totalCost + fees.totalFees)
+                return { success: false, error: `资金不足，需要 ${(totalCost + fees.totalFees).toFixed(2)}` };
+        }
+        if (side === order_entity_1.OrderSide.SHORT) {
+            const margin = totalCost * (0, constants_1.shortMarginRateFor)(symbol, this.volatilities.get(symbol));
+            if (Number(account.cash) < margin)
+                return { success: false, error: `保证金不足，需要 ${margin.toFixed(2)}` };
+        }
+        return { success: true };
+    }
+    async rollbackAuctionFills(symbol, fills) {
+        for (const f of fills || []) {
+            if (f.virtual || !f.orderId)
+                continue;
+            this.placeRestingOrder(symbol, f.orderId, f.accountId, f.side, f.price, f.qty);
+        }
+        this.logger.warn(`集合竞价结算失败，${(fills || []).filter((f) => !f.virtual).length} 条挂单已放回盘口恢复 PENDING`);
+        return { success: false, error: '集合竞价结算失败（挂单已回滚盘口）' };
+    }
+    async settleAuctionFills(symbol, fills) {
+        if (!fills || fills.length === 0)
+            return { success: true, settled: 0 };
+        // 阶段1：全量预校验
+        for (const f of fills) {
+            if (f.virtual || !f.orderId)
+                continue;
+            const cfFill = {
+                symbol,
+                side: f.side,
+                filledQuantity: f.qty,
+                avgPrice: f.price,
+                totalCost: Number((f.qty * f.price).toFixed(2)),
+            };
+            const ok = await this.precheckFill(f.accountId, symbol, f.side, cfFill);
+            if (!ok.success)
+                return this.rollbackAuctionFills(symbol, fills);
+        }
+        // 阶段2：进结算队列逐条结算（预校验已过，settleFillInner 确定性成功；DB 异常中断时未结算部分放回盘口）
+        return this.runExclusive(async () => {
+            let settled = 0;
+            let idx = 0;
+            try {
+                for (const f of fills) {
+                    idx++;
+                    if (f.virtual || !f.orderId)
+                        continue;
+                    const cfFill = {
+                        symbol,
+                        side: f.side,
+                        filledQuantity: f.qty,
+                        avgPrice: f.price,
+                        totalCost: Number((f.qty * f.price).toFixed(2)),
+                    };
+                    const r = await this.settleFillInner(f.accountId, symbol, f.side, cfFill, undefined);
+                    if (!r.success)
+                        throw new Error(r.error);
+                    const cfOrder = await this.orderRepo.findOne({ where: { id: f.orderId } });
+                    if (cfOrder) {
+                        cfOrder.filledQty = Number(cfOrder.filledQty || 0) + f.qty;
+                        if (Number(cfOrder.filledQty) >= Number(cfOrder.quantity)) {
+                            cfOrder.status = order_entity_1.OrderStatus.FILLED;
+                            cfOrder.avgFillPrice = f.price;
+                        }
+                        await this.orderRepo.save(cfOrder);
+                    }
+                    settled++;
+                }
+            }
+            catch (e) {
+                // 已结算部分保留（流水可对账），未结算部分放回盘口（显式降级：日志含完整凭据）
+                this.logger.error(`集合竞价结算中断（已结算 ${settled} 条）: ${e.message}`);
+                for (const f of fills.slice(idx - 1)) {
+                    if (!f.virtual && f.orderId)
+                        this.placeRestingOrder(symbol, f.orderId, f.accountId, f.side, f.price, f.qty);
+                }
+            }
+            return { success: true, settled };
+        });
+    }
+    // ─── Phase B P1: 盘后固定价格交易（A股 15:00-15:30，收盘价申报，独立队列不互吃连续竞价遗留单） ───
+    getClosingBook(symbol) {
+        let b = this.closingBook.get(symbol);
+        if (!b) {
+            b = { bids: [], asks: [] };
+            this.closingBook.set(symbol, b);
+        }
+        return b;
+    }
+    async submitClosingOrder(orderData, account, closePrice) {
+        const validation = await this.validateOrder(orderData, account);
+        if (!validation.valid) {
+            return { success: false, error: validation.error };
+        }
+        const close = Number(Number(closePrice).toFixed(2));
+        const price = Number(Number(orderData.price).toFixed(2));
+        if (price !== close) {
+            return { success: false, error: `盘后固定价格交易限以收盘价 ${close} 申报` };
+        }
+        const qty = Number(orderData.quantity);
+        const isBid = orderData.side === order_entity_1.OrderSide.BUY;
+        const book = this.getClosingBook(orderData.symbol);
+        const counterparty = isBid ? book.asks : book.bids;
+        let remaining = qty;
+        const fills = [];
+        let i = 0;
+        // 同价时间优先撮合 + 自成交防护（CN 无 short/cover，仅 buy/sell）
+        while (remaining > 0 && i < counterparty.length) {
+            const e = counterparty[i];
+            if (e.accountId === orderData.accountId) {
+                i++;
+                continue;
+            }
+            const fq = Math.min(remaining, Number(e.qty));
+            fills.push({ orderId: e.orderId, accountId: e.accountId, side: e.side, price: close, qty: fq, virtual: false });
+            e.qty = Number(e.qty) - fq;
+            if (Number(e.qty) <= 0)
+                counterparty.splice(i, 1);
+            else
+                i++;
+            remaining -= fq;
+        }
+        const saved = await this.orderRepo.save(this.orderRepo.create({
+            userId: orderData.userId,
+            accountId: orderData.accountId,
+            symbol: orderData.symbol,
+            type: order_entity_1.OrderType.LIMIT,
+            side: orderData.side,
+            price: close,
+            quantity: qty,
+            status: order_entity_1.OrderStatus.PENDING,
+            postClose: true,
+        }));
+        if (remaining > 0) {
+            const list = isBid ? book.bids : book.asks;
+            list.push({ orderId: saved.id, accountId: orderData.accountId, side: orderData.side, price: close, qty: remaining, time: Date.now() });
+            list.sort((a, b) => a.time - b.time); // 时间优先
+        }
+        const filledQty = qty - remaining;
+        if (filledQty <= 0)
+            return { success: true, order: saved, fill: null };
+        const ownFill = {
+            symbol: orderData.symbol,
+            side: orderData.side,
+            filledQuantity: filledQty,
+            avgPrice: close,
+            totalCost: Number((filledQty * close).toFixed(2)),
+            counterFills: fills,
+        };
+        const settle = await this.settleFill(orderData.accountId, orderData.symbol, orderData.side, ownFill, account.marketMode);
+        if (!settle.success) {
+            // 结算失败：对手方挂单放回 + 本方撤单
+            for (const f of fills) {
+                const list2 = f.side === order_entity_1.OrderSide.BUY ? book.bids : book.asks;
+                list2.push({ orderId: f.orderId, accountId: f.accountId, side: f.side, price: close, qty: f.qty, time: Date.now() });
+            }
+            saved.status = order_entity_1.OrderStatus.CANCELLED;
+            saved.rejectReason = settle.error;
+            await this.orderRepo.save(saved);
+            return { success: false, error: settle.error };
+        }
+        await this.settleCounterFills(orderData.symbol, account.marketMode, fills);
+        saved.filledQty = filledQty;
+        saved.avgFillPrice = close;
+        if (remaining <= 0) {
+            saved.status = order_entity_1.OrderStatus.FILLED;
+        }
+        await this.orderRepo.save(saved);
+        return { success: true, order: saved, fill: ownFill };
+    }
+    async cancelAfterHoursOrders() {
+        const pending = await this.orderRepo.find({ where: { status: order_entity_1.OrderStatus.PENDING, postClose: true } });
+        for (const o of pending) {
+            o.status = order_entity_1.OrderStatus.CANCELLED;
+            o.rejectReason = '盘后固定价格交易时段结束未成交';
+            await this.orderRepo.save(o);
+        }
+        this.closingBook.clear();
+        if (pending.length > 0)
+            this.logger.log(`🌆 盘后固定价格交易结束：${pending.length} 笔未成交申报已撤销`);
+        return pending.length;
+    }
     async getPendingOrders(accountId) {
         return this.orderRepo.find({
             where: { accountId, status: order_entity_1.OrderStatus.PENDING },
@@ -799,14 +1072,13 @@ let TradingEngineService = class TradingEngineService {
         const positions = await this.positionRepo.find({ where: { accountId: account.id } });
         // SECURITY: 冻结保证金属于用户资产，计入权益（避免误判过早强平）
         let totalEquity = Number(account.cash) + Number(account.shortCollateral || 0);
-        let totalBorrowed = 0; // 借入资金总额
+        // Phase B P1#9: 多仓负债按记账口径（account.borrowed，买入时按杠杆借入、卖出时偿还），不再由持仓市值推导
+        let totalBorrowed = Number(account.borrowed || 0);
         for (const pos of positions) {
             const price = prices[pos.symbol];
             if (price === undefined || price === null)
                 continue; // 无报价持仓跳过估值，避免按 0 计
             totalEquity += pos.longQty * price - pos.shortQty * price;
-            // 多仓借入资金 = 持仓市值 × (1 - 1/杠杆倍数)
-            totalBorrowed += pos.longQty * price * (1 - 1 / Number(account.leverage || 1));
             // 做空保证金要求 = 做空市值 × 个股保证金率
             totalBorrowed += pos.shortQty * price * (0, constants_1.shortMarginRateFor)(pos.symbol, this.volatilities.get(pos.symbol));
         }
@@ -877,7 +1149,10 @@ let TradingEngineService = class TradingEngineService {
                 const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.SELL, pos.longQty, acc.id);
                 if (fill) {
                     recovered += fill.totalCost;
-                    totalFees += this.calcFees(order_entity_1.OrderSide.SELL, fill.totalCost, fill.filledQuantity, acc.marketMode).totalFees;
+                    totalFees += this.calcFees(order_entity_1.OrderSide.SELL, fill.totalCost, fill.filledQuantity, market_utils_1.symbolMarket(pos.symbol)).totalFees;
+                    // Phase B: 卖出回笼现金同时按比例偿还融资负债
+                    const repay = Math.min(Number(acc.borrowed || 0), fill.totalCost * (1 - 1 / (Number(acc.leverage) || 1)));
+                    acc.borrowed = Number(acc.borrowed || 0) - repay;
                     // Phase A P0#4: 按实际成交量扣减，剩余持仓保留（跌停/无流动性时不得凭空蒸发）
                     pos.longQty = Number(pos.longQty) - fill.filledQuantity;
                     if (pos.longQty <= 0) {
@@ -892,7 +1167,7 @@ let TradingEngineService = class TradingEngineService {
                 const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.COVER, pos.shortQty, acc.id);
                 if (fill) {
                     recovered -= fill.totalCost;
-                    totalFees += this.calcFees(order_entity_1.OrderSide.COVER, fill.totalCost, fill.filledQuantity, acc.marketMode).totalFees;
+                    totalFees += this.calcFees(order_entity_1.OrderSide.COVER, fill.totalCost, fill.filledQuantity, market_utils_1.symbolMarket(pos.symbol)).totalFees;
                     pos.shortQty = Number(pos.shortQty) - fill.filledQuantity;
                     if (pos.shortQty <= 0) {
                         pos.shortQty = 0;
@@ -914,11 +1189,18 @@ let TradingEngineService = class TradingEngineService {
             recovered += leftover;
             acc.shortCollateral = 0;
         }
+        // Phase B P1#9: 全部持仓已清→剩余融资负债从现金扣除（负资产兜底：亏损破产时现金可负，走账户重置）
+        const remainingLong = positions.reduce((s, p) => s + Number(p.longQty || 0), 0);
+        const orphanDebt = Number(acc.borrowed || 0);
+        if (remainingLong <= 0 && orphanDebt > 0) {
+            recovered -= orphanDebt;
+            acc.borrowed = 0;
+        }
         // SECURITY: 强平归还冻结保证金并按标准计费（原实现清零保证金不归还、不计费，等于吞用户资产）
         acc.cash = Math.round((Number(acc.cash) + recovered - totalFees) * 100) / 100;
-        acc.marginUsed = 0;
+        acc.marginUsed = Math.round((Number(acc.borrowed || 0) + Number(acc.shortCollateral || 0)) * 100) / 100;
         await this.accountRepo.save(acc);
-        this.logger.warn(`账户 ${acc.id} 已被强制平仓，净回收 ${recovered.toFixed(2)}，费用 ${totalFees.toFixed(2)}，冻结保证金剩余 ${Number(acc.shortCollateral || 0).toFixed(2)}`);
+        this.logger.warn(`账户 ${acc.id} 已被强制平仓，净回收 ${recovered.toFixed(2)}，费用 ${totalFees.toFixed(2)}，负债剩余 ${Number(acc.borrowed || 0).toFixed(2)}，冻结保证金剩余 ${Number(acc.shortCollateral || 0).toFixed(2)}`);
         return recovered;
     }
     // F7 修复：日终检查所有账户保证金，爆仓（liquidate）则强制平仓
@@ -947,13 +1229,12 @@ let TradingEngineService = class TradingEngineService {
         };
         const evalMargin = () => {
             let equity = Number(acc.cash) + Number(acc.shortCollateral || 0);
-            let borrowed = 0;
+            let borrowed = Number(acc.borrowed || 0); // Phase B: 融资负债为记账口径（非持仓推导）
             for (const pos of positions) {
                 const price = priceOf(pos.symbol);
                 if (price === null)
                     continue;
                 equity += pos.longQty * price - pos.shortQty * price;
-                borrowed += pos.longQty * price * (1 - 1 / Number(acc.leverage || 1));
                 borrowed += pos.shortQty * price * (0, constants_1.shortMarginRateFor)(pos.symbol, this.volatilities.get(pos.symbol));
             }
             return borrowed > 0 ? equity / borrowed : 999;
@@ -973,8 +1254,11 @@ let TradingEngineService = class TradingEngineService {
                 // 自成交防护：追保市价单不与本人挂单撮合
                 const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.SELL, qty, acc.id);
                 if (fill) {
-                    const fees = this.calcFees(order_entity_1.OrderSide.SELL, fill.totalCost, fill.filledQuantity, acc.marketMode).totalFees;
+                    const fees = this.calcFees(order_entity_1.OrderSide.SELL, fill.totalCost, fill.filledQuantity, market_utils_1.symbolMarket(pos.symbol)).totalFees;
                     netCash += fill.totalCost - fees;
+                    // Phase B: 追保卖出同步按比例偿还融资负债（降杠杆）
+                    const repay = Math.min(Number(acc.borrowed || 0), fill.totalCost * (1 - 1 / (Number(acc.leverage) || 1)));
+                    acc.borrowed = Number(acc.borrowed || 0) - repay;
                     pos.longQty = Number(pos.longQty) - fill.filledQuantity;
                     if (pos.longQty <= 0) {
                         pos.longQty = 0;
@@ -988,7 +1272,7 @@ let TradingEngineService = class TradingEngineService {
                 const qty = Math.ceil(before * 0.5);
                 const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.COVER, qty, acc.id);
                 if (fill) {
-                    const fees = this.calcFees(order_entity_1.OrderSide.COVER, fill.totalCost, fill.filledQuantity, acc.marketMode).totalFees;
+                    const fees = this.calcFees(order_entity_1.OrderSide.COVER, fill.totalCost, fill.filledQuantity, market_utils_1.symbolMarket(pos.symbol)).totalFees;
                     const released = Number(acc.shortCollateral || 0) * (fill.filledQuantity / before);
                     releasedCollateral += released;
                     acc.shortCollateral = Number(acc.shortCollateral || 0) - released;
@@ -1004,6 +1288,7 @@ let TradingEngineService = class TradingEngineService {
             await this.positionRepo.save(pos);
         }
         acc.cash = Math.round((Number(acc.cash) + netCash) * 100) / 100;
+        acc.marginUsed = Math.round((Number(acc.borrowed || 0) + Number(acc.shortCollateral || 0)) * 100) / 100;
         await this.accountRepo.save(acc);
         this.logger.warn('账户 ' + acc.id + ' 追保部分平仓，现金净变动 ' + netCash.toFixed(2) + '，归还保证金 ' + releasedCollateral.toFixed(2) + '，当前保证金率 ' + evalMargin().toFixed(4));
         return netCash;

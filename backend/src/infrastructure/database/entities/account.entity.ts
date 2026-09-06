@@ -43,6 +43,11 @@ __decorate([
     (0, typeorm_1.Column)('float', { default: 0 }),
     __metadata("design:type", Number)
 ], Account.prototype, "shortCollateral", void 0);
+// Phase B: 融资负债（真杠杆：买入借入部分记账，卖出按比例偿还，日终计息、维持担保比强平）
+__decorate([
+    (0, typeorm_1.Column)('float', { default: 0 }),
+    __metadata("design:type", Number)
+], Account.prototype, "borrowed", void 0);
 __decorate([
     (0, typeorm_1.Column)('float', { default: 100000 }),
     __metadata("design:type", Number)

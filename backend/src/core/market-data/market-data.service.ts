@@ -29,6 +29,9 @@ import trading_engine_service_1 = require("../trading-engine/trading-engine.serv
 
 import market_math_1 = require("./market-math");
 
+// Phase B: 涨跌停统一区间函数（与撮合引擎/委托价校验共用）
+import market_utils_1 = require("../../common/market-utils");
+
 import market_maker_1 = require("./market-maker");
 
 import fundamentals_1 = require("./fundamentals");
@@ -511,6 +514,16 @@ let MarketDataService = class MarketDataService {
                     stock.price = maxUp;
                 if (stock.price < maxDn)
                     stock.price = maxDn;
+            }
+            // Phase B P1#8: A股日涨跌停落地——按昨收基准全天钳制（涨停价=昨收×1.1 固定），
+            // 逐 tick ±10% 只能约束相邻 bar，多次累计仍可突破当日带宽，这里做最终闸门
+            if (market_utils_1.isCnSymbol(stock.symbol)) {
+                const firstDay = Number(stock.listedDay) === Number(this.gameDay);
+                const base = Number(stock.prevClose) > 0 ? Number(stock.prevClose) : (Number(stock.dayOpen) > 0 ? Number(stock.dayOpen) : stock.price);
+                const band = market_utils_1.cnPriceLimits(base, firstDay);
+                if (band) {
+                    stock.price = this.clamp(stock.price, band.down, band.up);
+                }
             }
             stock.prevTickPrice = stock.price;
             stock.lastReturn = priceChange;
@@ -1620,6 +1633,8 @@ let MarketDataService = class MarketDataService {
             fxRates: (0, constants_1.getFxRates)(),
             // P1: 本市场实时开市状态（含节假日历判断），供前端休市遮罩/下单禁用使用
             isTradingTime: constants_1.isTradingTimeFor(this.market),
+            // Phase B: 盘后固定价格交易窗口（仅 CN 15:00-15:30）
+            isPostCloseTrading: constants_1.afterHoursStageFor(this.market) !== null,
         };
     }
     applyFactorImpulse(factor, impact) {
@@ -1903,7 +1918,8 @@ let MarketDataService = class MarketDataService {
     // P3 新闻因果链：首日即时冲击（40%）+ 持久影响档案（60% 按几何衰减分摊数日）
     // 新闻 → 因子冲击 + 定向个股/行业价格冲击，利好利空的定价过程持续数日（不再一次性打完）
     applyNewsImpact(news) {
-        const bullish = news.type !== 'bearish';
+        // Phase B P1#10: 方向修正——仅 bullish/insider 上涨、bearish 下跌、neutral 等其余类型方向为 0（不再必涨）
+        const direction = news.type === 'bullish' || news.type === 'insider' ? 1 : news.type === 'bearish' ? -1 : 0;
         const strength = 0.5 + Math.random() * 0.6; // 0.5%~1.1%
         // 1) 宏观因子：立即冲击（与旧行为一致）
         if (news.impact) {
@@ -1911,25 +1927,25 @@ let MarketDataService = class MarketDataService {
                 this.applyFactorImpulse(factor, val);
             }
         }
-        // 2) 定向个股/行业：首日 40% 即时 + 60% 持久衰减
-        if (news.targetedSymbol) {
-            const immediate = (bullish ? 1 : -1) * strength * 0.01 * 0.4;
+        // 2) 定向个股/行业：首日 40% 即时 + 60% 持久衰减（中性新闻 direction=0 不产生价格冲击）
+        if (direction !== 0 && news.targetedSymbol) {
+            const immediate = direction * strength * 0.01 * 0.4;
             const st = this.stocks.get(news.targetedSymbol);
             if (st) {
                 st.price = Math.max(0.5, st.price * (1 + immediate));
                 st.lastReturn = immediate;
             }
-            this.registerNewsImpact(news, 'symbol', news.targetedSymbol, (bullish ? 1 : -1) * strength * 0.01);
+            this.registerNewsImpact(news, 'symbol', news.targetedSymbol, direction * strength * 0.01);
         }
-        else if (news.targetedIndustry) {
-            const immediate = (bullish ? 1 : -1) * strength * 0.004 * 0.4;
+        else if (direction !== 0 && news.targetedIndustry) {
+            const immediate = direction * strength * 0.004 * 0.4;
             for (const st of this.stocks.values()) {
                 if (st.industry === news.targetedIndustry) {
                     st.price = Math.max(0.5, st.price * (1 + immediate));
                     st.lastReturn = immediate;
                 }
             }
-            this.registerNewsImpact(news, 'industry', news.targetedIndustry, (bullish ? 1 : -1) * strength * 0.004);
+            this.registerNewsImpact(news, 'industry', news.targetedIndustry, direction * strength * 0.004);
         }
         // 3) 纯因子新闻（无定向目标）：因子冲击的持久衰减部分
         if (!news.targetedSymbol && !news.targetedIndustry && news.impact) {

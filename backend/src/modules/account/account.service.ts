@@ -174,6 +174,8 @@ let AccountService = class AccountService {
             account.marginUsed = 0;
             // SECURITY: 冻结保证金必须归零（原实现遗留 shortCollateral 导致资金永久冻结）
             account.shortCollateral = 0;
+            // Phase B: 融资负债随重置清零
+            account.borrowed = 0;
             account.lastResetDay = currentDay;
             account.resetCount = (Number(account.resetCount) || 0) + 1;
             await this.accountRepo.save(account);

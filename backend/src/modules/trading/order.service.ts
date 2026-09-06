@@ -30,6 +30,9 @@ import debug_mode_service_1 = require("../../common/debug-mode/debug-mode.servic
 
 import constants_1 = require("../../common/constants");
 
+// Phase B: 跨市场闸门
+import market_utils_1 = require("../../common/market-utils");
+
 let OrderService = class OrderService {
     [key: string]: any;
     constructor(accountRepo, positionRepo, orderRepo, txRepo, engine, dataSource, debugMode) {
@@ -59,6 +62,30 @@ let OrderService = class OrderService {
             throw new common_1.NotFoundException(`账户不存在（${mode}）`);
         if (account.marketMode === 'CN' && (side === order_entity_1.OrderSide.SHORT || side === order_entity_1.OrderSide.COVER)) {
             return { success: false, error: 'A股模式不支持做空/融券' };
+        }
+        // Phase B P1#7: 服务层跨市场闸门（给前端明确 400，引擎层另有兜底）
+        const symbolMode = market_utils_1.symbolMarket(symbol);
+        if (symbolMode !== mode) {
+            throw new common_1.BadRequestException(`账户市场与股票市场不一致，禁止跨市场交易（${mode} 账户不能交易 ${symbol}）`);
+        }
+        // Phase B P1: 盘后固定价格交易（A股 15:00-15:30，仅限价单且价格=当日收盘价）
+        const afterStage = (0, constants_1.afterHoursStageFor)(mode);
+        if (!this.debugMode.canBypassHours(userId) && afterStage === 'fixedPrice') {
+            if (type !== order_entity_1.OrderType.LIMIT) {
+                throw new common_1.BadRequestException('盘后固定价格交易仅支持限价单申报');
+            }
+            const close = this.engine.prices.get(symbol);
+            if (close === undefined || close === null || !Number.isFinite(Number(close))) {
+                throw new common_1.BadRequestException('盘后固定价格交易：暂无当日收盘价，无法申报');
+            }
+            if (Math.round(Number(price || 0) * 100) / 100 !== Math.round(Number(close) * 100) / 100) {
+                throw new common_1.BadRequestException(`盘后固定价格交易限以收盘价 ${Number(close).toFixed(2)} 申报`);
+            }
+            const result = await this.engine.submitClosingOrder({ userId, accountId: account.id, symbol, type: order_entity_1.OrderType.LIMIT, side, quantity, price: Number(Number(close).toFixed(2)) }, account, close);
+            if (!result.success) {
+                return { success: false, error: result.error };
+            }
+            return { success: true, order: result.order, fill: result.fill || null };
         }
         const result = await this.engine.submitOrder({ userId, accountId: account.id, symbol, type, side, quantity, price, triggerPrice, displayQty }, account);
         if (!result.success) {

@@ -55,6 +55,8 @@ let MarketService = class MarketService {
         // P1 开盘竞价：各市场最近一次竞价开盘价（dayOpen 基准合并用）+ 每市场当日竞价已执行标记
         this.lastAuctionPrices = {};
         this.lastAuctionDay = {};
+        // Phase B: 盘后固定价格交易窗口跟踪（按 gameDay 防重入）
+        this.lastAfterHoursDay = -1;
         // P4 新闻错峰队列：开盘/收盘生成的新闻按 tick 逐条播报，避免同一时刻扎堆
         this.newsQueue = { CN: [], HK: [], US: [] };
         // P0 时间尺度：TICK_INTERVAL_MS 控制每个行情 tick 的真实间隔（1000=高速回放 1秒1分钟，60000=实时分钟级），钳制 200~60000
@@ -90,6 +92,11 @@ let MarketService = class MarketService {
                 return;
             this.engine.updatePrices(prices);
             this.engine.setDayOpen(prices);
+            // Phase B: 昨收同步（涨跌停/委托价校验基准）
+            try {
+                this.engine.setPrevCloses(marketData.getPrevCloses());
+            }
+            catch (e) { }
             try {
                 this.engine.setVolatilities(marketData.getVolatilities());
             }
@@ -140,6 +147,26 @@ let MarketService = class MarketService {
     async processMarket(market, marketData, counterKey) {
         let advanceCounter = false;
         try {
+            // Phase B P1: 盘后固定价格交易窗口（仅 A 股 15:00-15:30）——不生成行情，下单由 HTTP 路径即时撮合；
+            // 跨过 15:30 后一次性撤销未成交盘后申报（每天一次，按 gameDay 防重入）
+            if (market === 'CN' && !this.debugMode.isMarketActive()) {
+                const afterStage = (0, constants_1.afterHoursStageFor)('CN');
+                if (afterStage === 'fixedPrice') {
+                    if (this.lastAfterHoursDay !== marketData.gameDay) {
+                        this.lastAfterHoursDay = marketData.gameDay;
+                    }
+                    return;
+                }
+                if (this.lastAfterHoursDay === marketData.gameDay) {
+                    this.lastAfterHoursDay = -1;
+                    try {
+                        await this.engine.cancelAfterHoursOrders();
+                    }
+                    catch (e) {
+                        this.logger.warn('盘后申报撤销失败: ' + (e && e.message ? e.message : e));
+                    }
+                }
+            }
             // P1 三阶段集合竞价（仅 A 股 9:15-9:30）：整个窗口不生成连续行情
             // 9:15-9:20 可申报可撤单 / 9:20-9:25 可申报不可撤 / 9:25-9:30 撮合（每天仅一次，9:25 起执行）
             const auctionStage = (0, constants_1.auctionStageFor)(market);
@@ -184,6 +211,15 @@ let MarketService = class MarketService {
             if (counter === 0) {
                 // SECURITY: 日初先重置 T+1 再撮合挂单，避免首 tick 触发卖单被误判 T+1 取消
                 await this.engine.resetBoughtToday();
+                // Phase B: 清理跨夜遗留的盘后申报（重启/异常兜底），并同步昨收（涨跌停基准）
+                try {
+                    await this.engine.cancelAfterHoursOrders();
+                }
+                catch (e) { }
+                try {
+                    this.engine.setPrevCloses(marketData.getPrevCloses());
+                }
+                catch (e) { }
                 // Phase A P0#3: exDay 开盘除权（在竞价前执行，保证开盘价/竞价价均为除权后口径）
                 try {
                     await marketData.applyExRights(marketData.gameDay);
@@ -392,7 +428,7 @@ let MarketService = class MarketService {
     async runOpeningAuctions(market, marketData) {
         const prevCloses = marketData.getPrevCloses();
         const auctionPrices = {};
-        const realFills = [];
+        const realFills = {};
         for (const symbol of Object.keys(prevCloses)) {
             let result;
             try {
@@ -407,17 +443,25 @@ let MarketService = class MarketService {
             auctionPrices[symbol] = result.auctionPrice;
             for (const f of result.fills) {
                 if (!f.virtual && f.orderId) {
-                    realFills.push(f);
+                    (realFills[symbol] = realFills[symbol] || []).push(f);
                 }
             }
             this.logger.log('🔔 [' + market + '] 开盘竞价: ' + symbol + ' @ ' + result.auctionPrice + '（成交 ' + Math.floor(result.fills.length / 2) + ' 对）');
         }
-        if (realFills.length > 0) {
+        // Phase B P1#11: 修复参数错位（原 settleCounterFills(market, realFills) 令 mode=数组、counterFills=undefined
+        // → 竞价成交从未结算）；改为按 symbol 两阶段结算：全量预校验→队列内逐条结算，失败挂单放回盘口恢复 PENDING
+        for (const [symbol, fills] of Object.entries(realFills)) {
             try {
-                await this.engine.settleCounterFills(market, realFills);
+                await this.engine.settleAuctionFills(symbol, fills);
             }
             catch (e) {
-                this.logger.warn('集合竞价结算失败: ' + ((e && e.message) || e));
+                this.logger.warn('集合竞价结算失败 ' + symbol + ': ' + ((e && e.message) || e));
+                try {
+                    await this.engine.rollbackAuctionFills(symbol, fills);
+                }
+                catch (e2) {
+                    this.logger.error('集合竞价回滚失败 ' + symbol + ': ' + ((e2 && e2.message) || e2));
+                }
             }
         }
         this.lastAuctionPrices[market] = auctionPrices;

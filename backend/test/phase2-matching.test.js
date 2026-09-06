@@ -123,7 +123,7 @@ describe('P2 OFI 动态滑点', () => {
   });
 
   test('OFI 计算：买压大 → 正 OFI', () => {
-    expect(m.calcBookOFI(m.orderBooks.get('T1'))).toBeCloseTo((800 - 200) / 1000, 10);
+    expect(m.calcBookOFI('T1')).toBeCloseTo((800 - 200) / 1000, 10);
   });
 
   test('买方逆风（正 OFI）滑点步长大于顺风（负 OFI）', () => {
@@ -217,7 +217,7 @@ describe('P2 止损单簿记（触发审计/无流动性重试/超限取消）',
   }
 
   test('触发转市价成交：审计记录 triggered → filled', async () => {
-    const stop = { id: 'S1', accountId: 'AC1', userId: 'U1', symbol: 'T1', type: 'stop', side: 'buy', quantity: 100, price: null, triggerPrice: 10.0, filledQty: 0, status: 'pending' };
+    const stop = { id: 'S1', accountId: 'AC1', userId: 'U1', symbol: 'T1', type: 'stop', side: 'buy', quantity: 100, price: null, triggerPrice: 10.0, filledQty: 0, status: 'pending', postClose: false };
     const { engine, orderRepo } = makeEngine([stop]);
     engine.placeRestingOrder('T1', 'o1', 'A9', 'sell', 10.4, 100);
     const fills = await engine.checkPendingOrders();
@@ -232,7 +232,7 @@ describe('P2 止损单簿记（触发审计/无流动性重试/超限取消）',
   });
 
   test('触发后封板无流动性：保留订单并计数重试，10 次后取消', async () => {
-    const stop = { id: 'S2', accountId: 'AC1', userId: 'U1', symbol: 'T1', type: 'stop', side: 'buy', quantity: 100, price: null, triggerPrice: 10.0, filledQty: 0, status: 'pending' };
+    const stop = { id: 'S2', accountId: 'AC1', userId: 'U1', symbol: 'T1', type: 'stop', side: 'buy', quantity: 100, price: null, triggerPrice: 10.0, filledQty: 0, status: 'pending', postClose: false };
     const { engine, orderRepo } = makeEngine([stop]);
     engine.prices.set('T1', 11);
     engine.setDayOpen({ T1: 10 });
@@ -254,7 +254,7 @@ describe('P2 止损单簿记（触发审计/无流动性重试/超限取消）',
   });
 
   test('止损限价触发后按限价撮合（审计 convertTo=limit）', async () => {
-    const stopLimit = { id: 'S3', accountId: 'AC1', userId: 'U1', symbol: 'T1', type: 'stop-limit', side: 'buy', quantity: 100, price: 10.5, triggerPrice: 10.0, filledQty: 0, status: 'pending' };
+    const stopLimit = { id: 'S3', accountId: 'AC1', userId: 'U1', symbol: 'T1', type: 'stop-limit', side: 'buy', quantity: 100, price: 10.5, triggerPrice: 10.0, filledQty: 0, status: 'pending', postClose: false };
     const { engine, orderRepo } = makeEngine([stopLimit]);
     engine.placeRestingOrder('T1', 'o1', 'A9', 'sell', 10.4, 100);
     const fills = await engine.checkPendingOrders();

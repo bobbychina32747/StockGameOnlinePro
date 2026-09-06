@@ -83,6 +83,8 @@ export function OrderPanel() {
   // 管理员调试模式（休市忽略）+ 全服休市交易：服务端放行时前端同步解锁下单按钮
   const debugMode = useUIStore((s) => s.debugMode);
   const debugGlobal = useUIStore((s) => s.debugGlobal);
+  // Phase B: 盘后固定价格交易窗口（CN 15:00-15:30）：解锁限价申报，价格强制=收盘价
+  const postCloseTrading = useUIStore((s) => s.postCloseTrading);
   const [marketOpen, setMarketOpen] = useState(isTradingTimeFor(mode));
   // P1 三阶段竞价：9:15-9:20 可申报可撤 / 9:20-9:25 可申报不可撤 / 9:25-9:30 撮合中不可申报
   const [auctionStage, setAuctionStage] = useState(auctionStageFor(mode));
@@ -96,7 +98,8 @@ export function OrderPanel() {
     return () => clearInterval(id);
   }, [mode]);
   const canPlaceAuction = auctionStage === 'cancelable' || auctionStage === 'locked';
-  const canSubmit = !orderSubmitting && !invalidQty && !overBudget && effPrice > 0 && (marketOpen || canPlaceAuction || debugMode || debugGlobal);
+  const inPostClose = postCloseTrading && mode === 'CN' && !marketOpen && !canPlaceAuction;
+  const canSubmit = !orderSubmitting && !invalidQty && !overBudget && effPrice > 0 && (marketOpen || canPlaceAuction || inPostClose || debugMode || debugGlobal);
 
   // ─── 下单 ───
   const placeOrder = async () => {
@@ -116,12 +119,15 @@ export function OrderPanel() {
     }
     setOrderSubmitting(true);
     try {
+      // Phase B: 盘后窗口内强制限价 + 价格=收盘价（服务端二次校验，此处锁定输入口径）
+      const effType = inPostClose ? 'limit' : orderType;
+      const effOrderPrice = inPostClose ? Number(livePrice.toFixed(2)) : (orderPrice ? parseFloat(orderPrice) : undefined);
       const result = await tradingApi.placeOrder(mode, {
         symbol: selectedSymbol,
-        type: orderType,
+        type: effType,
         side: orderSide,
         quantity: orderQty,
-        price: orderPrice ? parseFloat(orderPrice) : undefined,
+        price: effOrderPrice,
         triggerPrice: orderTriggerPrice ? parseFloat(orderTriggerPrice) : undefined,
         displayQty: orderType === 'iceberg' ? parseInt(orderDisplayQty) : undefined,
       });

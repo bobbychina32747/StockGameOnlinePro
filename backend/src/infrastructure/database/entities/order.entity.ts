@@ -116,6 +116,11 @@ __decorate([
     (0, typeorm_1.Column)({ default: 0 }),
     __metadata("design:type", Number)
 ], Order.prototype, "triggerRetries", void 0);
+// Phase B: 盘后固定价格交易标记（15:00-15:30 收盘价撮合，15:30 未成交自动撤销）
+__decorate([
+    (0, typeorm_1.Column)({ default: false }),
+    __metadata("design:type", Boolean)
+], Order.prototype, "postClose", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
