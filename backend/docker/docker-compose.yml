@@ -1,0 +1,42 @@
+# Phase D：数据卷 + .env 注入 + healthcheck + restart（这些不属于 Dockerfile 职责）
+# 用法：docker compose -f backend/docker/docker-compose.yml up -d --build
+services:
+  backend:
+    build:
+      context: ..          # = backend/（与 Dockerfile 内 COPY 相对路径一致）
+      dockerfile: docker/Dockerfile.backend
+    container_name: sgp-backend
+    restart: unless-stopped
+    env_file:
+      - ../.env            # = backend/.env（PORT/JWT/ADMIN；无 DB_TYPE/SQLITE_PATH → 默认 better-sqlite3 ./data/stockgame.db）
+    environment:
+      - TRUST_PROXY=1      # 前面有 nginx 反代：限流/日志需真实客户端 IP
+    ports:
+      - "8000:8000"
+    volumes:
+      # SQLITE_PATH 默认 ./data/stockgame.db，后端 CWD=/app → 挂 /app/data
+      - sgp-data:/app/data
+      # 想直接复用本机开发库（backend/data）时改用：
+      # - ../data:/app/data
+    healthcheck:
+      # teams 定稿：公开无认证端点（Swagger 交互文档仅 development 挂载，生产不可依赖）
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/api/market/prices", "||", "exit", "1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ../../frontend   # backend/docker 上溯两级 = 仓库根/frontend
+      dockerfile: Dockerfile    # frontend/Dockerfile
+    container_name: sgp-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  sgp-data:

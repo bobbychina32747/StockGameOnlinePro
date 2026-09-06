@@ -3,7 +3,8 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json tsconfig.json ./
+# Phase D 修复①：npm ci 必须有 package-lock.json（原缺导致 ci 报错）
+COPY package.json package-lock.json tsconfig.json ./
 RUN npm ci
 
 COPY src/ ./src/
@@ -16,7 +17,8 @@ WORKDIR /app
 
 RUN apk add --no-cache tini
 
-COPY package.json ./
+# runner 阶段 npm ci --omit=dev 同样需要 lockfile
+COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
@@ -24,4 +26,5 @@ COPY --from=builder /app/dist ./dist
 EXPOSE 8000
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "dist/main"]
+# Phase D 修复②：tsconfig rootDir="." → 产物在 dist/src/，见 package.json start 脚本
+CMD ["node", "dist/src/main.js"]

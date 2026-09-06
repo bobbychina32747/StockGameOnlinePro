@@ -1,0 +1,11 @@
+# backend/.dockerignore（构建上下文 = backend/）
+node_modules
+dist
+dist.bak
+data
+data.bak
+test
+tools
+scripts
+.env
+*.log
