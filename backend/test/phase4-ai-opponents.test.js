@@ -76,7 +76,7 @@ describe('P4 AI 对手盘定义与绩效记账', () => {
 
 describe('P4 行情引擎集成（AI 对手盘绩效与订单流信号）', () => {
   function makeService() {
-    const s = new MarketDataService(null, null, null, 'CN');
+    const s = new MarketDataService(null, null, null, null, 'CN');
     s.stocks.set('T1', {
       symbol: 'T1', name: '测试', industry: '银行', market: 'CN', price: 10, intrinsic: 10,
       volatility: 0.02, lastReturn: 0, prevClose: 10, dayOpen: 10, dayHigh: 10, dayLow: 10,

@@ -97,7 +97,7 @@ describe('P2 冰山单', () => {
     const accountRepo = fakeRepo([{ id: 'AC1', cash: 1000000, marketMode: 'CN', totalTrades: 0, shortCollateral: 0 }]);
     const posRepo = fakeRepo();
     const txRepo = fakeRepo();
-    const engine = new TradingEngineService(orderRepo, accountRepo, posRepo, txRepo);
+    const engine = new TradingEngineService(orderRepo, accountRepo, posRepo, txRepo, null);
     engine.prices.set('T1', 10);
     const r = await engine.submitOrder({ userId: 'U1', accountId: 'AC1', symbol: 'T1', type: 'iceberg', side: 'buy', quantity: 300, price: 10.0, displayQty: 100 }, { id: 'AC1', cash: 1000000, marketMode: 'CN' });
     expect(r.success).toBe(true);
@@ -142,10 +142,10 @@ describe('P2 OFI 动态滑点', () => {
     expect(stressed).toBeGreaterThan(calm);
   });
 
-  test('总滑点上限 2%（大单部分成交，均价不超过 anchor×1.02）', () => {
+  test('总滑点上限 2%：触顶后按触顶价兜底成交（Phase A：市价单全部成交不丢量）', () => {
     const fill = m.executeMarketOrder('T1', 'buy', 50000, 'BUYER');
-    // 合成 400 全吃；滑点步长 0.0008×(1+2.2×0.6)=0.001856 → 11 档×500=5500，随后 slip 触顶 2% 停止
-    expect(fill.filledQuantity).toBe(5900);
+    // 合成档全吃；滑点逐档恶化至 2% 触顶后，剩余量按触顶价兜底成交（不再静默丢弃）
+    expect(fill.filledQuantity).toBe(50000);
     expect(fill.avgPrice).toBeGreaterThan(10.02);
     expect(fill.avgPrice).toBeLessThanOrEqual(10.02 * 1.02 + 1e-6);
   });
@@ -211,7 +211,7 @@ describe('P2 止损单簿记（触发审计/无流动性重试/超限取消）',
     const accountRepo = fakeRepo([account]);
     const posRepo = fakeRepo();
     const txRepo = fakeRepo();
-    const engine = new TradingEngineService(orderRepo, accountRepo, posRepo, txRepo);
+    const engine = new TradingEngineService(orderRepo, accountRepo, posRepo, txRepo, null);
     engine.prices.set('T1', 10);
     return { engine, orderRepo };
   }

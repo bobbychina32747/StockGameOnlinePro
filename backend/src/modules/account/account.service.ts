@@ -12,6 +12,9 @@ var __param = function (paramIndex, decorator) {
 };
 import common_1 = require("@nestjs/common");
 
+// Phase A: 重置防刷钱——RESET_ENABLED 开关（大赛期间关闭）
+import config_1 = require("@nestjs/config");
+
 import typeorm_1 = require("@nestjs/typeorm");
 
 import typeorm_2 = require("typeorm");
@@ -21,6 +24,11 @@ import account_entity_1 = require("../../infrastructure/database/entities/accoun
 import position_entity_1 = require("../../infrastructure/database/entities/position.entity");
 import transaction_entity_1 = require("../../infrastructure/database/entities/transaction.entity");
 
+// Phase A: 重置防刷钱——基金持仓/未成交挂单一票否决 + 审计
+import fund_holding_entity_1 = require("../../infrastructure/database/entities/fund-holding.entity");
+import order_entity_1 = require("../../infrastructure/database/entities/order.entity");
+import reset_audit_log_entity_1 = require("../../infrastructure/database/entities/reset-audit-log.entity");
+
 import risk_manager_service_1 = require("../../core/risk-manager/risk-manager.service");
 
 import trading_engine_service_1 = require("../../core/trading-engine/trading-engine.service");
@@ -29,12 +37,16 @@ import constants_1 = require("../../common/constants");
 
 let AccountService = class AccountService {
     [key: string]: any;
-    constructor(accountRepo, positionRepo, transactionRepo, riskManager, engine) {
+    constructor(accountRepo, positionRepo, transactionRepo, fundHoldingRepo, orderRepo, resetAuditRepo, riskManager, engine, config) {
         this.accountRepo = accountRepo;
         this.positionRepo = positionRepo;
         this.transactionRepo = transactionRepo;
+        this.fundHoldingRepo = fundHoldingRepo;
+        this.orderRepo = orderRepo;
+        this.resetAuditRepo = resetAuditRepo;
         this.riskManager = riskManager;
         this.engine = engine;
+        this.config = config;
         this.logger = new common_1.Logger(AccountService.name);
     }
     async getAccount(userId, mode = 'US') {
@@ -115,6 +127,11 @@ let AccountService = class AccountService {
         const cfg = presets[preset];
         if (!cfg)
             throw new common_1.BadRequestException('未知的角色预设');
+        // Phase A: 大赛进行中（RESET_ENABLED=false）禁止重置，保证赛季公平
+        const resetEnabled = String(this.config && this.config.get ? this.config.get('RESET_ENABLED', 'true') : 'true') === 'true';
+        if (!resetEnabled) {
+            return { success: false, error: '大赛进行中，账户重置已关闭' };
+        }
         // SECURITY: 重置必须走结算互斥队列，防止与成交结算交叉丢失更新
         if (!this.engine) {
             throw new common_1.ServiceUnavailableException('交易引擎不可用');
@@ -126,6 +143,26 @@ let AccountService = class AccountService {
             if (positions.length > 0) {
                 return { success: false, error: '存在持仓，无法重置账户（请先平仓）' };
             }
+            // Phase A P0#1: 基金份额是独立资产，持有时重置=申购→重置→赎回无限刷钱，一票否决
+            const fundHoldings = await this.fundHoldingRepo.find({ where: { userId, marketMode: mode } });
+            const fundValue = fundHoldings.reduce((s, h) => s + Number(h.shares || 0) * 1, 0);
+            if (fundHoldings.some((h) => Number(h.shares || 0) > 0)) {
+                return { success: false, error: '存在基金持仓，无法重置账户（请先赎回全部基金）' };
+            }
+            // Phase A P0#1: 挂单会被 checkPendingOrders 成交成持仓，是绕过"无持仓"检查的时序窗口，必须同步禁止
+            const pending = await this.orderRepo.find({ where: { accountId: account.id, status: order_entity_1.OrderStatus.PENDING } });
+            if (pending.length > 0) {
+                return { success: false, error: '存在未成交挂单，无法重置账户（请先撤单）' };
+            }
+            // Phase A: 冷却 1 个游戏日（按账户 currentDay 持久化，防排行榜/赛季刷分）
+            const lastResetDay = Number(account.lastResetDay || 0);
+            const currentDay = Number(account.currentDay || 0);
+            if (currentDay <= lastResetDay) {
+                return { success: false, error: '重置过于频繁，请下一个交易日后再试' };
+            }
+            const prevCash = Number(account.cash);
+            const prevEquity = Number(account.totalEquity);
+            const prevPeak = Number(account.peakEquity);
             account.cash = cfg.cash;
             account.leverage = cfg.leverage;
             account.totalEquity = cfg.cash;
@@ -137,8 +174,21 @@ let AccountService = class AccountService {
             account.marginUsed = 0;
             // SECURITY: 冻结保证金必须归零（原实现遗留 shortCollateral 导致资金永久冻结）
             account.shortCollateral = 0;
-            // 注：基金持仓（FundHolding）不在本服务管理范围，重置不涉及基金份额
+            account.lastResetDay = currentDay;
+            account.resetCount = (Number(account.resetCount) || 0) + 1;
             await this.accountRepo.save(account);
+            // Phase A: 审计落库（重置前后资金状态可追溯）
+            try {
+                await this.resetAuditRepo.save(this.resetAuditRepo.create({
+                    userId, marketMode: mode, preset,
+                    prevCash, prevEquity, prevPeak,
+                    fundValueAtReset: fundValue,
+                }));
+            }
+            catch (e) {
+                this.logger.warn('重置审计落库失败: ' + (e && e.message ? e.message : e));
+            }
+            this.logger.warn(`账户重置: user=${userId} ${mode} ${preset}（第 ${account.resetCount} 次，前资产 ¥${prevEquity.toFixed(2)}）`);
             return { success: true, account };
         });
     }
@@ -203,11 +253,18 @@ AccountService = __decorate(
     __param(0, (0, typeorm_1.InjectRepository)(account_entity_1.Account)),
     __param(1, (0, typeorm_1.InjectRepository)(position_entity_1.Position)),
     __param(2, (0, typeorm_1.InjectRepository)(transaction_entity_1.Transaction)),
+    __param(3, (0, typeorm_1.InjectRepository)(fund_holding_entity_1.FundHolding)),
+    __param(4, (0, typeorm_1.InjectRepository)(order_entity_1.Order)),
+    __param(5, (0, typeorm_1.InjectRepository)(reset_audit_log_entity_1.ResetAuditLog)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
+        typeorm_2.Repository,
+        typeorm_2.Repository,
+        typeorm_2.Repository,
         risk_manager_service_1.RiskManagerService,
-        trading_engine_service_1.TradingEngineService])
+        trading_engine_service_1.TradingEngineService,
+        config_1.ConfigService])
 ],
 AccountService
 );

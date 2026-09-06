@@ -19,6 +19,7 @@ jobs:
       PORT: '8000'
       SQLITE_PATH: ./data/ci-smoke.db
       TICK_INTERVAL_MS: '1000'
+      SANDBOX_FAST: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

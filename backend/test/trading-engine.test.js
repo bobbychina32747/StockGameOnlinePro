@@ -5,7 +5,7 @@ describe('TradingEngineService 核心逻辑', () => {
 
   beforeEach(() => {
     // 构造器只初始化内存结构（orderBooks/prices），不访问 repository
-    engine = new TradingEngineService(null, null, null, null);
+    engine = new TradingEngineService(null, null, null, null, null);
   });
 
   describe('calcFees 三市场费率', () => {

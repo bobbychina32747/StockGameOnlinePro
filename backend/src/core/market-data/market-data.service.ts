@@ -20,6 +20,9 @@ import stock_entity_1 = require("../../infrastructure/database/entities/stock.en
 
 import kline_entity_1 = require("../../infrastructure/database/entities/kline.entity");
 
+// Phase A: 分红事件落库（除权/发息持久化，防重启丢失）
+import dividend_event_entity_1 = require("../../infrastructure/database/entities/dividend-event.entity");
+
 import constants_1 = require("../../common/constants");
 
 import trading_engine_service_1 = require("../trading-engine/trading-engine.service");
@@ -37,10 +40,11 @@ let klineDedupDone = false;
 
 let MarketDataService = class MarketDataService {
     [key: string]: any;
-    constructor(stockRepo, klineRepo, engine, market = 'CN') {
+    constructor(stockRepo, klineRepo, dividendEventRepo, engine, market = 'CN') {
         this.stockRepo = stockRepo;
         this.market = market; // 三服务器：CN/HK/US 独立实例
         this.klineRepo = klineRepo;
+        this.dividendEventRepo = dividendEventRepo;
         this.engine = engine;
         this.logger = new common_1.Logger(MarketDataService.name);
         this.stocks = new Map<string, any>();
@@ -97,6 +101,22 @@ let MarketDataService = class MarketDataService {
     async init() {
         for (const f of constants_1.FACTOR_NAMES) {
             this.factors[f] = -0.02 + Math.random() * 0.04;
+        }
+        // Phase A: 加载未执行除权的分红事件（重启恢复 exDay 队列，防止丢除权/发息）
+        try {
+            if (this.dividendEventRepo) {
+                const pending = await this.dividendEventRepo.find({ where: { applied: false } });
+                for (const e of pending) {
+                    const list = this.dividends.get(e.symbol) || [];
+                    list.push({ id: e.id, perShare: Number(e.perShare), announceDay: Number(e.announceDay), exDay: Number(e.exDay), applied: !!e.applied });
+                    this.dividends.set(e.symbol, list);
+                }
+                if (pending.length > 0)
+                    this.logger.log('💧 已恢复 ' + pending.length + ' 条待除权分红事件');
+            }
+        }
+        catch (e) {
+            this.logger.warn('分红事件加载跳过: ' + (e && e.message ? e.message : e));
         }
         // 迁移：旧库补 industry/code/listDate/description 列（SQLite ALTER，幂等）
         const migrateCols = [
@@ -1804,31 +1824,73 @@ let MarketDataService = class MarketDataService {
             this.industryCycles.set(cfg.industry, fundamentals_1.randomCyclePhase());
         }
     }
-    // 分红：财报季记录（除权 + 持仓现金到账）
-    recordDividend(symbol, perShare, day) {
+    // 分红：财报日登记（announceDay），除权在 exDay 开盘执行，发息按 exDay-1 收盘持仓快照
+    // Phase A P0#3: 修复"除权日买入白拿全额股息"的无风险套利——A股式：登记日（exDay-1）收盘持有者享息
+    recordDividend(symbol, perShare, announceDay) {
+        const exDay = Number(announceDay) + 1;
+        const ev: any = { perShare: Number(perShare), announceDay: Number(announceDay), exDay, applied: false };
         const list = this.dividends.get(symbol) || [];
-        list.push({ perShare, day });
+        list.push(ev);
         this.dividends.set(symbol, list);
-        // 除权：股价下调
-        const st = this.stocks.get(symbol);
-        if (st) {
-            const before = Number(st.price);
-            st.price = Math.max(0.5, before - perShare);
-            // P1 复权：累计前复权因子（除权当日起历史价格按新因子折算，消除分红跳空）
-            if (before > 0) {
-                const info = this.adjFactors.get(symbol) || { factor: 1, series: [] };
-                info.factor = info.factor * (st.price / before);
-                info.series.push({ day: Number(day), factor: info.factor });
-                this.adjFactors.set(symbol, info);
+        // 落库防重启丢失（除权/发息事件持久化，幂等 UNIQUE(symbol, exDay) 冲突时忽略）
+        try {
+            this.dividendEventRepo.save(this.dividendEventRepo.create({
+                symbol, perShare: Number(perShare), announceDay: Number(announceDay), exDay, applied: false,
+            })).then((row) => { if (row && row.id) ev.id = row.id; }).catch(() => undefined);
+        }
+        catch (e) {
+            this.logger.warn('分红事件落库失败: ' + (e && e.message ? e.message : e));
+        }
+        return ev;
+    }
+    // Phase A: exDay 开盘除权——调价 + 前复权因子（原 recordDividend 即时调价逻辑迁移至此，
+    // 由 market.service 在每个游戏日 counter===0 竞价前调用）
+    async applyExRights(gameDay) {
+        let applied = 0;
+        const appliedIds = [];
+        for (const [symbol, list] of this.dividends.entries()) {
+            const st = this.stocks.get(symbol);
+            if (!st)
+                continue; // 其他市场的分红事件由对应市场实例处理
+            for (const ev of list) {
+                if (ev.applied || Number(ev.exDay) !== Number(gameDay))
+                    continue;
+                const before = Number(st.price);
+                st.price = Math.max(0.5, before - Number(ev.perShare));
+                // P1 复权：累计前复权因子（除权当日起历史价格按新因子折算，消除分红跳空）
+                if (before > 0) {
+                    const info = this.adjFactors.get(symbol) || { factor: 1, series: [] };
+                    info.factor = info.factor * (st.price / before);
+                    info.series.push({ day: Number(gameDay), factor: info.factor });
+                    this.adjFactors.set(symbol, info);
+                }
+                ev.applied = true;
+                applied++;
+                if (ev.id)
+                    appliedIds.push(ev.id);
             }
         }
+        if (appliedIds.length > 0) {
+            try {
+                // 按 id 精确标记，避免误标其他市场同 exDay 的事件
+                for (const id of appliedIds) {
+                    await this.dividendEventRepo.update({ id }, { applied: true });
+                }
+            }
+            catch (e) {
+                this.logger.warn('分红除权状态落库失败: ' + (e && e.message ? e.message : e));
+            }
+        }
+        if (applied > 0)
+            this.logger.log('💧 除权执行: ' + applied + ' 只股票（第 ' + gameDay + ' 个交易日）');
+        return applied;
     }
     getDividends(day) {
         const out = [];
         for (const [symbol, list] of this.dividends.entries()) {
             for (const d of list) {
-                if (d.day === day)
-                    out.push({ symbol, perShare: d.perShare });
+                if (Number(d.exDay) === Number(day))
+                    out.push({ symbol, perShare: d.perShare, day: d.exDay });
             }
         }
         return out;
@@ -1886,8 +1948,10 @@ MarketDataService = __decorate(
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(stock_entity_1.Stock)),
     __param(1, (0, typeorm_1.InjectRepository)(kline_entity_1.Kline)),
-    __param(2, (0, common_1.Optional)()),
+    __param(2, (0, typeorm_1.InjectRepository)(dividend_event_entity_1.DividendEvent)),
+    __param(3, (0, common_1.Optional)()),
     __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
         typeorm_2.Repository,
         trading_engine_service_1.TradingEngineService])
 ],

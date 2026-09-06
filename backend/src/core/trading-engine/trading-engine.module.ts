@@ -16,6 +16,9 @@ import position_entity_1 = require("../../infrastructure/database/entities/posit
 
 import transaction_entity_1 = require("../../infrastructure/database/entities/transaction.entity");
 
+// Phase A: 分红登记日持仓快照
+import dividend_snapshot_entity_1 = require("../../infrastructure/database/entities/dividend-snapshot.entity");
+
 import trading_engine_service_1 = require("./trading-engine.service");
 
 let TradingEngineModule = class TradingEngineModule {
@@ -28,7 +31,7 @@ TradingEngineModule = __decorate(
 [
     (0, common_1.Global)(),
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([order_entity_1.Order, account_entity_1.Account, position_entity_1.Position, transaction_entity_1.Transaction])],
+        imports: [typeorm_1.TypeOrmModule.forFeature([order_entity_1.Order, account_entity_1.Account, position_entity_1.Position, transaction_entity_1.Transaction, dividend_snapshot_entity_1.DividendSnapshot])],
         providers: [trading_engine_service_1.TradingEngineService],
         exports: [trading_engine_service_1.TradingEngineService],
     })

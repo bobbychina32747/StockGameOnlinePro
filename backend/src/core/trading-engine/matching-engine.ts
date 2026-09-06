@@ -350,6 +350,13 @@ export class MatchingEngine {
                     remaining -= tranche;
                     slip = Math.min(0.02, slip + step);
                 }
+                // Phase A P0#5: 滑点触顶后剩余量按触顶价兜底成交（真实交易所市价单不计价格全部成交），
+                // 杜绝"剩余量静默丢弃"叠加强平清零持仓导致的资产蒸发
+                if (remaining > 0) {
+                    totalCost += remaining * anchor * (1 + dirMul * 0.02);
+                    totalQty += remaining;
+                    remaining = 0;
+                }
             }
         }
         if (totalQty === 0)
@@ -541,6 +548,15 @@ export class MatchingEngine {
                     totalQty += tranche;
                     remaining -= tranche;
                     slip = Math.min(0.02, slip + step);
+                }
+                // Phase A P0#5: 滑点触顶后剩余量按触顶价兜底成交（仍受限价约束，FOK/IOC 语义不变）
+                if (remaining > 0) {
+                    const capPrice = anchor * (1 + dirMul * 0.02);
+                    if (isBuy ? capPrice <= limitPrice : capPrice >= limitPrice) {
+                        totalCost += remaining * capPrice;
+                        totalQty += remaining;
+                        remaining = 0;
+                    }
                 }
             }
         }

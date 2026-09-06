@@ -4,6 +4,24 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase A 资金与正确性修复（评审 P0 全量）
+
+### Fixed
+- **账户重置无限刷钱**：重置仅检查股票持仓，基金份额是独立资产被绕过（申购零费率基金→重置→赎回=资金复制）。现在基金持仓>0、存在 PENDING 挂单均一票否决；新增 1 游戏日冷却（lastResetDay 持久化）、RESET_ENABLED 环境开关（大赛期关闭）、reset_audit_logs 审计表与 resetCount（`account.service.ts`）
+- **止损限价单（STOP_LIMIT）触发前即成交**：带 price 的单立即入盘口交叉撮合，无视 triggerPrice。现在 STOP_LIMIT 提交不入盘口，仅由 checkPendingOrders 在触发价满足后转限价撮合（`trading-engine.service.ts`）
+- **分红当日除权+当日持仓发息的无风险套利**：改为 A股式快照口径——财报日仅登记（dividend_events 落库防重启丢失），exDay 开盘除权（竞价前执行），exDay-1 收盘拍持仓快照（dividend_snapshots），exDay 盘后按快照发息；净空头按每股扣息（负 DIVIDEND 流水）；paid 幂等防重复发放（`market-data.service.ts` + `trading-engine.service.ts` + `market.service.ts`）
+- **强平/追保吞对手挂单且并发丢写**：不走结算队列、不结算对手方、部分成交仍清零持仓。现在 forceLiquidate/forceLiquidateToTarget 进入 runExclusive 队列，队列内重读账户，settleCounterFillsInner 结算对手单（失败回滚盘口），自成交防护（excludeAccountId），持仓按实际成交量扣减、剩余保留，冻结保证金按平仓比例释放
+- **市价单滑点触顶后剩余量静默丢弃**：触顶后剩余量按 2% 触顶价兜底成交（FOK/IOC 仍受限价约束），与强平修复联动杜绝资产蒸发（`matching-engine.ts`）
+
+### Changed
+- **行情档位默认真实分钟级**：TICK_INTERVAL_MS 默认 60000（.env.example 与代码常量同步）；<60000 必须显式 SANDBOX_FAST=true 否则拒绝启动（快档日息/IPO/分红按游戏日加速，须自知为沙盒演示）；新增 `start-fast.bat` 一键快档；CI 冒烟补 SANDBOX_FAST
+- **开盘竞价按游戏日对齐**：lastAuctionDay 由真实日期改为 gameDay 键，修复快档下一天 60 个游戏日却只有一次竞价、竞价与游戏日脱节
+- 前端账户重置加 window.confirm 确认 + 服务端拒绝原因分支提示（原无条件弹成功）
+
+### Added
+- 新实体：dividend_events / dividend_snapshots / reset_audit_logs；accounts 表新增 lastResetDay/resetCount（TypeORM synchronize 自动迁移）
+- 新增测试 `phase7-money-safety.test.js`（止损限价触发语义/市价兜底/强平部分成交与对手结算/自成交防护/分红快照发息与幂等/空头扣息/重置防刷钱攻击链 15 例），后端 166→181
+
 ## [Unreleased] - Phase 6 回测平台升级
 
 ### Added

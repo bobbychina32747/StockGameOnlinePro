@@ -5,7 +5,7 @@ describe('TradingEngineService 真实订单簿（P0）', () => {
   let engine;
 
   beforeEach(() => {
-    engine = new TradingEngineService(null, null, null, null);
+    engine = new TradingEngineService(null, null, null, null, null);
     // 合成深度：模拟 refreshOrderBook 产出（买一 9.9 / 卖一 10.0 附近五档）
     engine.orderBooks.set('T1', {
       bids: [

@@ -26,10 +26,18 @@ import daily_snapshot_entity_1 = require("./entities/daily-snapshot.entity");
 
 import fund_holding_entity_1 = require("./entities/fund-holding.entity");
 
+// Phase A: 分红事件/快照 + 重置审计（防套利与刷钱可追溯）
+import dividend_event_entity_1 = require("./entities/dividend-event.entity");
+
+import dividend_snapshot_entity_1 = require("./entities/dividend-snapshot.entity");
+
+import reset_audit_log_entity_1 = require("./entities/reset-audit-log.entity");
+
 const entities = [
     user_entity_1.User, account_entity_1.Account, position_entity_1.Position, order_entity_1.Order,
     transaction_entity_1.Transaction, kline_entity_1.Kline, stock_entity_1.Stock, daily_snapshot_entity_1.DailySnapshot,
     fund_holding_entity_1.FundHolding,
+    dividend_event_entity_1.DividendEvent, dividend_snapshot_entity_1.DividendSnapshot, reset_audit_log_entity_1.ResetAuditLog,
 ];
 let DatabaseModule = class DatabaseModule {
     [key: string]: any;

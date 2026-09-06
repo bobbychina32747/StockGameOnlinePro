@@ -117,7 +117,7 @@ describe('P3 新闻影响衰减曲线', () => {
 
 describe('P3 行情引擎集成（null 依赖构造）', () => {
   function makeService() {
-    const s = new MarketDataService(null, null, null, 'CN');
+    const s = new MarketDataService(null, null, null, null, 'CN');
     s.stocks.set('T1', {
       symbol: 'T1', name: '测试', industry: '银行', price: 10, intrinsic: 10,
       volatility: 0.02, lastReturn: 0, prevClose: 10, dayOpen: 10, dayHigh: 10, dayLow: 10,

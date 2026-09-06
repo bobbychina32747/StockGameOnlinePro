@@ -5,7 +5,7 @@ describe('MarketDataService 行情引擎核心逻辑', () => {
 
   beforeEach(() => {
     // 构造器只初始化内存结构，不访问 repository；market='CN'
-    svc = new MarketDataService(null, null, null, 'CN');
+    svc = new MarketDataService(null, null, null, null, 'CN');
   });
 
   describe('clamp 边界钳制', () => {
@@ -88,25 +88,30 @@ describe('MarketDataService 行情引擎核心逻辑', () => {
     });
   });
 
-  describe('P1 复权因子', () => {
-    test('分红除权后累计复权因子并记录事件序列', () => {
+  describe('P1 复权因子（Phase A: 除权在 exDay 开盘执行）', () => {
+    test('分红除权后累计复权因子并记录事件序列', async () => {
       svc.stocks.set('A', { symbol: 'A', price: 10 });
-      svc.recordDividend('A', 2, 5);
+      svc.recordDividend('A', 2, 5); // announceDay=5 → exDay=6
+      expect(svc.stocks.get('A').price).toBe(10); // 登记日不调价（Phase A 修复除权日套利）
+      await svc.applyExRights(6);
       expect(svc.stocks.get('A').price).toBe(8);
       const adj = svc.adjFactors.get('A');
       expect(adj.factor).toBeCloseTo(0.8, 6);
       expect(adj.series.length).toBe(1);
-      expect(adj.series[0].day).toBe(5);
+      expect(adj.series[0].day).toBe(6);
       expect(adj.series[0].factor).toBeCloseTo(0.8, 6);
     });
 
-    test('多次分红因子累乘', () => {
+    test('多次分红因子累乘（按 exDay 依次执行）', async () => {
       svc.stocks.set('B', { symbol: 'B', price: 10 });
-      svc.recordDividend('B', 1, 3);   // 9/10 = 0.9
-      svc.recordDividend('B', 4.5, 9); // 4.5/9 = 0.5 → 0.45
+      svc.recordDividend('B', 1, 3);   // exDay=4: 9/10 = 0.9
+      svc.recordDividend('B', 4.5, 9); // exDay=10: 4.5/9 = 0.5 → 0.45
+      await svc.applyExRights(4);
+      await svc.applyExRights(10);
       const adj = svc.adjFactors.get('B');
       expect(adj.factor).toBeCloseTo(0.45, 6);
       expect(adj.series.length).toBe(2);
+      expect(svc.stocks.get('B').price).toBeCloseTo(4.5, 6);
     });
   });
 

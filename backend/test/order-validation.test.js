@@ -6,7 +6,7 @@ describe('TradingEngineService.validateOrder 订单校验', () => {
 
   beforeEach(() => {
     positionRepo = { findOne: jest.fn().mockResolvedValue(null) };
-    engine = new TradingEngineService(null, null, positionRepo, null);
+    engine = new TradingEngineService(null, null, positionRepo, null, null);
     engine.prices.set('T1', 100);
   });
 

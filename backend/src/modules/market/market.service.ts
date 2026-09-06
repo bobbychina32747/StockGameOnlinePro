@@ -58,8 +58,12 @@ let MarketService = class MarketService {
         // P4 新闻错峰队列：开盘/收盘生成的新闻按 tick 逐条播报，避免同一时刻扎堆
         this.newsQueue = { CN: [], HK: [], US: [] };
         // P0 时间尺度：TICK_INTERVAL_MS 控制每个行情 tick 的真实间隔（1000=高速回放 1秒1分钟，60000=实时分钟级），钳制 200~60000
-        const rawInterval = Number(config && config.get ? config.get('TICK_INTERVAL_MS', 1000) : 1000);
-        this.tickIntervalMs = Math.min(Math.max(Number.isFinite(rawInterval) ? rawInterval : 1000, 200), 60000);
+        const rawInterval = Number(config && config.get ? config.get('TICK_INTERVAL_MS', 60000) : 60000);
+        this.tickIntervalMs = Math.min(Math.max(Number.isFinite(rawInterval) ? rawInterval : 60000, 200), 60000);
+        // Phase A: 快档（<60000）会令日息/IPO/分红按游戏日 60 倍速失真——必须显式 SANDBOX_FAST=true 确认沙盒演示，否则拒绝启动
+        if (this.tickIntervalMs < 60000 && String((config && config.get ? config.get('SANDBOX_FAST', '') : '') || '') !== 'true') {
+            throw new Error(`TICK_INTERVAL_MS=${this.tickIntervalMs} < 60000 为沙盒高速回放（日息/IPO/分红按游戏日加速，与真实市场口径不符）。如确认用于演示/调试，请在 .env 显式设置 SANDBOX_FAST=true 后重启（或改用 start-fast.bat）。`);
+        }
     }
     // S2 真实交易时段判断：周一至周五 9:30-11:30 / 13:00-15:00
     isTradingTime() {
@@ -141,9 +145,9 @@ let MarketService = class MarketService {
             const auctionStage = (0, constants_1.auctionStageFor)(market);
             if (!this.debugMode.isMarketActive() && auctionStage) {
                 if (auctionStage === 'matching') {
-                    const todayKey = new Date().toDateString();
-                    if (this.lastAuctionDay[market] !== todayKey) {
-                        this.lastAuctionDay[market] = todayKey;
+                    // Phase A: 竞价按游戏日键（原按真实日期——快档下一天 60 个游戏日却只有一次竞价，与游戏日脱节）
+                    if (this.lastAuctionDay[market] !== marketData.gameDay) {
+                        this.lastAuctionDay[market] = marketData.gameDay;
                         await this.runOpeningAuctions(market, marketData);
                     }
                 }
@@ -180,11 +184,17 @@ let MarketService = class MarketService {
             if (counter === 0) {
                 // SECURITY: 日初先重置 T+1 再撮合挂单，避免首 tick 触发卖单被误判 T+1 取消
                 await this.engine.resetBoughtToday();
+                // Phase A P0#3: exDay 开盘除权（在竞价前执行，保证开盘价/竞价价均为除权后口径）
+                try {
+                    await marketData.applyExRights(marketData.gameDay);
+                }
+                catch (e) {
+                    this.logger.warn(`[` + market + `] 除权执行异常: ` + (e && e.message ? e.message : e));
+                }
                 // P1 开盘集合竞价：按最大成交量原则形成开盘价并撮合交叉挂单（早于连续竞价）
                 // P2: 当日已在盘前窗口竞价过则跳过（每天仅一次）
-                const todayKey = new Date().toDateString();
-                if (this.lastAuctionDay[market] !== todayKey) {
-                    this.lastAuctionDay[market] = todayKey;
+                if (this.lastAuctionDay[market] !== marketData.gameDay) {
+                    this.lastAuctionDay[market] = marketData.gameDay;
                     await this.runOpeningAuctions(market, marketData);
                 }
             }
@@ -255,7 +265,9 @@ let MarketService = class MarketService {
             }
             if (counter === 239) { // 分红/夜间事件
                 try {
-                    await this.engine.payDividends(marketData.getDividends(marketData.gameDay));
+                    // Phase A P0#3: 先拍次日除权股票的登记日快照，再按快照发放当日 exDay 的分红（A股式口径）
+                    await this.engine.snapshotDividendHolders(marketData.getDividends(marketData.gameDay + 1), marketData.gameDay + 1, market);
+                    await this.engine.payDividends(marketData.getDividends(marketData.gameDay), marketData.gameDay);
                 } catch (e) {
                     this.logger.error(`分红发放失败: ${e.message}`);
                 }

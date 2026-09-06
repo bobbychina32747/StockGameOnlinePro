@@ -12,6 +12,9 @@ import stock_entity_1 = require("../../infrastructure/database/entities/stock.en
 
 import kline_entity_1 = require("../../infrastructure/database/entities/kline.entity");
 
+// Phase A: 分红事件落库
+import dividend_event_entity_1 = require("../../infrastructure/database/entities/dividend-event.entity");
+
 import trading_engine_service_1 = require("../trading-engine/trading-engine.service");
 
 import market_data_service_1 = require("./market-data.service");
@@ -26,25 +29,27 @@ MarketDataModule = __decorate(
 [
     (0, common_1.Global)(),
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([stock_entity_1.Stock, kline_entity_1.Kline])],
+        imports: [typeorm_1.TypeOrmModule.forFeature([stock_entity_1.Stock, kline_entity_1.Kline, dividend_event_entity_1.DividendEvent])],
         providers: [
             market_data_service_1.MarketDataService,
             // 三服务器：HK/US 独立 MarketDataService 实例（CN 用默认）
             {
                 provide: 'MarketDataHK',
-                useFactory: (stockRepo, klineRepo, engine) => new market_data_service_1.MarketDataService(stockRepo, klineRepo, engine, 'HK'),
+                useFactory: (stockRepo, klineRepo, dividendEventRepo, engine) => new market_data_service_1.MarketDataService(stockRepo, klineRepo, dividendEventRepo, engine, 'HK'),
                 inject: [
                     (0, typeorm_1.getRepositoryToken)(stock_entity_1.Stock),
                     (0, typeorm_1.getRepositoryToken)(kline_entity_1.Kline),
+                    (0, typeorm_1.getRepositoryToken)(dividend_event_entity_1.DividendEvent),
                     trading_engine_service_1.TradingEngineService,
                 ],
             },
             {
                 provide: 'MarketDataUS',
-                useFactory: (stockRepo, klineRepo, engine) => new market_data_service_1.MarketDataService(stockRepo, klineRepo, engine, 'US'),
+                useFactory: (stockRepo, klineRepo, dividendEventRepo, engine) => new market_data_service_1.MarketDataService(stockRepo, klineRepo, dividendEventRepo, engine, 'US'),
                 inject: [
                     (0, typeorm_1.getRepositoryToken)(stock_entity_1.Stock),
                     (0, typeorm_1.getRepositoryToken)(kline_entity_1.Kline),
+                    (0, typeorm_1.getRepositoryToken)(dividend_event_entity_1.DividendEvent),
                     trading_engine_service_1.TradingEngineService,
                 ],
             },

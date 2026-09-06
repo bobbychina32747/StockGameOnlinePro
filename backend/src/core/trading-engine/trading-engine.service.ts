@@ -24,17 +24,21 @@ import position_entity_1 = require("../../infrastructure/database/entities/posit
 
 import transaction_entity_1 = require("../../infrastructure/database/entities/transaction.entity");
 
+// Phase A: 分红登记日持仓快照（按快照发息封堵除权日套利）
+import dividend_snapshot_entity_1 = require("../../infrastructure/database/entities/dividend-snapshot.entity");
+
 import constants_1 = require("../../common/constants");
 
 import matching_engine_1 = require("./matching-engine");
 
 let TradingEngineService = class TradingEngineService {
     [key: string]: any;
-    constructor(orderRepo, accountRepo, positionRepo, txRepo) {
+    constructor(orderRepo, accountRepo, positionRepo, txRepo, dividendSnapshotRepo) {
         this.orderRepo = orderRepo;
         this.accountRepo = accountRepo;
         this.positionRepo = positionRepo;
         this.txRepo = txRepo;
+        this.dividendSnapshotRepo = dividendSnapshotRepo;
         this.logger = new common_1.Logger(TradingEngineService.name);
         // P2 撮合引擎独立成类：盘口/撮合/竞价纯逻辑全部在 MatchingEngine（可直接单测）
         this.matching = new matching_engine_1.MatchingEngine();
@@ -251,7 +255,9 @@ let TradingEngineService = class TradingEngineService {
         });
         const saved = await this.orderRepo.save(order);
         // P0 真实盘口：限价单挂入盘口队列（价格-时间优先）
-        if (orderData.price) {
+        // Phase A P0#2: STOP_LIMIT 带 price 但不能入盘口——否则无视 triggerPrice 被对手/竞价提前成交；
+        // 仅由 checkPendingOrders 在触发价满足后转限价撮合
+        if (orderData.price && orderData.type !== order_entity_1.OrderType.STOP_LIMIT) {
             // P2 冰山单：仅显示量上盘口，隐藏量在显示量成交后由撮合引擎逐档补量（同价队尾）
             this.placeRestingOrder(orderData.symbol, saved.id, orderData.accountId, orderData.side, orderData.price, orderData.quantity, isIceberg ? { displayQty, hiddenQty } : undefined);
             // 立即尝试撮合：挂单价与对手方真实挂单交叉时按对手价成交（价格改善）
@@ -679,42 +685,109 @@ let TradingEngineService = class TradingEngineService {
         log.push({ ...entry, at: new Date().toISOString() });
         order.triggerLog = JSON.stringify(log.slice(-20));
     }
-    // 玩法：分红现金到账（日终结算，按持仓数量发放）
-    async payDividends(dividends) {
-        return this.runExclusive(() => this.payDividendsInner(dividends));
-    }
-    async payDividendsInner(dividends) {
+    // Phase A P0#3: 分红按"登记日（exDay-1）收盘持仓快照"发放（A股式），封堵除权日买入套利；
+    // 净空头按每股扣息（真实市场做空者在除权日需支付股息）；paid 标记幂等防重复发放
+    async payDividends(dividends, exDay) {
         if (!dividends || dividends.length === 0)
             return 0;
-        const allPositions = await this.positionRepo.find({ relations: ['account'] });
+        return this.runExclusive(() => this.payDividendsInner(dividends, exDay));
+    }
+    async payDividendsInner(dividends, exDay) {
+        const symbols = dividends.map((d) => d.symbol);
+        const perShareBy = new Map<string, number>(dividends.map((d) => [String(d.symbol), Number(d.perShare)] as [string, number]));
+        const snaps = await this.dividendSnapshotRepo.find({ where: { exDay: Number(exDay), paid: false } });
         let paid = 0;
-        for (const pos of allPositions) {
-            const div = dividends.find((d) => d.symbol === pos.symbol);
-            if (!div)
+        for (const snap of snaps) {
+            if (!symbols.includes(snap.symbol))
                 continue;
-            const qty = (pos.longQty || 0) - (pos.shortQty || 0);
-            if (qty <= 0)
+            const perShare = perShareBy.get(snap.symbol);
+            if (perShare === undefined)
                 continue;
-            const amount = Number((qty * Number(div.perShare)).toFixed(2));
-            pos.account.cash = Number(pos.account.cash) + amount;
-            await this.accountRepo.save(pos.account);
-            // C3 分红进交易流水
-            try {
-                await this.txRepo.save(this.txRepo.create({
-                    accountId: pos.account.id,
-                    symbol: pos.symbol,
-                    side: 'DIVIDEND',
-                    quantity: qty,
-                    price: Number(div.perShare),
-                    turnover: amount,
-                    commission: 0, stampDuty: 0, transferFee: 0, totalFees: 0,
-                }));
+            const account = await this.accountRepo.findOne({ where: { id: snap.accountId } });
+            if (!account)
+                continue;
+            const netQty = Number(snap.longQty || 0) - Number(snap.shortQty || 0);
+            // 幂等：paid 标记在资金变动后落库；异常中断后重跑靠 paid=false 过滤 + 下方 save 兜底
+            if (netQty > 0) {
+                const amount = Number((netQty * perShare).toFixed(2));
+                account.cash = Math.round((Number(account.cash) + amount) * 100) / 100;
+                await this.accountRepo.save(account);
+                try {
+                    await this.txRepo.save(this.txRepo.create({
+                        accountId: snap.accountId,
+                        symbol: snap.symbol,
+                        side: 'DIVIDEND',
+                        quantity: netQty,
+                        price: perShare,
+                        turnover: amount,
+                        commission: 0, stampDuty: 0, transferFee: 0, totalFees: 0,
+                    }));
+                }
+                catch (e) { }
+                paid += amount;
+                this.logger.log(`💰 分红到账: ${snap.symbol} ${netQty}股 × ${perShare}元 = ${amount}元（快照口径）`);
             }
-            catch (e) { }
-            paid += amount;
-            this.logger.log(`💰 分红到账: ${pos.symbol} ${qty}股 × ${div.perShare}元 = ${amount}元`);
+            else if (netQty < 0) {
+                // 做空者除权日付息（真实市场规则），负数流水
+                const amount = Number((Math.abs(netQty) * perShare).toFixed(2));
+                account.cash = Math.round((Number(account.cash) - amount) * 100) / 100;
+                await this.accountRepo.save(account);
+                try {
+                    await this.txRepo.save(this.txRepo.create({
+                        accountId: snap.accountId,
+                        symbol: snap.symbol,
+                        side: 'DIVIDEND',
+                        quantity: netQty,
+                        price: perShare,
+                        turnover: -amount,
+                        commission: 0, stampDuty: 0, transferFee: 0, totalFees: 0,
+                    }));
+                }
+                catch (e) { }
+                this.logger.log(`💸 空头付息: ${snap.symbol} 净空 ${Math.abs(netQty)}股 × ${perShare}元 = ${amount}元（快照口径）`);
+            }
+            snap.paid = true;
+            await this.dividendSnapshotRepo.save(snap);
         }
         return paid;
+    }
+    // Phase A: 登记日（exDay-1）收盘为次日除权的股票拍持仓快照（本市场 mode 的账户）
+    async snapshotDividendHolders(dividends, exDay, mode) {
+        if (!dividends || dividends.length === 0)
+            return 0;
+        const symbols = dividends.map((d) => d.symbol);
+        return this.runExclusive(async () => {
+            const positions = await this.positionRepo.find({ relations: ['account'] });
+            let created = 0;
+            for (const pos of positions) {
+                if (!pos.account || pos.account.marketMode !== mode)
+                    continue;
+                if (!symbols.includes(pos.symbol))
+                    continue;
+                const existing = await this.dividendSnapshotRepo.findOne({ where: { accountId: pos.accountId, symbol: pos.symbol, exDay: Number(exDay) } });
+                if (existing) {
+                    // 幂等：已存在则更新为最新收盘持仓（重复日终不会拍错）
+                    existing.longQty = Number(pos.longQty || 0);
+                    existing.shortQty = Number(pos.shortQty || 0);
+                    await this.dividendSnapshotRepo.save(existing);
+                    continue;
+                }
+                if (Number(pos.longQty || 0) <= 0 && Number(pos.shortQty || 0) <= 0)
+                    continue; // 无持仓不拍快照
+                await this.dividendSnapshotRepo.save(this.dividendSnapshotRepo.create({
+                    accountId: pos.accountId,
+                    symbol: pos.symbol,
+                    exDay: Number(exDay),
+                    longQty: Number(pos.longQty || 0),
+                    shortQty: Number(pos.shortQty || 0),
+                    paid: false,
+                }));
+                created++;
+            }
+            if (created > 0)
+                this.logger.log(`📸 分红快照: ${created} 条（${mode}，除权日 ${exDay}）`);
+            return created;
+        });
     }
     async getPendingOrders(accountId) {
         return this.orderRepo.find({
@@ -754,38 +827,98 @@ let TradingEngineService = class TradingEngineService {
         }
         return { safe: true, action: 'ok', marginLevel };
     }
+    // Phase A P0#4: 强平结算对手方挂单（队列内直调 settleFillInner，避免 settleFill 再入队死锁）；
+    // 对手方结算失败时把其挂单放回盘口，杜绝"被吃掉但无结算"的幽灵单
+    async settleCounterFillsInner(symbol, mode, counterFills) {
+        for (const cf of counterFills || []) {
+            if (cf.virtual || !cf.orderId)
+                continue;
+            const cfFill = {
+                symbol,
+                side: cf.side,
+                filledQuantity: cf.qty,
+                avgPrice: cf.price,
+                totalCost: Number((cf.qty * cf.price).toFixed(2)),
+            };
+            const r = await this.settleFillInner(cf.accountId, symbol, cf.side, cfFill, mode);
+            if (r.success) {
+                const cfOrder = await this.orderRepo.findOne({ where: { id: cf.orderId } });
+                if (cfOrder) {
+                    cfOrder.filledQty = Number(cfOrder.filledQty || 0) + cf.qty;
+                    if (Number(cfOrder.filledQty) >= Number(cfOrder.quantity)) {
+                        cfOrder.status = order_entity_1.OrderStatus.FILLED;
+                        cfOrder.avgFillPrice = cf.price;
+                    }
+                    await this.orderRepo.save(cfOrder);
+                }
+            }
+            else {
+                // 结算失败回滚盘口（与 submitOrder 的失败回滚语义一致）
+                this.placeRestingOrder(symbol, cf.orderId, cf.accountId, cf.side, cf.price, cf.qty);
+                this.logger.warn(`强平对手单结算失败已回滚: ${cf.orderId} - ${r.error}`);
+            }
+        }
+    }
     async forceLiquidate(account) {
-        const positions = await this.positionRepo.find({ where: { accountId: account.id } });
+        // Phase A P0#4: 强平进入结算互斥队列，与用户成交串行，防止 read-modify-write 互相覆盖
+        return this.runExclusive(() => this.forceLiquidateInner(account));
+    }
+    async forceLiquidateInner(account) {
+        // 队列内重读账户与持仓（入队前读到的可能是过期数据）
+        const acc = await this.accountRepo.findOne({ where: { id: account.id } });
+        if (!acc)
+            return 0;
+        const positions = await this.positionRepo.find({ where: { accountId: acc.id } });
         let recovered = 0;
         let totalFees = 0;
         for (const pos of positions) {
+            // 自成交防护：强平市价单不与本人挂单撮合
             if (pos.longQty > 0) {
-                const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.SELL, pos.longQty);
+                const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.SELL, pos.longQty, acc.id);
                 if (fill) {
                     recovered += fill.totalCost;
-                    totalFees += this.calcFees(order_entity_1.OrderSide.SELL, fill.totalCost, fill.filledQuantity, account.marketMode).totalFees;
-                    pos.longQty = 0;
-                    pos.longCost = 0;
+                    totalFees += this.calcFees(order_entity_1.OrderSide.SELL, fill.totalCost, fill.filledQuantity, acc.marketMode).totalFees;
+                    // Phase A P0#4: 按实际成交量扣减，剩余持仓保留（跌停/无流动性时不得凭空蒸发）
+                    pos.longQty = Number(pos.longQty) - fill.filledQuantity;
+                    if (pos.longQty <= 0) {
+                        pos.longQty = 0;
+                        pos.longCost = 0;
+                    }
+                    await this.settleCounterFillsInner(pos.symbol, acc.marketMode, fill.counterFills);
                 }
             }
             if (pos.shortQty > 0) {
-                const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.COVER, pos.shortQty);
+                const before = Number(pos.shortQty);
+                const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.COVER, pos.shortQty, acc.id);
                 if (fill) {
                     recovered -= fill.totalCost;
-                    totalFees += this.calcFees(order_entity_1.OrderSide.COVER, fill.totalCost, fill.filledQuantity, account.marketMode).totalFees;
-                    pos.shortQty = 0;
-                    pos.shortCost = 0;
+                    totalFees += this.calcFees(order_entity_1.OrderSide.COVER, fill.totalCost, fill.filledQuantity, acc.marketMode).totalFees;
+                    pos.shortQty = Number(pos.shortQty) - fill.filledQuantity;
+                    if (pos.shortQty <= 0) {
+                        pos.shortQty = 0;
+                        pos.shortCost = 0;
+                    }
+                    // 冻结保证金按实际平仓比例释放（剩余空仓保留对应保证金）
+                    const released = before > 0 ? Number(acc.shortCollateral || 0) * (fill.filledQuantity / before) : 0;
+                    acc.shortCollateral = Number(acc.shortCollateral || 0) - released;
+                    recovered += released;
+                    await this.settleCounterFillsInner(pos.symbol, acc.marketMode, fill.counterFills);
                 }
             }
             await this.positionRepo.save(pos);
         }
+        // 剩余空仓（跌停/无流动性未平）保留对应保证金；全部平完则归还所有冻结保证金
+        const remainingShort = positions.reduce((s, p) => s + Number(p.shortQty || 0), 0);
+        const leftover = Number(acc.shortCollateral || 0);
+        if (remainingShort <= 0 && leftover > 0) {
+            recovered += leftover;
+            acc.shortCollateral = 0;
+        }
         // SECURITY: 强平归还冻结保证金并按标准计费（原实现清零保证金不归还、不计费，等于吞用户资产）
-        const releasedCollateral = Number(account.shortCollateral || 0);
-        account.cash = Math.round((Number(account.cash) + recovered - totalFees + releasedCollateral) * 100) / 100;
-        account.marginUsed = 0;
-        account.shortCollateral = 0;
-        await this.accountRepo.save(account);
-        this.logger.warn(`账户 ${account.id} 已被强制平仓，净回收 ${recovered.toFixed(2)}，费用 ${totalFees.toFixed(2)}，归还保证金 ${releasedCollateral.toFixed(2)}`);
+        acc.cash = Math.round((Number(acc.cash) + recovered - totalFees) * 100) / 100;
+        acc.marginUsed = 0;
+        await this.accountRepo.save(acc);
+        this.logger.warn(`账户 ${acc.id} 已被强制平仓，净回收 ${recovered.toFixed(2)}，费用 ${totalFees.toFixed(2)}，冻结保证金剩余 ${Number(acc.shortCollateral || 0).toFixed(2)}`);
         return recovered;
     }
     // F7 修复：日终检查所有账户保证金，爆仓（liquidate）则强制平仓
@@ -799,20 +932,28 @@ let TradingEngineService = class TradingEngineService {
     }
     // P3 部分强平（追保）：按市值从大到小每次卖出/回补持仓一半，直到保证金率恢复到目标水平
     async forceLiquidateToTarget(account, targetLevel) {
-        const positions = await this.positionRepo.find({ where: { accountId: account.id } });
+        // Phase A P0#4: 追保同样进入结算互斥队列
+        return this.runExclusive(() => this.forceLiquidateToTargetInner(account, targetLevel));
+    }
+    async forceLiquidateToTargetInner(account, targetLevel) {
+        // 队列内重读账户（防过期数据丢失更新）
+        const acc = await this.accountRepo.findOne({ where: { id: account.id } });
+        if (!acc)
+            return 0;
+        const positions = await this.positionRepo.find({ where: { accountId: acc.id } });
         const priceOf = (symbol) => {
             const p = this.prices.get(symbol);
             return p === undefined || p === null ? null : p;
         };
         const evalMargin = () => {
-            let equity = Number(account.cash) + Number(account.shortCollateral || 0);
+            let equity = Number(acc.cash) + Number(acc.shortCollateral || 0);
             let borrowed = 0;
             for (const pos of positions) {
                 const price = priceOf(pos.symbol);
                 if (price === null)
                     continue;
                 equity += pos.longQty * price - pos.shortQty * price;
-                borrowed += pos.longQty * price * (1 - 1 / Number(account.leverage || 1));
+                borrowed += pos.longQty * price * (1 - 1 / Number(acc.leverage || 1));
                 borrowed += pos.shortQty * price * (0, constants_1.shortMarginRateFor)(pos.symbol, this.volatilities.get(pos.symbol));
             }
             return borrowed > 0 ? equity / borrowed : 999;
@@ -829,39 +970,42 @@ let TradingEngineService = class TradingEngineService {
                 break;
             if (pos.longQty > 0) {
                 const qty = Math.ceil(Number(pos.longQty) * 0.5);
-                const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.SELL, qty);
+                // 自成交防护：追保市价单不与本人挂单撮合
+                const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.SELL, qty, acc.id);
                 if (fill) {
-                    const fees = this.calcFees(order_entity_1.OrderSide.SELL, fill.totalCost, fill.filledQuantity, account.marketMode).totalFees;
+                    const fees = this.calcFees(order_entity_1.OrderSide.SELL, fill.totalCost, fill.filledQuantity, acc.marketMode).totalFees;
                     netCash += fill.totalCost - fees;
                     pos.longQty = Number(pos.longQty) - fill.filledQuantity;
                     if (pos.longQty <= 0) {
                         pos.longQty = 0;
                         pos.longCost = 0;
                     }
+                    await this.settleCounterFillsInner(pos.symbol, acc.marketMode, fill.counterFills);
                 }
             }
             if (pos.shortQty > 0) {
                 const before = Number(pos.shortQty);
                 const qty = Math.ceil(before * 0.5);
-                const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.COVER, qty);
+                const fill = this.executeMarketOrder(pos.symbol, order_entity_1.OrderSide.COVER, qty, acc.id);
                 if (fill) {
-                    const fees = this.calcFees(order_entity_1.OrderSide.COVER, fill.totalCost, fill.filledQuantity, account.marketMode).totalFees;
-                    const released = Number(account.shortCollateral || 0) * (fill.filledQuantity / before);
+                    const fees = this.calcFees(order_entity_1.OrderSide.COVER, fill.totalCost, fill.filledQuantity, acc.marketMode).totalFees;
+                    const released = Number(acc.shortCollateral || 0) * (fill.filledQuantity / before);
                     releasedCollateral += released;
-                    account.shortCollateral = Number(account.shortCollateral || 0) - released;
+                    acc.shortCollateral = Number(acc.shortCollateral || 0) - released;
                     netCash += released - fill.totalCost - fees;
                     pos.shortQty = Number(pos.shortQty) - fill.filledQuantity;
                     if (pos.shortQty <= 0) {
                         pos.shortQty = 0;
                         pos.shortCost = 0;
                     }
+                    await this.settleCounterFillsInner(pos.symbol, acc.marketMode, fill.counterFills);
                 }
             }
             await this.positionRepo.save(pos);
         }
-        account.cash = Math.round((Number(account.cash) + netCash) * 100) / 100;
-        await this.accountRepo.save(account);
-        this.logger.warn('账户 ' + account.id + ' 追保部分平仓，现金净变动 ' + netCash.toFixed(2) + '，归还保证金 ' + releasedCollateral.toFixed(2) + '，当前保证金率 ' + evalMargin().toFixed(4));
+        acc.cash = Math.round((Number(acc.cash) + netCash) * 100) / 100;
+        await this.accountRepo.save(acc);
+        this.logger.warn('账户 ' + acc.id + ' 追保部分平仓，现金净变动 ' + netCash.toFixed(2) + '，归还保证金 ' + releasedCollateral.toFixed(2) + '，当前保证金率 ' + evalMargin().toFixed(4));
         return netCash;
     }
     async forceLiquidateMarginalAccounts() {
@@ -903,7 +1047,9 @@ TradingEngineService = __decorate(
     __param(1, (0, typeorm_1.InjectRepository)(account_entity_1.Account)),
     __param(2, (0, typeorm_1.InjectRepository)(position_entity_1.Position)),
     __param(3, (0, typeorm_1.InjectRepository)(transaction_entity_1.Transaction)),
+    __param(4, (0, typeorm_1.InjectRepository)(dividend_snapshot_entity_1.DividendSnapshot)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository])

@@ -6,7 +6,7 @@ export const MARKET = {
     CLOSE_HOUR: 16,
     CLOSE_MINUTE: 0,
     TICKS_PER_DAY: 240, // S2 与本地时钟同步：A股真实交易分钟数(9:30-11:30 120 + 13:00-15:00 120)
-    TICK_INTERVAL_MS: 1000,
+    TICK_INTERVAL_MS: 60000, // Phase A: 默认真实分钟级（快档须 SANDBOX_FAST=true，见 market.service 启动校验）
 };
 
 // B1 多市场：A股池（market 默认 CN），港股 HK_POOL / 美股 US_POOL 见下

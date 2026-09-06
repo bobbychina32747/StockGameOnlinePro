@@ -52,9 +52,15 @@ export function AccountPanel() {
   };
 
   const resetPreset = async (preset: string) => {
-    await accountApi.reset(mode, preset);
-    await fetchAccount(mode);
-    addNotification(`已重置为${preset}`, 'success');
+    // Phase A: 破坏性操作加确认；服务端可能因基金持仓/挂单/冷却/大赛关闭而拒绝，按结果分支提示
+    if (!window.confirm(`确认重置为「${preset}」？\n账户资金、绩效与历史将被清空（需先平仓、赎回基金、撤单），且每个交易日后才能再次重置。`)) return;
+    const res = await accountApi.reset(mode, preset);
+    if (res && res.success) {
+      await fetchAccount(mode);
+      addNotification(`已重置为${preset}`, 'success');
+    } else {
+      addNotification(`重置失败：${(res && res.error) || '未知错误'}`, 'error');
+    }
   };
 
   // P3 跨市场划转：汇率折算 + 0.1% 手续费（服务端计算）
