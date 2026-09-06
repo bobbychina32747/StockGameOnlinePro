@@ -32,6 +32,15 @@ let AuthService = class AuthService {
         this.userRepo = userRepo;
         this.accountRepo = accountRepo;
         this.jwtService = jwtService;
+        // ─── Phase D: 账号级防爆破（纵深防御；IP 层 10次/分限流在 main.ts 挂载）───
+        // 内存 Map：trim 后的 username → { failCount, lockedUntil }，进程内单实例有效（本项目单进程部署）。
+        // 不存在用户名同样计数锁定（锁定键为不存在的名字，对真实用户无影响——teams 二档方案中
+        // 「锁 IP」需要控制器传 req.ip 且 NAT 下会误伤，现有 express IP 限流已承担该层，故统一按名计数）。
+        // 常量做成实例字段便于 phase10 单测覆写（如 LOGIN_LOCK_MS=1 验证锁定期外恢复）。
+        this.loginFails = new Map();
+        this.LOGIN_MAX_FAILS = 5;
+        this.LOGIN_LOCK_MS = 10 * 60 * 1000; // 10 分钟
+        this.LOGIN_LOCK_MSG = '尝试次数过多，账号已锁定10分钟';
     }
     // 主应用启动自动确保管理员存在（防 DB 覆盖丢失）
     async onModuleInit() {
@@ -113,13 +122,61 @@ let AuthService = class AuthService {
         const token = this.jwtService.sign({ sub: user.id, username: user.username, role: user.role });
         return { user: this.toSafeUser(user), token };
     }
+    loginFailKey(username) {
+        // trim 规范化：拒绝 " admin " 与 "admin" 各记一次的分裂计数
+        return String(username || '').trim();
+    }
+    purgeExpiredLoginFails() {
+        if (this.loginFails.size < 5000)
+            return; // 低于阈值不扫
+        const now = Date.now();
+        for (const [k, v] of this.loginFails) { // Map 迭代中 delete 安全
+            if (v.lockedUntil <= now)
+                this.loginFails.delete(k);
+        }
+        if (this.loginFails.size > 10000)
+            this.loginFails.clear(); // 极端兜底（正常不可能）
+    }
+    checkLoginLocked(key) {
+        const rec = this.loginFails.get(key);
+        if (!rec)
+            return;
+        const now = Date.now();
+        if (rec.lockedUntil > now) {
+            throw new common_1.UnauthorizedException(this.LOGIN_LOCK_MSG);
+        }
+        // lockedUntil=0 表示「仅有失败计数、尚未锁定」——保留计数记录；>0 且已过期才惰性清除
+        if (rec.lockedUntil > 0)
+            this.loginFails.delete(key);
+    }
+    recordLoginFail(key) {
+        this.purgeExpiredLoginFails();
+        const now = Date.now();
+        const rec = this.loginFails.get(key) || { failCount: 0, lockedUntil: 0 };
+        rec.failCount += 1;
+        if (rec.failCount >= this.LOGIN_MAX_FAILS) {
+            rec.lockedUntil = now + this.LOGIN_LOCK_MS; // 第 5 次失败即锁
+            rec.failCount = 0; // 重置计数，避免锁内继续累加
+        }
+        this.loginFails.set(key, rec);
+    }
     async login(username, password) {
-        const user = await this.userRepo.findOne({ where: { username } });
-        if (!user)
+        const key = this.loginFailKey(username);
+        // 锁定检查先于一切 IO/bcrypt：锁定期内既不查库也不跑 bcrypt（省钱省 CPU，且不可被计时旁路）
+        this.checkLoginLocked(key);
+        const user = await this.userRepo.findOne({ where: { username: key } });
+        if (!user) {
+            // teams 定稿取舍：不存在的用户名同样计数 → 爆破方无法区分「用户名不存在」与「密码错误」；
+            // 锁定键为不存在的名字本身（惰性键），不会锁住任何真实账号
+            this.recordLoginFail(key);
             throw new common_1.UnauthorizedException('用户名或密码错误');
+        }
         const valid = await bcrypt.compare(password, user.password);
-        if (!valid)
+        if (!valid) {
+            this.recordLoginFail(key);
             throw new common_1.UnauthorizedException('用户名或密码错误');
+        }
+        this.loginFails.delete(key); // 成功登录清零
         const token = this.jwtService.sign({ sub: user.id, username: user.username, role: user.role });
         return { user: this.toSafeUser(user), token };
     }

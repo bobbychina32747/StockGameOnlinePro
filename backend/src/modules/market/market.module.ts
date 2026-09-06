@@ -10,6 +10,10 @@ import jwt_1 = require("@nestjs/jwt");
 
 import config_1 = require("@nestjs/config");
 
+import typeorm_1 = require("@nestjs/typeorm");
+
+import user_entity_1 = require("../../infrastructure/database/entities/user.entity");
+
 import market_controller_1 = require("./market.controller");
 
 import market_gateway_1 = require("./market.gateway");
@@ -36,6 +40,8 @@ MarketModule = __decorate(
                     secret: config.get('JWT_SECRET'),
                 }),
             }),
+            // Phase D: WS 握手校验 isActive 需要 User repo（autoLoadEntities 下 forFeature 全局可用）
+            typeorm_1.TypeOrmModule.forFeature([user_entity_1.User]),
         ],
         controllers: [market_controller_1.MarketController],
         providers: [market_gateway_1.MarketGateway, market_service_1.MarketService, news_service_1.NewsService],

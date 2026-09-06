@@ -24,3 +24,21 @@ export function cnPriceLimits(base, firstDay) {
         ? { up: Number((b * 1.44).toFixed(4)), down: Number((b * 0.64).toFixed(4)) }
         : { up: Number((b * 1.1).toFixed(4)), down: Number((b * 0.9).toFixed(4)) };
 }
+
+// Phase D: WS fill 广播前脱敏——剥离对手方账户/订单标识（原样广播会向所有客户端泄露
+// 对手方 accountId/orderId/mmId）。顶层字段保持引擎原命名（filledQuantity/avgPrice/totalCost/fees），
+// counterFills 仅保留前端可展示信息 {side, price, qty, virtual}；纯函数不改输入。
+export function sanitizeFill(fill) {
+    if (!fill || typeof fill !== 'object')
+        return fill;
+    const out = { ...fill };
+    if (Array.isArray(fill.counterFills)) {
+        out.counterFills = fill.counterFills.map((cf) => ({
+            side: cf.side,
+            price: cf.price,
+            qty: cf.qty,
+            virtual: !!cf.virtual,
+        }));
+    }
+    return out;
+}

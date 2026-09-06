@@ -52,6 +52,16 @@ async function bootstrap() {
         legacyHeaders: false,
     });
     app.use('/api/auth', authLimiter);
+    // Phase D: /market/backtest 为无认证公共计算接口（逐根 K 线跑策略），单 IP 限流防滥用；
+    // app.use 匹配原始请求路径（含 /api 前缀），与上方 authLimiter 同款先例
+    const backtestLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        max: 20,
+        message: { statusCode: 429, message: '请求过于频繁，请稍后再试' },
+        standardHeaders: true,
+        legacyHeaders: false,
+    });
+    app.use('/api/market/backtest', backtestLimiter);
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
@@ -69,19 +79,21 @@ async function bootstrap() {
         credentials: true,
     });
     const port = config.get('PORT', 8000);
-    // P5 工程化：Swagger API 文档（/api/docs；无装饰器也能列出全部路由，量化接入见 docs/API.md）
-    try {
-        const swaggerConfig = new swagger_1.DocumentBuilder()
-            .setTitle('StockSim Pro API')
-            .setDescription('模拟炒股平台接口文档：行情/交易/账户/量化接入（模拟数据仅供学习，不构成投资建议）')
-            .setVersion('0.2.0')
-            .addBearerAuth()
-            .build();
-        const document = swagger_1.SwaggerModule.createDocument(app, swaggerConfig);
-        swagger_1.SwaggerModule.setup('api/docs', app, document);
-    }
-    catch (e) {
-        logger.warn('Swagger 文档初始化失败: ' + (e && e.message ? e.message : e));
+    // P5 工程化：Swagger API 文档（/api/docs）仅 development 环境挂载（生产不暴露接口清单与 schema）
+    if (process.env.NODE_ENV === 'development') {
+        try {
+            const swaggerConfig = new swagger_1.DocumentBuilder()
+                .setTitle('StockSim Pro API')
+                .setDescription('模拟炒股平台接口文档：行情/交易/账户/量化接入（模拟数据仅供学习，不构成投资建议）')
+                .setVersion('0.2.0')
+                .addBearerAuth()
+                .build();
+            const document = swagger_1.SwaggerModule.createDocument(app, swaggerConfig);
+            swagger_1.SwaggerModule.setup('api/docs', app, document);
+        }
+        catch (e) {
+            logger.warn('Swagger 文档初始化失败: ' + (e && e.message ? e.message : e));
+        }
     }
     await app.listen(port);
     logger.log(`应用已启动: http://localhost:${port}/api`);

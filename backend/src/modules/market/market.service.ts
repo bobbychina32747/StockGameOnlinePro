@@ -235,7 +235,8 @@ let MarketService = class MarketService {
                 }
             }
             const fills = await this.engine.checkPendingOrders();
-            fills.forEach((f) => { this.gateway.broadcastFill(f); });
+            // Phase D: 广播前脱敏——剥离 counterFills 中对手方 accountId/orderId/mmId（全量广播泄露）
+            fills.forEach((f) => { this.gateway.broadcastFill((0, market_utils_1.sanitizeFill)(f)); });
             // 经济泡沫破灭广播
             const bursts = marketData.getBurstEvents();
             for (const b of bursts) {
