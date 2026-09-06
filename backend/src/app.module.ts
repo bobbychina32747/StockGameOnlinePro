@@ -34,6 +34,9 @@ import ranking_module_1 = require("./modules/ranking/ranking.module");
 
 import admin_module_1 = require("./modules/admin/admin.module");
 
+// Phase C: 模拟大赛 V1
+import season_module_1 = require("./modules/season/season.module");
+
 let AppModule = class AppModule {
     [key: string]: any;
 };
@@ -108,6 +111,7 @@ AppModule = __decorate(
             fund_module_1.FundModule,
             ranking_module_1.RankingModule,
             admin_module_1.AdminModule,
+            season_module_1.SeasonModule,
         ],
     })
 ],

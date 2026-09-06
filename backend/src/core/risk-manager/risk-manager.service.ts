@@ -127,6 +127,20 @@ let RiskManagerService = class RiskManagerService {
                     title: `📉 单日亏损 ${(Math.abs(dayRet) * 100).toFixed(1)}%`, desc: `第 ${day} 个交易日，你的账户单日亏损超过 10%`, lesson: '单日巨亏通常是重仓追高或未设止损。建议：①控制单笔仓位 ≤20% ②永远设止损单 ③泡沫期的暴涨回调往往最凶',
                 });
             }
+            // Phase C: 数据驱动教训卡——单日大赚（警惕追高兑现风险）
+            if (dayRet > 0.1) {
+                this.addReview(account.userId, {
+                    type: '大赚',
+                    title: `🚀 单日盈利 ${(dayRet * 100).toFixed(1)}%`, desc: `第 ${day} 个交易日，你的账户单日盈利超过 10%`, lesson: '单日大涨常常伴随短期过热。建议：①检查仓位是否过于集中 ②考虑分批兑现 ③别把运气当能力，看回撤数据说话',
+                });
+            }
+        }
+        // Phase C: 数据驱动教训卡——满仓单票（单一持仓市值超总权益 80%）
+        if (positions.maxSingleRatio > 0.8 && Number(account.totalEquity) > 0) {
+            this.addReview(account.userId, {
+                type: '满仓单票',
+                title: `🎯 单票集中度 ${(positions.maxSingleRatio * 100).toFixed(0)}%`, desc: `第 ${day} 个交易日，单一持仓占总资产 ${(positions.maxSingleRatio * 100).toFixed(0)}%`, lesson: '鸡蛋别放一个篮子：①单一持仓建议 ≤ 总资产 50% ②分散到 2-3 个不相关行业 ③重仓单票时务必设止损',
+            });
         }
         account.peakEquity = Math.max(Number(account.peakEquity), Number(account.totalEquity));
         account.dailyPnl = Number(account.totalEquity) - Number(account.dayStartEquity);
@@ -162,16 +176,22 @@ let RiskManagerService = class RiskManagerService {
         const positions = await this.positionRepo.find({ where: { accountId: account.id } });
         let holdValue = 0;
         let marginUsed = 0;
+        let maxSingle = 0;
         for (const pos of positions) {
             const price = this.currentPrices[pos.symbol];
             if (price === undefined || price === null)
                 continue; // 无报价持仓跳过估值，避免按 0 计
+            const singleValue = Math.max(0, (Number(pos.longQty) - Number(pos.shortQty)) * price);
+            maxSingle = Math.max(maxSingle, singleValue);
             holdValue += (pos.longQty - pos.shortQty) * price;
             // Phase B P1#9: 多头全额现金买入对应的借入部分已记账在 account.borrowed，不再由持仓市值推导；
             // marginUsed 仅保留空头保证金（兼容字段，利息基数已改用 borrowed+shortCollateral）
             marginUsed += pos.shortQty * price * constants_1.RISK.marginShortRate;
         }
-        return { holdValue, marginUsed };
+        // Phase C: 单票集中度 = 最大单票市值 / 总权益（总权益在调用后计算，用现金+持仓近似）
+        const equityApprox = Number(account.cash) + holdValue + Number(account.shortCollateral || 0) - Number(account.borrowed || 0);
+        const maxSingleRatio = equityApprox > 0 ? maxSingle / equityApprox : 0;
+        return { holdValue, marginUsed, maxSingleRatio };
     }
     async calculateMetrics(account, txs) {
         const history = this.equityHistory.get(account.id) || [];

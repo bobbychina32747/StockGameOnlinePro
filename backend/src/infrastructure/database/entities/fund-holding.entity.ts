@@ -36,6 +36,11 @@ __decorate([
     (0, typeorm_1.Column)('float', { default: 0 }),
     __metadata("design:type", Number)
 ], FundHolding.prototype, "totalInvested", void 0);
+// Phase C: 首次申购游戏日（赎回费持有期档位基准：<7交易日1.5% / 7-30日0.5% / ≥30日0）
+__decorate([
+    (0, typeorm_1.Column)('int', { default: 0 }),
+    __metadata("design:type", Number)
+], FundHolding.prototype, "firstBuyDay", void 0);
 
 export { FundHolding };
 

@@ -33,11 +33,20 @@ import dividend_snapshot_entity_1 = require("./entities/dividend-snapshot.entity
 
 import reset_audit_log_entity_1 = require("./entities/reset-audit-log.entity");
 
+// Phase C: 成就服务端化
+import achievement_entity_1 = require("./entities/achievement.entity");
+
+// Phase C: 模拟大赛赛季
+import season_entity_1 = require("./entities/season.entity");
+import season_entry_entity_1 = require("./entities/season-entry.entity");
+
 const entities = [
     user_entity_1.User, account_entity_1.Account, position_entity_1.Position, order_entity_1.Order,
     transaction_entity_1.Transaction, kline_entity_1.Kline, stock_entity_1.Stock, daily_snapshot_entity_1.DailySnapshot,
     fund_holding_entity_1.FundHolding,
     dividend_event_entity_1.DividendEvent, dividend_snapshot_entity_1.DividendSnapshot, reset_audit_log_entity_1.ResetAuditLog,
+    achievement_entity_1.Achievement,
+    season_entity_1.Season, season_entry_entity_1.SeasonEntry,
 ];
 let DatabaseModule = class DatabaseModule {
     [key: string]: any;

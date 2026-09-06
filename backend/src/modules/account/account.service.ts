@@ -29,6 +29,12 @@ import fund_holding_entity_1 = require("../../infrastructure/database/entities/f
 import order_entity_1 = require("../../infrastructure/database/entities/order.entity");
 import reset_audit_log_entity_1 = require("../../infrastructure/database/entities/reset-audit-log.entity");
 
+// Phase C: 成就服务端化
+import achievement_entity_1 = require("../../infrastructure/database/entities/achievement.entity");
+
+// Phase C: 赛季中禁重置/划转
+import season_service_1 = require("../season/season.service");
+
 import risk_manager_service_1 = require("../../core/risk-manager/risk-manager.service");
 
 import trading_engine_service_1 = require("../../core/trading-engine/trading-engine.service");
@@ -37,7 +43,7 @@ import constants_1 = require("../../common/constants");
 
 let AccountService = class AccountService {
     [key: string]: any;
-    constructor(accountRepo, positionRepo, transactionRepo, fundHoldingRepo, orderRepo, resetAuditRepo, riskManager, engine, config) {
+    constructor(accountRepo, positionRepo, transactionRepo, fundHoldingRepo, orderRepo, resetAuditRepo, riskManager, engine, config, achievementRepo, seasonService) {
         this.accountRepo = accountRepo;
         this.positionRepo = positionRepo;
         this.transactionRepo = transactionRepo;
@@ -47,6 +53,8 @@ let AccountService = class AccountService {
         this.riskManager = riskManager;
         this.engine = engine;
         this.config = config;
+        this.achievementRepo = achievementRepo;
+        this.seasonService = seasonService;
         this.logger = new common_1.Logger(AccountService.name);
     }
     async getAccount(userId, mode = 'US') {
@@ -132,6 +140,10 @@ let AccountService = class AccountService {
         if (!resetEnabled) {
             return { success: false, error: '大赛进行中，账户重置已关闭' };
         }
+        // Phase C: 赛季中已报名的账户禁止重置（快照净值赛公平性）
+        if (this.seasonService && await this.seasonService.isBlocked(userId)) {
+            return { success: false, error: '赛季进行中，账户重置已关闭' };
+        }
         // SECURITY: 重置必须走结算互斥队列，防止与成交结算交叉丢失更新
         if (!this.engine) {
             throw new common_1.ServiceUnavailableException('交易引擎不可用');
@@ -203,6 +215,10 @@ let AccountService = class AccountService {
         if (!fromMode || !toMode || fromMode === toMode) {
             return { success: false, error: '划转市场必须不同（CN/HK/US）' };
         }
+        // Phase C: 赛季中已报名的账户禁止划转（防搬钱虚增赛季净值）
+        if (this.seasonService && await this.seasonService.isBlocked(userId)) {
+            return { success: false, error: '赛季进行中，跨市场划转已关闭' };
+        }
         // P5 动态汇率：用实时汇率（行情引擎每日演化）而非固定基准
         const fx = (0, constants_1.getFxRates)();
         const fromRate = fx[fromMode];
@@ -245,6 +261,26 @@ let AccountService = class AccountService {
                 : '🇺🇸 美股 | T+0 | 可多空 | 无印花税',
         };
     }
+    // Phase C: 成就服务端化（评估在前端，服务端只做幂等持久化 + 跨设备查询）
+    getAchievements(userId) {
+        return this.achievementRepo.find({ where: { userId }, order: { unlockedAt: 'ASC' } });
+    }
+    async unlockAchievement(userId, code) {
+        if (!code || typeof code !== 'string' || code.length > 40) {
+            return { success: false, error: '成就代码无效' };
+        }
+        const existing = await this.achievementRepo.findOne({ where: { userId, code } });
+        if (existing)
+            return { success: true, duplicate: true };
+        try {
+            await this.achievementRepo.save(this.achievementRepo.create({ userId, code }));
+            return { success: true };
+        }
+        catch (e) {
+            // UNIQUE(userId, code) 冲突=并发幂等
+            return { success: true, duplicate: true };
+        }
+    }
 };
 
 export { AccountService };
@@ -258,6 +294,7 @@ AccountService = __decorate(
     __param(3, (0, typeorm_1.InjectRepository)(fund_holding_entity_1.FundHolding)),
     __param(4, (0, typeorm_1.InjectRepository)(order_entity_1.Order)),
     __param(5, (0, typeorm_1.InjectRepository)(reset_audit_log_entity_1.ResetAuditLog)),
+    __param(9, (0, typeorm_1.InjectRepository)(achievement_entity_1.Achievement)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
@@ -266,7 +303,9 @@ AccountService = __decorate(
         typeorm_2.Repository,
         risk_manager_service_1.RiskManagerService,
         trading_engine_service_1.TradingEngineService,
-        config_1.ConfigService])
+        config_1.ConfigService,
+        typeorm_2.Repository,
+        season_service_1.SeasonService])
 ],
 AccountService
 );

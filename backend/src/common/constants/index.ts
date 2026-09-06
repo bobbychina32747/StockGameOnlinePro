@@ -355,6 +355,17 @@ export function afterHoursStageFor(mode, now?) {
     return null;
 }
 
+// Phase C: 红利税率（teams 定稿二档制）——CN 持有 ≤7 交易日 20%、>7 交易日 0%；HK 统一 20%；US 统一 30%
+// holdDays = 除权日前一日 - 建仓日（lockDay=0 视为当日建仓）
+export function dividendTaxRate(market, holdDays) {
+    const days = Math.max(0, Number(holdDays) || 0);
+    if (market === 'HK')
+        return 0.2;
+    if (market === 'US')
+        return 0.3;
+    return days <= 7 ? 0.2 : 0;
+}
+
 // P1: 按市场判断是否处于交易时段（mode: CN/HK/US；未知/缺省回退 CN 保持向后兼容）
 // 美股：夏令时/冬令时动态时段 + 跨午夜交易日按美东日期判节假日
 export function isTradingTimeFor(mode, now?) {

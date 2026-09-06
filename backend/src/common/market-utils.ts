@@ -19,5 +19,8 @@ export function cnPriceLimits(base, firstDay) {
     const b = Number(base);
     if (!Number.isFinite(b) || b <= 0)
         return null;
-    return firstDay ? { up: b * 1.44, down: b * 0.64 } : { up: b * 1.1, down: b * 0.9 };
+    // toFixed(4) 消除 100×1.1=110.00000000000001 类浮点尾巴（委托价校验/封板判定的容差口径统一）
+    return firstDay
+        ? { up: Number((b * 1.44).toFixed(4)), down: Number((b * 0.64).toFixed(4)) }
+        : { up: Number((b * 1.1).toFixed(4)), down: Number((b * 0.9).toFixed(4)) };
 }

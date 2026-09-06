@@ -18,6 +18,12 @@ import fund_holding_entity_1 = require("../../infrastructure/database/entities/f
 import order_entity_1 = require("../../infrastructure/database/entities/order.entity");
 import reset_audit_log_entity_1 = require("../../infrastructure/database/entities/reset-audit-log.entity");
 
+// Phase C: 成就服务端化
+import achievement_entity_1 = require("../../infrastructure/database/entities/achievement.entity");
+
+// Phase C: 赛季中禁重置/划转（AccountService 注入 SeasonService）
+import season_module_1 = require("../season/season.module");
+
 import account_controller_1 = require("./account.controller");
 
 import account_service_1 = require("./account.service");
@@ -31,7 +37,7 @@ export { AccountModule };
 AccountModule = __decorate(
 [
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([account_entity_1.Account, position_entity_1.Position, transaction_entity_1.Transaction, fund_holding_entity_1.FundHolding, order_entity_1.Order, reset_audit_log_entity_1.ResetAuditLog])],
+        imports: [typeorm_1.TypeOrmModule.forFeature([account_entity_1.Account, position_entity_1.Position, transaction_entity_1.Transaction, fund_holding_entity_1.FundHolding, order_entity_1.Order, reset_audit_log_entity_1.ResetAuditLog, achievement_entity_1.Achievement]), season_module_1.SeasonModule],
         controllers: [account_controller_1.AccountController],
         providers: [account_service_1.AccountService],
         exports: [account_service_1.AccountService],

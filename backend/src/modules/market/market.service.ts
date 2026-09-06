@@ -302,8 +302,9 @@ let MarketService = class MarketService {
             if (counter === 239) { // 分红/夜间事件
                 try {
                     // Phase A P0#3: 先拍次日除权股票的登记日快照，再按快照发放当日 exDay 的分红（A股式口径）
+                    // Phase C: 传 market 用于红利税档位（CN 二档 / HK 20% / US 30%）
                     await this.engine.snapshotDividendHolders(marketData.getDividends(marketData.gameDay + 1), marketData.gameDay + 1, market);
-                    await this.engine.payDividends(marketData.getDividends(marketData.gameDay), marketData.gameDay);
+                    await this.engine.payDividends(marketData.getDividends(marketData.gameDay), marketData.gameDay, market);
                 } catch (e) {
                     this.logger.error(`分红发放失败: ${e.message}`);
                 }

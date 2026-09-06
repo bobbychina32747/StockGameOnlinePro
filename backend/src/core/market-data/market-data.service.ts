@@ -63,6 +63,8 @@ let MarketDataService = class MarketDataService {
         this.nextIpoDay = 30;
         // P1 复权：累计前复权因子与分红事件序列（历史价格 × 因子 = 前复权价）
         this.adjFactors = new Map<string, { factor: number, series: { day: number, factor: number }[] }>();
+        // Phase C: 指数除数（首次 getIndices 时初始化，保持点位连续）
+        this.indexDivisors = {};
         this.dayEvents = null;
         this.dividends = new Map<string, any[]>();
         this.gameDay = 0;
@@ -982,20 +984,53 @@ let MarketDataService = class MarketDataService {
         ];
         return defs.filter((d) => d.market === this.market || (d.market === 'CN' && this.market === 'CN')).map((d) => {
             const members = [...this.stocks.values()].filter((st) => d.filter(st));
-            let total = 0;
+            // Phase C: 自由流通市值加权（hash 稳定流通股本 × 价格 × 新股阶梯纳入权重）
+            let weightedNow = 0;
+            let weightedPrev = 0;
             for (const st of members) {
-                const prev = Number(st.prevClose) || Number(st.dayOpen) || 1;
-                total += (st.price - prev) / prev;
+                const floatShares = this.floatSharesOf(st);
+                const w = this.indexInclusionWeight(st);
+                weightedNow += Number(st.price) * floatShares * w;
+                const prev = Number(st.prevClose) || Number(st.dayOpen) || Number(st.price) || 1;
+                weightedPrev += prev * floatShares * w;
             }
-            const change = members.length ? (total / members.length) * 100 : 0;
+            if (weightedPrev <= 0)
+                return { code: d.code, name: d.name, value: d.base, changePct: 0, members: members.length };
+            // 除数法保持点位连续：divisor 每日收盘重算，新股阶梯纳入时也不会跳变
+            if (!this.indexDivisors[d.code] || !Number.isFinite(this.indexDivisors[d.code])) {
+                this.indexDivisors[d.code] = weightedNow / d.base;
+            }
+            const value = Number((weightedNow / this.indexDivisors[d.code]).toFixed(2));
+            const change = (weightedNow / weightedPrev - 1) * 100;
             return {
                 code: d.code,
                 name: d.name,
-                value: Number((d.base * (1 + change / 100)).toFixed(2)),
+                value,
                 changePct: Number(change.toFixed(2)),
                 members: members.length,
             };
         });
+    }
+    // Phase C: hash 稳定流通股本（万股，8000~12000）
+    floatSharesOf(st) {
+        if (st.floatShares && Number(st.floatShares) > 0)
+            return Number(st.floatShares);
+        let h = 0;
+        const s = String(st.symbol || '');
+        for (let i = 0; i < s.length; i++)
+            h = (h * 31 + s.charCodeAt(i)) % 100000;
+        st.floatShares = 8000 + (h % 4000);
+        return st.floatShares;
+    }
+    // Phase C: 新股阶梯纳入——上市次日起 5 个游戏日内权重 0→1 线性（避免指数跳变，teams 定稿）
+    indexInclusionWeight(st) {
+        const listed = Number(st.listedDay);
+        if (!Number.isFinite(listed) || listed <= 0)
+            return 1; // 老股（无 listedDay 记录）全额权重
+        const days = Number(this.gameDay) - listed;
+        if (days <= 0)
+            return 0;
+        return Math.min(1, Math.max(0, (days - 1) / 5));
     }
     // S2 交易时段时间映射：0-119 → 9:30-11:30；120-239 → 13:00-15:00（真实A股时段）
     tradingTime(day, minute) {

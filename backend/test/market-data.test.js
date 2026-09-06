@@ -116,12 +116,12 @@ describe('MarketDataService 行情引擎核心逻辑', () => {
   });
 
   describe('getIndices 指数实时计算', () => {
-    test('上证指数随成分股涨跌计算', () => {
+    test('上证指数随成分股涨跌计算（Phase C: 市值加权除数法，首次调用锚定基期点位）', () => {
       svc.stocks.set('T1', { symbol: 'T1', code: '688001', market: 'CN', price: 110, prevClose: 100 });
       const indices = svc.getIndices();
       const sh = indices.find((i) => i.code === '000001');
       expect(sh.changePct).toBeCloseTo(10, 2);
-      expect(sh.value).toBeCloseTo(3410, 2);
+      expect(sh.value).toBeCloseTo(3100, 2); // 首次调用锚定 base 3100，涨跌由 changePct 表达
     });
   });
 });

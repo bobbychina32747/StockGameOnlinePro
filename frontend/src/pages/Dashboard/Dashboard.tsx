@@ -51,6 +51,14 @@ export default function Dashboard() {
     let timer: ReturnType<typeof setInterval> | null = null;
     if (!realtimeTf) {
       timer = setInterval(load, 15000);
+    } else {
+      // Phase C: 实时周期下 WS 只推 tick，盘口深度无人更新 → 15s 低频只刷盘口（不重复拉 K 线）
+      timer = setInterval(async () => {
+        try {
+          const ob = await marketApi.orderBook(selectedSymbol);
+          setOrderBook(selectedSymbol, ob);
+        } catch (e) { /* 瞬时错误忽略 */ }
+      }, 15000);
     }
     return () => { if (timer) clearInterval(timer); };
   }, [selectedSymbol, selectedTimeframe, realtimeTf, setKlines, setOrderBook]);

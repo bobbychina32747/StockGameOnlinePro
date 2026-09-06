@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import api from '../services/api.client';
+import api, { setUnauthorizedHandler } from '../services/api.client';
 
 // localStorage 安全解析：数据损坏时回退默认值，避免整站崩溃
 function safeParse<T>(raw: string | null, fallback: T): T {
@@ -55,6 +55,7 @@ interface MarketState {
   setStocks: (stocks: any[]) => void;
   setPrices: (prices: Record<string, number>) => void;
   addTick: (tick: TickData) => void;
+  addTicks: (ticks: TickData[]) => void;
   setKlines: (symbol: string, tf: string, data: any[]) => void;
   setOrderBook: (symbol: string, book: any) => void;
 }
@@ -70,44 +71,51 @@ export const useMarketStore = create<MarketState>((set) => ({
   setStocks: (stocks) => set({ stocks }),
   setPrices: (prices) => set({ prices }),
   addTick: (tick) => {
-    // 防御：非法 tick（NaN/负数/异常大 timestamp）直接忽略，避免 Date 计算抛错
-    if (
-      typeof tick?.symbol !== 'string' ||
-      typeof tick?.price !== 'number' || !isFinite(tick.price) || tick.price < 0 ||
-      typeof tick?.volume !== 'number' || !isFinite(tick.volume) || tick.volume < 0 ||
-      typeof tick?.timestamp !== 'number' || !isFinite(tick.timestamp) ||
-      tick.timestamp < 0 || tick.timestamp > 1e9
-    ) return;
+    useMarketStore.getState().addTicks([tick]);
+  },
+  // Phase C: 按 tick 批量 set（一次 setState 处理整批），消除"每 tick O(n) 全拷 + 逐条 set"的 GC 压力
+  addTicks: (rawTicks) => {
+    const valid = (rawTicks || []).filter((tick) =>
+      typeof tick?.symbol === 'string' &&
+      typeof tick?.price === 'number' && isFinite(tick.price) && tick.price >= 0 &&
+      typeof tick?.volume === 'number' && isFinite(tick.volume) && tick.volume >= 0 &&
+      typeof tick?.timestamp === 'number' && isFinite(tick.timestamp) &&
+      tick.timestamp >= 0 && tick.timestamp <= 1e9
+    );
+    if (valid.length === 0) return;
     set((state) => {
-      const prices = { ...state.prices, [tick.symbol]: tick.price };
-      const ticks = [...state.ticks.slice(-100), tick];
+      const prices = { ...state.prices };
+      for (const t of valid) prices[t.symbol] = t.price;
+      const ticks = [...state.ticks.slice(-100), ...valid].slice(-100);
       // Q5：由 tick 实时维护 1min K 线（tick=1分钟，后端 bar 时间公式同步复现）
       // S2 时段同步：TICKS_PER_DAY=240，1min 时间映射真实A股时段(0-119→9:30-11:30, 120-239→13:00-15:00)
-      const gameDay = Math.floor(tick.timestamp / 240);
-      const dayTick = tick.timestamp % 240;
-      const time = (dayTick < 120
-        ? new Date(2024, 0, 1 + gameDay, 9, 30 + dayTick)
-        : new Date(2024, 0, 1 + gameDay, 13, dayTick - 120)).toISOString();
       const klines = { ...state.klines };
-      const symKlines = { ...(klines[tick.symbol] || {}) };
-      const arr = (symKlines['1min'] || []).slice();
-      const last = arr[arr.length - 1];
-      if (last && new Date(last.time).getTime() === new Date(time).getTime()) {
-        // 同一分钟：更新 close/high/low，累加 volume
-        arr[arr.length - 1] = {
-          ...last,
-          close: tick.price,
-          high: Math.max(last.high, tick.price),
-          low: Math.min(last.low, tick.price),
-          volume: last.volume + tick.volume,
-        };
-      } else {
-        arr.push({ time, open: tick.price, high: tick.price, low: tick.price, close: tick.price, volume: tick.volume });
-        // 大 cap：session 内头部不滚动（防 LoD 头部桶重排 = 历史只读）
-        if (arr.length > 50000) arr.shift();
+      for (const tick of valid) {
+        const gameDay = Math.floor(tick.timestamp / 240);
+        const dayTick = tick.timestamp % 240;
+        const time = (dayTick < 120
+          ? new Date(2024, 0, 1 + gameDay, 9, 30 + dayTick)
+          : new Date(2024, 0, 1 + gameDay, 13, dayTick - 120)).toISOString();
+        const symKlines = { ...(klines[tick.symbol] || {}) };
+        const arr = (symKlines['1min'] || []).slice();
+        const last = arr[arr.length - 1];
+        if (last && new Date(last.time).getTime() === new Date(time).getTime()) {
+          // 同一分钟：更新 close/high/low，累加 volume
+          arr[arr.length - 1] = {
+            ...last,
+            close: tick.price,
+            high: Math.max(last.high, tick.price),
+            low: Math.min(last.low, tick.price),
+            volume: last.volume + tick.volume,
+          };
+        } else {
+          arr.push({ time, open: tick.price, high: tick.price, low: tick.price, close: tick.price, volume: tick.volume });
+          // 大 cap：session 内头部不滚动（防 LoD 头部桶重排 = 历史只读）
+          if (arr.length > 50000) arr.shift();
+        }
+        symKlines['1min'] = arr;
+        klines[tick.symbol] = symKlines;
       }
-      symKlines['1min'] = arr;
-      klines[tick.symbol] = symKlines;
       return { prices, ticks, klines };
     });
   },
@@ -281,3 +289,8 @@ export const useUIStore = create<UIState>((set) => ({
       newsHistory: [news, ...s.newsHistory].slice(0, 20),
     })),
 }));
+
+// Phase C: 401 统一走 logout（清 store 残留 + ProtectedRoute 自动跳登录，不再整页硬刷新）
+setUnauthorizedHandler(() => {
+  useAuthStore.getState().logout();
+});

@@ -3,24 +3,17 @@ import { connectWebSocket, disconnectWebSocket } from '../services/ws.client';
 import { useMarketStore, useUIStore } from '../store';
 
 export function useWebSocket() {
-  const addTick = useMarketStore((s) => s.addTick);
+  const addTicks = useMarketStore((s) => s.addTicks);
   const addNotification = useUIStore((s) => s.addNotification);
 
   useEffect(() => {
     const socket = connectWebSocket();
 
     socket.on('tick', (data: any) => {
-      // 负载校验：结构/字段非法时跳过，防止 addTick 内 Date 计算抛错（socket 回调 ErrorBoundary 拦不到）
+      // 负载校验：结构/字段非法时跳过（store 内还有逐条防御）
       if (!data || !Array.isArray(data.ticks)) return;
-      data.ticks.forEach((t: any) => {
-        if (
-          typeof t?.symbol !== 'string' ||
-          typeof t?.price !== 'number' || !isFinite(t.price) ||
-          typeof t?.volume !== 'number' || !isFinite(t.volume) ||
-          typeof t?.timestamp !== 'number' || !isFinite(t.timestamp) || t.timestamp < 0
-        ) return;
-        addTick(t);
-      });
+      // Phase C: 整批交给 store 批量 set（一次 setState 处理全部 tick）
+      addTicks(data.ticks);
     });
 
     socket.on('fill', (data: any) => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore, useMarketStore, useUIStore } from '../../store';
 import { adminApi, marketApi } from '../../services/api.client';
@@ -7,13 +7,31 @@ import { NotificationContainer } from '../UI/Notification';
 import { MarketIndexBar } from '../Trading/MarketIndexBar';
 import { NoticeCenter } from './NoticeCenter';
 import { SettingsModal } from './SettingsModal';
+// Phase C: 顶栏行情条独立 memo 子组件（原 AppLayout 订阅整个 prices 对象 → 每 tick 全树重渲染）
+const TopBarTicker = memo(function TopBarTicker() {
+  const p1 = useMarketStore((s) => s.prices['T1']);
+  const p2 = useMarketStore((s) => s.prices['C1']);
+  const p3 = useMarketStore((s) => s.prices['E2']);
+  return (
+    <>
+      {p1 !== undefined && (
+        <span>688001 芯澜: <b>{p1.toFixed(2)}</b></span>
+      )}
+      {p2 !== undefined && (
+        <span>600809 杏花: <b>{p2.toFixed(2)}</b></span>
+      )}
+      {p3 !== undefined && (
+        <span>300450 电芯: <b>{p3.toFixed(2)}</b></span>
+      )}
+    </>
+  );
+});
 export function AppLayout() {
   // WS 生命周期挂在布局顶层：路由切换不断线（全站只初始化一次）
   useWebSocket();
 
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const prices = useMarketStore((s) => s.prices);
   const latestNews = useUIStore((s) => s.latestNews);
   const navigate = useNavigate();
   const theme = useUIStore((s) => s.theme);
@@ -78,15 +96,7 @@ export function AppLayout() {
               {tickIntervalMs < 30000 ? '⏩ 高速回放（1秒=1分钟）' : '🕐 实时行情'}
             </span>
           )}
-          {prices['T1'] && (
-            <span>688001 芯澜: <b>{prices['T1'].toFixed(2)}</b></span>
-          )}
-          {prices['C1'] && (
-            <span>600809 杏花: <b>{prices['C1'].toFixed(2)}</b></span>
-          )}
-          {prices['E2'] && (
-            <span>300450 电芯: <b>{prices['E2'].toFixed(2)}</b></span>
-          )}
+          <TopBarTicker />
         </div>
 
         <NoticeCenter />

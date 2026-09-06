@@ -215,10 +215,14 @@ export function OrderPanel() {
           {orderType !== 'market' && (
             <div style={{ display: 'flex', gap: 6 }}>
               <input
-                className="input" type="number" placeholder="价格" value={orderPrice}
+                className="input" type="number" placeholder="价格" value={inPostClose ? String(livePrice.toFixed(2)) : orderPrice}
                 onChange={(e) => setOrderPrice(e.target.value)} step="0.01"
+                readOnly={inPostClose}
+                title={inPostClose ? '盘后固定价格交易限以收盘价申报' : undefined}
               />
-              <button className="btn btn-sm btn-ghost" title="填入现价" onClick={() => prices[selectedSymbol] && setOrderPrice(String(prices[selectedSymbol].toFixed(2)))}>现价</button>
+              {!inPostClose && (
+                <button className="btn btn-sm btn-ghost" title="填入现价" onClick={() => prices[selectedSymbol] && setOrderPrice(String(prices[selectedSymbol].toFixed(2)))}>现价</button>
+              )}
             </div>
           )}
           {(orderType === 'stop' || orderType === 'stop-limit') && (

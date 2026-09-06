@@ -207,6 +207,18 @@ a:hover { color: var(--color-brand-hover); }
   font-weight: 600;
 }
 
+/* P0 行情速度徽章（顶部状态栏：高速回放/实时行情）
+   Phase C: 从 .m-tab 规则体内移出（原嵌套被浏览器错误恢复丢弃，桌面端无样式） */
+.market-speed-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--color-warning);
+  white-space: nowrap;
+}
+
 .top-bar .user-info {
   display: flex;
   align-items: center;
@@ -1286,13 +1298,14 @@ body.density-compact .info-row { padding: 2px 0; }
   .m-view .chart-area { flex: 1; min-height: 0; }
   .m-view .stock-list-panel { flex: 1; min-height: 0; }
 
-  /* 底部 Tab 栏 */
+  /* 底部 Tab 栏（Phase C: safe-area 适配 iPhone 手势条） */
   .m-tabbar {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     height: 48px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     display: flex;
     background: var(--bg-card, #171922);
     border-top: 1px solid var(--border, #2e3240);
@@ -1305,17 +1318,6 @@ body.density-compact .info-row { padding: 2px 0; }
     border: none;
     background: transparent;
     color: #8b90a0;
-
-/* P0 行情速度徽章（顶部状态栏：高速回放/实时行情） */
-.market-speed-badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  color: var(--color-warning);
-  white-space: nowrap;
-}
     font-size: 13px;
     cursor: pointer;
     display: flex;

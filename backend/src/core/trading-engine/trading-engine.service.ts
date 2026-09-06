@@ -752,12 +752,13 @@ let TradingEngineService = class TradingEngineService {
     }
     // Phase A P0#3: 分红按"登记日（exDay-1）收盘持仓快照"发放（A股式），封堵除权日买入套利；
     // 净空头按每股扣息（真实市场做空者在除权日需支付股息）；paid 标记幂等防重复发放
-    async payDividends(dividends, exDay) {
+    // Phase C: 红利税二档制（dividendTaxRate）——CN ≤7交易日20%/>7日0%，HK 20%，US 30%；流水记税后净额（UI 口径一致）
+    async payDividends(dividends, exDay, market) {
         if (!dividends || dividends.length === 0)
             return 0;
-        return this.runExclusive(() => this.payDividendsInner(dividends, exDay));
+        return this.runExclusive(() => this.payDividendsInner(dividends, exDay, market));
     }
-    async payDividendsInner(dividends, exDay) {
+    async payDividendsInner(dividends, exDay, market) {
         const symbols = dividends.map((d) => d.symbol);
         const perShareBy = new Map<string, number>(dividends.map((d) => [String(d.symbol), Number(d.perShare)] as [string, number]));
         const snaps = await this.dividendSnapshotRepo.find({ where: { exDay: Number(exDay), paid: false } });
@@ -772,9 +773,13 @@ let TradingEngineService = class TradingEngineService {
             if (!account)
                 continue;
             const netQty = Number(snap.longQty || 0) - Number(snap.shortQty || 0);
+            // Phase C: 持有期 = 登记日（exDay-1） - 快照时点建仓日（lockDay=0 视为当日建仓）
+            const holdDays = Number(snap.lockDay || 0) > 0 ? Math.max(0, Number(exDay) - 1 - Number(snap.lockDay)) : 0;
+            const taxRate = constants_1.dividendTaxRate(market || 'CN', holdDays);
             // 幂等：paid 标记在资金变动后落库；异常中断后重跑靠 paid=false 过滤 + 下方 save 兜底
             if (netQty > 0) {
-                const amount = Number((netQty * perShare).toFixed(2));
+                const gross = Number((netQty * perShare).toFixed(2));
+                const amount = Number((gross * (1 - taxRate)).toFixed(2));
                 account.cash = Math.round((Number(account.cash) + amount) * 100) / 100;
                 await this.accountRepo.save(account);
                 try {
@@ -785,12 +790,13 @@ let TradingEngineService = class TradingEngineService {
                         quantity: netQty,
                         price: perShare,
                         turnover: amount,
-                        commission: 0, stampDuty: 0, transferFee: 0, totalFees: 0,
+                        // 红利税计入印花税/总费用字段便于对账（UI 展示 turnover 即税后到账额）
+                        commission: 0, stampDuty: Number((gross - amount).toFixed(2)), transferFee: 0, totalFees: Number((gross - amount).toFixed(2)),
                     }));
                 }
                 catch (e) { }
                 paid += amount;
-                this.logger.log(`💰 分红到账: ${snap.symbol} ${netQty}股 × ${perShare}元 = ${amount}元（快照口径）`);
+                this.logger.log(`💰 分红到账: ${snap.symbol} ${netQty}股 × ${perShare}元 = 税前${gross}，税后${amount}元（税率${(taxRate * 100).toFixed(0)}%，快照口径）`);
             }
             else if (netQty < 0) {
                 // 做空者除权日付息（真实市场规则），负数流水
@@ -834,6 +840,7 @@ let TradingEngineService = class TradingEngineService {
                     // 幂等：已存在则更新为最新收盘持仓（重复日终不会拍错）
                     existing.longQty = Number(pos.longQty || 0);
                     existing.shortQty = Number(pos.shortQty || 0);
+                    existing.lockDay = Number(pos.lockDay || 0);
                     await this.dividendSnapshotRepo.save(existing);
                     continue;
                 }
@@ -845,6 +852,7 @@ let TradingEngineService = class TradingEngineService {
                     exDay: Number(exDay),
                     longQty: Number(pos.longQty || 0),
                     shortQty: Number(pos.shortQty || 0),
+                    lockDay: Number(pos.lockDay || 0),
                     paid: false,
                 }));
                 created++;

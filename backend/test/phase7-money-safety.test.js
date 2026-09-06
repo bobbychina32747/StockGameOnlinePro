@@ -139,15 +139,33 @@ describe('Phase A 分红快照发息（P0#3）', () => {
     return { engine, snapRepo, accountRepo, txRepo };
   }
 
-  test('多头按登记日快照发息，快照置 paid', async () => {
+  test('多头按登记日快照发息，快照置 paid（lockDay=0 → 持有0日 → CN 红利税 20%）', async () => {
     const { engine, accountRepo, snapRepo, txRepo } = makeDivEnv([
-      { id: 'S1', accountId: 'AC1', symbol: 'T1', exDay: 6, longQty: 100, shortQty: 0, paid: false },
+      { id: 'S1', accountId: 'AC1', symbol: 'T1', exDay: 6, longQty: 100, shortQty: 0, lockDay: 0, paid: false },
     ]);
-    await engine.payDividends([{ symbol: 'T1', perShare: 2 }], 6);
+    await engine.payDividends([{ symbol: 'T1', perShare: 2 }], 6, 'CN');
     const acct = accountRepo.rows.find((a) => a.id === 'AC1');
-    expect(Number(acct.cash)).toBeCloseTo(1200, 2);
+    expect(Number(acct.cash)).toBeCloseTo(1160, 2); // 税前200 → 20%税 → 到账160
     expect(snapRepo.rows.find((s) => s.id === 'S1').paid).toBe(true);
-    expect(txRepo.rows.some((t) => t.side === 'DIVIDEND' && t.turnover === 200)).toBe(true);
+    expect(txRepo.rows.some((t) => t.side === 'DIVIDEND' && t.turnover === 160 && t.totalFees === 40)).toBe(true);
+  });
+
+  test('持有 >7 交易日免红利税（CN 二档制）', async () => {
+    const { engine, accountRepo } = makeDivEnv([
+      { id: 'S5', accountId: 'AC1', symbol: 'T1', exDay: 40, longQty: 100, shortQty: 0, lockDay: 30, paid: false },
+    ]);
+    await engine.payDividends([{ symbol: 'T1', perShare: 2 }], 40, 'CN');
+    const acct = accountRepo.rows.find((a) => a.id === 'AC1');
+    expect(Number(acct.cash)).toBeCloseTo(1200, 2); // 登记日 39 - 建仓日 30 = 9 日 >7 → 免税
+  });
+
+  test('HK 统一红利税 20%、US 统一 30%（长持有也收）', async () => {
+    const env1 = makeDivEnv([{ id: 'S6', accountId: 'AC1', symbol: 'T1', exDay: 40, longQty: 100, shortQty: 0, lockDay: 30, paid: false }]);
+    await env1.engine.payDividends([{ symbol: 'T1', perShare: 2 }], 40, 'HK');
+    expect(Number(env1.accountRepo.rows.find((a) => a.id === 'AC1').cash)).toBeCloseTo(1160, 2);
+    const env2 = makeDivEnv([{ id: 'S7', accountId: 'AC1', symbol: 'T1', exDay: 40, longQty: 100, shortQty: 0, lockDay: 30, paid: false }]);
+    await env2.engine.payDividends([{ symbol: 'T1', perShare: 2 }], 40, 'US');
+    expect(Number(env2.accountRepo.rows.find((a) => a.id === 'AC1').cash)).toBeCloseTo(1140, 2);
   });
 
   test('净空头除权日扣息（负 DIVIDEND 流水）', async () => {

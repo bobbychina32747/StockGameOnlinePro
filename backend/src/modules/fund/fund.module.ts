@@ -16,6 +16,9 @@ import fund_controller_1 = require("./fund.controller");
 
 import fund_service_1 = require("./fund.service");
 
+// Phase C: 赛季中禁基金申购/赎回（FundService 注入 SeasonService）
+import season_module_1 = require("../season/season.module");
+
 let FundModule = class FundModule {
     [key: string]: any;
 };
@@ -25,7 +28,7 @@ export { FundModule };
 FundModule = __decorate(
 [
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([account_entity_1.Account, fund_holding_entity_1.FundHolding])],
+        imports: [typeorm_1.TypeOrmModule.forFeature([account_entity_1.Account, fund_holding_entity_1.FundHolding]), season_module_1.SeasonModule],
         controllers: [fund_controller_1.FundController],
         providers: [fund_service_1.FundService],
         exports: [fund_service_1.FundService],

@@ -49,6 +49,12 @@ let AccountController = class AccountController {
     async transfer(user, fromMode, toMode, amount) {
         return this.accountService.transferCash(user.id, fromMode, toMode, amount);
     }
+    getAchievements(user) {
+        return this.accountService.getAchievements(user.id);
+    }
+    unlockAchievement(user, body) {
+        return this.accountService.unlockAchievement(user.id, body && body.code);
+    }
 };
 __decorate([
     (0, common_1.Get)(),
@@ -118,6 +124,21 @@ __decorate([
     __metadata("design:paramtypes", [user_entity_1.User, String, String]),
     __metadata("design:returntype", Promise)
 ], AccountController.prototype, "resetAccount", null);
+__decorate([
+    (0, common_1.Get)('achievements'),
+    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [user_entity_1.User]),
+    __metadata("design:returntype", Promise)
+], AccountController.prototype, "getAchievements", null);
+__decorate([
+    (0, common_1.Post)('achievements'),
+    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [user_entity_1.User, Object]),
+    __metadata("design:returntype", Promise)
+], AccountController.prototype, "unlockAchievement", null);
 
 export { AccountController };
 

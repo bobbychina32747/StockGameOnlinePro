@@ -17,17 +17,21 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-// 401 时清除token
+// 401 统一登出回调（由 store 注册，避免 api.client ↔ store 循环依赖）
+let unauthorizedHandler: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: () => void) {
+  unauthorizedHandler = fn;
+}
+
+// 401 时清除token并统一登出（Phase C：不再整页硬跳转，store 残留由 logout 清理）
 api.interceptors.response.use(
   (res) => res,
   (err: AxiosError) => {
-    // 登录/注册接口的 401 由业务层处理（展示错误信息），不整页跳转
+    // 登录/注册接口的 401 由业务层处理（展示错误信息），不触发登出
     const url = err.config?.url || '';
     const isAuthRequest = url.includes('/auth/login') || url.includes('/auth/register');
     if (err.response?.status === 401 && !isAuthRequest) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      if (unauthorizedHandler) unauthorizedHandler();
     }
     return Promise.reject(err);
   },
@@ -41,6 +45,14 @@ export const authApi = {
     api.post('/auth/register', { username, password }).then((r) => r.data),
 };
 
+// ─── Phase C: 模拟大赛 ───
+export const seasonApi = {
+  enroll: () => api.post('/season/enroll').then((r) => r.data),
+  current: () => api.get('/season/current').then((r) => r.data),
+  leaderboard: (market: string = 'ALL', limit: number = 20) => api.get('/season/leaderboard', { params: { market, limit } }).then((r) => r.data),
+  history: () => api.get('/season/history').then((r) => r.data),
+};
+
 // ─── Account (所有接口接受 mode 参数) ───
 export const accountApi = {
   get: (mode: string = 'US') => api.get(`/account?mode=${mode}`).then((r) => r.data),
@@ -48,6 +60,9 @@ export const accountApi = {
   history: (mode: string = 'US') => api.get(`/account/history?mode=${mode}`).then((r) => r.data),
   transactions: (mode: string = 'US') => api.get(`/account/transactions?mode=${mode}`).then((r) => r.data),
   reviews: () => api.get(`/account/reviews`).then((r) => r.data),
+  // Phase C: 成就服务端化
+  achievements: () => api.get(`/account/achievements`).then((r) => r.data),
+  unlockAchievement: (code: string) => api.post(`/account/achievements`, { code }).then((r) => r.data),
   setLeverage: (mode: string, leverage: number) =>
     api.post(`/account/leverage?mode=${mode}`, { leverage }).then((r) => r.data),
   reset: (mode: string, preset: string) =>

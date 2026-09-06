@@ -37,6 +37,11 @@ __decorate([
     (0, typeorm_1.Column)('float', { default: 0 }),
     __metadata("design:type", Number)
 ], DividendSnapshot.prototype, "shortQty", void 0);
+// Phase C: 快照时点的建仓日（红利税持有期近似：0=无记录按当日建仓）
+__decorate([
+    (0, typeorm_1.Column)('int', { default: 0 }),
+    __metadata("design:type", Number)
+], DividendSnapshot.prototype, "lockDay", void 0);
 // 发息幂等标记：防止重复日终结算重复发息
 __decorate([
     (0, typeorm_1.Column)({ default: false }),

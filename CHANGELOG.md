@@ -4,6 +4,26 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase C 规则补全 + 前端体验 + 模拟大赛 V1
+
+### Added
+- **红利税二档制**（teams 定稿）：A股持有 ≤7 交易日 20%、>7 交易日 0%（快照 lockDay 近似持有期）；HK 统一 20%、US 统一 30%；分红流水记税后净额、税额计入流水费用字段（UI 口径一致）（`dividendTaxRate` + `payDividends`）
+- **基金/ETF 费率模型**：申购费（ETF 0.15%/货基 0）、赎回费三档（<7交易日 1.5% / 7-30日 0.5% / ≥30日 0，`fund_holdings.firstBuyDay` 持有期）、币种按账户市场实时汇率折算（NAV 以 CNY 计价）；NAV 保持稳健上涨（风控红线：不重开重置/赎回套利窗口）（`fund.service.ts`）
+- **指数权重动态化**：自由流通市值加权（hash 稳定流通股本）+ 除数法点位连续 + 新股上市次日起 5 游戏日阶梯权重纳入（避免跳变）（`getIndices`）
+- **数据驱动教训卡**：单日大赚 >10%、满仓单票集中度 >80%（真实持仓/日收益触发，日结算幂等）（`risk-manager`）
+- **成就服务端化**：`achievements` 表（UNIQUE(userId,code) 幂等）+ `GET/POST /account/achievements` + 前端本地与服务端合并展示（跨设备持久）
+- **模拟大赛 V1**（快照净值赛 MVP，teams 定稿）：10 游戏日滚动赛季（`seasons`/`season_entries` 两表）、一键报名三市场同时参赛（首位报名者开赛、anchorDay 定格）、快照净值合成收益率排序（本金差异免疫）、前三 tierScore +300/200/100 荣誉奖励、30s 调度任一市场跑满自动结算并开新赛季、**赛季中已报名账户禁重置/划转/基金**；`POST /season/enroll` + `GET /season/current|leaderboard|history`；Ranking 页赛季榜/全服榜切换 + 报名入口
+- 新增测试 `phase9-season-rules.test.js`（红利税 4 例/基金费率 4 例/赛季报名结算幂等 5 例/涨跌停工具 1 例），后端 204→217
+
+### Changed
+- **前端性能四件套**：addTick 批量 set（一次 setState 处理整批 tick，消除每 tick O(n) 全拷）；AppLayout 顶栏行情条独立 memo 组件（整对象订阅 prices 不再带动全树重渲染）；实时周期盘口 15s 低频轮询（修复盘口整场冻结）；StockListPanel boards 依赖补 prices（板块涨跌实时）
+- **前端体验修复**：盘后窗口价格输入框只读锁定收盘价（销债）；CSS 徽章块移出错误嵌套（桌面端恢复样式）；移动端 Tab 栏 safe-area-inset-bottom；AchievementBoard 裸 JSON.parse 加安全回退；Ranking dayReturn=-1 除零防护；401 统一走 store logout（不再整页硬刷新）；删除 4 个空/死文件；生产构建关闭 sourcemap + echarts 独立分包（主包 1.4MB→357KB）
+- 分红快照实体新增 lockDay 列（红利税持有期口径，synchronize 自动迁移）
+
+### 取舍说明
+- 融券展期：裁剪为"无固定期限（已隐式展期）+ 日终利息已含券息"，不做展期端点（真实券商融券多为随借随还按日计息）
+- 段位评分数据驱动：推迟 Phase D（记 tech-debt 台账）
+
 ## [Unreleased] - Phase B 交易规则补全与盘后交易（评审 P1 全量，teams 协商定稿）
 
 ### Fixed

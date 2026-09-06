@@ -1,5 +1,6 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useUIStore } from '../../store';
+import { accountApi } from '../../services/api.client';
 
 // 成就定义：基于绩效指标判定（B3）
 interface Achievement {
@@ -22,8 +23,22 @@ const ACHIEVEMENTS: Achievement[] = [
 ];
 
 // 成就面板（localStorage 记录解锁，首次解锁弹通知）
+function safeParse(raw: string | null, fallback: any): any {
+  try {
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback; // Phase C: 数据损坏回退，不再炸 Profile 页
+  }
+}
 export function AchievementBoard({ perf }: { perf: any }) {
   const addNotification = useUIStore((s) => s.addNotification);
+  // Phase C: 服务端已解锁成就（跨设备持久）
+  const [serverUnlocked, setServerUnlocked] = useState<string[]>([]);
+  useEffect(() => {
+    accountApi.achievements().then((list) => {
+      if (Array.isArray(list)) setServerUnlocked(list.map((a: any) => a.code));
+    }).catch(() => {});
+  }, []);
 
   const results = useMemo(() => {
     const map: Record<string, boolean> = {};
@@ -33,7 +48,7 @@ export function AchievementBoard({ perf }: { perf: any }) {
 
   useEffect(() => {
     if (!perf) return;
-    const saved = JSON.parse(localStorage.getItem('ss.achievements') || '{}');
+    const saved = safeParse(localStorage.getItem('ss.achievements'), {});
     const next = { ...saved };
     let fresh = 0;
     for (const a of ACHIEVEMENTS) {
@@ -41,19 +56,21 @@ export function AchievementBoard({ perf }: { perf: any }) {
         next[a.id] = true;
         fresh++;
         setTimeout(() => addNotification(`🏅 解锁成就：${a.name}`, 'success'), fresh * 600);
+        // Phase C: 上报服务端幂等持久化（UNIQUE(userId,code)，重复忽略）
+        accountApi.unlockAchievement(a.id).catch(() => {});
       }
     }
     if (fresh > 0) localStorage.setItem('ss.achievements', JSON.stringify(next));
   }, [results, perf, addNotification]);
 
-  const unlockedCount = ACHIEVEMENTS.filter((a) => results[a.id]).length;
+  const unlockedCount = ACHIEVEMENTS.filter((a) => results[a.id] || serverUnlocked.includes(a.id)).length;
 
   return (
     <div className="card">
       <h3>🏅 成就 ({unlockedCount}/{ACHIEVEMENTS.length})</h3>
       <div className="achievement-grid">
         {ACHIEVEMENTS.map((a) => {
-          const got = results[a.id];
+          const got = results[a.id] || serverUnlocked.includes(a.id);
           return (
             <div key={a.id} className={`achievement-item ${got ? 'unlocked' : 'locked'}`} title={a.desc}>
               <span className="achievement-icon">{got ? a.icon : '🔒'}</span>

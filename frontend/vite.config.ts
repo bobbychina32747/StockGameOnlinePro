@@ -24,6 +24,14 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    // Phase C: 生产构建不携带 sourcemap（原 7.3MB 源码随包分发）；echarts 单独分包
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          echarts: ['echarts', 'echarts-for-react'],
+        },
+      },
+    },
   },
 });

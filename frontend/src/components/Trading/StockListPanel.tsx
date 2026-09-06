@@ -71,7 +71,8 @@ export function StockListPanel() {
       const leader = [...arr].sort((a, b) => liveQuote(sorted, prices, b.symbol).changePct - liveQuote(sorted, prices, a.symbol).changePct)[0];
       return { industry, avg, upCount, total: arr.length, leader };
     }).sort((a, b) => b.avg - a.avg);
-  }, [sorted]);
+    // Phase C: prices 参与计算必须进依赖，否则板块涨跌幅滞后至下一次 stocks 轮询
+  }, [sorted, prices]);
 
   return (
     <div className="stock-list-panel">
