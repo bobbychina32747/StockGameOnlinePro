@@ -88,6 +88,9 @@ __decorate([
     __decorate([(0, typeorm_1.Column)({ default: '青铜' }), __metadata("design:type", String)], Account.prototype, "tier", void 0);
     __decorate([(0, typeorm_1.Column)('float', { default: 0 }), __metadata("design:type", Number)], Account.prototype, "tierScore", void 0);
     __decorate([(0, typeorm_1.Column)({ default: 0 }), __metadata("design:type", Number)], Account.prototype, "totalTrades", void 0);
+    // Phase E: 赛季积分（荣誉分，与 tierScore 段位分拆列——tierScore 由 computeTier 每日覆盖为段位口径，
+    // 赛季奖励只写入 seasonPoints 仅赛季结算单一路径累加；三市场账户同额记账为 V1 兼容语义）
+    __decorate([(0, typeorm_1.Column)('float', { default: 0 }), __metadata("design:type", Number)], Account.prototype, "seasonPoints", void 0);
     // Phase A 防刷钱：重置冷却（按游戏日）与重置计数（审计）
     __decorate([(0, typeorm_1.Column)('int', { default: 0 }), __metadata("design:type", Number)], Account.prototype, "lastResetDay", void 0);
     __decorate([(0, typeorm_1.Column)('int', { default: 0 }), __metadata("design:type", Number)], Account.prototype, "resetCount", void 0);

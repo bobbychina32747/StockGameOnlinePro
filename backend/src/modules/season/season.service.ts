@@ -25,6 +25,11 @@ import account_entity_1 = require("../../infrastructure/database/entities/accoun
 // Phase C: 模拟大赛 V1（快照净值赛 MVP：10 游戏日滚动赛季、手动报名、收益率排序、荣誉奖励、赛季中禁重置/划转/基金）
 // 行情引擎注入：默认 CN 实例 + HK/US 字符串 token（与 market-data.module 工厂一致）
 import market_data_service_1 = require("../../core/market-data/market-data.service");
+
+// Phase E: 赛季类型轮换表（teams 定稿顺序 biweekly→monthly→weekly：跨度变化可感知、避免连续短赛疲劳；
+// 首位 biweekly 保证改造后首个新赛季仍为现口径 10 游戏日，线上无跳变）
+const SEASON_TYPE_CYCLE = ['biweekly', 'monthly', 'weekly'];
+const TYPE_DURATION_DAYS = { weekly: 5, biweekly: 10, monthly: 20 };
 let SeasonService = class SeasonService {
     [key: string]: any;
     constructor(seasonRepo, entryRepo, accountRepo, marketData, marketDataHK, marketDataUS) {
@@ -50,16 +55,20 @@ let SeasonService = class SeasonService {
             where: [{ status: season_entity_1.SeasonStatus.ENROLLING }, { status: season_entity_1.SeasonStatus.RUNNING }],
         });
         if (!season) {
-            const settled = await this.seasonRepo.find({ order: { seq: 'DESC' }, take: 1 });
+            const settled = await this.seasonRepo.find({ where: { status: season_entity_1.SeasonStatus.SETTLED } });
+            settled.sort((a, b) => Number(b.seq) - Number(a.seq)); // fakeRepo 无 order 支持 → 服务内排序
             const seq = (settled.length ? Number(settled[0].seq) : 0) + 1;
+            // Phase E: type 轮换决定 durationDays（durationDays 列保留供读侧零改动）
+            const type = SEASON_TYPE_CYCLE[(seq - 1) % SEASON_TYPE_CYCLE.length];
             season = await this.seasonRepo.save(this.seasonRepo.create({
                 seq,
                 name: `第 ${seq} 赛季`,
                 status: season_entity_1.SeasonStatus.ENROLLING,
                 anchorDay: '{}',
-                durationDays: 10,
+                type,
+                durationDays: TYPE_DURATION_DAYS[type],
             }));
-            this.logger.log(`🏆 新赛季开启: 第 ${seq} 赛季（报名中）`);
+            this.logger.log(`🏆 新赛季开启: 第 ${seq} 赛季（${type}，${TYPE_DURATION_DAYS[type]} 游戏日）`);
         }
         return season;
     }
@@ -105,7 +114,7 @@ let SeasonService = class SeasonService {
             await this.seasonRepo.save(season);
             this.logger.log(`🏆 ${season.name} 开赛（anchorDay=${season.anchorDay}，${season.durationDays} 游戏日）`);
         }
-        return { success: true, season: { id: season.id, seq: season.seq, name: season.name, status: season.status, anchorDay: JSON.parse(season.anchorDay), durationDays: season.durationDays }, entries: entries.map((e) => e.id), created };
+        return { success: true, season: { id: season.id, seq: season.seq, name: season.name, type: season.type, status: season.status, anchorDay: JSON.parse(season.anchorDay), durationDays: season.durationDays }, entries: entries.map((e) => e.id), created };
     }
     // 赛季中禁重置/划转/基金（MVP 一刀切：有 active 报名的用户在 RUNNING 赛季中冻结这三项）
     async isBlocked(userId) {
@@ -160,13 +169,24 @@ let SeasonService = class SeasonService {
             myRank = myRank >= 0 ? myRank + 1 : null;
         }
         return {
-            season: { id: season.id, seq: season.seq, name: season.name, status: season.status, anchorDay: anchor, durationDays: season.durationDays, daysLeft },
+            season: { id: season.id, seq: season.seq, name: season.name, type: season.type, status: season.status, anchorDay: anchor, durationDays: season.durationDays, daysLeft },
             enrolled: entries.length > 0,
             myReturn,
             myRank,
         };
     }
-    // 结算：active 报名固化 finalEquity/finalReturn/排名；前三 tierScore +300/200/100；幂等（RUNNING 才执行，串行锁防并发）
+    // 结算：active 报名固化 finalEquity/finalReturn/排名；前三 seasonPoints +300/200/100；幂等（RUNNING 才执行，串行锁防并发）
+    // Phase E: 奖励改记 seasonPoints（荣誉积分独立列）——tierScore 由 computeTier 每日覆盖为段位分，
+    // 双语义冲突见 phaseE 方案 01；积分按用户计一次，账户层三市场同额累加仅为 V1 记账语义兼容
+    rewardFor(rank) {
+        if (rank === 1)
+            return { medal: 'gold', points: 300 };
+        if (rank === 2)
+            return { medal: 'silver', points: 200 };
+        if (rank === 3)
+            return { medal: 'bronze', points: 100 };
+        return null; // 前三开外无奖励（archive/points 共用查表，防常量漂移）
+    }
     async settleSeason() {
         const run = this.settleChain.then(() => this.settleSeasonInner());
         this.settleChain = run.then(() => undefined, () => undefined);
@@ -193,12 +213,12 @@ let SeasonService = class SeasonService {
         const ranking = [...byUser.values()]
             .map((r) => ({ userId: r.userId, ret: r.startSum > 0 ? (r.equitySum - r.startSum) / r.startSum : 0 }))
             .sort((a, b) => b.ret - a.ret);
-        // 前三 tierScore 奖励（荣誉体系，不印钱）
-        const rewards = [300, 200, 100];
+        // 前三 seasonPoints 奖励（荣誉体系，不印钱；与 V1 一致：该用户全部市场账户同额累加）
         for (let i = 0; i < Math.min(3, ranking.length); i++) {
+            const reward = this.rewardFor(i + 1);
             const accounts = await this.accountRepo.find({ where: { userId: ranking[i].userId } });
             for (const account of accounts) {
-                account.tierScore = Number(account.tierScore || 0) + rewards[i];
+                account.seasonPoints = Number(account.seasonPoints || 0) + reward.points;
                 await this.accountRepo.save(account);
             }
         }
@@ -236,9 +256,144 @@ let SeasonService = class SeasonService {
             const entries = await this.entryRepo.find({ where: { seasonId: s.id, status: season_entry_entity_1.EntryStatus.SETTLED } });
             const champs = entries.filter((e) => e.finalRank === 1).map((e) => ({ userId: e.userId, finalReturn: Number(e.finalReturn) * 100, finalRank: e.finalRank }));
             const uniq = [...new Map(champs.map((c) => [c.userId, c])).values()];
-            out.push({ seq: s.seq, name: s.name, settledAt: s.settledAt, champions: uniq });
+            out.push({ seq: s.seq, name: s.name, type: s.type, settledAt: s.settledAt, champions: uniq });
         }
         return out;
+    }
+    // Phase E V2: 赛程日历——DB 当前赛季（enrolling/running）+ 合成未来届（不落库）。
+    // 时间语义：快档下游戏日与真实日历解耦，startDay 为相对今日的偏移（估算值，文档已注明）。
+    // 注意：fakeRepo 无 order 支持 → 服务内显式按 seq 排序，勿依赖仓库层排序。
+    async schedule(count = 6) {
+        const gameDays = this.gameDays();
+        const current = await this.seasonRepo.findOne({
+            where: [{ status: season_entity_1.SeasonStatus.ENROLLING }, { status: season_entity_1.SeasonStatus.RUNNING }],
+        });
+        const out = [];
+        let seq = 1;
+        let nextStart = 0; // 下届 startDay（相对 today）
+        if (current) {
+            seq = Number(current.seq);
+            const anchor = JSON.parse(current.anchorDay || '{}');
+            const duration = Number(current.durationDays);
+            const elapsed = current.status === season_entity_1.SeasonStatus.RUNNING
+                ? Math.max(0, Number(gameDays.CN) - Number(anchor.CN || 0), Number(gameDays.HK) - Number(anchor.HK || 0), Number(gameDays.US) - Number(anchor.US || 0))
+                : 0;
+            out.push({
+                seq, name: current.name, type: current.type, status: current.status,
+                startDay: 0, durationDays: duration,
+                daysLeft: current.status === 'running' ? Math.max(0, duration - elapsed) : null,
+                anchorDay: current.status === 'running' ? anchor : null,
+            });
+            nextStart = Math.max(0, duration - elapsed);
+        }
+        else {
+            const settled = await this.seasonRepo.find({ order: { seq: 'DESC' }, take: 1 });
+            seq = settled.length ? Number(settled[0].seq) : 0;
+        }
+        const want = Math.max(0, Math.min(Number.isFinite(Number(count)) && Number(count) > 0 ? Number(count) : 6, 100) - out.length);
+        for (let i = 0; i < want; i++) {
+            seq += 1;
+            const type = SEASON_TYPE_CYCLE[(seq - 1) % SEASON_TYPE_CYCLE.length];
+            out.push({ seq, name: `第 ${seq} 赛季`, type, status: 'upcoming', startDay: nextStart, durationDays: TYPE_DURATION_DAYS[type], daysLeft: null });
+            nextStart += TYPE_DURATION_DAYS[type];
+        }
+        return { today: gameDays, seasons: out };
+    }
+    // Phase E V2: 战绩档案——最小口径两点曲线（报名起点+结算终点；season_entries 无逐日净值、
+    // daily_snapshots 无 accountId 无法归属账户，逐日曲线裁到 V3）；档案用结算时固化值，不回溯账户现值
+    async archive(seasonId, userId) {
+        const season = await this.seasonRepo.findOne({ where: { id: seasonId } });
+        if (!season || season.status !== season_entity_1.SeasonStatus.SETTLED) {
+            return { success: false, error: '赛季不存在或未结算' };
+        }
+        const entries = await this.entryRepo.find({ where: { seasonId: season.id, status: season_entry_entity_1.EntryStatus.SETTLED } });
+        const byUser = new Map();
+        for (const e of entries) {
+            const row = byUser.get(e.userId) || { userId: e.userId, startSum: 0, equitySum: 0, bestRank: null };
+            row.startSum += Number(e.startEquity);
+            row.equitySum += Number(e.finalEquity);
+            if (e.finalRank !== null && e.finalRank !== undefined && (row.bestRank === null || Number(e.finalRank) < Number(row.bestRank)))
+                row.bestRank = Number(e.finalRank);
+            byUser.set(e.userId, row);
+        }
+        const rows = [...byUser.values()]
+            .map((r) => ({ userId: r.userId, startSum: r.startSum, equitySum: r.equitySum, ret: r.startSum > 0 ? (r.equitySum - r.startSum) / r.startSum : 0, bestRank: r.bestRank }))
+            .sort((a, b) => b.ret - a.ret);
+        const championRow = rows.length ? rows[0] : null;
+        const champion = championRow ? { userId: championRow.userId, ret: Number((championRow.ret * 100).toFixed(2)) } : null;
+        const toCurve = (row) => [
+            { point: '报名', equity: Number(row.startSum.toFixed(2)) },
+            { point: '结算', equity: Number(row.equitySum.toFixed(2)) },
+        ];
+        const championEntries = championRow ? entries.filter((e) => e.userId === championRow.userId).map((e) => ({ marketMode: e.marketMode, startEquity: Number(e.startEquity), finalEquity: Number(e.finalEquity), ret: Number((e.finalReturn || 0) * 100).toFixed(2) })) : null;
+        let mine = null;
+        const myRow = rows.find((r) => r.userId === userId);
+        if (myRow) {
+            const rank = rows.indexOf(myRow) + 1;
+            const reward = this.rewardFor(rank);
+            const myEntries = entries.filter((e) => e.userId === userId).map((e) => ({ marketMode: e.marketMode, startEquity: Number(e.startEquity), finalEquity: Number(e.finalEquity), ret: Number((e.finalReturn || 0) * 100).toFixed(2) }));
+            mine = {
+                rank,
+                ret: Number((myRow.ret * 100).toFixed(2)),
+                medal: reward ? reward.medal : null,
+                points: reward ? reward.points : 0,
+                curve: toCurve(myRow),
+                entries: myEntries,
+            };
+        }
+        return {
+            success: true,
+            season: { seq: season.seq, name: season.name, type: season.type, settledAt: season.settledAt, entriesCount: entries.length, champion },
+            mine,
+            championCurve: championRow ? { userId: championRow.userId, entries: championEntries, curve: toCurve(championRow) } : null,
+        };
+    }
+    // Phase E V2: 赛季积分榜——用户级口径取 max(各账户 seasonPoints)（V1 结算对三市场账户同额累加，
+    // sum 会把单场胜利计 ×3 失真）；consecutiveWins 由已结算 entries 推导（从最近一届往回数连续冠军）
+    async points(limit = 20) {
+        const settled = await this.seasonRepo.find({ where: { status: season_entity_1.SeasonStatus.SETTLED } });
+        settled.sort((a, b) => Number(b.seq) - Number(a.seq)); // fakeRepo 无 order，服务内排序
+        const users = new Set();
+        const entryAll = [];
+        for (const s of settled) {
+            const es = await this.entryRepo.find({ where: { seasonId: s.id, status: season_entry_entity_1.EntryStatus.SETTLED } });
+            for (const e of es) {
+                users.add(e.userId);
+                entryAll.push({ seasonSeq: Number(s.seq), userId: e.userId, finalRank: e.finalRank });
+            }
+        }
+        const pointsByUser = new Map();
+        for (const u of users) {
+            // 逐用户查询（fake 天然支持等值 where，避免 In 兼容面扩散）
+            const accounts = await this.accountRepo.find({ where: { userId: u } });
+            pointsByUser.set(u, accounts.reduce((m, a) => Math.max(m, Number(a.seasonPoints || 0)), 0));
+        }
+        // consecutiveWins：按赛季 seq 降序推每个用户从最近一届往回数连续冠军届数，遇非冠军即断
+        const bySeason = new Map();
+        for (const e of entryAll) {
+            const arr = bySeason.get(e.seasonSeq) || [];
+            arr.push(e);
+            bySeason.set(e.seasonSeq, arr);
+        }
+        const winsByUser = new Map();
+        for (const u of users) {
+            let wins = 0;
+            for (const s of settled) { // settled 已按 seq 降序
+                const es = bySeason.get(Number(s.seq)) || [];
+                const mine = es.find((e) => e.userId === u);
+                if (!mine)
+                    continue; // 未参赛的届跳过（不打断连续夺冠）
+                if (Number(mine.finalRank) === 1)
+                    wins += 1;
+                else
+                    break;
+            }
+            winsByUser.set(u, wins);
+        }
+        const rows = [...users]
+            .map((u) => ({ userId: u, points: pointsByUser.get(u) || 0, consecutiveWins: winsByUser.get(u) || 0 }))
+            .sort((a, b) => b.points - a.points || b.consecutiveWins - a.consecutiveWins);
+        return rows.slice(0, Math.min(Math.max(Number(limit) || 20, 1), 100)).map((r, i) => ({ rank: i + 1, ...r }));
     }
 };
 

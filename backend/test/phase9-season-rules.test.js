@@ -137,7 +137,7 @@ describe('Phase C 模拟大赛 V1', () => {
     expect(Number(board[0].seasonReturn)).toBeCloseTo(20, 1);
     expect(Number(board[1].seasonReturn)).toBeCloseTo(10, 1);
   });
-  test('结算：固化收益与排名、前三 tierScore 奖励、幂等', async () => {
+  test('结算：固化收益与排名、前三 seasonPoints 奖励、幂等', async () => {
     const { svc, seasonRepo, entryRepo, accountRepo } = makeSeason(accounts, { gameDay: 10 });
     await svc.enroll('U1');
     entryRepo.rows.push({ id: 'E4', seasonId: seasonRepo.rows[0].id, userId: 'U2', accountId: 'AC4', marketMode: 'CN', startEquity: 50000, startDay: 10, status: 'active' });
@@ -151,9 +151,11 @@ describe('Phase C 模拟大赛 V1', () => {
     expect(seasonRepo.rows[0].status).toBe('settled');
     expect(entryRepo.rows.every((e) => e.status === 'settled' && e.finalReturn !== undefined)).toBe(true);
     const u2 = accountRepo.rows.find((a) => a.id === 'AC4');
-    expect(Number(u2.tierScore)).toBe(300); // 冠军奖励
+    expect(Number(u2.seasonPoints)).toBe(300); // 冠军奖励（Phase E 拆列后记 seasonPoints）
+    expect(Number(u2.tierScore)).toBe(0); // 段位分不被赛季奖励污染
     const u1 = accountRepo.rows.find((a) => a.id === 'AC1');
-    expect(Number(u1.tierScore)).toBe(200);
+    expect(Number(u1.seasonPoints)).toBe(200);
+    expect(Number(u1.tierScore)).toBe(0);
     // 幂等：无 RUNNING 赛季再结算
     const r2 = await svc.settleSeason();
     expect(r2.success).toBe(false);

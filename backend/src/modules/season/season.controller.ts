@@ -35,6 +35,16 @@ let SeasonController = class SeasonController {
     history() {
         return this.seasonService.history();
     }
+    // Phase E V2: 赛程日历 / 战绩档案 / 赛季积分榜
+    schedule(count) {
+        return this.seasonService.schedule(count);
+    }
+    archive(user, seasonId) {
+        return this.seasonService.archive(seasonId, user.id);
+    }
+    points(limit) {
+        return this.seasonService.points(limit);
+    }
 };
 __decorate([
     (0, common_1.Post)('enroll'),
@@ -64,6 +74,28 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], SeasonController.prototype, "history", null);
+__decorate([
+    (0, common_1.Get)('schedule'),
+    __param(0, (0, common_1.Query)('count')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", Promise)
+], SeasonController.prototype, "schedule", null);
+__decorate([
+    (0, common_1.Get)('archive/:seasonId'),
+    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('seasonId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [user_entity_1.User, String]),
+    __metadata("design:returntype", Promise)
+], SeasonController.prototype, "archive", null);
+__decorate([
+    (0, common_1.Get)('points'),
+    __param(0, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", Promise)
+], SeasonController.prototype, "points", null);
 
 export { SeasonController };
 

@@ -14,6 +14,12 @@ export enum SeasonStatus {
     RUNNING = 'running',
     SETTLED = 'settled',
 }
+// Phase E: 赛季类型（weekly=5 / biweekly=10 / monthly=20 游戏日；轮换开赛见 season.service）
+export enum SeasonType {
+    WEEKLY = 'weekly',
+    BIWEEKLY = 'biweekly',
+    MONTHLY = 'monthly',
+}
 
 // Phase C: 模拟大赛赛季（快照净值赛 MVP：10 游戏日滚动赛季，手动报名）
 let Season = class Season {
@@ -35,6 +41,11 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'simple-enum', enum: SeasonStatus, default: SeasonStatus.ENROLLING }),
     __metadata("design:type", String)
 ], Season.prototype, "status", void 0);
+// Phase E: 赛季类型；durationDays 列保留（读侧零改动，开赛时由 type 同步写入）
+__decorate([
+    (0, typeorm_1.Column)({ type: 'simple-enum', enum: SeasonType, default: SeasonType.BIWEEKLY }),
+    __metadata("design:type", String)
+], Season.prototype, "type", void 0);
 // 开赛时各市场 gameDay（JSON：{CN,HK,US}），赛季结束判定 = 任一市场 gameDay ≥ anchor+duration
 __decorate([
     (0, typeorm_1.Column)({ type: 'text', default: '{}' }),
