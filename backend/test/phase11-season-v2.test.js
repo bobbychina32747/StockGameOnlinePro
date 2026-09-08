@@ -135,6 +135,13 @@ describe('Phase E 大赛 V2：类型轮换与赛程', () => {
   });
 });
 
+describe('Phase E API 文档防腐烂（V2 新路由必须收录）', () => {
+  const apiMd = fs.readFileSync(path.resolve(__dirname, '../../docs/API.md'), 'utf8');
+  test.each(['GET /season/schedule', 'GET /season/archive/:seasonId', 'GET /season/points', 'seasonPoints', 'consecutiveWins'])('API.md 收录 %s', (term) => {
+    expect(apiMd).toContain(term);
+  });
+});
+
 describe('Phase E 注册枚举面收口（方案 B）', () => {
   const { AuthService } = require('../dist/src/modules/auth/auth.service');
   const bcrypt = require('bcrypt');

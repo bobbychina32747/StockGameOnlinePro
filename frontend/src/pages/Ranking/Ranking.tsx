@@ -101,6 +101,12 @@ export default function Ranking() {
       <div className="tournament-banner">
         <div className="tournament-title">
           <b>🏆 {seasonInfo?.season?.name || '模拟炒股大赛'}</b>
+          {/* Phase E: 赛季类型标签（teams 红线：报名入口必须可见类型与时长） */}
+          {seasonInfo?.season?.type && (
+            <span className="season-type-tag">
+              {seasonInfo.season.type === 'weekly' ? `周赛 · ${seasonInfo.season.durationDays} 游戏日` : seasonInfo.season.type === 'monthly' ? `月赛 · ${seasonInfo.season.durationDays} 游戏日` : `双周赛 · ${seasonInfo.season.durationDays} 游戏日`}
+            </span>
+          )}
           <span>
             {seasonInfo?.season?.status === 'enrolling' && '报名中 · 首位报名者开赛'}
             {seasonInfo?.season?.status === 'running' && `赛季进行中 · 剩余 ${seasonInfo.season.daysLeft} 个游戏日`}

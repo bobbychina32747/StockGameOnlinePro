@@ -10,7 +10,7 @@
 - 股票代码约定：`H` 前缀=港股，`U` 前缀=美股，其余=A股（如 `T1`/`C1`、`H001`、`U001`）
 - Swagger 交互文档：**仅 development 环境**挂载 `GET /api/docs`
 - 限流：`/api/auth/*` 每 IP 10 次/分；`/api/market/backtest` 每 IP 20 次/分。超限返回 `429 {"statusCode":429,"message":"请求过于频繁，请稍后再试"}`
-- 错误约定：Nest 异常返回 `{statusCode, message, error}`；401=未认证/凭证错、403=越权、404、409（注册重名）、429=限流。多数交易类业务拒绝以 HTTP 200 + `{success:false, error}` 返回（逐端点注明）
+- 错误约定：Nest 异常返回 `{statusCode, message, error}`；401=未认证/凭证错、403=越权、404、429=限流。多数业务拒绝以 HTTP 200 + `{success:false, error}` 返回（逐端点注明，注册重名亦走此约定）
 - 请求体校验：ValidationPipe `whitelist+forbidNonWhitelisted`——未知字段直接 400
 
 ---
@@ -21,7 +21,7 @@
 ```json
 { "username": "你的用户名(2-50字符)", "password": "你的密码(8-72字符)" }
 ```
-注册即创建 CN/HK/US 三市场账户，各 100000 初始资金。返回 `{user:{id,username,role,isActive,createdAt,updatedAt}, token}`；重名返回 `409 用户名已存在`。
+注册即创建 CN/HK/US 三市场账户，各 100000 初始资金。返回 `{user:{id,username,role,isActive,createdAt,updatedAt}, token}`；重名返回 **HTTP 200 + `{success:false, error:'注册失败，请更换用户名'}`**（枚举面收口：状态码与文案均不区分「已存在/可注册」）。
 
 ### POST /auth/login（公开，HTTP 200）
 ```json
@@ -202,21 +202,35 @@ timeframe: `1min`（默认）/ `5min` / `60min` / `daily` / `weekly` / `monthly`
 
 ---
 
-## 7. 赛季（模拟大赛 V1，四端点全部需 token）
+## 7. 赛季（模拟大赛 V2，全部需 token）
 
-10 游戏日滚动快照净值赛；报名即三市场同时参赛（首个报名者触发开赛，anchorDay 定格）；赛季自动结算并开新赛季。
+快照净值赛；报名即三市场同时参赛（首个报名者触发开赛，anchorDay 定格）；赛季自动结算并轮换开新赛季。
+**赛季类型轮换**（Phase E）：`biweekly` 双周赛 10 游戏日 → `monthly` 月赛 20 游戏日 → `weekly` 周赛 5 游戏日，循环。
 
 ### POST /season/enroll — 报名
-成功 `{success, season:{id,seq,name,status,anchorDay,durationDays}, entries[], created}`；重复报名/已开赛 → `{success:false,error:'当前赛季已开赛，报名已截止'}`。
+成功 `{success, season:{id,seq,name,type,status,anchorDay,durationDays}, entries[], created}`；重复报名/已开赛 → `{success:false,error:'当前赛季已开赛，报名已截止'}`。
 
 ### GET /season/current — 我的状态
-`{season:{...,daysLeft}, enrolled, myReturn, myRank}`
+`{season:{id,seq,name,type,status,anchorDay,durationDays,daysLeft}, enrolled, myReturn, myRank}`
 
 ### GET /season/leaderboard?market=ALL&limit=20 — 赛季榜
 合成收益率口径（Σ净值-Σ起点）/Σ起点（本金差异免疫）；market=ALL|CN|HK|US，limit 1~100。返回 `[{userId, seasonReturn, seasonPnl}]`（此表返回 userId 原值，与 /ranking 的脱敏口径不同）。
 
 ### GET /season/history — 已结算赛季（最近 5 届）
-`[{seq,name,settledAt,champions[]}]`
+`[{seq,name,type,settledAt,champions[]}]`
+
+### GET /season/schedule?count=6 — 赛程日历（Phase E）
+当前赛季（enrolling/running）+ 合成未来届（不落库；`startDay` 为相对今日的游戏日偏移，**估算值**，快档下游戏日与真实日历解耦）。返回 `{today:{CN,HK,US}, seasons:[{seq,name,type,status,startDay,durationDays,daysLeft,anchorDay?}]}`，count 钳制 1~100。
+
+### GET /season/archive/:seasonId — 战绩档案（Phase E）
+已结算赛季：`{success, season:{seq,name,type,settledAt,entriesCount,champion}, mine:{rank,ret,medal,points,curve,entries}|null, championCurve}`。curve 为**两点最小口径**（报名起点→结算终点；逐日净值需赛季快照结构升级，裁到 V3）。未结算/不存在 → `{success:false,error:'赛季不存在或未结算'}`。
+
+### GET /season/points?limit=20 — 赛季积分榜（Phase E）
+`[{rank, userId, points, consecutiveWins}]`。points 为**用户级口径 = max(该用户各市场账户 seasonPoints)**（三市场账户同额记账为 V1 兼容语义，sum 会把单场胜利 ×3 失真）；consecutiveWins = 从最近一届往回数连续冠军届数（未参赛届跳过）。
+
+### 赛季积分说明（Phase E 拆列）
+- `seasonPoints`：荣誉积分，仅赛季结算前三名 +300/200/100 累加（该用户全部市场账户同额）
+- `tierScore`：段位分，由日终 computeTier 按绩效公式**覆盖**（两列互不隐式互算）
 
 **赛季冻结**：赛季 RUNNING 中、有 ACTIVE 报名的用户——账户重置、跨市场划转、基金申购/赎回全部关闭（返回 `{success:false,error}`）。
 
@@ -315,7 +329,7 @@ history = requests.get(f'{BASE}/trading/history', params={'mode': 'US'}, headers
 - **交易时段**：按本地时钟+节假日历判断（CN 9:30-11:30/13:00-15:00；HK 9:30-12:00/13:00-16:00；US 按美东时段含夏令时）；休市下单被拒（管理员调试模式除外）
 - **跨市场划转**：动态汇率（HK/US 逐日 ±3% 随机游走）+ 0.1% 手续费；赛季报名中禁划转
 - **重置**：需无持仓/无基金份额/无挂单 + 冷却 1 游戏日；RESET_ENABLED=false（大赛中）与赛季报名中禁重置
-- **赛季**：10 游戏日滚动赛季；赛季中已报名账户禁重置/划转/基金；前三名 tierScore +300/200/100
+- **赛季**：类型轮换（双周10日/月赛20日/周赛5日）；赛季中已报名账户禁重置/划转/基金；前三名 seasonPoints +300/200/100（与段位 tierScore 分离）
 - 模拟世界：宏观因子（宏观经济/行业景气/市场情绪/政策风险等）受股票表现反馈影响，新闻定向冲击个股/行业——策略可结合 `news` 事件与 `/market/flow-signals` 资金流信号
 
 ---

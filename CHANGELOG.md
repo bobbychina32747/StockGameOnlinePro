@@ -4,6 +4,23 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase E 竞技化：模拟大赛 V2 + 债务清理
+
+### Changed
+- **seasonPoints 拆列**（销 P2 tierScore 双语义冲突）：account 新增 `seasonPoints` 荣誉积分列，赛季前三奖励由 tierScore 累加改为 seasonPoints（+300/200/100，该用户全部市场账户同额记账为 V1 兼容语义）；tierScore 归 computeTier 段位口径，两列互不隐式互算（phase9 断言改口径 + 锁 tierScore=0）
+- **注册用户名枚举面收口**（teams 方案 B）：register 重名由 409 改为 HTTP 200 + `{success:false,error:'注册失败，请更换用户名'}`——状态码与文案均不区分「已存在/可注册」；前端 Login 显式 `success===false` 判错（已核验 api.client 拦截器仅特判 401 不吞 200 包裹）
+- **红利税持有期修复**：lockDay 建仓时记 `currentDay`（此前恒 0 → 持有期恒 0 → CN 长线玩家恒按 20% 档错收）；加仓不刷新（保留最早建仓日）；resetAccount 不动 currentDay 已核验无漏税面
+
+### Added
+- **模拟大赛 V2**：seasons 加 `type`（weekly=5/月赛 monthly=20/双周 biweekly=10 游戏日；teams 定稿轮换 biweekly→monthly→weekly，首位兼容存量 10 日语义）；`GET /season/schedule`（赛程日历，合成未来届 + startDay 相对偏移估算值）；`GET /season/archive/:seasonId`（战绩档案：排名/奖牌/积分/报名起点→结算终点两点曲线/分市场明细/冠军对比，未结算返回 200+success:false）；`GET /season/points`（积分榜 max 口径防单场 ×3 失真 + 连续夺冠由 entries 推导）；前端报名横幅加赛季类型标签（teams 红线：类型与时长玩家可见）
+- 新增测试 `phase11-season-v2.test.js` 23 例（拆列/轮换/赛程/档案/积分榜/注册/lockDay/API 防腐烂），后端 304→327、前端 52 例全绿
+
+### 取舍说明
+- 赛季类型轮换顺序采用产品定稿 biweekly→monthly→weekly（跨度变化可感知、避免连续短赛疲劳）；月赛 20 日等待由 daysLeft 可见性缓解
+- archive 曲线为两点最小口径（season_entries 无逐日净值且 daily_snapshots 无 accountId 无法归属），逐日曲线裁到 V3
+- 显式融券展期端点不做（隐式展期+券息日计，REALISM #15 裁剪注记）；除权日 T+1 经核验与真实规则一致（文档注记 + lockDay 相邻缺陷修复）
+- Docker 端到端冒烟本机无 Docker 环境未执行 → tech-debt 登记 open（有 Docker/CI 后补跑）
+
 ## [Unreleased] - Phase D 工程化收口
 
 ### Security

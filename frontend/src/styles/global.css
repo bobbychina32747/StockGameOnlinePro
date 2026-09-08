@@ -1127,6 +1127,12 @@ select.input {
   padding: 16px 18px; margin-bottom: 14px;
 }
 .tournament-title b { font-size: 16px; color: var(--text-primary); }
+/* Phase E: 赛季类型标签（报名入口类型可见，teams 红线） */
+.tournament-title .season-type-tag {
+  display: inline-block; font-size: var(--font-size-xs); color: var(--color-brand-light);
+  background: var(--color-brand-subtle); border-radius: 999px; padding: 1px 8px;
+  margin-left: 8px; margin-top: 0; vertical-align: middle;
+}
 .tournament-title span { display: block; font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 .tournament-podium { display: flex; align-items: flex-end; justify-content: center; gap: 18px; margin-top: 14px; }
 .podium-item { text-align: center; min-width: 90px; }

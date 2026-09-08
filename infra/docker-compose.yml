@@ -1,3 +1,8 @@
+# ⚠️ LEGACY / DEPRECATED（Phase E 注记，2026-09）：PostgreSQL+Redis 时代遗留编排，
+# 其中 backend/frontend 构建引用已失效（frontend/docker/Dockerfile.frontend 与 data-generator 目录均不存在），
+# 且 postgres/redis 前提与现役 sqlite 默认（DB_TYPE=sqlite）互斥。
+# 现役编排：backend/docker/docker-compose.yml（better-sqlite3 单卷两服务，8000/3000，healthcheck /api/market/prices）。
+# 本文件保留仅供历史回看，请勿再以其部署。
 version: '3.8'
 
 services:

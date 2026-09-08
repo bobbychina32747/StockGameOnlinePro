@@ -108,7 +108,7 @@ npm run dev
 ### 开发与质量门禁
 
 ```bash
-# 后端：类型构建 + 单元测试（166 例）+ 数据库迁移校验（sql.js → better-sqlite3）
+# 后端：类型构建 + 单元测试（322 例）+ 数据库迁移校验（sql.js → better-sqlite3，已完成）
 cd backend
 npm run build && npm test -- --runInBand
 npm run db:migrate          # 备份 + integrity_check + 逐表行数核对 + 切换 WAL
@@ -150,7 +150,7 @@ npm run lint && npx tsc -b && npm test -- --runInBand
 
 | 层 | 技术 |
 |---|---|
-| 后端 | NestJS + TypeORM + sql.js（SQLite WASM）|
+| 后端 | NestJS + TypeORM + better-sqlite3（SQLite 原生驱动，WAL 增量写盘）|
 | 前端 | React + Vite + ECharts + Zustand + Socket.IO |
 | 行情生成 | 自研 GARCH 波动率 + 厚尾跳跃扩散 + 隔夜跳空模型 + 宏观因子 + 行业联动 + 趋势状态机 |
 | 交易撮合 | 真实订单簿（价格-时间优先）+ 开盘集合竞价（最大成交量定价）+ 滑点模型 |
@@ -239,7 +239,7 @@ docs/
 - **JWT_SECRET**：必须在 `backend/.env` 配置强密钥（弱密钥会被启动校验拒绝，见 `jwt.strategy.ts`）
 - **默认账号**：管理员密码由 `ADMIN_PASSWORD` 环境变量决定；仅开发环境（NODE_ENV=development）未设置时回退 `admin123`，其余环境未设置强密码（≥8 位）时后端**拒绝创建**默认管理员；`backend/src/infrastructure/database/seed.ts` 的演示账号（demo）同理，部署公网前务必配置
 - **WebSocket**：/market 网关强制 JWT 认证（握手 `auth.token`），未认证连接立即断开
-- **数据库**：`backend/data/*.db` 为本地模拟数据，请勿提交到版本控制（已 gitignore）；持久化采用定时导出+原子替换（默认 60s），强杀进程最多丢失约一分钟数据
+- **数据库**：`backend/data/*.db` 为本地模拟数据，请勿提交到版本控制（已 gitignore）；默认 better-sqlite3 + WAL 增量写盘（强杀最多丢失一个 WAL 检查点周期，秒级），旧 sql.js 定时导出路径仅为兼容回退
 
 ---
 
