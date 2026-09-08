@@ -21,6 +21,12 @@ export default function Login() {
     try {
       const fn = isRegister ? authApi.register : authApi.login;
       const data = await fn(username, password);
+      // Phase E: 注册重名改为 200+{success:false}（枚举面收口）——成功判定必须显式检查
+      if (isRegister && data && data.success === false) {
+        setError(data.error || '注册失败，请更换用户名');
+        setLoading(false);
+        return;
+      }
       setAuth(data.token, { id: data.user.id, username: data.user.username, role: data.user.role });
       navigate('/');
     } catch (err: any) {

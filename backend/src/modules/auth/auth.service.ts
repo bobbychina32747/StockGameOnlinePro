@@ -103,7 +103,9 @@ let AuthService = class AuthService {
     async register(username, password) {
         const existing = await this.userRepo.findOne({ where: { username } });
         if (existing)
-            throw new common_1.ConflictException('用户名已存在');
+            // Phase E: 枚举面收口（teams 方案 B）——重名不再 409，统一 200+{success:false}，
+            // 状态码不可区分"已存在/可注册"；文案不泄露存在性（与登录侧防枚举对称）
+            return { success: false, error: '注册失败，请更换用户名' };
         const hashed = await bcrypt.hash(password, 10);
         const user = this.userRepo.create({ username, password: hashed });
         await this.userRepo.save(user);

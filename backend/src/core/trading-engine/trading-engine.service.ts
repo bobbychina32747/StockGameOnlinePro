@@ -545,7 +545,9 @@ let TradingEngineService = class TradingEngineService {
         account.totalTrades = (Number(account.totalTrades) || 0) + 1;
         await this.accountRepo.save(account);
         if (!pos) {
-            pos = this.positionRepo.create({ accountId: account.id, symbol, longQty: 0, shortQty: 0, longCost: 0, shortCost: 0, boughtToday: 0, lockDay: 0 });
+            // Phase E: 建仓记 lockDay=建仓日（修复红利税持有期恒 0 → CN 长线玩家恒按 20% 档错收）；
+            // 加仓不刷新（保留最早建仓日=建仓字面语义，快照单值锁定的简化口径）
+            pos = this.positionRepo.create({ accountId: account.id, symbol, longQty: 0, shortQty: 0, longCost: 0, shortCost: 0, boughtToday: 0, lockDay: Number(account.currentDay) || 0 });
         }
         this.updatePosition(pos, side, fill);
         await this.positionRepo.save(pos);

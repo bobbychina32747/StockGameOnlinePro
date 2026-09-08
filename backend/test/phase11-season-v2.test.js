@@ -135,6 +135,90 @@ describe('Phase E 大赛 V2：类型轮换与赛程', () => {
   });
 });
 
+describe('Phase E 注册枚举面收口（方案 B）', () => {
+  const { AuthService } = require('../dist/src/modules/auth/auth.service');
+  const bcrypt = require('bcrypt');
+  let hashSpy;
+  beforeEach(() => { hashSpy = jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed'); });
+  afterEach(() => { hashSpy.mockRestore(); });
+
+  test('重名注册：不 throw，返回 200 包裹 {success:false} 且文案不泄露存在性', async () => {
+    const userRepo = {
+      findOne: async () => ({ id: 'u1', username: 'alice' }),
+      create: (o) => o,
+      save: async (o) => o,
+    };
+    const accountRepo = { create: (o) => o, save: async (o) => o };
+    const svc = new AuthService(userRepo, accountRepo, { sign: () => 't' });
+    const r = await svc.register('alice', 'password123');
+    expect(r).toEqual({ success: false, error: '注册失败，请更换用户名' });
+    expect(r.error).not.toContain('已存在'); // 不泄露存在性
+  });
+
+  test('新用户名注册：仍创建 CN/HK/US 三账户并返回 token', async () => {
+    const saved = [];
+    const userRepo = {
+      findOne: async () => null,
+      create: (o) => ({ ...o, id: 'u9' }),
+      save: async (o) => { saved.push(o); return o; },
+    };
+    const accountRepo = { create: (o) => o, save: async (o) => { saved.push(o); return o; } };
+    const svc = new AuthService(userRepo, accountRepo, { sign: () => 'tok9' });
+    const r = await svc.register('bob', 'password123');
+    expect(r.token).toBe('tok9');
+    expect(r.success).toBeUndefined(); // 成功路径不带 success 字段（前端按 undefined 走成功分支）
+    const modes = saved.filter((x) => x.marketMode).map((x) => x.marketMode).sort();
+    expect(modes).toEqual(['CN', 'HK', 'US']);
+  });
+});
+
+describe('Phase E lockDay 记账（红利税持有期真实化）', () => {
+  const { TradingEngineService } = require('../dist/src/core/trading-engine/trading-engine.service');
+  function matchesWhere(r, where) {
+    if (Array.isArray(where)) return where.some((w) => matchesWhere(r, w));
+    return Object.entries(where || {}).every(([k, v]) => String(r[k]) === String(v));
+  }
+  function repo(seed = []) {
+    const rows = [...seed];
+    let idc = 1;
+    return {
+      rows,
+      find: async (q) => rows.filter((r) => matchesWhere(r, q?.where)),
+      findOne: async (q) => rows.find((r) => matchesWhere(r, q?.where)) || null,
+      save: async (e) => { if (!e.id) e.id = 'auto-' + idc++; const i = rows.findIndex((r) => r.id === e.id); if (i >= 0) rows[i] = e; else rows.push(e); return e; },
+      create: (obj) => obj,
+    };
+  }
+  function makeEngine(account) {
+    const accountRepo = repo([account]);
+    const posRepo = repo([]);
+    const engine = new TradingEngineService(repo([]), accountRepo, posRepo, repo([]), null);
+    engine.prices.set('T1', 10);
+    engine.placeRestingOrder('T1', 'r1', 'RX', 'sell', 10, 10000);
+    return { engine, posRepo, accountRepo };
+  }
+
+  test('建仓记 lockDay=建仓日（currentDay=9）', async () => {
+    const { engine, posRepo } = makeEngine({ id: 'AC1', userId: 'U1', marketMode: 'CN', cash: 100000, leverage: 1, totalEquity: 100000, currentDay: 9 });
+    const r = await engine.submitOrder({ userId: 'U1', accountId: 'AC1', symbol: 'T1', type: 'market', side: 'buy', quantity: 100 }, { id: 'AC1', marketMode: 'CN', cash: 100000, leverage: 1 });
+    expect(r.success).toBe(true);
+    expect(Number(posRepo.rows[0].lockDay)).toBe(9);
+  });
+
+  test('加仓不刷新 lockDay（保留最早建仓日）', async () => {
+    const { engine, posRepo, accountRepo } = makeEngine({ id: 'AC1', userId: 'U1', marketMode: 'CN', cash: 100000, leverage: 1, totalEquity: 100000, currentDay: 9 });
+    await engine.submitOrder({ userId: 'U1', accountId: 'AC1', symbol: 'T1', type: 'market', side: 'buy', quantity: 100 }, accountRepo.rows[0]);
+    accountRepo.rows[0].currentDay = 20; // 第 20 日加仓
+    await engine.submitOrder({ userId: 'U1', accountId: 'AC1', symbol: 'T1', type: 'market', side: 'buy', quantity: 100 }, accountRepo.rows[0]);
+    expect(Number(posRepo.rows[0].lockDay)).toBe(9); // 仍为首次建仓日
+  });
+
+  test('账户无 currentDay → lockDay=0（存量兼容，行为与改前一致）', async () => {
+    const { engine, posRepo } = makeEngine({ id: 'AC2', userId: 'U2', marketMode: 'CN', cash: 100000, leverage: 1, totalEquity: 100000 });
+    await engine.submitOrder({ userId: 'U2', accountId: 'AC2', symbol: 'T1', type: 'market', side: 'buy', quantity: 100 }, { id: 'AC2', marketMode: 'CN', cash: 100000, leverage: 1 });
+    expect(Number(posRepo.rows[0].lockDay)).toBe(0);
+  });
+});
 describe('Phase E 大赛 V2：档案与积分榜', () => {
   function settledEntries(seasonId) {
     return [
