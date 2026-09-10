@@ -1,124 +1,102 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-import typeorm_1 = require("typeorm");
+import {
+    Column,
+    CreateDateColumn,
+    Entity,
+    JoinColumn,
+    ManyToOne,
+    OneToMany,
+    PrimaryGeneratedColumn,
+    Unique,
+    UpdateDateColumn,
+} from 'typeorm';
+import { User } from './user.entity';
+import { Position } from './position.entity';
+import { Order } from './order.entity';
 
-import user_entity_1 = require("./user.entity");
+@Entity('accounts')
+@Unique(['userId', 'marketMode'])
+export class Account {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-import position_entity_1 = require("./position.entity");
+    @Column()
+    userId: string;
 
-import order_entity_1 = require("./order.entity");
+    @ManyToOne(() => User, (user) => user.accounts)
+    @JoinColumn({ name: 'userId' })
+    user: User;
 
-let Account = class Account {
-    [key: string]: any;
-};
-__decorate([
-    (0, typeorm_1.PrimaryGeneratedColumn)('uuid'),
-    __metadata("design:type", String)
-], Account.prototype, "id", void 0);
-__decorate([
-    (0, typeorm_1.Column)(),
-    __metadata("design:type", String)
-], Account.prototype, "userId", void 0);
-__decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, (user) => user.accounts),
-    (0, typeorm_1.JoinColumn)({ name: 'userId' }),
-    __metadata("design:type", user_entity_1.User)
-], Account.prototype, "user", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { default: 100000 }),
-    __metadata("design:type", Number)
-], Account.prototype, "cash", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { default: 0 }),
-    __metadata("design:type", Number)
-], Account.prototype, "marginUsed", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { default: 0 }),
-    __metadata("design:type", Number)
-], Account.prototype, "shortCollateral", void 0);
-// Phase B: 融资负债（真杠杆：买入借入部分记账，卖出按比例偿还，日终计息、维持担保比强平）
-__decorate([
-    (0, typeorm_1.Column)('float', { default: 0 }),
-    __metadata("design:type", Number)
-], Account.prototype, "borrowed", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { default: 100000 }),
-    __metadata("design:type", Number)
-], Account.prototype, "totalEquity", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { default: 100000 }),
-    __metadata("design:type", Number)
-], Account.prototype, "peakEquity", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { default: 100000 }),
-    __metadata("design:type", Number)
-], Account.prototype, "initialEquity", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ default: 'US' }),
-    __metadata("design:type", String)
-], Account.prototype, "marketMode", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ default: 1 }),
-    __metadata("design:type", Number)
-], Account.prototype, "leverage", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ default: 0 }),
-    __metadata("design:type", Number)
-], Account.prototype, "currentDay", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { default: 100000 }),
-    __metadata("design:type", Number)
-], Account.prototype, "dayStartEquity", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { default: 0 }),
-    __metadata("design:type", Number)
-], Account.prototype, "dailyPnl", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { default: 0 }),
-    __metadata("design:type", Number)
-], Account.prototype, "totalPnl", void 0);
+    @Column('float', { default: 100000 })
+    cash: number;
+
+    @Column('float', { default: 0 })
+    marginUsed: number;
+
+    @Column('float', { default: 0 })
+    shortCollateral: number;
+
+    // Phase B: 融资负债（真杠杆：买入借入部分记账，卖出按比例偿还，日终计息、维持担保比强平）
+    @Column('float', { default: 0 })
+    borrowed: number;
+
+    @Column('float', { default: 100000 })
+    totalEquity: number;
+
+    @Column('float', { default: 100000 })
+    peakEquity: number;
+
+    @Column('float', { default: 100000 })
+    initialEquity: number;
+
+    @Column({ default: 'US' })
+    marketMode: string;
+
+    @Column({ default: 1 })
+    leverage: number;
+
+    @Column({ default: 0 })
+    currentDay: number;
+
+    @Column('float', { default: 100000 })
+    dayStartEquity: number;
+
+    @Column('float', { default: 0 })
+    dailyPnl: number;
+
+    @Column('float', { default: 0 })
+    totalPnl: number;
+
     // 段位系统：评分 + 段位 + 累计交易次数
-    __decorate([(0, typeorm_1.Column)({ default: '青铜' }), __metadata("design:type", String)], Account.prototype, "tier", void 0);
-    __decorate([(0, typeorm_1.Column)('float', { default: 0 }), __metadata("design:type", Number)], Account.prototype, "tierScore", void 0);
-    __decorate([(0, typeorm_1.Column)({ default: 0 }), __metadata("design:type", Number)], Account.prototype, "totalTrades", void 0);
+    @Column({ default: '青铜' })
+    tier: string;
+
+    @Column('float', { default: 0 })
+    tierScore: number;
+
+    @Column({ default: 0 })
+    totalTrades: number;
+
     // Phase E: 赛季积分（荣誉分，与 tierScore 段位分拆列——tierScore 由 computeTier 每日覆盖为段位口径，
     // 赛季奖励只写入 seasonPoints 仅赛季结算单一路径累加；三市场账户同额记账为 V1 兼容语义）
-    __decorate([(0, typeorm_1.Column)('float', { default: 0 }), __metadata("design:type", Number)], Account.prototype, "seasonPoints", void 0);
+    @Column('float', { default: 0 })
+    seasonPoints: number;
+
     // Phase A 防刷钱：重置冷却（按游戏日）与重置计数（审计）
-    __decorate([(0, typeorm_1.Column)('int', { default: 0 }), __metadata("design:type", Number)], Account.prototype, "lastResetDay", void 0);
-    __decorate([(0, typeorm_1.Column)('int', { default: 0 }), __metadata("design:type", Number)], Account.prototype, "resetCount", void 0);
+    @Column('int', { default: 0 })
+    lastResetDay: number;
 
-__decorate([
-    (0, typeorm_1.OneToMany)(() => position_entity_1.Position, (pos) => pos.account),
-    __metadata("design:type", Array)
-], Account.prototype, "positions", void 0);
-__decorate([
-    (0, typeorm_1.OneToMany)(() => order_entity_1.Order, (order) => order.account),
-    __metadata("design:type", Array)
-], Account.prototype, "orders", void 0);
-__decorate([
-    (0, typeorm_1.CreateDateColumn)(),
-    __metadata("design:type", Date)
-], Account.prototype, "createdAt", void 0);
-__decorate([
-    (0, typeorm_1.UpdateDateColumn)(),
-    __metadata("design:type", Date)
-], Account.prototype, "updatedAt", void 0);
+    @Column('int', { default: 0 })
+    resetCount: number;
 
-export { Account };
+    @OneToMany(() => Position, (pos) => pos.account)
+    positions: Position[];
 
-Account = __decorate(
-[
-    (0, typeorm_1.Entity)('accounts'),
-    (0, typeorm_1.Unique)(['userId', 'marketMode'])
-],
-Account
-);
+    @OneToMany(() => Order, (order) => order.account)
+    orders: Order[];
 
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
+}

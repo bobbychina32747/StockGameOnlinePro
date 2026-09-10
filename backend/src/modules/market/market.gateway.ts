@@ -1,38 +1,63 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-import websockets_1 = require("@nestjs/websockets");
+import { Injectable, Logger } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import { Server, Socket } from 'socket.io';
+import { Repository } from 'typeorm';
 
-import socket_io_1 = require("socket.io");
+import { User } from '../../infrastructure/database/entities/user.entity';
 
-import common_1 = require("@nestjs/common");
+// 行情 tick 广播载荷（market-data 生成：symbol/price/volume/timestamp）
+interface MarketTick {
+    symbol: string;
+    price: number;
+    volume: number;
+    timestamp: number;
+}
 
-import jwt_1 = require("@nestjs/jwt");
-
-import typeorm_1 = require("@nestjs/typeorm");
-
-import typeorm_2 = require("typeorm");
-
-import user_entity_1 = require("../../infrastructure/database/entities/user.entity");
-
-let MarketGateway = class MarketGateway {
+// 成交广播载荷：顶层字段保持引擎原命名（filledQuantity/avgPrice/totalCost/fees），
+// counterFills 已由 sanitizeFill 脱敏（仅 side/price/qty/virtual）
+interface FillBroadcast {
+    symbol?: string;
+    side?: string;
+    filledQuantity?: number;
+    avgPrice?: number;
+    totalCost?: number;
+    fees?: number;
+    counterFills?: Array<{ side: string; price: number; qty: number; virtual: boolean }>;
     [key: string]: any;
-    constructor(jwtService, userRepo) {
-        this.jwtService = jwtService;
-        this.userRepo = userRepo;
-        this.logger = new common_1.Logger(MarketGateway.name);
-        this.clients = 0;
-    }
-    async handleConnection(client) {
+}
+
+// 新闻广播载荷（每日新闻 / 泡沫破灭 / 内幕消息共用）
+interface NewsBroadcast {
+    title: string;
+    description: string;
+    type: string;
+    impact: Record<string, number>;
+    duration: number;
+    [key: string]: any;
+}
+
+@Injectable()
+@WebSocketGateway({
+    // FIX(M5): 收紧 CORS 白名单（原 origin:'*' 为无差别放行）
+    cors: { origin: ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000'], credentials: true },
+    namespace: '/market',
+})
+export class MarketGateway {
+    @WebSocketServer()
+    server: Server;
+
+    private readonly logger = new Logger(MarketGateway.name);
+
+    clients = 0;
+
+    constructor(
+        private readonly jwtService: JwtService,
+        @InjectRepository(User) private readonly userRepo: Repository<User>,
+    ) {}
+
+    async handleConnection(client: Socket) {
         // SECURITY(C): WS 必须携带 JWT（前端 socket.io 使用 auth: { token } 传参），校验失败直接断开
         // Phase D: verify 后再查 User 校验 isActive——用户被禁用后其存量 WS 立即断开
         // （HTTP 侧由 JwtStrategy.validate 每次请求兜底；WS 无请求概念，故在此补 DB 检查）
@@ -64,39 +89,22 @@ let MarketGateway = class MarketGateway {
         this.clients++;
         this.logger.log(`WS 客户端已连接: ${client.id} (在线: ${this.clients})`);
     }
-    handleDisconnect(client) {
+
+    handleDisconnect(client: Socket) {
         // 认证失败的连接未计入 clients，避免计数变负
         this.clients = Math.max(0, this.clients - 1);
         this.logger.log(`WS 客户端已断开: ${client.id} (在线: ${this.clients})`);
     }
-    broadcastTick(ticks) {
+
+    broadcastTick(ticks: MarketTick[]) {
         this.server.emit('tick', { ticks, timestamp: Date.now() });
     }
-    broadcastFill(fill) {
+
+    broadcastFill(fill: FillBroadcast) {
         this.server.emit('fill', fill);
     }
-    broadcastNews(news) {
+
+    broadcastNews(news: NewsBroadcast) {
         this.server.emit('news', news);
     }
-};
-__decorate([
-    (0, websockets_1.WebSocketServer)(),
-    __metadata("design:type", socket_io_1.Server)
-], MarketGateway.prototype, "server", void 0);
-
-export { MarketGateway };
-
-MarketGateway = __decorate(
-[
-    (0, common_1.Injectable)(),
-    (0, websockets_1.WebSocketGateway)({
-        // FIX(M5): 收紧 CORS 白名单（原 origin:'*' 为无差别放行）
-        cors: { origin: ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000'], credentials: true },
-        namespace: '/market',
-    }),
-    __param(1, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
-    __metadata("design:paramtypes", [jwt_1.JwtService, typeorm_2.Repository])
-],
-MarketGateway
-);
-
+}

@@ -1,53 +1,30 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-import common_1 = require("@nestjs/common");
+import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
-import jwt_1 = require("@nestjs/jwt");
+import { User } from '../../infrastructure/database/entities/user.entity';
 
-import config_1 = require("@nestjs/config");
+import { MarketController } from './market.controller';
+import { MarketGateway } from './market.gateway';
+import { MarketService } from './market.service';
+import { NewsService } from './news.service';
 
-import typeorm_1 = require("@nestjs/typeorm");
-
-import user_entity_1 = require("../../infrastructure/database/entities/user.entity");
-
-import market_controller_1 = require("./market.controller");
-
-import market_gateway_1 = require("./market.gateway");
-
-import market_service_1 = require("./market.service");
-
-import news_service_1 = require("./news.service");
-
-let MarketModule = class MarketModule {
-    [key: string]: any;
-};
-
-export { MarketModule };
-
-MarketModule = __decorate(
-[
-    (0, common_1.Module)({
-        imports: [
-            // SECURITY(C): 为 WS 网关提供 JWT 校验能力（global:false，仅本模块可见）
-            jwt_1.JwtModule.registerAsync({
-                global: false,
-                inject: [config_1.ConfigService],
-                useFactory: (config) => ({
-                    secret: config.get('JWT_SECRET'),
-                }),
+@Module({
+    imports: [
+        // SECURITY(C): 为 WS 网关提供 JWT 校验能力（global:false，仅本模块可见）
+        JwtModule.registerAsync({
+            global: false,
+            inject: [ConfigService],
+            useFactory: (config: ConfigService) => ({
+                secret: config.get('JWT_SECRET'),
             }),
-            // Phase D: WS 握手校验 isActive 需要 User repo（autoLoadEntities 下 forFeature 全局可用）
-            typeorm_1.TypeOrmModule.forFeature([user_entity_1.User]),
-        ],
-        controllers: [market_controller_1.MarketController],
-        providers: [market_gateway_1.MarketGateway, market_service_1.MarketService, news_service_1.NewsService],
-        exports: [market_service_1.MarketService, news_service_1.NewsService],
-    })
-],
-MarketModule
-);
-
+        }),
+        // Phase D: WS 握手校验 isActive 需要 User repo（autoLoadEntities 下 forFeature 全局可用）
+        TypeOrmModule.forFeature([User]),
+    ],
+    controllers: [MarketController],
+    providers: [MarketGateway, MarketService, NewsService],
+    exports: [MarketService, NewsService],
+})
+export class MarketModule {}

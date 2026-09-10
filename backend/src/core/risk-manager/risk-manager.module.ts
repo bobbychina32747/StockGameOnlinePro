@@ -1,38 +1,17 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-import common_1 = require("@nestjs/common");
+import { Global, Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
-import typeorm_1 = require("@nestjs/typeorm");
+import { Account } from '../../infrastructure/database/entities/account.entity';
+import { Position } from '../../infrastructure/database/entities/position.entity';
+import { DailySnapshot } from '../../infrastructure/database/entities/daily-snapshot.entity';
+import { Transaction } from '../../infrastructure/database/entities/transaction.entity';
 
-import account_entity_1 = require("../../infrastructure/database/entities/account.entity");
+import { RiskManagerService } from './risk-manager.service';
 
-import position_entity_1 = require("../../infrastructure/database/entities/position.entity");
-
-import daily_snapshot_entity_1 = require("../../infrastructure/database/entities/daily-snapshot.entity");
-
-import transaction_entity_1 = require("../../infrastructure/database/entities/transaction.entity");
-
-import risk_manager_service_1 = require("./risk-manager.service");
-
-let RiskManagerModule = class RiskManagerModule {
-    [key: string]: any;
-};
-
-export { RiskManagerModule };
-
-RiskManagerModule = __decorate(
-[
-    (0, common_1.Global)(),
-    (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([account_entity_1.Account, position_entity_1.Position, daily_snapshot_entity_1.DailySnapshot, transaction_entity_1.Transaction])],
-        providers: [risk_manager_service_1.RiskManagerService],
-        exports: [risk_manager_service_1.RiskManagerService],
-    })
-],
-RiskManagerModule
-);
-
+@Global()
+@Module({
+    imports: [TypeOrmModule.forFeature([Account, Position, DailySnapshot, Transaction])],
+    providers: [RiskManagerService],
+    exports: [RiskManagerService],
+})
+export class RiskManagerModule {}

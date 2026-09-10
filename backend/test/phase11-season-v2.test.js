@@ -71,10 +71,16 @@ describe('Phase E seasonPoints 拆列', () => {
     expect(Number(u1.seasonPoints)).toBe(600);
   });
 
-  test('实体源码含 seasonPoints 列（防列被误删）', () => {
-    const src = fs.readFileSync(path.resolve(__dirname, '../src/infrastructure/database/entities/account.entity.ts'), 'utf8');
-    expect(src).toContain('"seasonPoints"');
-    expect(src).toContain("'float'");
+  // Phase R：由"读源码文本正则"改为"读 TypeORM 元数据"——断言更强（真正校验列定义）且不再被
+  // 源码风格/引号形式影响（重构前 @@Column 是反编译产物、列名以字符串字面量出现）
+  test('实体元数据含 seasonPoints 列且类型为 float（防列被误删）', () => {
+    const { getMetadataArgsStorage } = require('typeorm');
+    const { Account } = require('../dist/src/infrastructure/database/entities/account.entity');
+    const col = getMetadataArgsStorage().columns.find((c) => c.target === Account && c.propertyName === 'seasonPoints');
+    expect(col).toBeTruthy();
+    expect(col.options.type).toBe('float');
+    // tierScore 仍在（拆列不得互删）
+    expect(getMetadataArgsStorage().columns.some((c) => c.target === Account && c.propertyName === 'tierScore')).toBe(true);
   });
 
   test('computeTier 不覆盖 seasonPoints（两列互不隐式互算）', () => {

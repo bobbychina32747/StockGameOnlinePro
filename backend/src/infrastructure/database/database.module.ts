@@ -1,67 +1,40 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-import common_1 = require("@nestjs/common");
+import { Global, Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
-import typeorm_1 = require("@nestjs/typeorm");
-
-import user_entity_1 = require("./entities/user.entity");
-
-import account_entity_1 = require("./entities/account.entity");
-
-import position_entity_1 = require("./entities/position.entity");
-
-import order_entity_1 = require("./entities/order.entity");
-
-import transaction_entity_1 = require("./entities/transaction.entity");
-
-import kline_entity_1 = require("./entities/kline.entity");
-
-import stock_entity_1 = require("./entities/stock.entity");
-
-import daily_snapshot_entity_1 = require("./entities/daily-snapshot.entity");
-
-import fund_holding_entity_1 = require("./entities/fund-holding.entity");
+import { User } from './entities/user.entity';
+import { Account } from './entities/account.entity';
+import { Position } from './entities/position.entity';
+import { Order } from './entities/order.entity';
+import { Transaction } from './entities/transaction.entity';
+import { Kline } from './entities/kline.entity';
+import { Stock } from './entities/stock.entity';
+import { DailySnapshot } from './entities/daily-snapshot.entity';
+import { FundHolding } from './entities/fund-holding.entity';
 
 // Phase A: 分红事件/快照 + 重置审计（防套利与刷钱可追溯）
-import dividend_event_entity_1 = require("./entities/dividend-event.entity");
-
-import dividend_snapshot_entity_1 = require("./entities/dividend-snapshot.entity");
-
-import reset_audit_log_entity_1 = require("./entities/reset-audit-log.entity");
+import { DividendEvent } from './entities/dividend-event.entity';
+import { DividendSnapshot } from './entities/dividend-snapshot.entity';
+import { ResetAuditLog } from './entities/reset-audit-log.entity';
 
 // Phase C: 成就服务端化
-import achievement_entity_1 = require("./entities/achievement.entity");
+import { Achievement } from './entities/achievement.entity';
 
 // Phase C: 模拟大赛赛季
-import season_entity_1 = require("./entities/season.entity");
-import season_entry_entity_1 = require("./entities/season-entry.entity");
+import { Season } from './entities/season.entity';
+import { SeasonEntry } from './entities/season-entry.entity';
 
-const entities = [
-    user_entity_1.User, account_entity_1.Account, position_entity_1.Position, order_entity_1.Order,
-    transaction_entity_1.Transaction, kline_entity_1.Kline, stock_entity_1.Stock, daily_snapshot_entity_1.DailySnapshot,
-    fund_holding_entity_1.FundHolding,
-    dividend_event_entity_1.DividendEvent, dividend_snapshot_entity_1.DividendSnapshot, reset_audit_log_entity_1.ResetAuditLog,
-    achievement_entity_1.Achievement,
-    season_entity_1.Season, season_entry_entity_1.SeasonEntry,
-];
-let DatabaseModule = class DatabaseModule {
-    [key: string]: any;
-};
-
-export { DatabaseModule };
-
-DatabaseModule = __decorate(
-[
-    (0, common_1.Global)(),
-    (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature(entities)],
-        exports: [typeorm_1.TypeOrmModule],
-    })
-],
-DatabaseModule
-);
-
+@Global()
+@Module({
+    imports: [
+        TypeOrmModule.forFeature([
+            User, Account, Position, Order,
+            Transaction, Kline, Stock, DailySnapshot,
+            FundHolding,
+            DividendEvent, DividendSnapshot, ResetAuditLog,
+            Achievement,
+            Season, SeasonEntry,
+        ]),
+    ],
+    exports: [TypeOrmModule],
+})
+export class DatabaseModule {}

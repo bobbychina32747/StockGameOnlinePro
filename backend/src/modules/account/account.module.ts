@@ -1,48 +1,28 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-import common_1 = require("@nestjs/common");
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
-import typeorm_1 = require("@nestjs/typeorm");
-
-import account_entity_1 = require("../../infrastructure/database/entities/account.entity");
-
-import position_entity_1 = require("../../infrastructure/database/entities/position.entity");
-import transaction_entity_1 = require("../../infrastructure/database/entities/transaction.entity");
+import { Account } from '../../infrastructure/database/entities/account.entity';
+import { Position } from '../../infrastructure/database/entities/position.entity';
+import { Transaction } from '../../infrastructure/database/entities/transaction.entity';
 
 // Phase A: 重置防刷钱——基金持仓/未成交挂单一票否决 + 审计
-import fund_holding_entity_1 = require("../../infrastructure/database/entities/fund-holding.entity");
-import order_entity_1 = require("../../infrastructure/database/entities/order.entity");
-import reset_audit_log_entity_1 = require("../../infrastructure/database/entities/reset-audit-log.entity");
+import { FundHolding } from '../../infrastructure/database/entities/fund-holding.entity';
+import { Order } from '../../infrastructure/database/entities/order.entity';
+import { ResetAuditLog } from '../../infrastructure/database/entities/reset-audit-log.entity';
 
 // Phase C: 成就服务端化
-import achievement_entity_1 = require("../../infrastructure/database/entities/achievement.entity");
+import { Achievement } from '../../infrastructure/database/entities/achievement.entity';
 
 // Phase C: 赛季中禁重置/划转（AccountService 注入 SeasonService）
-import season_module_1 = require("../season/season.module");
+import { SeasonModule } from '../season/season.module';
 
-import account_controller_1 = require("./account.controller");
+import { AccountController } from './account.controller';
+import { AccountService } from './account.service';
 
-import account_service_1 = require("./account.service");
-
-let AccountModule = class AccountModule {
-    [key: string]: any;
-};
-
-export { AccountModule };
-
-AccountModule = __decorate(
-[
-    (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([account_entity_1.Account, position_entity_1.Position, transaction_entity_1.Transaction, fund_holding_entity_1.FundHolding, order_entity_1.Order, reset_audit_log_entity_1.ResetAuditLog, achievement_entity_1.Achievement]), season_module_1.SeasonModule],
-        controllers: [account_controller_1.AccountController],
-        providers: [account_service_1.AccountService],
-        exports: [account_service_1.AccountService],
-    })
-],
-AccountModule
-);
-
+@Module({
+    imports: [TypeOrmModule.forFeature([Account, Position, Transaction, FundHolding, Order, ResetAuditLog, Achievement]), SeasonModule],
+    controllers: [AccountController],
+    providers: [AccountService],
+    exports: [AccountService],
+})
+export class AccountModule {}

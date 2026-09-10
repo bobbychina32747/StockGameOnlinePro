@@ -1,115 +1,104 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-import common_1 = require("@nestjs/common");
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 
-import typeorm_1 = require("@nestjs/typeorm");
+import { Account } from '../../infrastructure/database/entities/account.entity';
+import { Position } from '../../infrastructure/database/entities/position.entity';
+import { Order, OrderSide, OrderType } from '../../infrastructure/database/entities/order.entity';
+import { Transaction } from '../../infrastructure/database/entities/transaction.entity';
 
-import typeorm_2 = require("typeorm");
+import { TradingEngineService } from '../../core/trading-engine/trading-engine.service';
 
-import account_entity_1 = require("../../infrastructure/database/entities/account.entity");
+import { DebugModeService } from '../../common/debug-mode/debug-mode.service';
 
-import position_entity_1 = require("../../infrastructure/database/entities/position.entity");
-
-import order_entity_1 = require("../../infrastructure/database/entities/order.entity");
-
-import transaction_entity_1 = require("../../infrastructure/database/entities/transaction.entity");
-
-import trading_engine_service_1 = require("../../core/trading-engine/trading-engine.service");
-
-import debug_mode_service_1 = require("../../common/debug-mode/debug-mode.service");
-
-import constants_1 = require("../../common/constants");
+import { afterHoursStageFor, auctionStageFor, isTradingTimeFor } from '../../common/constants';
 
 // Phase B: 跨市场闸门
-import market_utils_1 = require("../../common/market-utils");
+import { symbolMarket } from '../../common/market-utils';
 
-let OrderService = class OrderService {
-    [key: string]: any;
-    constructor(accountRepo, positionRepo, orderRepo, txRepo, engine, dataSource, debugMode) {
-        this.debugMode = debugMode;
-        this.accountRepo = accountRepo;
-        this.positionRepo = positionRepo;
-        this.orderRepo = orderRepo;
-        this.txRepo = txRepo;
-        this.engine = engine;
-        this.dataSource = dataSource;
-        this.logger = new common_1.Logger(OrderService.name);
-    }
-    async placeOrder(userId, mode, symbol, type, side, quantity, price, triggerPrice, displayQty) {
+@Injectable()
+export class OrderService {
+    private readonly logger = new Logger(OrderService.name);
+
+    constructor(
+        @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
+        @InjectRepository(Position) private readonly positionRepo: Repository<Position>,
+        @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
+        @InjectRepository(Transaction) private readonly txRepo: Repository<Transaction>,
+        private readonly engine: TradingEngineService,
+        private readonly dataSource: DataSource,
+        private readonly debugMode: DebugModeService,
+    ) {}
+
+    async placeOrder(userId: string, mode: string, symbol: string, type: OrderType, side: OrderSide, quantity: number, price: number, triggerPrice: number, displayQty: number) {
         // S2 休市校验：非交易时段拒绝下单
         // 调试模式仅对开启它的管理员（canBypassHours 白名单）跳过休市检查
         // P1 三阶段竞价（A股）：9:15-9:20 可申报可撤 / 9:20-9:25 可申报不可撤 / 9:25-9:30 撮合中不接受申报
-        const auctionStage = (0, constants_1.auctionStageFor)(mode);
+        const auctionStage = auctionStageFor(mode);
         if (!this.debugMode.canBypassHours(userId) && auctionStage === 'matching') {
-            throw new common_1.BadRequestException('集合竞价撮合中（9:25-9:30），暂不接受申报');
+            throw new BadRequestException('集合竞价撮合中（9:25-9:30），暂不接受申报');
         }
         const canPlaceInAuction = auctionStage === 'cancelable' || auctionStage === 'locked';
-        if (!this.debugMode.canBypassHours(userId) && !(0, constants_1.isTradingTimeFor)(mode) && !canPlaceInAuction) {
-            throw new common_1.BadRequestException('休市中，当前市场不在交易时段，无法下单');
+        if (!this.debugMode.canBypassHours(userId) && !isTradingTimeFor(mode) && !canPlaceInAuction) {
+            throw new BadRequestException('休市中，当前市场不在交易时段，无法下单');
         }
         const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });
         if (!account)
-            throw new common_1.NotFoundException(`账户不存在（${mode}）`);
-        if (account.marketMode === 'CN' && (side === order_entity_1.OrderSide.SHORT || side === order_entity_1.OrderSide.COVER)) {
+            throw new NotFoundException(`账户不存在（${mode}）`);
+        if (account.marketMode === 'CN' && (side === OrderSide.SHORT || side === OrderSide.COVER)) {
             return { success: false, error: 'A股模式不支持做空/融券' };
         }
         // Phase B P1#7: 服务层跨市场闸门（给前端明确 400，引擎层另有兜底）
-        const symbolMode = market_utils_1.symbolMarket(symbol);
+        const symbolMode = symbolMarket(symbol);
         if (symbolMode !== mode) {
-            throw new common_1.BadRequestException(`账户市场与股票市场不一致，禁止跨市场交易（${mode} 账户不能交易 ${symbol}）`);
+            throw new BadRequestException(`账户市场与股票市场不一致，禁止跨市场交易（${mode} 账户不能交易 ${symbol}）`);
         }
         // Phase B P1: 盘后固定价格交易（A股 15:00-15:30，仅限价单且价格=当日收盘价）
-        const afterStage = (0, constants_1.afterHoursStageFor)(mode);
+        const afterStage = afterHoursStageFor(mode);
         if (!this.debugMode.canBypassHours(userId) && afterStage === 'fixedPrice') {
-            if (type !== order_entity_1.OrderType.LIMIT) {
-                throw new common_1.BadRequestException('盘后固定价格交易仅支持限价单申报');
+            if (type !== OrderType.LIMIT) {
+                throw new BadRequestException('盘后固定价格交易仅支持限价单申报');
             }
             const close = this.engine.prices.get(symbol);
             if (close === undefined || close === null || !Number.isFinite(Number(close))) {
-                throw new common_1.BadRequestException('盘后固定价格交易：暂无当日收盘价，无法申报');
+                throw new BadRequestException('盘后固定价格交易：暂无当日收盘价，无法申报');
             }
             if (Math.round(Number(price || 0) * 100) / 100 !== Math.round(Number(close) * 100) / 100) {
-                throw new common_1.BadRequestException(`盘后固定价格交易限以收盘价 ${Number(close).toFixed(2)} 申报`);
+                throw new BadRequestException(`盘后固定价格交易限以收盘价 ${Number(close).toFixed(2)} 申报`);
             }
-            const result = await this.engine.submitClosingOrder({ userId, accountId: account.id, symbol, type: order_entity_1.OrderType.LIMIT, side, quantity, price: Number(Number(close).toFixed(2)) }, account, close);
+            // 引擎返回值的字段随分支不同（success/error/order/fill 非同一形状），保持原动态取值语义
+            const result: any = await this.engine.submitClosingOrder({ userId, accountId: account.id, symbol, type: OrderType.LIMIT, side, quantity, price: Number(Number(close).toFixed(2)) }, account, close);
             if (!result.success) {
                 return { success: false, error: result.error };
             }
             return { success: true, order: result.order, fill: result.fill || null };
         }
-        const result = await this.engine.submitOrder({ userId, accountId: account.id, symbol, type, side, quantity, price, triggerPrice, displayQty }, account);
+        // 同上：success 分支或带 settle、或仅带 order，沿用原动态取值
+        const result: any = await this.engine.submitOrder({ userId, accountId: account.id, symbol, type, side, quantity, price, triggerPrice, displayQty }, account);
         if (!result.success) {
             return { success: false, error: result.error };
         }
-        if (type === order_entity_1.OrderType.MARKET) {
+        if (type === OrderType.MARKET) {
             // P0: 本方与对手方结算已由引擎 submitOrder 完成（返回 settle），避免二次撮合
             return result.settle || result;
         }
         return { success: true, order: result.order };
     }
-    async cancelOrder(userId, orderId, mode) {
+
+    async cancelOrder(userId: string, orderId: string, mode: string) {
         // P1 三阶段竞价：9:20-9:25 申报锁定不可撤单，9:25-9:30 撮合阶段不可撤单（真实规则）
-        const stage = (0, constants_1.auctionStageFor)(mode);
+        const stage = auctionStageFor(mode);
         if (!this.debugMode.canBypassHours(userId) && (stage === 'locked' || stage === 'matching')) {
-            throw new common_1.BadRequestException('集合竞价 9:20-9:25 申报不可撤单（9:25 起进入撮合），请在开盘后撤单');
+            throw new BadRequestException('集合竞价 9:20-9:25 申报不可撤单（9:25 起进入撮合），请在开盘后撤单');
         }
         const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });
         if (!account)
-            throw new common_1.NotFoundException('账户不存在');
+            throw new NotFoundException('账户不存在');
         const ok = await this.engine.cancelOrder(orderId, account.id);
         return { success: ok };
     }
-    async getHistory(userId, mode) {
+
+    async getHistory(userId: string, mode: string) {
         const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });
         if (!account)
             return [];
@@ -119,31 +108,11 @@ let OrderService = class OrderService {
             take: 100,
         });
     }
-    async getPendingOrders(userId, mode) {
+
+    async getPendingOrders(userId: string, mode: string) {
         const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });
         if (!account)
             return [];
         return this.engine.getPendingOrders(account.id);
     }
-};
-
-export { OrderService };
-
-OrderService = __decorate(
-[
-    (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(account_entity_1.Account)),
-    __param(1, (0, typeorm_1.InjectRepository)(position_entity_1.Position)),
-    __param(2, (0, typeorm_1.InjectRepository)(order_entity_1.Order)),
-    __param(3, (0, typeorm_1.InjectRepository)(transaction_entity_1.Transaction)),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
-        trading_engine_service_1.TradingEngineService,
-        typeorm_2.DataSource,
-        debug_mode_service_1.DebugModeService])
-],
-OrderService
-);
-
+}

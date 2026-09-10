@@ -1,39 +1,19 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-import common_1 = require("@nestjs/common");
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
-import typeorm_1 = require("@nestjs/typeorm");
+import { Account } from '../../infrastructure/database/entities/account.entity';
+import { FundHolding } from '../../infrastructure/database/entities/fund-holding.entity';
 
-import account_entity_1 = require("../../infrastructure/database/entities/account.entity");
-
-import fund_holding_entity_1 = require("../../infrastructure/database/entities/fund-holding.entity");
-
-import fund_controller_1 = require("./fund.controller");
-
-import fund_service_1 = require("./fund.service");
+import { FundController } from './fund.controller';
+import { FundService } from './fund.service';
 
 // Phase C: 赛季中禁基金申购/赎回（FundService 注入 SeasonService）
-import season_module_1 = require("../season/season.module");
+import { SeasonModule } from '../season/season.module';
 
-let FundModule = class FundModule {
-    [key: string]: any;
-};
-
-export { FundModule };
-
-FundModule = __decorate(
-[
-    (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([account_entity_1.Account, fund_holding_entity_1.FundHolding]), season_module_1.SeasonModule],
-        controllers: [fund_controller_1.FundController],
-        providers: [fund_service_1.FundService],
-        exports: [fund_service_1.FundService],
-    })
-],
-FundModule
-);
-
+@Module({
+    imports: [TypeOrmModule.forFeature([Account, FundHolding]), SeasonModule],
+    controllers: [FundController],
+    providers: [FundService],
+    exports: [FundService],
+})
+export class FundModule {}

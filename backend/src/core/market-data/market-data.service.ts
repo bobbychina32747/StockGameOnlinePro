@@ -1,55 +1,110 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-import common_1 = require("@nestjs/common");
-
-import typeorm_1 = require("@nestjs/typeorm");
-
-import typeorm_2 = require("typeorm");
-
-import stock_entity_1 = require("../../infrastructure/database/entities/stock.entity");
-
-import kline_entity_1 = require("../../infrastructure/database/entities/kline.entity");
-
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { Stock } from '../../infrastructure/database/entities/stock.entity';
+import { Kline } from '../../infrastructure/database/entities/kline.entity';
 // Phase A: 分红事件落库（除权/发息持久化，防重启丢失）
-import dividend_event_entity_1 = require("../../infrastructure/database/entities/dividend-event.entity");
-
-import constants_1 = require("../../common/constants");
-
-import trading_engine_service_1 = require("../trading-engine/trading-engine.service");
-
-import market_math_1 = require("./market-math");
-
+import { DividendEvent } from '../../infrastructure/database/entities/dividend-event.entity';
+import * as constants_1 from '../../common/constants';
+import { TradingEngineService } from '../trading-engine/trading-engine.service';
+import * as market_math_1 from './market-math';
 // Phase B: 涨跌停统一区间函数（与撮合引擎/委托价校验共用）
-import market_utils_1 = require("../../common/market-utils");
-
-import market_maker_1 = require("./market-maker");
-
-import fundamentals_1 = require("./fundamentals");
-
-import ai_opponents_1 = require("./ai-opponents");
+import * as market_utils_1 from '../../common/market-utils';
+import * as market_maker_1 from './market-maker';
+import * as fundamentals_1 from './fundamentals';
+import * as ai_opponents_1 from './ai-opponents';
 
 // SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
 let klineDedupDone = false;
 
-let MarketDataService = class MarketDataService {
-    [key: string]: any;
-    constructor(stockRepo, klineRepo, dividendEventRepo, engine, market = 'CN') {
+// 单市场状态快照（getState 返回值）；后三个可选字段由 MarketService 聚合三市场状态时附加
+export interface MarketStateSnapshot {
+    gameDay: number;
+    tickCount: number;
+    marketRegime: string;
+    factors: Record<string, number>;
+    hotTopics: any[];
+    macroHistory: any[];
+    industryCycles: Record<string, string>;
+    fxRates: { CN: number; HK: number; US: number };
+    isTradingTime: boolean;
+    isPostCloseTrading: boolean;
+    tickIntervalMs?: number;
+    offHoursTrading?: boolean;
+    markets?: any;
+}
+
+@Injectable()
+export class MarketDataService {
+    // ─── 依赖（构造函数注入） ───
+    private readonly stockRepo: Repository<Stock>;
+    private readonly klineRepo: Repository<Kline>;
+    private readonly dividendEventRepo: Repository<DividendEvent>;
+    private readonly engine: TradingEngineService;
+    private readonly market: string;
+    private readonly logger: Logger;
+    // ─── 行情状态 ───
+    private stocks: Map<string, any>;
+    private marketRegime: string;
+    private tickCount: number;
+    // 财报事件（真实化：按财报季生成并影响股价）
+    private reports: Map<string, any>;
+    // ─── 玩法引擎：热点题材 / IPO / 黑天鹅 / 分红 ───
+    private hotTopics: any[];
+    private hotDay: number;
+    private ipoQueue: any[];
+    private nextIpoDay: number;
+    // P1 复权：累计前复权因子与分红事件序列（历史价格 × 因子 = 前复权价）
+    private adjFactors: Map<string, any>;
+    // Phase C: 指数除数（首次 getIndices 时初始化，保持点位连续）
+    private indexDivisors: Record<string, number>;
+    private dayEvents: any;
+    private dividends: Map<string, any[]>;
+    // gameDay 为对外可读字段（fund/season/market 服务与前端状态快照都会读它）；
+    // 其余字段保持 private —— 重构前它们没有可见性修饰（等价于 public），这里是收紧后的显式契约
+    gameDay: number;
+    private factors: Record<string, number>;
+    private isRunning: boolean;
+    // 经济泡沫机制：破灭中的行业 + 破灭事件广播队列
+    private burstingIndustries: Set<string>;
+    private burstEvents: any[];
+    private industryBubbleMap: Record<string, number>;
+    // AI 对手盘：机构/游资/散户市场参与者（每服务器独立，完全本地：规则策略 + 本地随机森林，零 API）
+    // P4 具名对手盘 + 策略 + 绩效记账（净值/胜率/段位）
+    private aiLedger: any[];
+    private aiAgents: any[];
+    private aiAdaptiveEnabled: boolean;
+    private aiVolBucket: string;
+    // P4 订单流信号：机构/游资大单净流入（股数，逐日清零）
+    private bigOrderFlow: Map<string, number>;
+    private intervalHandle: any;
+    // 性能优化：股票池配置缓存（消除每 tick 的 find O(n)）
+    private poolBySymbol: Map<string, any>;
+    // P2 做市商：每市场 2 个，双边报价 + 库存管理（mmQuote 定价，虚拟挂单进真实盘口）
+    private marketMakers: { id: string; inventory: Map<string, number> }[];
+    private mmHookRegistered: boolean;
+    // P3 基本面：行业景气周期（四阶段马尔可夫）、新闻持久影响档案、宏观数据日历
+    private industryCycles: Map<string, string>;
+    private newsImpacts: any[];
+    private macroEvents: any[];
+    private macroHistory: any[];
+    constructor(
+        @InjectRepository(Stock) stockRepo: Repository<Stock>,
+        @InjectRepository(Kline) klineRepo: Repository<Kline>,
+        @InjectRepository(DividendEvent) dividendEventRepo: Repository<DividendEvent>,
+        @Optional() engine: TradingEngineService,
+        // market：CN 实例由 Nest 类 provider 构造、HK/US 由 module 工厂显式传参。
+        // 反编译版签名的 design:paramtypes 只有 4 项（第 5 参 Nest 不解析 → 用默认值 'CN'）；
+        // 真装饰器会为这个无标注参数补一项 Object/String 元数据，Nest 会当作令牌去解析并启动失败，
+        // 故必须标 @Optional()：解析不到时注入 undefined → 默认值 'CN' 生效，与重构前行为一致。
+        @Optional() market = 'CN',
+    ) {
         this.stockRepo = stockRepo;
         this.market = market; // 三服务器：CN/HK/US 独立实例
         this.klineRepo = klineRepo;
         this.dividendEventRepo = dividendEventRepo;
         this.engine = engine;
-        this.logger = new common_1.Logger(MarketDataService.name);
+        this.logger = new Logger(MarketDataService.name);
         this.stocks = new Map<string, any>();
         this.marketRegime = 'sideways';
         this.tickCount = 0;
@@ -300,7 +355,7 @@ let MarketDataService = class MarketDataService {
         // 三服务器：仅加载本市场的 K 线（原实现全表加载×3，277MB 库会产生数 GB 级瞬时内存峰值）
         const ownSymbols = [...this.stocks.keys()];
         const allHistory = ownSymbols.length > 0
-            ? await this.klineRepo.find({ where: { symbol: typeorm_2.In(ownSymbols) }, order: { time: 'ASC' } })
+            ? await this.klineRepo.find({ where: { symbol: In(ownSymbols) }, order: { time: 'ASC' } })
             : [];
         const historyRows = allHistory.filter((r) => this.stocks.has(r.symbol));
         if (historyRows.length > 0) {
@@ -993,10 +1048,10 @@ let MarketDataService = class MarketDataService {
     updateFxRate() {
         if (this.market !== 'HK' && this.market !== 'US')
             return;
-        const rates = (0, constants_1.getFxRates)();
+        const rates = constants_1.getFxRates();
         const base = constants_1.FX_CNY_PER_UNIT[this.market];
         rates[this.market] = Math.max(base * 0.97, Math.min(base * 1.03, Number(rates[this.market]) + (Math.random() - 0.5) * base * 0.006));
-        (0, constants_1.setFxRates)(rates);
+        constants_1.setFxRates(rates);
     }
     // P5 A股新股首日集合（挂牌当日 ±44% 带宽，次日自然出集合）
     getIpoFirstDaySymbols() {
@@ -1370,29 +1425,29 @@ let MarketDataService = class MarketDataService {
         }
         // S1 补：当天完整 1min/5min 落库（current 只是最后一根，完整历史必须全量）
         if (!skipPersist) {
-        const dayStart = new Date(2024, 0, 1 + this.gameDay).getTime();
-        for (const stock of this.stocks.values()) {
-            for (const bar of stock.kline1min) {
-                if (new Date(bar.time).getTime() >= dayStart) {
-                    try {
-                        batchKlines.push(this.klineRepo.create({
-                            symbol: stock.symbol, timeframe: '1min',
-                            time: bar.time, open: bar.open, high: bar.high, low: bar.low, close: bar.close, volume: bar.volume,
-                        }));
-                    } catch (e) { }
+            const dayStart = new Date(2024, 0, 1 + this.gameDay).getTime();
+            for (const stock of this.stocks.values()) {
+                for (const bar of stock.kline1min) {
+                    if (new Date(bar.time).getTime() >= dayStart) {
+                        try {
+                            batchKlines.push(this.klineRepo.create({
+                                symbol: stock.symbol, timeframe: '1min',
+                                time: bar.time, open: bar.open, high: bar.high, low: bar.low, close: bar.close, volume: bar.volume,
+                            }));
+                        } catch (e) { }
+                    }
+                }
+                for (const bar of stock.kline5min) {
+                    if (new Date(bar.time).getTime() >= dayStart) {
+                        try {
+                            batchKlines.push(this.klineRepo.create({
+                                symbol: stock.symbol, timeframe: '5min',
+                                time: bar.time, open: bar.open, high: bar.high, low: bar.low, close: bar.close, volume: bar.volume,
+                            }));
+                        } catch (e) { }
+                    }
                 }
             }
-            for (const bar of stock.kline5min) {
-                if (new Date(bar.time).getTime() >= dayStart) {
-                    try {
-                        batchKlines.push(this.klineRepo.create({
-                            symbol: stock.symbol, timeframe: '5min',
-                            time: bar.time, open: bar.open, high: bar.high, low: bar.low, close: bar.close, volume: bar.volume,
-                        }));
-                    } catch (e) { }
-                }
-            }
-        }
         }
         // 批量写入（daily + 当天完整 1min/5min）
         if (batchKlines.length > 0) {
@@ -1722,7 +1777,8 @@ let MarketDataService = class MarketDataService {
             klines.push(current);
         return klines;
     }
-    getState() {
+    // 单市场状态快照的显式契约：后三个字段由 market.service 聚合三市场状态时附加（见 MarketService.getState）
+    getState(): MarketStateSnapshot {
         return {
             gameDay: this.gameDay,
             tickCount: this.tickCount,
@@ -1733,7 +1789,7 @@ let MarketDataService = class MarketDataService {
             macroHistory: [...this.macroHistory],
             industryCycles: { ...Object.fromEntries(this.industryCycles.entries()) },
             // P5: 动态汇率（HK/US 逐日演化，划转即时使用）
-            fxRates: (0, constants_1.getFxRates)(),
+            fxRates: constants_1.getFxRates(),
             // P1: 本市场实时开市状态（含节假日历判断），供前端休市遮罩/下单禁用使用
             isTradingTime: constants_1.isTradingTimeFor(this.market),
             // Phase B: 盘后固定价格交易窗口（仅 CN 15:00-15:30）
@@ -2058,22 +2114,4 @@ let MarketDataService = class MarketDataService {
             }
         }
     }
-};
-
-export { MarketDataService };
-
-MarketDataService = __decorate(
-[
-    (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(stock_entity_1.Stock)),
-    __param(1, (0, typeorm_1.InjectRepository)(kline_entity_1.Kline)),
-    __param(2, (0, typeorm_1.InjectRepository)(dividend_event_entity_1.DividendEvent)),
-    __param(3, (0, common_1.Optional)()),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
-        trading_engine_service_1.TradingEngineService])
-],
-MarketDataService
-);
-
+}

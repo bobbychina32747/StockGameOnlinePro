@@ -1,153 +1,67 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-import common_1 = require("@nestjs/common");
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { CurrentUser, JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { User } from '../../infrastructure/database/entities/user.entity';
+import { AccountService } from './account.service';
 
-import jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
+@Controller('account')
+@UseGuards(JwtAuthGuard)
+export class AccountController {
+    constructor(private readonly accountService: AccountService) {}
 
-import user_entity_1 = require("../../infrastructure/database/entities/user.entity");
-
-import account_service_1 = require("./account.service");
-
-let AccountController = class AccountController {
-    [key: string]: any;
-    constructor(accountService) {
-        this.accountService = accountService;
-    }
-    async getAccount(user, mode = 'US') {
+    @Get()
+    async getAccount(@CurrentUser() user: User, @Query('mode') mode: string = 'US') {
         const account = await this.accountService.getAccount(user.id, mode);
         const positions = await this.accountService.getPositions(account.id);
         return { account, positions };
     }
-    async getMetrics(user, mode = 'US') {
+
+    @Get('metrics')
+    async getMetrics(@CurrentUser() user: User, @Query('mode') mode: string = 'US') {
         return this.accountService.getMetrics(user.id, mode);
     }
-    getHistory(user, mode = 'US') {
+
+    @Get('history')
+    getHistory(@CurrentUser() user: User, @Query('mode') mode: string = 'US') {
         return this.accountService.getHistory(user.id, mode);
     }
-    getTransactions(user, mode = 'US', limit) {
+
+    @Get('transactions')
+    getTransactions(@CurrentUser() user: User, @Query('mode') mode: string = 'US', @Query('limit') limit: string) {
         return this.accountService.getTransactions(user.id, mode, limit);
     }
-    getReviews(user) {
+
+    @Get('reviews')
+    getReviews(@CurrentUser() user: User) {
         return this.accountService.getReviews(user.id);
     }
-    async setLeverage(user, mode, leverage) {
+
+    @Post('leverage')
+    async setLeverage(@CurrentUser() user: User, @Query('mode') mode: string, @Body('leverage') leverage: number) {
         return this.accountService.setLeverage(user.id, mode || 'US', leverage);
     }
-    async resetAccount(user, mode, preset) {
+
+    @Post('reset')
+    async resetAccount(@CurrentUser() user: User, @Query('mode') mode: string, @Body('preset') preset: string) {
         return this.accountService.resetAccount(user.id, mode || 'US', preset);
     }
-    async transfer(user, fromMode, toMode, amount) {
+
+    @Post('transfer')
+    async transfer(
+        @CurrentUser() user: User,
+        @Query('fromMode') fromMode: string,
+        @Query('toMode') toMode: string,
+        @Body('amount') amount: number,
+    ) {
         return this.accountService.transferCash(user.id, fromMode, toMode, amount);
     }
-    getAchievements(user) {
+
+    @Get('achievements')
+    getAchievements(@CurrentUser() user: User) {
         return this.accountService.getAchievements(user.id);
     }
-    unlockAchievement(user, body) {
+
+    @Post('achievements')
+    unlockAchievement(@CurrentUser() user: User, @Body() body: any) {
         return this.accountService.unlockAchievement(user.id, body && body.code);
     }
-};
-__decorate([
-    (0, common_1.Get)(),
-    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
-    __param(1, (0, common_1.Query)('mode')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [user_entity_1.User, String]),
-    __metadata("design:returntype", Promise)
-], AccountController.prototype, "getAccount", null);
-__decorate([
-    (0, common_1.Get)('metrics'),
-    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
-    __param(1, (0, common_1.Query)('mode')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [user_entity_1.User, String]),
-    __metadata("design:returntype", Promise)
-], AccountController.prototype, "getMetrics", null);
-__decorate([
-    (0, common_1.Get)('history'),
-    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
-    __param(1, (0, common_1.Query)('mode')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [user_entity_1.User, String]),
-    __metadata("design:returntype", void 0)
-], AccountController.prototype, "getHistory", null);
-__decorate([
-    (0, common_1.Get)('transactions'),
-    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
-    __param(1, (0, common_1.Query)('mode')),
-    __param(2, (0, common_1.Query)('limit')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [user_entity_1.User, String, String]),
-    __metadata("design:returntype", void 0)
-], AccountController.prototype, "getTransactions", null);
-__decorate([
-    (0, common_1.Post)('leverage'),
-    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
-    __param(1, (0, common_1.Query)('mode')),
-    __param(2, (0, common_1.Body)('leverage')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [user_entity_1.User, String, Number]),
-    __metadata("design:returntype", Promise)
-], AccountController.prototype, "setLeverage", null);
-__decorate([
-    (0, common_1.Post)('transfer'),
-    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
-    __param(1, (0, common_1.Query)('fromMode')),
-    __param(2, (0, common_1.Query)('toMode')),
-    __param(3, (0, common_1.Body)('amount')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [user_entity_1.User, String, String, Number]),
-    __metadata("design:returntype", Promise)
-], AccountController.prototype, "transfer", null);
-__decorate([
-    (0, common_1.Get)('reviews'),
-    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [user_entity_1.User]),
-    __metadata("design:returntype", Promise)
-], AccountController.prototype, "getReviews", null);
-__decorate([
-    (0, common_1.Post)('reset'),
-    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
-    __param(1, (0, common_1.Query)('mode')),
-    __param(2, (0, common_1.Body)('preset')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [user_entity_1.User, String, String]),
-    __metadata("design:returntype", Promise)
-], AccountController.prototype, "resetAccount", null);
-__decorate([
-    (0, common_1.Get)('achievements'),
-    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [user_entity_1.User]),
-    __metadata("design:returntype", Promise)
-], AccountController.prototype, "getAchievements", null);
-__decorate([
-    (0, common_1.Post)('achievements'),
-    __param(0, (0, jwt_auth_guard_1.CurrentUser)()),
-    __param(1, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [user_entity_1.User, Object]),
-    __metadata("design:returntype", Promise)
-], AccountController.prototype, "unlockAchievement", null);
-
-export { AccountController };
-
-AccountController = __decorate(
-[
-    (0, common_1.Controller)('account'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    __metadata("design:paramtypes", [account_service_1.AccountService])
-],
-AccountController
-);
-
+}

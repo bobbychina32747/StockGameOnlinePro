@@ -1,33 +1,32 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-import common_1 = require("@nestjs/common");
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
-import typeorm_1 = require("@nestjs/typeorm");
+import { Account } from '../../infrastructure/database/entities/account.entity';
+import { DailySnapshot } from '../../infrastructure/database/entities/daily-snapshot.entity';
 
-import typeorm_2 = require("typeorm");
+// 榜单缓存条目（内部保留 userId 供 getUserRank 查询，对外输出时在 getRankings 中剔除）
+interface RankingEntry {
+    userId: string;
+    market: string;
+    tier: string;
+    username: string;
+    totalEquity: number;
+    totalReturn: number;
+    dayReturn: number;
+    rank: number;
+}
 
-import account_entity_1 = require("../../infrastructure/database/entities/account.entity");
+@Injectable()
+export class RankingService {
+    private readonly logger = new Logger(RankingService.name);
+    private cache: RankingEntry[] = [];
 
-import daily_snapshot_entity_1 = require("../../infrastructure/database/entities/daily-snapshot.entity");
+    constructor(
+        @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
+        @InjectRepository(DailySnapshot) private readonly snapshotRepo: Repository<DailySnapshot>,
+    ) {}
 
-let RankingService = class RankingService {
-    [key: string]: any;
-    constructor(accountRepo, snapshotRepo) {
-        this.accountRepo = accountRepo;
-        this.snapshotRepo = snapshotRepo;
-        this.logger = new common_1.Logger(RankingService.name);
-        this.cache = [];
-    }
     async calculateRankings() {
         const accounts = await this.accountRepo.find({ relations: ['user'] });
         // Q2 优化：只取每用户最近 2 天的快照（按 max(day) 裁剪），避免全量快照参与计算
@@ -46,7 +45,7 @@ let RankingService = class RankingService {
         });
         // 快照表只有 userId（无 accountId），多市场账户同一天有多条快照，按 userId 串算会跨账户混算，
         // 因此快照仅作为 dayStartEquity 缺失时的兜底
-        const dayReturnFallback = (userId) => {
+        const dayReturnFallback = (userId: string): number => {
             const arr = byUser.get(userId) || [];
             if (arr.length === 0)
                 return 0;
@@ -78,8 +77,9 @@ let RankingService = class RankingService {
         this.cache = entries;
         return entries;
     }
+
     // 三服务器排行：market=ALL 跨服总榜；CN/HK/US 服内榜
-    getRankings(limit = 20, sort = 'totalReturn', market = 'ALL') {
+    getRankings(limit: number = 20, sort: string = 'totalReturn', market: string = 'ALL') {
         // sort: totalReturn(总收益) | dayReturn(今日) | equity(总资产)
         // SECURITY(F): limit 钳制到 1..50，非法值回退 20
         const n = Math.min(Math.max(Number(limit) || 20, 1), 50);
@@ -88,7 +88,7 @@ let RankingService = class RankingService {
             ? this.cache.filter((e) => e.market === market)
             : this.cache;
         // SECURITY(F): 输出剔除 userId，并对 username 脱敏（保留前 2 个字符，其余用 *）
-        const maskUsername = (name) => {
+        const maskUsername = (name: string): string => {
             const chars = Array.from(name || '未知');
             return chars.length <= 2 ? chars.join('') : chars.slice(0, 2).join('') + '*'.repeat(chars.length - 2);
         };
@@ -105,21 +105,8 @@ let RankingService = class RankingService {
             rank: e.rank,
         }));
     }
-    getUserRank(userId) {
+
+    getUserRank(userId: string) {
         return this.cache.find((e) => e.userId === userId);
     }
-};
-
-export { RankingService };
-
-RankingService = __decorate(
-[
-    (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(account_entity_1.Account)),
-    __param(1, (0, typeorm_1.InjectRepository)(daily_snapshot_entity_1.DailySnapshot)),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository])
-],
-RankingService
-);
-
+}

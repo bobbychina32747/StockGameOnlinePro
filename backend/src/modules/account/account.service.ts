@@ -1,91 +1,77 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-import common_1 = require("@nestjs/common");
+import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 
 // Phase A: 重置防刷钱——RESET_ENABLED 开关（大赛期间关闭）
-import config_1 = require("@nestjs/config");
-
-import typeorm_1 = require("@nestjs/typeorm");
-
-import typeorm_2 = require("typeorm");
-
-import account_entity_1 = require("../../infrastructure/database/entities/account.entity");
-
-import position_entity_1 = require("../../infrastructure/database/entities/position.entity");
-import transaction_entity_1 = require("../../infrastructure/database/entities/transaction.entity");
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Account } from '../../infrastructure/database/entities/account.entity';
+import { Position } from '../../infrastructure/database/entities/position.entity';
+import { Transaction } from '../../infrastructure/database/entities/transaction.entity';
 
 // Phase A: 重置防刷钱——基金持仓/未成交挂单一票否决 + 审计
-import fund_holding_entity_1 = require("../../infrastructure/database/entities/fund-holding.entity");
-import order_entity_1 = require("../../infrastructure/database/entities/order.entity");
-import reset_audit_log_entity_1 = require("../../infrastructure/database/entities/reset-audit-log.entity");
+import { FundHolding } from '../../infrastructure/database/entities/fund-holding.entity';
+import { Order, OrderStatus } from '../../infrastructure/database/entities/order.entity';
+import { ResetAuditLog } from '../../infrastructure/database/entities/reset-audit-log.entity';
 
 // Phase C: 成就服务端化
-import achievement_entity_1 = require("../../infrastructure/database/entities/achievement.entity");
+import { Achievement } from '../../infrastructure/database/entities/achievement.entity';
 
 // Phase C: 赛季中禁重置/划转
-import season_service_1 = require("../season/season.service");
-
-import risk_manager_service_1 = require("../../core/risk-manager/risk-manager.service");
+import { SeasonService } from '../season/season.service';
+import { RiskManagerService } from '../../core/risk-manager/risk-manager.service';
 
 // Phase F: 流水「最近 N 笔」口径单一来源
-import perf_1 = require("../../core/risk-manager/perf");
+import { sliceRecentAsc } from '../../core/risk-manager/perf';
+import { TradingEngineService } from '../../core/trading-engine/trading-engine.service';
+import { FX_TRANSFER_FEE_RATE, RISK, getFxRates } from '../../common/constants';
 
-import trading_engine_service_1 = require("../../core/trading-engine/trading-engine.service");
+@Injectable()
+export class AccountService {
+    private readonly logger = new Logger(AccountService.name);
 
-import constants_1 = require("../../common/constants");
+    constructor(
+        @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
+        @InjectRepository(Position) private readonly positionRepo: Repository<Position>,
+        @InjectRepository(Transaction) private readonly transactionRepo: Repository<Transaction>,
+        @InjectRepository(FundHolding) private readonly fundHoldingRepo: Repository<FundHolding>,
+        @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
+        @InjectRepository(ResetAuditLog) private readonly resetAuditRepo: Repository<ResetAuditLog>,
+        private readonly riskManager: RiskManagerService,
+        private readonly engine: TradingEngineService,
+        private readonly config: ConfigService,
+        @InjectRepository(Achievement) private readonly achievementRepo: Repository<Achievement>,
+        private readonly seasonService: SeasonService,
+    ) {}
 
-let AccountService = class AccountService {
-    [key: string]: any;
-    constructor(accountRepo, positionRepo, transactionRepo, fundHoldingRepo, orderRepo, resetAuditRepo, riskManager, engine, config, achievementRepo, seasonService) {
-        this.accountRepo = accountRepo;
-        this.positionRepo = positionRepo;
-        this.transactionRepo = transactionRepo;
-        this.fundHoldingRepo = fundHoldingRepo;
-        this.orderRepo = orderRepo;
-        this.resetAuditRepo = resetAuditRepo;
-        this.riskManager = riskManager;
-        this.engine = engine;
-        this.config = config;
-        this.achievementRepo = achievementRepo;
-        this.seasonService = seasonService;
-        this.logger = new common_1.Logger(AccountService.name);
-    }
-    async getAccount(userId, mode = 'US') {
+    async getAccount(userId: string, mode: string = 'US') {
         const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });
         if (!account)
-            throw new common_1.NotFoundException(`账户不存在（${mode}）`);
+            throw new NotFoundException(`账户不存在（${mode}）`);
         return account;
     }
-    async getOrCreateAccount(userId, mode) {
+
+    async getOrCreateAccount(userId: string, mode: string) {
         const existing = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });
         if (existing)
             return existing;
         const account = this.accountRepo.create({
             userId,
             marketMode: mode,
-            cash: constants_1.RISK.initialCash,
-            totalEquity: constants_1.RISK.initialCash,
-            peakEquity: constants_1.RISK.initialCash,
-            initialEquity: constants_1.RISK.initialCash,
-            dayStartEquity: constants_1.RISK.initialCash,
+            cash: RISK.initialCash,
+            totalEquity: RISK.initialCash,
+            peakEquity: RISK.initialCash,
+            initialEquity: RISK.initialCash,
+            dayStartEquity: RISK.initialCash,
         });
         return this.accountRepo.save(account);
     }
-    async getPositions(accountId) {
+
+    async getPositions(accountId: string) {
         return this.positionRepo.find({ where: { accountId } });
     }
+
     // Q7：交易流水（资金明细/交割单）
-    getTransactions(userId, mode, limit = 100) {
+    getTransactions(userId: string, mode: string, limit: string | number = 100) {
         return this.accountRepo.find({ where: { userId, marketMode: mode } }).then((list) => {
             const acct = list && list[0];
             if (!acct)
@@ -97,14 +83,16 @@ let AccountService = class AccountService {
             });
         });
     }
+
     // Q4：账户历史净值曲线
-    getHistory(userId, mode) {
+    getHistory(userId: string, mode: string) {
         return this.accountRepo.find({ where: { userId, marketMode: mode } }).then((list) => {
             const acct = list && list[0];
             return acct ? this.riskManager.getEquityHistory(acct.id) : [];
         });
     }
-    async getMetrics(userId, mode) {
+
+    async getMetrics(userId: string, mode: string) {
         const account = await this.getAccount(userId, mode);
         // P5 配对级绩效：最近 500 笔流水（升序）做 FIFO 配对
         // Phase F 修复：原「升序 + take 500」在 SQLite 下取到的是最旧 500 笔（与注释/日终段位口径相反）
@@ -113,25 +101,28 @@ let AccountService = class AccountService {
             where: { accountId: account.id },
             order: { createdAt: 'ASC' },
         });
-        const txs = perf_1.sliceRecentAsc(allTxs);
+        const txs = sliceRecentAsc(allTxs);
         const metrics = await this.riskManager.calculateMetrics(account, txs);
         return { account, metrics };
     }
-    async setLeverage(userId, mode, leverage) {
+
+    async setLeverage(userId: string, mode: string, leverage: number) {
         const account = await this.getAccount(userId, mode);
         // SECURITY: 非数字（NaN/Infinity/字符串）会绕过比较并污染保证金计算，必须先校验有限性
         const lev = Number(leverage);
         if (!Number.isFinite(lev) || lev < 1 || lev > 3) {
-            throw new common_1.BadRequestException('杠杆倍数必须是 1~3 之间的数字');
+            throw new BadRequestException('杠杆倍数必须是 1~3 之间的数字');
         }
         account.leverage = lev;
         return this.accountRepo.save(account);
     }
+
     // 交易复盘：个人 + 全局教训卡
-    getReviews(userId) {
+    getReviews(userId: string) {
         return this.riskManager ? this.riskManager.getReviews(userId) : [];
     }
-    async resetAccount(userId, mode, preset) {
+
+    async resetAccount(userId: string, mode: string, preset: string) {
         const presets = {
             '散户': { cash: 100000, leverage: 1 },
             '机构': { cash: 500000, leverage: 2 },
@@ -139,7 +130,7 @@ let AccountService = class AccountService {
         };
         const cfg = presets[preset];
         if (!cfg)
-            throw new common_1.BadRequestException('未知的角色预设');
+            throw new BadRequestException('未知的角色预设');
         // Phase A: 大赛进行中（RESET_ENABLED=false）禁止重置，保证赛季公平
         const resetEnabled = String(this.config && this.config.get ? this.config.get('RESET_ENABLED', 'true') : 'true') === 'true';
         if (!resetEnabled) {
@@ -151,7 +142,7 @@ let AccountService = class AccountService {
         }
         // SECURITY: 重置必须走结算互斥队列，防止与成交结算交叉丢失更新
         if (!this.engine) {
-            throw new common_1.ServiceUnavailableException('交易引擎不可用');
+            throw new ServiceUnavailableException('交易引擎不可用');
         }
         return this.engine.runExclusive(async () => {
             const account = await this.getAccount(userId, mode);
@@ -167,7 +158,7 @@ let AccountService = class AccountService {
                 return { success: false, error: '存在基金持仓，无法重置账户（请先赎回全部基金）' };
             }
             // Phase A P0#1: 挂单会被 checkPendingOrders 成交成持仓，是绕过"无持仓"检查的时序窗口，必须同步禁止
-            const pending = await this.orderRepo.find({ where: { accountId: account.id, status: order_entity_1.OrderStatus.PENDING } });
+            const pending = await this.orderRepo.find({ where: { accountId: account.id, status: OrderStatus.PENDING } });
             if (pending.length > 0) {
                 return { success: false, error: '存在未成交挂单，无法重置账户（请先撤单）' };
             }
@@ -211,8 +202,9 @@ let AccountService = class AccountService {
             return { success: true, account };
         });
     }
+
     // P3 跨市场资金划转：按汇率折算（CN/HK/US → 人民币 → 目标币种），收 0.1% 手续费
-    async transferCash(userId, fromMode, toMode, amount) {
+    async transferCash(userId: string, fromMode: string, toMode: string, amount: number) {
         const amt = Number(amount);
         if (!Number.isFinite(amt) || amt <= 0) {
             return { success: false, error: '划转金额必须为大于0的数字' };
@@ -225,7 +217,7 @@ let AccountService = class AccountService {
             return { success: false, error: '赛季进行中，跨市场划转已关闭' };
         }
         // P5 动态汇率：用实时汇率（行情引擎每日演化）而非固定基准
-        const fx = (0, constants_1.getFxRates)();
+        const fx = getFxRates();
         const fromRate = fx[fromMode];
         const toRate = fx[toMode];
         if (!fromRate || !toRate) {
@@ -244,16 +236,17 @@ let AccountService = class AccountService {
             if (!to)
                 return { success: false, error: '转入账户不存在' };
             const cnyValue = amt * fromRate;
-            const received = (cnyValue / toRate) * (1 - constants_1.FX_TRANSFER_FEE_RATE);
+            const received = (cnyValue / toRate) * (1 - FX_TRANSFER_FEE_RATE);
             from.cash = Math.round((Number(from.cash) - amt) * 100) / 100;
             to.cash = Math.round((Number(to.cash) + received) * 100) / 100;
             await this.accountRepo.save(from);
             await this.accountRepo.save(to);
-            this.logger.log('跨市场划转 ' + userId + ': ' + fromMode + ' -' + amt.toFixed(2) + ' → ' + toMode + ' +' + received.toFixed(2) + '（手续费 ' + (constants_1.FX_TRANSFER_FEE_RATE * 100).toFixed(1) + '%）');
+            this.logger.log('跨市场划转 ' + userId + ': ' + fromMode + ' -' + amt.toFixed(2) + ' → ' + toMode + ' +' + received.toFixed(2) + '（手续费 ' + (FX_TRANSFER_FEE_RATE * 100).toFixed(1) + '%）');
             return { success: true, received: Number(received.toFixed(2)) };
         });
     }
-    getModeInfo(mode) {
+
+    getModeInfo(mode: string) {
         const isCN = mode === 'CN';
         return {
             mode,
@@ -266,11 +259,13 @@ let AccountService = class AccountService {
                 : '🇺🇸 美股 | T+0 | 可多空 | 无印花税',
         };
     }
+
     // Phase C: 成就服务端化（评估在前端，服务端只做幂等持久化 + 跨设备查询）
-    getAchievements(userId) {
+    getAchievements(userId: string) {
         return this.achievementRepo.find({ where: { userId }, order: { unlockedAt: 'ASC' } });
     }
-    async unlockAchievement(userId, code) {
+
+    async unlockAchievement(userId: string, code: string) {
         if (!code || typeof code !== 'string' || code.length > 40) {
             return { success: false, error: '成就代码无效' };
         }
@@ -286,32 +281,4 @@ let AccountService = class AccountService {
             return { success: true, duplicate: true };
         }
     }
-};
-
-export { AccountService };
-
-AccountService = __decorate(
-[
-    (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(account_entity_1.Account)),
-    __param(1, (0, typeorm_1.InjectRepository)(position_entity_1.Position)),
-    __param(2, (0, typeorm_1.InjectRepository)(transaction_entity_1.Transaction)),
-    __param(3, (0, typeorm_1.InjectRepository)(fund_holding_entity_1.FundHolding)),
-    __param(4, (0, typeorm_1.InjectRepository)(order_entity_1.Order)),
-    __param(5, (0, typeorm_1.InjectRepository)(reset_audit_log_entity_1.ResetAuditLog)),
-    __param(9, (0, typeorm_1.InjectRepository)(achievement_entity_1.Achievement)),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
-        typeorm_2.Repository,
-        risk_manager_service_1.RiskManagerService,
-        trading_engine_service_1.TradingEngineService,
-        config_1.ConfigService,
-        typeorm_2.Repository,
-        season_service_1.SeasonService])
-],
-AccountService
-);
-
+}

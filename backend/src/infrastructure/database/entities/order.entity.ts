@@ -1,142 +1,110 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-import typeorm_1 = require("typeorm");
-
-import user_entity_1 = require("./user.entity");
-
-import account_entity_1 = require("./account.entity");
+import {
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    JoinColumn,
+    ManyToOne,
+    PrimaryGeneratedColumn,
+} from 'typeorm';
+import { User } from './user.entity';
+import { Account } from './account.entity';
 
 export enum OrderType {
-    MARKET = "market",
-    LIMIT = "limit",
-    STOP = "stop",
-    STOP_LIMIT = "stop-limit",
-    FOK = "fok",
-    IOC = "ioc",
-    ICEBERG = "iceberg",
+    MARKET = 'market',
+    LIMIT = 'limit',
+    STOP = 'stop',
+    STOP_LIMIT = 'stop-limit',
+    FOK = 'fok',
+    IOC = 'ioc',
+    ICEBERG = 'iceberg',
 }
+
 export enum OrderSide {
-    BUY = "buy",
-    SELL = "sell",
-    SHORT = "short",
-    COVER = "cover",
+    BUY = 'buy',
+    SELL = 'sell',
+    SHORT = 'short',
+    COVER = 'cover',
 }
+
 export enum OrderStatus {
-    PENDING = "pending",
-    PARTIAL = "partial",
-    FILLED = "filled",
-    CANCELLED = "cancelled",
-    REJECTED = "rejected",
+    PENDING = 'pending',
+    PARTIAL = 'partial',
+    FILLED = 'filled',
+    CANCELLED = 'cancelled',
+    REJECTED = 'rejected',
 }
-let Order = class Order {
-    [key: string]: any;
-};
-__decorate([
-    (0, typeorm_1.PrimaryGeneratedColumn)('uuid'),
-    __metadata("design:type", String)
-], Order.prototype, "id", void 0);
-__decorate([
-    (0, typeorm_1.Column)(),
-    __metadata("design:type", String)
-], Order.prototype, "userId", void 0);
-__decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.User),
-    (0, typeorm_1.JoinColumn)({ name: 'userId' }),
-    __metadata("design:type", user_entity_1.User)
-], Order.prototype, "user", void 0);
-__decorate([
-    (0, typeorm_1.Column)(),
-    __metadata("design:type", String)
-], Order.prototype, "accountId", void 0);
-__decorate([
-    (0, typeorm_1.ManyToOne)(() => account_entity_1.Account, (acc) => acc.orders),
-    (0, typeorm_1.JoinColumn)({ name: 'accountId' }),
-    __metadata("design:type", account_entity_1.Account)
-], Order.prototype, "account", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ length: 10 }),
-    __metadata("design:type", String)
-], Order.prototype, "symbol", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ type: 'simple-enum', enum: OrderType }),
-    __metadata("design:type", String)
-], Order.prototype, "type", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ type: 'simple-enum', enum: OrderSide }),
-    __metadata("design:type", String)
-], Order.prototype, "side", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { nullable: true }),
-    __metadata("design:type", Number)
-], Order.prototype, "price", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { nullable: true }),
-    __metadata("design:type", Number)
-], Order.prototype, "triggerPrice", void 0);
-__decorate([
-    (0, typeorm_1.Column)(),
-    __metadata("design:type", Number)
-], Order.prototype, "quantity", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ default: 0 }),
-    __metadata("design:type", Number)
-], Order.prototype, "filledQty", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ type: 'simple-enum', enum: OrderStatus, default: OrderStatus.PENDING }),
-    __metadata("design:type", String)
-], Order.prototype, "status", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { nullable: true }),
-    __metadata("design:type", Number)
-], Order.prototype, "avgFillPrice", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
-    __metadata("design:type", String)
-], Order.prototype, "rejectReason", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { nullable: true }),
-    __metadata("design:type", Number)
-], Order.prototype, "displayQty", void 0);
-__decorate([
-    (0, typeorm_1.Column)('float', { nullable: true }),
-    __metadata("design:type", Number)
-], Order.prototype, "hiddenQty", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
-    __metadata("design:type", String)
-], Order.prototype, "triggerLog", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ default: 0 }),
-    __metadata("design:type", Number)
-], Order.prototype, "triggerRetries", void 0);
-// Phase B: 盘后固定价格交易标记（15:00-15:30 收盘价撮合，15:30 未成交自动撤销）
-__decorate([
-    (0, typeorm_1.Column)({ default: false }),
-    __metadata("design:type", Boolean)
-], Order.prototype, "postClose", void 0);
-__decorate([
-    (0, typeorm_1.CreateDateColumn)(),
-    __metadata("design:type", Date)
-], Order.prototype, "createdAt", void 0);
 
-export { Order };
+@Entity('orders')
+// Phase D: 账户维订单查询索引（getPendingOrders/账户重置查挂单/订单历史页）
+@Index(['accountId', 'status'])
+// Phase F: 挂单扫描索引——checkPendingOrders 按 (status=PENDING, type IN [limit,stop,stop-limit]) 过滤，
+// 原仅有 (accountId,status) 复合索引无法命中该等值+枚举查询（挂单量增长后全表扫）
+@Index(['status', 'type'])
+export class Order {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-Order = __decorate(
-[
-    (0, typeorm_1.Entity)('orders'),
-    // Phase D: 账户维订单查询索引（getPendingOrders/账户重置查挂单/订单历史页）
-    (0, typeorm_1.Index)(['accountId', 'status']),
-    // Phase F: 挂单扫描索引——checkPendingOrders 按 (status=PENDING, type IN [limit,stop,stop-limit]) 过滤，
-    // 原仅有 (accountId,status) 复合索引无法命中该等值+枚举查询（挂单量增长后全表扫）
-    (0, typeorm_1.Index)(['status', 'type'])
-],
-Order
-);
+    @Column()
+    userId: string;
 
+    @ManyToOne(() => User)
+    @JoinColumn({ name: 'userId' })
+    user: User;
+
+    @Column()
+    accountId: string;
+
+    @ManyToOne(() => Account, (acc) => acc.orders)
+    @JoinColumn({ name: 'accountId' })
+    account: Account;
+
+    @Column({ length: 10 })
+    symbol: string;
+
+    @Column({ type: 'simple-enum', enum: OrderType })
+    type: OrderType;
+
+    @Column({ type: 'simple-enum', enum: OrderSide })
+    side: OrderSide;
+
+    @Column('float', { nullable: true })
+    price?: number;
+
+    @Column('float', { nullable: true })
+    triggerPrice?: number;
+
+    @Column()
+    quantity: number;
+
+    @Column({ default: 0 })
+    filledQty: number;
+
+    @Column({ type: 'simple-enum', enum: OrderStatus, default: OrderStatus.PENDING })
+    status: OrderStatus;
+
+    @Column('float', { nullable: true })
+    avgFillPrice?: number;
+
+    @Column({ type: 'text', nullable: true })
+    rejectReason?: string;
+
+    @Column('float', { nullable: true })
+    displayQty?: number;
+
+    @Column('float', { nullable: true })
+    hiddenQty?: number;
+
+    @Column({ type: 'text', nullable: true })
+    triggerLog?: string;
+
+    @Column({ default: 0 })
+    triggerRetries: number;
+
+    // Phase B: 盘后固定价格交易标记（15:00-15:30 收盘价撮合，15:30 未成交自动撤销）
+    @Column({ default: false })
+    postClose: boolean;
+
+    @CreateDateColumn()
+    createdAt: Date;
+}

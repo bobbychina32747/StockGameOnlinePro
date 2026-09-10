@@ -1,42 +1,63 @@
-var __param = function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-import common_1 = require("@nestjs/common");
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
-import market_data_service_1 = require("../../core/market-data/market-data.service");
+import { DebugModeService } from '../../common/debug-mode/debug-mode.service';
+import { MarketDataService } from '../../core/market-data/market-data.service';
+import { TradingEngineService } from '../../core/trading-engine/trading-engine.service';
+import { RiskManagerService } from '../../core/risk-manager/risk-manager.service';
+import { runBacktest } from '../../core/backtest/backtest-engine';
 
-import trading_engine_service_1 = require("../../core/trading-engine/trading-engine.service");
+import { MarketGateway } from './market.gateway';
+import { NewsService } from './news.service';
 
-import debug_mode_service_1 = require("../../common/debug-mode/debug-mode.service");
-
-import risk_manager_service_1 = require("../../core/risk-manager/risk-manager.service");
-
-import market_gateway_1 = require("./market.gateway");
-
-import news_service_1 = require("./news.service");
-
-import config_1 = require("@nestjs/config");
-
-import constants_1 = require("../../common/constants");
-
-import market_utils_1 = require("../../common/market-utils");
-
-import backtest_engine_1 = require("../../core/backtest/backtest-engine");
+import * as constants_1 from '../../common/constants';
+import * as market_utils_1 from '../../common/market-utils';
 
 const { symbolMarket } = market_utils_1;
 
-let MarketService = class MarketService {
+@Injectable()
+export class MarketService {
+    // 兼容原反编译产物的动态下标访问（this[counterKey]，counterKey = tickCounter/tickCounterHK/tickCounterUS）
     [key: string]: any;
-    constructor(marketData, engine, gateway, newsService, riskManager, marketDataHK, marketDataUS, debugMode, config) {
+
+    private readonly logger = new Logger(MarketService.name);
+    private readonly marketData: MarketDataService;
+    // 三服务器：HK/US 为自定义 provider 注入的独立 MarketDataService 实例
+    private readonly marketDataHK: MarketDataService;
+    private readonly marketDataUS: MarketDataService;
+    private readonly engine: TradingEngineService;
+    private readonly gateway: MarketGateway;
+    private readonly newsService: NewsService;
+    // 全局账户结算/强平/复盘依赖，provider 缺失时为 undefined（原 @Optional() 语义）
+    private readonly riskManager: RiskManagerService;
+    private readonly debugMode: DebugModeService;
+    // 三服务器：全局价格聚合（riskManager 需全部市场价格）
+    private allPrices: Record<string, any> = {};
+    private tickCounter = 0;
+    private tickCounterHK = 0;
+    private tickCounterUS = 0;
+    private processing = false;
+    private lastTickAt = 0;
+    private tickIntervalMs = 60000;
+    // P1 开盘竞价：各市场最近一次竞价开盘价（dayOpen 基准合并用）+ 每市场当日竞价已执行标记
+    private lastAuctionPrices: Record<string, any> = {};
+    private lastAuctionDay: Record<string, number> = {};
+    // Phase B: 盘后固定价格交易窗口跟踪（按 gameDay 防重入）
+    private lastAfterHoursDay = -1;
+    // P4 新闻错峰队列：开盘/收盘生成的新闻按 tick 逐条播报，避免同一时刻扎堆
+    private newsQueue: Record<string, any[]> = { CN: [], HK: [], US: [] };
+
+    constructor(
+        marketData: MarketDataService,
+        engine: TradingEngineService,
+        gateway: MarketGateway,
+        newsService: NewsService,
+        @Optional() riskManager: RiskManagerService,
+        @Inject('MarketDataHK') marketDataHK: MarketDataService,
+        @Inject('MarketDataUS') marketDataUS: MarketDataService,
+        debugMode: DebugModeService,
+        config: ConfigService,
+    ) {
         this.debugMode = debugMode;
         this.marketData = marketData;
         this.marketDataHK = marketDataHK;
@@ -49,7 +70,7 @@ let MarketService = class MarketService {
         this.gateway = gateway;
         this.newsService = newsService;
         this.riskManager = riskManager;
-        this.logger = new common_1.Logger(MarketService.name);
+        this.logger = new Logger(MarketService.name);
         this.tickCounter = 0;
         this.processing = false;
         // P1 开盘竞价：各市场最近一次竞价开盘价（dayOpen 基准合并用）+ 每市场当日竞价已执行标记
@@ -67,6 +88,7 @@ let MarketService = class MarketService {
             throw new Error(`TICK_INTERVAL_MS=${this.tickIntervalMs} < 60000 为沙盒高速回放（日息/IPO/分红按游戏日加速，与真实市场口径不符）。如确认用于演示/调试，请在 .env 显式设置 SANDBOX_FAST=true 后重启（或改用 start-fast.bat）。`);
         }
     }
+
     // S2 真实交易时段判断：周一至周五 9:30-11:30 / 13:00-15:00
     isTradingTime() {
         const now = new Date();
@@ -78,10 +100,12 @@ let MarketService = class MarketService {
         const afternoon = minutes >= 13 * 60 && minutes < 15 * 60;
         return morning || afternoon;
     }
+
     // S2 市场是否开市（供下单校验）；P1 支持按市场判断独立时段
     isMarketOpen(mode) {
-        return (0, constants_1.isTradingTimeFor)(mode || 'CN');
+        return constants_1.isTradingTimeFor(mode || 'CN');
     }
+
     // P4 修复：启动预热——把行情引擎内部价格/波动率/合成盘口立即同步到最新状态
     warmUpMarket(marketData) {
         if (!marketData)
@@ -107,6 +131,7 @@ let MarketService = class MarketService {
             this.logger.warn('行情引擎预热失败: ' + (e && e.message ? e.message : e));
         }
     }
+
     async onModuleInit() {
         await this.marketData.init();
         // 三服务器：HK/US 实例手动初始化（factory 创建不触发生命周期钩子）
@@ -143,6 +168,7 @@ let MarketService = class MarketService {
         this.startTickLoop();
         this.logger.log('市场行情推送已启动（交易时段同步），tickCounter=' + this.tickCounter);
     }
+
     // 三服务器：单市场 tick 处理（行情生成/开盘事件/日终结算/挂单触发）
     async processMarket(market, marketData, counterKey) {
         let advanceCounter = false;
@@ -150,7 +176,7 @@ let MarketService = class MarketService {
             // Phase B P1: 盘后固定价格交易窗口（仅 A 股 15:00-15:30）——不生成行情，下单由 HTTP 路径即时撮合；
             // 跨过 15:30 后一次性撤销未成交盘后申报（每天一次，按 gameDay 防重入）
             if (market === 'CN' && !this.debugMode.isMarketActive()) {
-                const afterStage = (0, constants_1.afterHoursStageFor)('CN');
+                const afterStage = constants_1.afterHoursStageFor('CN');
                 if (afterStage === 'fixedPrice') {
                     if (this.lastAfterHoursDay !== marketData.gameDay) {
                         this.lastAfterHoursDay = marketData.gameDay;
@@ -169,7 +195,7 @@ let MarketService = class MarketService {
             }
             // P1 三阶段集合竞价（仅 A 股 9:15-9:30）：整个窗口不生成连续行情
             // 9:15-9:20 可申报可撤单 / 9:20-9:25 可申报不可撤 / 9:25-9:30 撮合（每天仅一次，9:25 起执行）
-            const auctionStage = (0, constants_1.auctionStageFor)(market);
+            const auctionStage = constants_1.auctionStageFor(market);
             if (!this.debugMode.isMarketActive() && auctionStage) {
                 if (auctionStage === 'matching') {
                     // Phase A: 竞价按游戏日键（原按真实日期——快档下一天 60 个游戏日却只有一次竞价，与游戏日脱节）
@@ -181,7 +207,7 @@ let MarketService = class MarketService {
                 return;
             }
             // P1: 各市场独立时段——非本市场交易时段（且非调试模式）直接跳过，不生成行情
-            if (!this.debugMode.isMarketActive() && !(0, constants_1.isTradingTimeFor)(market)) {
+            if (!this.debugMode.isMarketActive() && !constants_1.isTradingTimeFor(market)) {
                 return;
             }
             const ticks = await marketData.generateTick();
@@ -236,7 +262,7 @@ let MarketService = class MarketService {
             }
             const fills = await this.engine.checkPendingOrders();
             // Phase D: 广播前脱敏——剥离 counterFills 中对手方 accountId/orderId/mmId（全量广播泄露）
-            fills.forEach((f) => { this.gateway.broadcastFill((0, market_utils_1.sanitizeFill)(f)); });
+            fills.forEach((f) => { this.gateway.broadcastFill(market_utils_1.sanitizeFill(f)); });
             // 经济泡沫破灭广播
             const bursts = marketData.getBurstEvents();
             for (const b of bursts) {
@@ -359,12 +385,14 @@ let MarketService = class MarketService {
             }
         }
     }
+
     // P4 修复：tick 节奏——调试模式（无视限制）休市期走 1s/tick 高速回放，
     // 正常交易时段按配置 TICK_INTERVAL_MS（1000 高速 / 60000 真实分钟级）
     tickDelay() {
-        const anyTrading = (0, constants_1.isTradingTimeFor)('CN') || (0, constants_1.isTradingTimeFor)('HK') || (0, constants_1.isTradingTimeFor)('US');
-        return (0, constants_1.tickDelayMs)(this.debugMode.isMarketActive(), anyTrading, this.tickIntervalMs);
+        const anyTrading = constants_1.isTradingTimeFor('CN') || constants_1.isTradingTimeFor('HK') || constants_1.isTradingTimeFor('US');
+        return constants_1.tickDelayMs(this.debugMode.isMarketActive(), anyTrading, this.tickIntervalMs);
     }
+
     async startTickLoop() {
         this.lastTickAt = Date.now();
         const tick = async () => {
@@ -407,6 +435,7 @@ let MarketService = class MarketService {
         // 调试模式开启后首个 tick 在 5s 内生效（旧实现要等满第一个 60s 定时器）
         setTimeout(tick, Math.min(this.tickDelay(), 5000));
     }
+
     // P4 新闻错峰：入队 + 每 tick 播报一条
     enqueueNews(market, item) {
         if (!item)
@@ -414,6 +443,7 @@ let MarketService = class MarketService {
         const q = this.newsQueue[market] || (this.newsQueue[market] = []);
         q.push(item);
     }
+
     flushNewsQueue(market) {
         const q = this.newsQueue[market];
         if (!q || q.length === 0)
@@ -426,11 +456,12 @@ let MarketService = class MarketService {
             this.logger.warn('新闻播报失败: ' + ((e && e.message) || e));
         }
     }
+
     // P1 开盘集合竞价：对每只有挂单的股票按最大成交量原则定价并撮合，用户成交走真实结算
     async runOpeningAuctions(market, marketData) {
         const prevCloses = marketData.getPrevCloses();
         const auctionPrices = {};
-        const realFills = {};
+        const realFills: Record<string, any[]> = {};
         for (const symbol of Object.keys(prevCloses)) {
             let result;
             try {
@@ -471,16 +502,20 @@ let MarketService = class MarketService {
             marketData.setAuctionDayOpens(auctionPrices);
         }
     }
+
     // 三服务器路由：按股票代码前缀选择对应市场实例（H→HK，U→US，其他→CN）
     marketDataFor(symbol) {
         return symbolMarket(symbol) === 'HK' ? this.marketDataHK : symbolMarket(symbol) === 'US' ? this.marketDataUS : this.marketData;
     }
+
     getKlines(symbol, timeframe) {
         return this.marketDataFor(symbol).getKlines(symbol, timeframe);
     }
+
     getOrderBook(symbol) {
         return this.engine.getOrderBook(symbol);
     }
+
     getPrices() {
         // 三服务器合并
         const all = {};
@@ -490,6 +525,7 @@ let MarketService = class MarketService {
         }
         return all;
     }
+
     getStocks() {
         // 三服务器合并（前端按市场过滤）
         const all = [];
@@ -499,6 +535,7 @@ let MarketService = class MarketService {
         }
         return all;
     }
+
     getIndices() {
         // 三服务器合并（前端按市场过滤显示）
         const all = [];
@@ -508,13 +545,14 @@ let MarketService = class MarketService {
         }
         return all;
     }
+
     getState() {
         // 合并：当前市场用 CN（前端市场切换时按各自 state 展示）
         const cn = this.marketData.getState();
         // P0: 暴露 tick 间隔，前端据此标注「高速回放」或「实时行情」
         // P4 修复：调试模式休市期为 1s/tick 高速回放（与 tickDelay() 一致）
-        const anyTradingNow = (0, constants_1.isTradingTimeFor)('CN') || (0, constants_1.isTradingTimeFor)('HK') || (0, constants_1.isTradingTimeFor)('US');
-        cn.tickIntervalMs = (0, constants_1.tickDelayMs)(this.debugMode.isMarketActive(), anyTradingNow, this.tickIntervalMs);
+        const anyTradingNow = constants_1.isTradingTimeFor('CN') || constants_1.isTradingTimeFor('HK') || constants_1.isTradingTimeFor('US');
+        cn.tickIntervalMs = constants_1.tickDelayMs(this.debugMode.isMarketActive(), anyTradingNow, this.tickIntervalMs);
         // P6: 全服休市交易状态（所有客户端据此解锁休市下单）
         cn.offHoursTrading = !!this.debugMode.getGlobalBypass();
         // 浅拷贝避免循环引用（markets.CN 不能引用 cn 自身）
@@ -525,9 +563,11 @@ let MarketService = class MarketService {
         };
         return cn;
     }
+
     getReports(symbol) {
         return this.marketDataFor(symbol).getReports(symbol);
     }
+
     // P4 AI 对手盘：三服务器合并排名（完全本地策略，零外部 API）
     getAiOpponents() {
         const all = [];
@@ -537,20 +577,22 @@ let MarketService = class MarketService {
         }
         return all.sort((a, b) => b.pnlPct - a.pnlPct);
     }
+
     // P4 订单流信号：OFI + 机构/游资大单净流入（按股票所属市场路由）
     getFlowSignals(symbol) {
         return this.marketDataFor(symbol).getFlowSignals(symbol);
     }
+
     // ─── B2 回测：多策略 + 真实手续费 + 滑点 + 基准（Phase 6 委托纯引擎） ───
-    backtest(symbol, fast = 5, slow = 20, timeframe = '1min', strategy = 'ma_cross', slippageBps = 0, period = 14, momentumN = 10) {
+    backtest(symbol: string, fast: string | number = 5, slow: string | number = 20, timeframe: string = '1min', strategy: string = 'ma_cross', slippageBps: string | number = 0, period: string | number = 14, momentumN: string | number = 10) {
         const klines = this.marketDataFor(symbol).getKlines(symbol, timeframe);
         const mode = symbolMarket(symbol);
         // 引擎只用 close 序列；费率/滑点口径与实盘一致（回测≈实盘）
         const bars = klines.map((k) => ({ open: 0, high: 0, low: 0, close: Number(k.close) }));
-        return backtest_engine_1.runBacktest(bars, {
+        return runBacktest(bars, {
             symbol,
             timeframe,
-            strategy: ((['ma_cross', 'rsi_reversal', 'momentum'].includes(strategy) ? strategy : 'ma_cross') as any), // 白名单校验后传入引擎
+            strategy: (['ma_cross', 'rsi_reversal', 'momentum'].includes(strategy) ? strategy : 'ma_cross') as any, // 白名单校验后传入引擎
             fast: Number(fast), slow: Number(slow),
             rsiPeriod: Number(period), momentumN: Number(momentumN),
             feeMode: mode,
@@ -558,26 +600,4 @@ let MarketService = class MarketService {
             lotSize: mode === 'US' ? 1 : 100,
         });
     }
-};
-
-export { MarketService };
-
-MarketService = __decorate(
-[
-    (0, common_1.Injectable)(),
-    __param(4, (0, common_1.Optional)()),
-    __param(5, (0, common_1.Inject)('MarketDataHK')),
-    __param(6, (0, common_1.Inject)('MarketDataUS')),
-    __metadata("design:paramtypes", [market_data_service_1.MarketDataService,
-        trading_engine_service_1.TradingEngineService,
-        market_gateway_1.MarketGateway,
-        news_service_1.NewsService,
-        risk_manager_service_1.RiskManagerService,
-        market_data_service_1.MarketDataService,
-        market_data_service_1.MarketDataService,
-        debug_mode_service_1.DebugModeService,
-        config_1.ConfigService])
-],
-MarketService
-);
-
+}

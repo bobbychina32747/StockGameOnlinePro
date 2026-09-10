@@ -1,47 +1,36 @@
-var __decorate = function (decorators, target, key?, desc?) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-import common_1 = require("@nestjs/common");
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+import { User, UserRole } from '../../infrastructure/database/entities/user.entity';
+import { Account } from '../../infrastructure/database/entities/account.entity';
+import { RISK } from '../../common/constants';
 
-import jwt_1 = require("@nestjs/jwt");
+// 登录失败记录：trim 后的 username → 失败计数 / 锁定截止时间戳
+interface LoginFailRecord {
+    failCount: number;
+    lockedUntil: number;
+}
 
-import typeorm_1 = require("@nestjs/typeorm");
+@Injectable()
+export class AuthService {
+    // ─── Phase D: 账号级防爆破（纵深防御；IP 层 10次/分限流在 main.ts 挂载）───
+    // 内存 Map：trim 后的 username → { failCount, lockedUntil }，进程内单实例有效（本项目单进程部署）。
+    // 不存在用户名同样计数锁定（锁定键为不存在的名字，对真实用户无影响——teams 二档方案中
+    // 「锁 IP」需要控制器传 req.ip 且 NAT 下会误伤，现有 express IP 限流已承担该层，故统一按名计数）。
+    // 常量做成实例字段便于 phase10 单测覆写（如 LOGIN_LOCK_MS=1 验证锁定期外恢复）。
+    private loginFails = new Map<string, LoginFailRecord>();
+    private LOGIN_MAX_FAILS = 5;
+    private LOGIN_LOCK_MS = 10 * 60 * 1000; // 10 分钟
+    private LOGIN_LOCK_MSG = '尝试次数过多，账号已锁定10分钟';
 
-import typeorm_2 = require("typeorm");
+    constructor(
+        @InjectRepository(User) private readonly userRepo: Repository<User>,
+        @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
+        private readonly jwtService: JwtService,
+    ) {}
 
-import bcrypt = require("bcrypt");
-
-import user_entity_1 = require("../../infrastructure/database/entities/user.entity");
-
-import account_entity_1 = require("../../infrastructure/database/entities/account.entity");
-
-import constants_1 = require("../../common/constants");
-
-let AuthService = class AuthService {
-    [key: string]: any;
-    constructor(userRepo, accountRepo, jwtService) {
-        this.userRepo = userRepo;
-        this.accountRepo = accountRepo;
-        this.jwtService = jwtService;
-        // ─── Phase D: 账号级防爆破（纵深防御；IP 层 10次/分限流在 main.ts 挂载）───
-        // 内存 Map：trim 后的 username → { failCount, lockedUntil }，进程内单实例有效（本项目单进程部署）。
-        // 不存在用户名同样计数锁定（锁定键为不存在的名字，对真实用户无影响——teams 二档方案中
-        // 「锁 IP」需要控制器传 req.ip 且 NAT 下会误伤，现有 express IP 限流已承担该层，故统一按名计数）。
-        // 常量做成实例字段便于 phase10 单测覆写（如 LOGIN_LOCK_MS=1 验证锁定期外恢复）。
-        this.loginFails = new Map();
-        this.LOGIN_MAX_FAILS = 5;
-        this.LOGIN_LOCK_MS = 10 * 60 * 1000; // 10 分钟
-        this.LOGIN_LOCK_MSG = '尝试次数过多，账号已锁定10分钟';
-    }
     // 主应用启动自动确保管理员存在（防 DB 覆盖丢失）
     async onModuleInit() {
         try {
@@ -64,18 +53,18 @@ let AuthService = class AuthService {
                 const admin = this.userRepo.create({
                     username: adminUsername,
                     password: hashed,
-                    role: user_entity_1.UserRole.ADMIN,
+                    role: UserRole.ADMIN,
                 });
                 await this.userRepo.save(admin);
                 for (const mode of ['CN', 'HK', 'US']) {
                     const account = this.accountRepo.create({
                         userId: admin.id,
                         marketMode: mode,
-                        cash: constants_1.RISK.initialCash,
-                        totalEquity: constants_1.RISK.initialCash,
-                        peakEquity: constants_1.RISK.initialCash,
-                        initialEquity: constants_1.RISK.initialCash,
-                        dayStartEquity: constants_1.RISK.initialCash,
+                        cash: RISK.initialCash,
+                        totalEquity: RISK.initialCash,
+                        peakEquity: RISK.initialCash,
+                        initialEquity: RISK.initialCash,
+                        dayStartEquity: RISK.initialCash,
                     });
                     await this.accountRepo.save(account);
                 }
@@ -87,8 +76,9 @@ let AuthService = class AuthService {
             console.error('[Seed] 管理员创建失败:', e.message);
         }
     }
+
     // SECURITY(H3): 序列化时排除密码哈希，避免泄露
-    toSafeUser(user) {
+    toSafeUser(user: User) {
         if (!user)
             return user;
         return {
@@ -100,7 +90,8 @@ let AuthService = class AuthService {
             updatedAt: user.updatedAt,
         };
     }
-    async register(username, password) {
+
+    async register(username: string, password: string) {
         const existing = await this.userRepo.findOne({ where: { username } });
         if (existing)
             // Phase E: 枚举面收口（teams 方案 B）——重名不再 409，统一 200+{success:false}，
@@ -113,21 +104,23 @@ let AuthService = class AuthService {
             const account = this.accountRepo.create({
                 userId: user.id,
                 marketMode: mode,
-                cash: constants_1.RISK.initialCash,
-                totalEquity: constants_1.RISK.initialCash,
-                peakEquity: constants_1.RISK.initialCash,
-                initialEquity: constants_1.RISK.initialCash,
-                dayStartEquity: constants_1.RISK.initialCash,
+                cash: RISK.initialCash,
+                totalEquity: RISK.initialCash,
+                peakEquity: RISK.initialCash,
+                initialEquity: RISK.initialCash,
+                dayStartEquity: RISK.initialCash,
             });
             await this.accountRepo.save(account);
         }
         const token = this.jwtService.sign({ sub: user.id, username: user.username, role: user.role });
         return { user: this.toSafeUser(user), token };
     }
-    loginFailKey(username) {
+
+    loginFailKey(username: string) {
         // trim 规范化：拒绝 " admin " 与 "admin" 各记一次的分裂计数
         return String(username || '').trim();
     }
+
     purgeExpiredLoginFails() {
         if (this.loginFails.size < 5000)
             return; // 低于阈值不扫
@@ -139,19 +132,21 @@ let AuthService = class AuthService {
         if (this.loginFails.size > 10000)
             this.loginFails.clear(); // 极端兜底（正常不可能）
     }
-    checkLoginLocked(key) {
+
+    checkLoginLocked(key: string) {
         const rec = this.loginFails.get(key);
         if (!rec)
             return;
         const now = Date.now();
         if (rec.lockedUntil > now) {
-            throw new common_1.UnauthorizedException(this.LOGIN_LOCK_MSG);
+            throw new UnauthorizedException(this.LOGIN_LOCK_MSG);
         }
         // lockedUntil=0 表示「仅有失败计数、尚未锁定」——保留计数记录；>0 且已过期才惰性清除
         if (rec.lockedUntil > 0)
             this.loginFails.delete(key);
     }
-    recordLoginFail(key) {
+
+    recordLoginFail(key: string) {
         this.purgeExpiredLoginFails();
         const now = Date.now();
         const rec = this.loginFails.get(key) || { failCount: 0, lockedUntil: 0 };
@@ -162,7 +157,8 @@ let AuthService = class AuthService {
         }
         this.loginFails.set(key, rec);
     }
-    async login(username, password) {
+
+    async login(username: string, password: string) {
         const key = this.loginFailKey(username);
         // 锁定检查先于一切 IO/bcrypt：锁定期内既不查库也不跑 bcrypt（省钱省 CPU，且不可被计时旁路）
         this.checkLoginLocked(key);
@@ -171,30 +167,15 @@ let AuthService = class AuthService {
             // teams 定稿取舍：不存在的用户名同样计数 → 爆破方无法区分「用户名不存在」与「密码错误」；
             // 锁定键为不存在的名字本身（惰性键），不会锁住任何真实账号
             this.recordLoginFail(key);
-            throw new common_1.UnauthorizedException('用户名或密码错误');
+            throw new UnauthorizedException('用户名或密码错误');
         }
         const valid = await bcrypt.compare(password, user.password);
         if (!valid) {
             this.recordLoginFail(key);
-            throw new common_1.UnauthorizedException('用户名或密码错误');
+            throw new UnauthorizedException('用户名或密码错误');
         }
         this.loginFails.delete(key); // 成功登录清零
         const token = this.jwtService.sign({ sub: user.id, username: user.username, role: user.role });
         return { user: this.toSafeUser(user), token };
     }
-};
-
-export { AuthService };
-
-AuthService = __decorate(
-[
-    (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
-    __param(1, (0, typeorm_1.InjectRepository)(account_entity_1.Account)),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
-        jwt_1.JwtService])
-],
-AuthService
-);
-
+}
