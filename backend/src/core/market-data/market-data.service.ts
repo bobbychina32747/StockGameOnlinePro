@@ -17,6 +17,14 @@ import * as ai_opponents_1 from './ai-opponents';
 // SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
 let klineDedupDone = false;
 
+// R5-⑧ 做市商库存风控阈值（每个做市商 / 每只标的的净库存上下限，单位：股）：
+// 取 ±60,000 股 ≈ 单次报价量的几十倍（MM_PARAMS.quoteSize=800；任务书原按 500 股估的"百倍量级"，
+// 实际报价量已调为 800，故本值为约 75 倍）——足以覆盖连续多轮报价撤换的正常做市吞吐，
+// 又能防止报价被单向吃穿时库存无界累积（原实现只记股数、无上下限：
+// 单边行情下做市商会退化成"无限吸货 / 无限供货"的对手盘）。
+// 注：这是库存风控（触边只收窄报价边），不是价格干预——mmQuote 的定价/价差/库存偏斜一律不动。
+const MM_INVENTORY_LIMIT = 60000;
+
 // 单市场状态快照（getState 返回值）；后三个可选字段由 MarketService 聚合三市场状态时附加
 export interface MarketStateSnapshot {
     gameDay: number;
@@ -821,20 +829,40 @@ export class MarketDataService {
     activeAiResting(ledger) {
         const list = Array.isArray(ledger.restingOrders) ? ledger.restingOrders : (ledger.restingOrders = []);
         const tick = Number(this.tickCount) || 0;
-        ledger.restingOrders = list.filter((o) => Number(o.expiresAtTick) > tick
+        const kept = list.filter((o) => Number(o.expiresAtTick) > tick
             && Number(o.qty) - Number(o.filledQty || 0) > 0);
-        return ledger.restingOrders;
+        // R5-⑪ 修复：必须「原地裁剪」而不是重建数组——调用点普遍持有该数组的别名（resting.push 挂新单），
+        // 重建会让别名变孤儿数组，随后 push 的挂单一律不进账本（现金占用恒 0、成交回调报"挂单记录缺失"）。
+        if (kept.length !== list.length) {
+            list.length = 0;
+            for (const o of kept)
+                list.push(o);
+        }
+        return list;
+    }
+    // P0-3: 活跃买单的现金占用 Σ(剩余量 × 挂单价)——只读口径，不改写账本任何字段。
+    // R5-⑪: 市价买单的现金闸门需要该值；此处**不得**调用 refreshAiRestingValue（其历史实现会重建数组，
+    // 破坏调用点上方捕获的 resting 别名），故单列只读求和，供两处复用。
+    aiRestingCash(ledger) {
+        const tick = Number(this.tickCount) || 0;
+        let sum = 0;
+        for (const o of (Array.isArray(ledger.restingOrders) ? ledger.restingOrders : [])) {
+            if (Number(o.expiresAtTick) <= tick)
+                continue;
+            const side = String(o.side || '').toLowerCase();
+            if (side !== 'buy' && side !== 'cover')
+                continue;
+            const left = Number(o.qty) - Number(o.filledQty || 0);
+            if (left > 0)
+                sum += left * Number(o.price);
+        }
+        return Number.isFinite(sum) ? sum : 0;
     }
     // P0-3: restingValue 兼容字段——旧口径是"未平挂单市值 ×0.97 指数衰减近似"，已由精确占用取代；
     // 保留字段但改写为活跃买单的现金占用 Σ(剩余量 × 挂单价)，读到的值不再陈旧
     refreshAiRestingValue(ledger) {
-        let sum = 0;
-        for (const o of this.activeAiResting(ledger)) {
-            const side = String(o.side || '').toLowerCase();
-            if (side === 'buy' || side === 'cover')
-                sum += (Number(o.qty) - Number(o.filledQty || 0)) * Number(o.price);
-        }
-        ledger.restingValue = Number.isFinite(sum) ? sum : 0;
+        this.activeAiResting(ledger); // 先清理到期/已吃完的记录（冻结只在活跃期内占用）
+        ledger.restingValue = this.aiRestingCash(ledger);
         return ledger.restingValue;
     }
     // ─── P0-3: AI 限价挂单成交入账（本次修复的核心：原先只有做市商回调，AI 挂单成交后账本完全不动） ───
@@ -1009,7 +1037,12 @@ export class MarketDataService {
             // 账本闸门 0.8×cash 为硬约束，不参与参数化——团队 C9 红线）
             let qty = Math.round(eff.scale * (0.5 + ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'qty')()));
             if (side === 'buy') {
-                qty = Math.min(qty, Math.floor((ledger.cash * 0.8) / Math.max(priceNow, 0.01)));
+                // R5-⑪: 市价买单必须先扣除「活跃挂单的现金占用」，否则同一 tick 内
+                // "挂买单（占用一部分现金）+ 市价买单（再按全额 cash 算量）"会叠加突破 0.8×cash 硬闸门。
+                // 占用量取 aiRestingCash（= Σ 活跃买单 剩余量 × 挂单价，跨标的合计；只读、不重建数组）。
+                // 余额 ≤ 0 时 qty ≤ 0 → 下方 continue 跳过该笔（只收紧，不放宽任何既有闸门）。
+                const restingCash = this.aiRestingCash(ledger);
+                qty = Math.min(qty, Math.floor((ledger.cash * 0.8 - restingCash) / Math.max(priceNow, 0.01)));
             }
             else {
                 // P0-3: 可卖量 = 持仓 − 活跃卖单剩余量（卖单冻结）。市价分支也走这条口径，
@@ -1808,8 +1841,19 @@ export class MarketDataService {
                 // 撤旧报价 → 挂新报价（TTL 到期由引擎 prune 兜底）
                 this.engine.removeRestingOrder(stock.symbol, bidId);
                 this.engine.removeRestingOrder(stock.symbol, askId);
-                this.engine.placeVirtualOrder(stock.symbol, 'buy', q.bid, q.size, currentTick + p.ttlTicks, { orderId: bidId, mmId: mm.id });
-                this.engine.placeVirtualOrder(stock.symbol, 'sell', q.ask, q.size, currentTick + p.ttlTicks, { orderId: askId, mmId: mm.id });
+                // R5-⑧ 库存风控：本单成交会把库存顶穿上限 → 只报卖边；会击穿下限 → 只报买边；
+                // 区间内维持双边。判定用"当前库存 ± 本次报量"，避免贴在限额上时仍挂出越界的边。
+                const canBid = inv + Number(q.size) <= MM_INVENTORY_LIMIT;
+                const canAsk = inv - Number(q.size) >= -MM_INVENTORY_LIMIT;
+                if (canBid)
+                    this.engine.placeVirtualOrder(stock.symbol, 'buy', q.bid, q.size, currentTick + p.ttlTicks, { orderId: bidId, mmId: mm.id });
+                if (canAsk)
+                    this.engine.placeVirtualOrder(stock.symbol, 'sell', q.ask, q.size, currentTick + p.ttlTicks, { orderId: askId, mmId: mm.id });
+                // 触及限额只打 debug（每 refreshTicks 一次，不刷屏）
+                if (!canBid || !canAsk) {
+                    this.logger.debug(`[MM库存风控] ${mm.id} ${stock.symbol} 库存=${inv} 报价量=${q.size}`
+                        + `${canBid ? '' : ' 暂停买边(顶上限)'}${canAsk ? '' : ' 暂停卖边(触下限)'} 限额=±${MM_INVENTORY_LIMIT}`);
+                }
             }
         }
     }
@@ -1817,9 +1861,22 @@ export class MarketDataService {
         for (const mm of this.marketMakers) {
             if (mm.id !== f.mmId)
                 continue;
+            // R5-⑧: 成交载荷异常（NaN/非正）不得写进库存——NaN 会让后续"库存判断"全部失效
+            const qty = Number(f.qty);
+            if (!Number.isFinite(qty) || qty <= 0) {
+                this.logger.warn(`做市商成交载荷异常，跳过库存更新: mm=${f.mmId} ${f.symbol} qty=${f.qty}`);
+                return;
+            }
             const cur = Number(mm.inventory.get(f.symbol)) || 0;
             // MM 挂 sell 被吃 → 库存减少；挂 buy 被吃 → 库存增加
-            mm.inventory.set(f.symbol, cur + (f.side === 'sell' ? -Number(f.qty) : Number(f.qty)));
+            const next = cur + (f.side === 'sell' ? -qty : qty);
+            // R5-⑧: 单笔成交（含跳空/大额成交）同样受上下限约束——越界即 clamp 回区间，
+            // 否则一笔巨量成交就把库存顶出风控区间，下一轮报价的边判定失去意义
+            const clamped = Math.max(-MM_INVENTORY_LIMIT, Math.min(MM_INVENTORY_LIMIT, next));
+            if (clamped !== next) {
+                this.logger.debug(`[MM库存风控] ${mm.id} ${f.symbol} 成交后库存 ${next} 越界，已收敛到 ${clamped}`);
+            }
+            mm.inventory.set(f.symbol, clamped);
             return;
         }
     }
@@ -2249,6 +2306,26 @@ export class MarketDataService {
                     continue; // 库中该事件已 applied=true → 幂等跳过
                 const before = Number(st.price);
                 st.price = Math.max(0.5, before - perShare);
+                // R5-⑫: 除权是"同一存量按比例折算"，日内高低/今开必须同比例缩放——
+                // 原实现只调 price/prevClose，dayHigh/dayLow 仍是除权前值（如 10.00）而 price=9.50，
+                // 导致"当日最高价高于开盘价一档"、振幅统计与前端图表同步偏高。
+                // 口径：ratio = 除权后价 / 除权前价（含 0.5 保底），dayOpen 一并缩放为"除权后当日基准"
+                // （竞价前 applyExRights 调用，随后 setAuctionDayOpens 会用竞价开盘价覆盖今开）。
+                // 复权因子累计逻辑不在此处改动（下方 info.factor 计算保持原口径）。
+                const ratio = before > 0 ? st.price / before : 1;
+                if (ratio > 0 && ratio !== 1) {
+                    const scale = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) * ratio : null);
+                    const high = scale(st.dayHigh);
+                    const low = scale(st.dayLow);
+                    const open = scale(st.dayOpen);
+                    // 兜底保证 dayHigh >= price >= dayLow（缩放后仍可能因历史脏值/保底价反向）
+                    if (high !== null)
+                        st.dayHigh = Math.max(st.price, high);
+                    if (low !== null)
+                        st.dayLow = Math.min(st.price, low);
+                    if (open !== null)
+                        st.dayOpen = open;
+                }
                 // P1-15: 除权同时按每股分红下调昨收（prevClose -= perShare，保底 >0），
                 // 使除权日涨跌幅/涨跌停基准不含分红缺口（原实现只调 price，次日开盘即"凭空跌"一块钱）
                 const prevBefore = Number(st.prevClose);

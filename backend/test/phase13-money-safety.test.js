@@ -357,8 +357,14 @@ describe('Phase 13 P1-7 集合竞价两阶段结算的失败语义', () => {
     expect(logs.errors.join('|')).toContain('集合竞价结算中断');
     // 第一条（买方 AC2）资金确实已变：这是 settled=1 的对账依据
     expect(Number(accountRepo.rows.find((a) => a.id === 'AC2').cash)).toBeLessThan(100000);
-    // 中断条目回到盘口（既有显式降级语义）
-    expect((engine.realBooks.get('T1').asks || []).some((a) => a.orderId === 'oAsk')).toBe(true);
+    // R5-② 语义更新（原断言为"中断条目回到盘口"）：失败条目不再回盘口——settleFillInner 是"校验→逐条 save"顺序写，
+    // 失败可能发生在已写账户之后，放回盘口等于允许它被再次撮合结算（重复扣款/重复持仓变动）。
+    // 现改为：只回滚失败条目之后的未结算条目；失败条目保持 PENDING + rejectReason 标记供人工核对。
+    // 本用例的失败点正是订单实体写入（failSaveIds 含 oAsk），故打标保存同样失败——此处只校验"未回盘"与"留下人工对账凭据"；
+    // 打标成功路径（PENDING + rejectReason）由 phase14-order-hardening.test.js 覆盖。
+    // 注：失败条目不再回盘且其后无未结算条目 → 该标的盘口可能根本没被创建，故用可选链判空（判空即"未回盘"成立）
+    expect((engine.realBooks.get('T1')?.asks || []).some((a) => a.orderId === 'oAsk')).toBe(false);
+    expect(logs.errors.join('|')).toContain('请人工对账');
     expect(orderRepo.calls.save).toBeGreaterThanOrEqual(1);
   });
 

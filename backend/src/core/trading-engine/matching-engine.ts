@@ -487,6 +487,9 @@ export class MatchingEngine {
         const bidQueue = bids.filter((e) => e.price >= auctionPrice);
         const askQueue = asks.filter((e) => e.price <= auctionPrice);
         const fills = [];
+        // R5-⑬: 竞价虚拟成交的钩子载荷（本函数是纯计算、无 DB，钩子在 return 前统一触发）。
+        // fills 内容保持不变（不含 mmId/tag），故单独收集源挂单的归属信息。
+        const virtualHooks = [];
         const removeEntry = (arr, entry, qty) => {
             const idx = arr.indexOf(entry);
             if (idx < 0)
@@ -504,8 +507,16 @@ export class MatchingEngine {
             const b = bidQueue[i];
             const a = askQueue[j];
             const qty = Math.min(bidLeft, askLeft);
+            const fillPrice = Number(Number(auctionPrice).toFixed(2));
             fills.push({ orderId: b.orderId, accountId: b.accountId, side: b.side, price: Number(Number(auctionPrice).toFixed(2)), qty, virtual: !!b.virtual });
             fills.push({ orderId: a.orderId, accountId: a.accountId, side: a.side, price: Number(Number(auctionPrice).toFixed(2)), qty, virtual: !!a.virtual });
+            // R5-⑬: 与 matchAgainstBook 同一载荷形状（成交价用竞价成交价 auctionPrice）。
+            // 原实现竞价只吐 fills 不触发 virtualFillHook：AI 挂单/做市商报价在竞价成交后账本不动，
+            // 冻结要等 TTL 过期才释放（restingOrders 长期被占用、AI 参与率被错误压制）。
+            for (const e of [b, a]) {
+                if (e.virtual)
+                    virtualHooks.push({ mmId: e.mmId || null, tag: e.tag ?? null, orderId: e.orderId, symbol, side: e.side, qty, price: fillPrice });
+            }
             removeEntry(book.bids, b, qty);
             removeEntry(book.asks, a, qty);
             bidLeft -= qty;
@@ -519,6 +530,15 @@ export class MatchingEngine {
                 j++;
                 if (j < askQueue.length)
                     askLeft = askQueue[j].qty;
+            }
+        }
+        // R5-⑬: 竞价成交先触发虚拟成交钩子（做市商库存 / AI 账本与冻结同步），再返回调用方
+        if (this.virtualFillHook) {
+            for (const payload of virtualHooks) {
+                try {
+                    this.virtualFillHook(payload);
+                }
+                catch (e) { }
             }
         }
         return { auctionPrice: Number(Number(auctionPrice).toFixed(2)), fills };

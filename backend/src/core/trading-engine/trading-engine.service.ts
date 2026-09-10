@@ -175,7 +175,10 @@ export class TradingEngineService {
     // P0-2 修复：返回结构化结算结果 { ok, settled, failed }，并把"结算失败"从静默吞掉改为"对手单放回盘口 + 告警"。
     // 修复根因：原实现丢弃 settleFill 的返回值，对手方结算失败时仍累加其 filledQty 甚至置 FILLED——
     // 制造"对手单显示已成交、其账户却没扣款/没出货"的坏账（语义现与同文件 settleCounterFillsInner 对齐）。
-    async settleCounterFills(symbol: string, mode: string, counterFills: any[]) {
+    // R5-③: opts.rollbackTo 指定对手单回滚落点（默认 'continuous' 保持既有调用点行为不变）。
+    // 修复根因：盘后固定价格交易的对手单原被 placeRestingOrder 写进连续竞价盘口，
+    // 等于把 15:30 后本应失效的盘后申报变成次日连续竞价活单——盘后场景必须回 this.closingBook。
+    async settleCounterFills(symbol: string, mode: string, counterFills: any[], opts?: { rollbackTo?: 'continuous' | 'close' }) {
         const failed: Array<{ orderId: string; error: string }> = [];
         let settled = 0;
         for (const cf of counterFills || []) {
@@ -191,10 +194,20 @@ export class TradingEngineService {
             };
             const result = await this.settleFill(cf.accountId, symbol, cf.side, cfFill, mode);
             if (!result.success) {
-                // 结算失败 → 对手单放回盘口，且不累加 filledQty / 不置 FILLED（订单实体保持 PENDING，等待下次撮合）
-                this.placeRestingOrder(symbol, cf.orderId, cf.accountId, cf.side, cf.price, cf.qty);
+                // 结算失败 → 对手单回滚，且不累加 filledQty / 不置 FILLED（订单实体保持 PENDING，等待下次撮合）
                 const error = String(result.error || '对手方结算失败');
-                this.logger.warn(`对手单结算失败已回滚盘口: ${cf.orderId} - ${error}`);
+                if (opts?.rollbackTo === 'close') {
+                    // R5-③: 回滚至盘后队列（字段形状与 submitClosingOrder 内既有 push 一致，time 用于同价时间优先）
+                    const closeBook = this.getClosingBook(symbol);
+                    const list = cf.side === OrderSide.BUY ? closeBook.bids : closeBook.asks;
+                    list.push({ orderId: cf.orderId, accountId: cf.accountId, side: cf.side, price: cf.price, qty: cf.qty, time: Date.now() });
+                    list.sort((a, b) => a.time - b.time);
+                    this.logger.warn(`对手单结算失败已回滚至盘后队列: ${cf.orderId} - ${error}`);
+                }
+                else {
+                    this.placeRestingOrder(symbol, cf.orderId, cf.accountId, cf.side, cf.price, cf.qty);
+                    this.logger.warn(`对手单结算失败已回滚盘口: ${cf.orderId} - ${error}`);
+                }
                 failed.push({ orderId: cf.orderId, error });
                 continue;
             }
@@ -289,6 +302,8 @@ export class TradingEngineService {
                 status: orderStatus,
                 filledQty: fill.filledQuantity,
                 avgFillPrice: fill.avgPrice,
+                // R5-⑥: FOK/IOC 立即成交路径自建订单实体且不向上返回，幂等键只能在此落库
+                clientOrderId: orderData.clientOrderId,
             });
             await this.orderRepo.save(order);
             return { success: true, fill, settle };
@@ -309,6 +324,8 @@ export class TradingEngineService {
             displayQty: isIceberg ? displayQty : null,
             hiddenQty: isIceberg ? hiddenQty : null,
             postClose: false,
+            // R5-⑥: 幂等键透传（service 层按 orderId 回填兜底，此处直落避免多一次写库）
+            clientOrderId: orderData.clientOrderId,
         });
         const saved = await this.orderRepo.save(order);
         // P0 真实盘口：限价单挂入盘口队列（价格-时间优先）
@@ -1035,6 +1052,23 @@ export class TradingEngineService {
         this.logger.warn(`集合竞价结算失败，${(fills || []).filter((f) => !f.virtual).length} 条挂单已放回盘口恢复 PENDING`);
         return { success: false, error: '集合竞价结算失败（挂单已回滚盘口）' };
     }
+    // R5-②: 竞价中断的失败条目打标——保持 PENDING（不置 FILLED/CANCELLED），仅写 rejectReason 供人工对账。
+    // 该条结算可能已部分落库（账户已写、订单实体未写），只有人工能判定真实状态，故既不放回盘口也不改状态。
+    async markAuctionFillUnreconciled(fill: any) {
+        try {
+            const order = await this.orderRepo.findOne({ where: { id: fill.orderId } });
+            if (!order)
+                return;
+            order.rejectReason = '集合竞价结算中断，需人工核对';
+            await this.orderRepo.save(order);
+            this.logger.error(`竞价中断条目不回滚（可能已部分落库），请人工对账: orderId=${fill.orderId} accountId=${fill.accountId} ${fill.side} ${fill.qty}股@${fill.price}`);
+        }
+        catch (err) {
+            // 打标本身失败不得影响回滚主流程，凭日志人工对账
+            const msg = err && err.message ? err.message : String(err);
+            this.logger.error(`竞价中断条目打标失败（可能已部分落库），请人工对账: orderId=${fill.orderId} - ${msg}`);
+        }
+    }
     async settleAuctionFills(symbol: string, fills: any[]) {
         if (!fills || fills.length === 0)
             return { success: true, settled: 0 };
@@ -1093,7 +1127,14 @@ export class TradingEngineService {
                 // 已结算部分保留（流水可对账），未结算部分放回盘口（显式降级：日志含完整凭据）
                 const message = e && e.message ? e.message : String(e);
                 this.logger.error(`集合竞价结算中断（已结算 ${settled} 条）: ${message}`);
-                for (const f of fills.slice(idx - 1)) {
+                // R5-② 修复：只回滚失败条目「之后」的未结算条目，失败条目本身绝不回盘口。
+                // 修复根因：原实现 for (const f of fills.slice(idx - 1)) 把失败的那一条也放回盘口，而 settleFillInner 是
+                // "校验→逐条 save(account/position/tx)" 顺序写——失败可能发生在已写账户之后，放回盘口等于允许它被再次
+                // 撮合结算（重复扣款/重复持仓变动）。idx 已自增到失败条目序号，故 fills[idx - 1] 是失败条目。
+                const failedFill = fills[idx - 1];
+                if (failedFill && !failedFill.virtual && failedFill.orderId)
+                    await this.markAuctionFillUnreconciled(failedFill);
+                for (const f of fills.slice(idx)) {
                     if (!f.virtual && f.orderId)
                         this.placeRestingOrder(symbol, f.orderId, f.accountId, f.side, f.price, f.qty);
                 }
@@ -1156,6 +1197,8 @@ export class TradingEngineService {
             quantity: qty,
             status: OrderStatus.PENDING,
             postClose: true,
+            // R5-⑥: 幂等键透传（盘后申报同样受网络重试影响）
+            clientOrderId: orderData.clientOrderId,
         }));
         if (remaining > 0) {
             const list = isBid ? book.bids : book.asks;
@@ -1185,7 +1228,8 @@ export class TradingEngineService {
             await this.orderRepo.save(saved);
             return { success: false, error: settle.error };
         }
-        await this.settleCounterFills(orderData.symbol, account.marketMode, fills);
+        // R5-③: 盘后场景回滚目标必须是盘后队列，不能写进连续竞价盘口（否则 15:30 后申报变次日活单）
+        await this.settleCounterFills(orderData.symbol, account.marketMode, fills, { rollbackTo: 'close' });
         saved.filledQty = filledQty;
         saved.avgFillPrice = close;
         if (remaining <= 0) {
