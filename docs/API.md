@@ -74,6 +74,7 @@ Body `{"preset":"散户|机构|日内交易者"}`（散户 10w/1x、机构 50w/2
 
 ### POST /account/transfer?fromMode=CN&toMode=US — 跨市场划转
 Body `{"amount": 1000}`。动态汇率折算 + 0.1% 手续费，返回 `{success, received}`。赛季报名中禁划转。
+非 CN/HK/US 的市场参数（含 `__proto__`/大小写变体等非法值）现返回 **400**（Phase 13 加固，防止原型链取值绕过）；同市场或空值仍是 200 + `{success:false,error}`。
 
 ### GET /account/achievements / POST /account/achievements — 成就
 GET 返回成就列表；POST body `{"code":"..."}` 幂等解锁（UNIQUE(userId,code)），返回 `{success, duplicate?}`。
@@ -104,7 +105,7 @@ Body：
 | `stop` | 止损单：价格穿越 `triggerPrice` 转市价；触发后无流动性重试 10 次后取消；**不挂盘口** |
 | `stop-limit` | 止损限价：触发后才按 `price` 限价撮合，**触发前严禁入盘口**（防止无视触发价被提前成交） |
 | `fok` | Fill-or-Kill：按限价立即撮合，必须全部成交否则整体撤销并回滚对手方 |
-| `ioc` | Immediate-or-Cancel：按限价立即撮合，成交部分、剩余撤销 |
+| `ioc` | Immediate-or-Cancel：按限价立即撮合，成交部分（订单落库状态为 `partial`，Phase 13 修复：原实现部分成交谎报 `filled`）、剩余撤销 |
 | `iceberg` | 冰山单：`quantity` 为总量、`displayQty` 为盘口显示量，显示量吃尽后同价队尾补量 |
 
 **side**：`buy/sell/short/cover`；CN 禁 `short/cover`（返回 `{success:false,error:'A股模式不支持做空/融券'}`）；CN 为 T+1（当日买入次日可卖）。
@@ -259,7 +260,7 @@ timeframe: `1min`（默认）/ `5min` / `60min` / `daily` / `weekly` / `monthly`
 ## 8. 排行与管理（需 token；管理端点需 ADMIN role，否则 403）
 
 ### GET /ranking?limit=&sort=totalReturn&market=ALL — 全服排行榜
-sort: `totalReturn|dayReturn|equity`；limit 1~50。输出 `{market, tier, username(脱敏:前2字符+*), totalEquity, totalReturn, dayReturn, rank}`——**无 userId**。每 30s + 启动 10s 后重算缓存。
+sort: `totalReturn|dayReturn|equity`（`equity`＝按**总权益 `totalEquity`** 排序，Phase 13 修复：原实现取不到该字段导致退化为 totalReturn 序）；limit 1~50。输出 `{market, tier, username(脱敏:前2字符+*), totalEquity, totalReturn, dayReturn, rank}`——**无 userId**。每 30s + 启动 10s 后重算缓存。
 
 ### GET /admin/stats、GET /admin/users?page&limit — 管理统计/用户列表（ADMIN）
 

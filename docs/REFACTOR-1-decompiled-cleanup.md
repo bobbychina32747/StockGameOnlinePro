@@ -53,9 +53,10 @@
 5. `ranking.controller.getRankings` 的 `design:paramtypes` 由 `[Number]` 补全为 `[Number, String, String]`（原先 `sort/market` 无元数据；Nest 对 String/undefined 元类型行为一致）。
 6. 枚举字段（`OrderType/OrderStatus/SeasonType/EntryStatus`）现在有枚举类型；全仓无裸字符串赋值（tsc 已验证）。
 
-## 5. 沿路发现的真实缺陷（**未修复**，按风险排序，行号为当前文件）
+## 5. 沿路发现的真实缺陷（**已在本文件 §7 分批修复**，行号为 Refactor-1 时的文件行号）
 
-> 本次重构是零行为变更，所以这些都是**既有缺陷**。建议按 P0 → P1 顺序单独立项修复（每项都需要回归测试）。
+> Refactor-1 是零行为变更清理，所以下列缺陷当时只登记不修改。
+> **Refactor-2/3（Phase 13）已修复其中 P0 ×5 与 P1 ×17**，见 §7；剩余项仍在 tech-debt 台账跟踪。
 
 ### P0 · 资金安全
 1. **卖出偿还融资导致权益虚增、可无限套利** — `core/trading-engine/trading-engine.service.ts:550-557`（另 `:1216`、`:1322`）：
@@ -103,8 +104,44 @@
 
 ## 6. 后续建议（供排期）
 
-- **REFACTOR-2（建议立即做）**：按 P0-1 → P0-5 逐项修复 + 回归测试（每项都是"资金/账本"级别，且都有明确的复现算式）。
-- **REFACTOR-3**：P1 批量修复（幻影挂单固化、竞价原子性、强平流水、幂等守卫、段位降级保护）。
-- **REFACTOR-4**：`tsconfig` 开启 `strict`（需要先补 `Map<string, any>` 之类的真实类型，规模较大）。
+- ~~**REFACTOR-2**：P0-1 → P0-5 逐项修复~~ → **已完成（Phase 13，见 §7）**
+- ~~**REFACTOR-3**：P1 批量修复~~ → **已完成 17 项（见 §7）**，剩余 P1/P2 留在台账
+- **REFACTOR-4**：`tsconfig` 开启 `strict`（需要先补 `Map<string, any>` 之类的真实类型，规模较大）
+- **REFACTOR-5（候选）**：① 赛季结算的"加分 + 打标记"改成单事务（需要按账户维度的发奖台账）；② 竞价 catch 回滚区分"已扣款/仅实体未同步"；③ 盘后固定价格交易的回滚目标修正（对手单应回 `closingBook` 而非连续竞价盘口）；④ 下单幂等键；⑤ WS 每用户连接上限；⑥ AI 账本手续费口径与挂单现金预留
 - E2E 环境提示：`~/.dsh/browser-profile` 这个持久 profile 一旦被强杀残留会锁住/损坏（表现为浏览器崩溃退出码 `0xC0000409`）；
   跑 E2E 时可用隔离 profile：`SGP_E2E_PLAYWRIGHT_CONFIG=<指向独立 userDataDir 的配置>`（本次即用此法复现 6/6 PASS）。
+
+---
+
+## 7. Phase 13（Refactor-2/3）修复记录
+
+**已修复（P0 ×5 + P1 ×17 + 前端 ×5 hook 依赖）**：
+
+| # | 缺陷（§5 编号） | 修复要点 | 回归测试 |
+|---|---|---|---|
+| P0-1 | 卖出偿还融资未扣现金（可刷钱） | 三处（`settleFillInner` SELL / `forceLiquidateInner` / `forceLiquidateToTargetInner`）改为"卖券所得先还债、净额进现金" | `phase13-money-safety` ①②③④ + `phase8` 口径更新 |
+| P0-2 | `settleCounterFills` 吞结算失败 | 返回 `{ok, settled, failed}`；失败放回盘口 + warn，不置 FILLED | `phase13-money-safety` ⑥⑦⑧ |
+| P0-3 | AI 限价挂单成交无账本回调（可重复卖出同一批股） | `virtualFillHook` 覆盖全部虚拟挂单（带 `tag/orderId`）；AI 账本 `restingOrders` 冻结（卖=持仓−活跃挂单，买=`cash×restBudget` 精确占用）；成交即入账 | `phase13-ai-ledger` ①②③④ |
+| P0-4 | 分红 NaN 污染现金 | 非有限 `perShare`/金额整条跳过 + 写库前 `Number.isFinite` 防线 | `phase13-money-safety` ⑭ |
+| P0-5 | 基金申购舍入套利 + 无事务 | 金额规范化到分、扣款与份额同源、赎回向下取整（<1 分拒绝）、两次写库进事务 | `phase13-fund-safety` 16 例 |
+| P1-6 | 回滚固化虚拟挂单 | 4 处 cf 循环补 `if (cf.virtual \|\| !cf.orderId) continue` | `phase13-money-safety` ⑨⑩ |
+| P1-7 | 竞价两阶段非原子/失败谎报成功 | 预校验移入 `runExclusive`；失败/异常返回 `success:false` | `phase13-money-safety` ⑬ |
+| P1-8 | 强平/追保无流水 | 新增 `recordLiquidationTx`，4 个成交点接入 | `phase13-money-safety` ③④⑤ |
+| P1-9 | AI 市价单结算异常被吞 | `{ok:false}` → 不入账、不计价格冲击、error 日志 | `phase13-ai-ledger` ⑤ |
+| P1-10 | 分红事件幂等窗口 | 落库 `await` + 回填 `id` + 应用后 `applied:true` + 同 `(symbol, exDay)` 复用 | `phase13-price-band` |
+| P1-11 | 日终幂等守卫只判相等 | 改为 `currentDay >= day` 跳过（重放保护） | `phase13-gateway-settlement` ⑤⑥⑦ |
+| P1-12 | 流水预载失败刷段位 | `txPreloadOk` 标志，失败不调用 `computeTier`/不 save 段位 + error 日志 | `phase13-gateway-settlement` ⑧ |
+| P1-13 | AI 报价基准不一致 | 复用 `cnPriceLimits`（昨收 + 首日 ±44%/-36%） | `phase13-ai-ledger` ⑥ |
+| P1-14 | `applyUserFill` 越带 | 冲击价夹紧 + 写 `dayHigh/dayLow` | `phase13-price-band` |
+| P1-15 | 跳空/除权口径 | 跳空写回前夹紧；除权同时下调 `prevClose` | `phase13-price-band` |
+| P1-16 | 原型链绕过 / limit 负值 | `hasOwnProperty` 判定 + 汇率白名单 + `limit` 钳到 `[1,300]` | `phase13-input-guards` 12 例 |
+| P1-18* | 成就可伪造 | **未修**（需产品定义服务端判定口径） | — 台账 |
+| P1-19 | `sort=equity` 失效 | key 改为真实字段 `totalEquity` | `phase13-season-ranking` ⑧ |
+| P1-20 | 赛季重复发分 / `ensureSeason` 并发 | `season_entries.rewarded` 列（用户级幂等发分）+ 唯一冲突幂等返回 | `phase13-season-ranking` ①-⑦ |
+| P1-21 | WS 在线人数少计 | 连接打 `__counted` 标记，仅计数者自减 | `phase13-gateway-settlement` ①-④ |
+| P2-22 | IOC 部分成交谎报 FILLED | 落 `PARTIAL` | `phase13-money-safety` ⑪⑫ |
+| P2-24 | `recordDailyEquity` 除零 / NaN 权益 | 除零防护 + 非有限跳过保存 | `phase13-gateway-settlement` ⑨⑩ |
+| 前端 | 5 条 `exhaustive-deps`（含 `MarketIndexBar` 切市场读旧值的真 bug） | 真修依赖（无 disable）：`useMemo` 稳定 `bars`、`applyAdjustmentPure` + `useCallback`、补 `marketMode`/zustand action 依赖 | `MarketIndexBar.test.tsx`、`ChartPanelAdjust.test.tsx` |
+
+**仍未修（已在 tech-debt 台账登记，见 REFACTOR-5 候选）**：赛季结算的真正原子性（加分+打标记需事务与发奖台账）、竞价回滚粒度、盘后回滚目标、登录锁 DoS、成就服务端判定、下单幂等键、WS 连接上限、做市商现金账、NAV 落库、`app.config` 的 `synchronize` 生产开关、AI 手续费口径与挂单现金预留、除权日 `dayHigh/dayLow` 口径。
+

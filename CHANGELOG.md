@@ -4,6 +4,45 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase 13 资金安全与健壮性修复（Refactor-2/3）
+
+### Fixed · P0 资金安全（5 项，均配复现算式与回归测试）
+- **卖出偿还融资时未从现金扣除 `repay`（可无限套利）**：真杠杆账户买入时 `ownCash = totalCost / leverage`、差额记 `borrowed`；卖出时只减负债不减现金 → 杠杆 2 买入 1000 股 @100（ownCash 50000 / borrow 50000）后同价卖出，现金凭空 +50000，反复买卖即刷钱。现三处（`settleFillInner` SELL、`forceLiquidateInner`、`forceLiquidateToTargetInner`）统一为 **卖券所得先还债、净额进现金**（`leverage = 1` 时 `repay = 0`，行为不变）
+- **`settleCounterFills` 忽略结算返回值 → 单边坏账**：对手单结算失败仍累加 `filledQty` 并可能置 `FILLED`（订单"已成交"、账户未变且无回滚）。现返回 `{ok, settled, failed}`，失败即放回盘口 + warn，语义与 `settleCounterFillsInner` 对齐
+- **AI 限价挂单成交后无任何账本回调（可跨日重复卖出同一批股票）**：`virtualFillHook` 原先只对做市商（`mmId`）触发。现 `matching-engine` 对**所有虚拟挂单**触发回调并携带 `tag/orderId`；AI 账本新增 `restingOrders`（挂单冻结）——卖单受「持仓 − 活跃挂单」约束、买单受 `cash × restBudget` 精确占用约束，成交即入账（现金/持仓/`recordAiTrade`）
+- **分红 `perShare` 非有限值 → `cash = NaN` 落库（不可逆）**：现整条事件跳过 + error 日志，并加写库前 `Number.isFinite` 防线（算出的现金非有限则不保存、恢复原值）
+- **基金申购舍入套利 + 两次写库无事务**：`amt=0.014` 曾「实扣 0.01 却按 0.014 计份额」（可循环抽干现金），且 cash 与份额两次独立写库（中间崩溃＝扣钱不记份额 / 加钱不减份额＝造钱）。现金额先规范化到分并**扣款与份额同源**、赎回按「对平台不亏」侧取整（不足 1 分直接拒绝），两次写库进 `dataSource.transaction` 单一事务
+
+### Fixed · P1 幂等/并发/风控口径（12 项）
+- 日终幂等守卫由「相等跳过」改为「`currentDay >= day` 跳过」（此前以更早的 day 重放会重复计息、重复写快照、`currentDay` 回退）
+- 流水预载失败不再把全体账户段位按「0 流水＝白银」覆盖写库（段位保持不变 + error 日志）
+- `recordDailyEquity` 除零防护 + 落库前 `Number.isFinite` 兜底；`totalEquity` 非有限则跳过该账户本次保存（不污染 `peakEquity`）
+- 集合竞价两阶段结算：预校验移入 `runExclusive` 队列内（队列内重读账户/持仓），异常不再返回 `success: true`
+- 强平/追保补写交易流水（此前"钱变了但没有成交记录"，对账断链）
+- 回滚不再把 AI/做市商虚拟挂单固化成 `accountId=null` 的"真实"挂单（4 处 cf 循环补 `virtual` 过滤）
+- IOC 部分成交状态由 `FILLED` 改为 `PARTIAL`（`PARTIAL` 枚举此前闲置）
+- AI 市价单对手方结算失败不再静默吞掉（不入账、不计价格冲击、error 日志）
+- AI 限价报价改用与撮合引擎同源的涨跌停工具（昨收基准 + 新股首日 ±44%/-36%；原先 `dayOpen ±10%` 与封板/委托校验不一致）
+- `applyUserFill` 冲击价受涨跌停夹紧并写入 `dayHigh/dayLow`；隔夜跳空写回前夹紧；除权同时下调 `prevClose`（使除权日涨跌幅不含分红缺口）
+- 分红事件落库幂等（`await` 落库 + 回填 `id` + 应用后写 `applied:true` + 同 `(symbol, exDay)` 复用同一事件），消除重启后重复除权与复权因子二次累计
+- 赛季结算重放安全（`season_entries` 新增 `rewarded` 列，按用户幂等发分）+ `ensureSeason` 撞唯一约束改为幂等返回同一届；`/ranking?sort=equity` 修复为按 `totalEquity` 排序；WS 在线人数不再因认证失败连接而少计
+
+### Fixed · P1 输入校验加固
+- `resetAccount` 的角色预设改为 `hasOwnProperty` 判定（`preset='constructor'/'__proto__'` 曾可绕过校验并把账户字段写成 `undefined`）
+- 划转汇率取值加市场白名单（非 CN/HK/US 现在 400）
+- 流水 `limit` 负值绕过上限修复（`limit=-1` 曾返回全部流水；现钳制到 `[1,300]`）
+
+### Changed · 前端
+- **5 条 `react-hooks/exhaustive-deps` 全部真修**（无 eslint-disable）：`AIAssistant` 的 `bars` 依赖改 `useMemo` 稳定、`ChartPanel` 复权逻辑抽为模块级纯函数 `applyAdjustmentPure` + `useCallback`、`MarketIndexBar` 补 `marketMode` 依赖（**修掉真实 bug**：切市场后仍读旧市场状态）、`useWebSocket` 补 `addTicks/addNotification` 依赖（zustand action 引用稳定，不会重订阅）；顺带清掉 4 处无意义 `any`（97→93 警告，0 error）
+- 新增前端用例 5 例（`MarketIndexBar.test.tsx` 切市场读到最新状态、`ChartPanelAdjust.test.tsx` 三档复权口径）
+
+### 验证
+- 后端 **473/473 全绿**（368 → +105：`phase13-money-safety` 14 / `phase13-ai-ledger` / `phase13-price-band` / `phase13-fund-safety` 16 / `phase13-input-guards` 12 / `phase13-gateway-settlement` 12 / `phase13-season-ranking` 9）；`tsc --noEmit` 0 error
+- 前端 64/64 全绿 + lint 0 error + 生产构建（含 PWA 清单门禁）通过
+- 启动冒烟（临时库）通过；**API 形状回归比对 35 端点**仅 1 处差异且属设计内行为（T1 当日跌停封板 → 引擎按设计清空买盘，T2/T3 双边正常）
+- **浏览器 E2E 6/6 PASS**（登录/下单/撤单/排行/赛季/断线壳）；生产模式冒烟：`/api/prices` 200 且 `/api/docs` 404
+- 注：`phase8` 的「卖出按比例偿还负债」断言原先把**带 bug 的现金数**写死（期望值正好多 50000），已按修复后的口径更新并补权益守恒断言
+
 ## [Unreleased] - Refactor-1 反编译风格 TS 清理（零行为变更）
 
 ### Changed
