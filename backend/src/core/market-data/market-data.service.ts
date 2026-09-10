@@ -84,8 +84,18 @@ let MarketDataService = class MarketDataService {
                 positions: new Map<string, { qty: number, cost: number }>(),
                 restingValue: 0, trades: 0, wins: 0, losses: 0, realizedPnl: 0,
                 equityHistory: [],
+                // Phase F 在线自适应状态（全内存，冷启原子复位为默认值；团队 C2/C10）
+                params: ai_opponents_1.defaultAiParams(),
+                perfMarks: [],
+                treeHit: new Array(ai_opponents_1.RF_TREES.length).fill(0),
+                treeMiss: new Array(ai_opponents_1.RF_TREES.length).fill(0),
+                treeWeights: null,
             });
         }
+        // Phase F 应急开关（团队 C5）：AI_ADAPTIVE_ENABLED=false → 参数回默认 + 系数全 1 + 树权重 null
+        this.aiAdaptiveEnabled = String((typeof process !== 'undefined' && process.env ? process.env.AI_ADAPTIVE_ENABLED : '') || 'true') !== 'false';
+        // Phase F: 最近一次 tick 聚合出的波动档（对外可见面用，团队 C1 要求暴露 volBucket）
+        this.aiVolBucket = 'normal';
         // P4 订单流信号：机构/游资大单净流入（股数，逐日清零）
         this.bigOrderFlow = new Map<string, number>();
         this.intervalHandle = null;
@@ -722,18 +732,29 @@ let MarketDataService = class MarketDataService {
                 this.factors['市场情绪'] ?? 0,
             ));
         }
+        // Phase F: 波动档由当 tick 已有 features 聚合（零额外扫描）→ 与 marketRegime 复合成状态系数
+        const volBucket = ai_opponents_1.volBucketOf([...features.values()]);
+        this.aiVolBucket = volBucket;
+        const coef = ai_opponents_1.regimeCoef(this.marketRegime, volBucket);
         for (let ai = 0; ai < this.aiAgents.length; ai++) {
             const agent = this.aiAgents[ai];
-            if (Math.random() > agent.activity)
-                continue;
             const ledger = this.aiLedger[ai];
+            // Phase F 在线自适应（团队 C1-C16）：参数由绩效 + regime 驱动，出口恒在钳制带内；
+            // 关闭开关（AI_ADAPTIVE_ENABLED=false）时回落到默认参数与全 1 系数（零回归）
+            const eff = this.aiAdaptiveEnabled
+                ? ai_opponents_1.effectiveParams(agent, ledger.params, coef)
+                : ai_opponents_1.effectiveParams(agent, ai_opponents_1.defaultAiParams(), ai_opponents_1.AI_COEF_BASE);
+            // 确定性随机：salt 隔离用途 → 同一 (gameDay, tick, agent) 必然重放同一决策序列
+            if (ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'act')() > eff.activity)
+                continue;
             // 未平挂单市值指数衰减（近似 TTL 到期释放预算）
             ledger.restingValue = (ledger.restingValue || 0) * 0.97;
-            // 选股：羊群/动量策略追热点行业；均值回归选超跌；其余随机
+            // 选股：羊群/动量策略追热点行业（概率随 hotBias/regime 缩放）；均值回归选超跌；其余随机
+            const pickRng = ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'pick');
             let target;
             if ((agent.strategy === 'herd' || agent.strategy === 'momentum') && this.hotTopics.length > 0) {
                 const hotIndustry = this.hotTopics[0].industry;
-                target = arr.find((st) => st.industry === hotIndustry && Math.random() < 0.5) || arr[Math.floor(Math.random() * arr.length)];
+                target = arr.find((st) => st.industry === hotIndustry && pickRng() < eff.hotProb) || arr[Math.floor(pickRng() * arr.length)];
             }
             else if (agent.strategy === 'meanrev') {
                 target = arr.reduce((a, b) => {
@@ -743,29 +764,43 @@ let MarketDataService = class MarketDataService {
                 });
             }
             else {
-                target = arr[Math.floor(Math.random() * arr.length)];
+                target = arr[Math.floor(pickRng() * arr.length)];
             }
             const feats = features.get(target.symbol);
             // 羊群效应：热点行业 → 追涨正反馈（策略信号 + RF 融合）
             const hotFlag = this.hotTopics.length > 0 && this.hotTopics[0].industry === target.industry;
-            let dir = ai_opponents_1.decideDirection(agent.strategy, feats, hotFlag);
-            // P3 行为树：游资/散户持仓止盈(+5%)/止损(-3%)；机构持仓过重(>现金60%)再平衡卖出
+            let dir = ai_opponents_1.decideDirection(agent.strategy, feats, hotFlag,
+                ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'dir'),
+                { gain: eff.gain, treeWeights: ledger.treeWeights, herdBias: eff.herdWeight });
+            // P3 行为树：游资/散户持仓止盈/止损；机构持仓过重(>现金60%)再平衡卖出
+            // Phase F: 止盈/止损阈值改为绝对值参数（默认 5%/-3% 与现状一致），随绩效与 regime 平滑移动
             const priceNow = Number(target.price);
             const held = ledger.positions.get(target.symbol);
             const heldQty = held ? held.qty : 0;
             const heldCost = held ? held.cost : 0;
             if (heldQty > 0 && heldCost > 0) {
                 const pnl = (priceNow - heldCost) / heldCost;
-                if ((agent.type === '游资' || agent.type === '散户') && (pnl > 0.05 || pnl < -0.03))
+                if ((agent.type === '游资' || agent.type === '散户') && (pnl > eff.takeProfit || pnl < eff.stopLoss))
                     dir = -1;
             }
             if (agent.type === '机构' && heldQty * priceNow > ledger.cash * 0.6)
                 dir = -1;
             if (dir === 0)
                 continue;
+            // Phase F 在线学习样本：决策产生即计数（R8 钉死"决策即计"口径，非成交后计数）
+            if (this.aiAdaptiveEnabled) {
+                const votes = ai_opponents_1.treeVotes(feats);
+                for (let k = 0; k < votes.length; k++) {
+                    if (Math.sign(votes[k]) === dir)
+                        ledger.treeHit[k]++;
+                    else if (Math.sign(votes[k]) === -dir)
+                        ledger.treeMiss[k]++;
+                }
+            }
             const side = dir > 0 ? 'buy' : 'sell';
-            // P3 资金约束：买单受现金约束、卖单受持仓约束
-            let qty = Math.round(agent.scale * (0.5 + Math.random()));
+            // P3 资金约束：买单受现金约束、卖单受持仓约束（Phase F: 规模随自适应系数缩放；
+            // 账本闸门 0.8×cash 为硬约束，不参与参数化——团队 C9 红线）
+            let qty = Math.round(eff.scale * (0.5 + ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'qty')()));
             if (side === 'buy') {
                 qty = Math.min(qty, Math.floor((ledger.cash * 0.8) / Math.max(priceNow, 0.01)));
             }
@@ -780,18 +815,20 @@ let MarketDataService = class MarketDataService {
             const base = Number(target.dayOpen) || 1;
             const limitUp = isCN && base > 0 ? base * 1.10 : null;
             const limitDown = isCN && base > 0 ? base * 0.90 : null;
-            if (Math.random() < 0.67) {
+            if (ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'route')() < 0.67) {
                 // 限价挂单进入盘口排队：机构贴价大单、游资中等、散户偏远小单；TTL 8~30 tick
-                if (ledger.restingValue + qty * priceNow > ledger.cash * 0.6)
+                // Phase F: 挂单预算上限 = eff.restBudget（默认 0.6 = 现状；硬闸门 0.8×cash 在市价单侧不变）
+                if (ledger.restingValue + qty * priceNow > ledger.cash * eff.restBudget)
                     continue; // 挂单预算约束
-                const offsetPct = agent.type === '机构' ? 0.0005 + Math.random() * 0.001
-                    : agent.type === '游资' ? 0.001 + Math.random() * 0.0015
-                        : 0.0015 + Math.random() * 0.002;
+                const offsetRng = ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'offset');
+                const offsetPct = agent.type === '机构' ? 0.0005 + offsetRng() * 0.001
+                    : agent.type === '游资' ? 0.001 + offsetRng() * 0.0015
+                        : 0.0015 + offsetRng() * 0.002;
                 let price = priceNow * (1 + dir * offsetPct);
                 if (isCN && limitUp !== null && limitDown !== null) {
                     price = Math.min(Math.max(price, limitDown), limitUp);
                 }
-                const ttlTicks = 8 + Math.floor(Math.random() * 22);
+                const ttlTicks = 8 + Math.floor(ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'ttl')() * 22);
                 try {
                     this.engine.placeVirtualOrder(target.symbol, side, Number(price.toFixed(2)), qty, this.tickCount + ttlTicks);
                     ledger.restingValue += qty * Number(price.toFixed(2));
@@ -844,10 +881,14 @@ let MarketDataService = class MarketDataService {
             }
         }
     }
-    // ─── P4 AI 对手盘绩效：每日净值快照（endOfDay 调用） ───
+    // ─── P4 AI 对手盘绩效：每日净值快照（endOfDay 调用）；Phase F 在同一入口做自适应更新 ───
+    // 团队 C3/R8：每 AI_RETRAIN_EVERY(5) 游戏日执行「参数平滑 + RF 树权重重加权」，树结构/阈值/叶值冻结；
+    // 日常只 push 快照（O(10)，不阻塞 tick）；关闭开关时整套自适应跳过（零回归）
     markAiEquityDaily() {
         const day = this.gameDay;
+        const retrainDay = this.aiAdaptiveEnabled && day > 0 && day % ai_opponents_1.AI_RETRAIN_EVERY === 0;
         for (let i = 0; i < this.aiAgents.length; i++) {
+            const agent = this.aiAgents[i];
             const ledger = this.aiLedger[i];
             let holdingsValue = 0;
             for (const [sym, pos] of ledger.positions.entries()) {
@@ -857,6 +898,21 @@ let MarketDataService = class MarketDataService {
             const equity = Number(ledger.cash) + holdingsValue;
             ledger.equityHistory = (ledger.equityHistory || []).slice(-60);
             ledger.equityHistory.push({ day, equity: Math.round(equity) });
+            // 绩效环形缓冲（容量 AI_PERF_WINDOW+1，供窗口收益/回撤/盈亏口径使用）
+            ledger.perfMarks = [...(ledger.perfMarks || []), { day, equity: Math.round(equity), realizedPnl: Math.round(Number(ledger.realizedPnl) || 0) }].slice(-(ai_opponents_1.AI_PERF_WINDOW + 1));
+            if (!this.aiAdaptiveEnabled)
+                continue;
+            if (retrainDay) {
+                const score = ai_opponents_1.perfScoreOf(ledger.perfMarks, ai_opponents_1.winRateOf(ledger));
+                const target = ai_opponents_1.applyPerfFeedback(ledger.params, score);
+                ledger.params = ai_opponents_1.smoothParams(ledger.params, target);
+                ledger.treeWeights = ai_opponents_1.adaptTreeWeights(ledger.treeHit, ledger.treeMiss);
+                ledger.lastPerfScore = score;
+            }
+        }
+        if (retrainDay) {
+            const muts = this.aiLedger.map((l) => `${l.params.activityMul.toFixed(2)}/${l.params.scaleMul.toFixed(2)}`).join(' ');
+            this.logger.debug(`[AI自适应] 第 ${day} 游戏日重训：regime=${this.marketRegime} 活跃/规模乘数 ${muts}`);
         }
     }
     // ─── P4 AI 对手盘排名（玩家可挑战的对手） ───
@@ -875,6 +931,8 @@ let MarketDataService = class MarketDataService {
             const equityReturn = (equity - initial) / initial;
             const winRate = ai_opponents_1.winRateOf(ledger);
             const perf = ai_opponents_1.tierFor(equityReturn, winRate, Number(ledger.trades) || 0);
+            // Phase F 对外可见面（团队 C1：只露聚合档位 + 两个乘数；不露 takeProfit/stopLoss 等裸参数，防反推套利）
+            const params = ledger.params || ai_opponents_1.defaultAiParams();
             out.push({
                 id: agent.id,
                 name: agent.name,
@@ -890,6 +948,16 @@ let MarketDataService = class MarketDataService {
                 score: Number(perf.score.toFixed(1)),
                 positions: ledger.positions.size,
                 equityHistory: ledger.equityHistory || [],
+                adaptive: {
+                    enabled: this.aiAdaptiveEnabled,
+                    regime: this.marketRegime,
+                    regimeLabel: ai_opponents_1.REGIME_LABELS[this.marketRegime] || this.marketRegime,
+                    vol: this.aiVolBucket,
+                    volLabel: ai_opponents_1.VOL_BUCKET_LABELS[this.aiVolBucket] || this.aiVolBucket,
+                    level: ai_opponents_1.mindsetOf(params.activityMul),
+                    activityMul: Number(Number(params.activityMul).toFixed(2)),
+                    scaleMul: Number(Number(params.scaleMul).toFixed(2)),
+                },
             });
         }
         return out.sort((a, b) => b.pnlPct - a.pnlPct);

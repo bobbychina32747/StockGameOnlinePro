@@ -29,6 +29,8 @@ describe('API.md 与实现路由一致（静态抽查）', () => {
     'fok', 'ioc', 'iceberg', 'stop-limit',
     'isPostCloseTrading', 'counterFills', '维持担保比',
     '15:00-15:30', '20%', 'borrowed', 'cash × leverage', '+44%/-36%',
+    // Phase F: AI 在线自适应对外字段（团队 C1：只露聚合档位）
+    'adaptive', 'activityMul', 'scaleMul', 'regimeLabel',
   ];
   test.each(MUST_HAVE_SEMANTIC)('收录关键语义 %s', (term) => {
     expect(apiMd).toContain(term);

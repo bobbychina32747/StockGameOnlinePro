@@ -1120,6 +1120,14 @@ select.input {
 .ob-price { position: relative; z-index: 1; font-family: var(--font-mono); }
 .ob-size { position: relative; z-index: 1; font-family: var(--font-mono); color: var(--text-muted); }
 
+/* ═══ Phase F：AI 对手盘在线自适应档位标签（只露聚合档位） ═══ */
+.ai-mindset {
+  font-style: normal; font-size: 9px; border-radius: 3px; padding: 0 3px; margin-left: 5px;
+  background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border-subtle);
+}
+.ai-mindset-aggressive { background: var(--color-warning-bg); color: var(--color-warning); border-color: transparent; }
+.ai-mindset-cautious { background: var(--color-brand-subtle); color: var(--color-brand); border-color: transparent; }
+
 /* ═══ 排行榜：大赛横幅 + 排序 ═══ */
 .tournament-banner {
   background: linear-gradient(135deg, var(--bg-elevated), var(--color-brand-subtle));

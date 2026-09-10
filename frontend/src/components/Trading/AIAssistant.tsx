@@ -3,6 +3,16 @@ import { marketApi } from '../../services/api.client';
 import { useAccountStore, useMarketStore, useUIStore } from '../../store';
 import { CollapsibleCard } from './CollapsibleCard';
 
+// Phase F: AI 在线自适应档位 → 一句话可解释的中文标签（团队 C1/R11）
+// aggressive = 最近战绩好、出手更凶；cautious = 亏损后主动收缩；normal = 常态
+// 导出供单测直接断言（不依赖组件渲染）
+export function adaptiveLabel(adaptive: any): string | null {
+  if (!adaptive || adaptive.enabled === false) return null;
+  if (adaptive.level === 'aggressive') return '⚡ 激进';
+  if (adaptive.level === 'cautious') return '🛡 收缩';
+  return '➖ 稳健';
+}
+
 // C4 AI 助手：基于行情/K线/新闻生成交易建议 + C2 语音涨跌提醒 + P4 AI 对手盘排行榜
 export function AIAssistant() {
   const stocks = useMarketStore((s) => s.stocks);
@@ -114,7 +124,7 @@ export function AIAssistant() {
         </button>
         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>价格波动 ≥1% 自动播报</span>
       </div>
-      {/* P4 AI 对手盘排行榜：本地策略 + 随机森林，零外部 API */}
+      {/* P4 AI 对手盘排行榜：本地策略 + 随机森林，零外部 API；Phase F 追加在线自适应档位 */}
       {opponents.length > 0 && (
         <div style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
           <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
@@ -122,12 +132,26 @@ export function AIAssistant() {
             <span style={{ fontWeight: 400, fontSize: 10, color: 'var(--text-muted)', marginLeft: 6 }}>
               （本地策略+随机森林，零 API）
             </span>
+            {/* Phase F: 市场状态一句话可解释（团队 C1/R11：只露聚合档位，不露裸参数） */}
+            {opponents[0]?.adaptive?.regimeLabel && (
+              <span style={{ fontWeight: 400, fontSize: 10, color: 'var(--text-muted)', marginLeft: 6 }}>
+                · 市场 {opponents[0].adaptive.regimeLabel}
+              </span>
+            )}
           </div>
           {opponents.slice(0, 5).map((o, i) => (
             <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0' }}>
               <span>
                 #{i + 1} {o.name}
                 <span style={{ color: 'var(--text-muted)', marginLeft: 6, fontSize: 10 }}>{o.strategyName}</span>
+                {adaptiveLabel(o.adaptive) && (
+                  <span
+                    className={`ai-mindset ai-mindset-${o.adaptive.level}`}
+                    title={`在线自适应：参与率 ×${o.adaptive.activityMul}，单笔规模 ×${o.adaptive.scaleMul}（每 5 个交易日按自身战绩调整）`}
+                  >
+                    {adaptiveLabel(o.adaptive)}
+                  </span>
+                )}
               </span>
               <span className={o.pnlPct >= 0 ? 'up' : 'down'} style={{ fontFamily: 'var(--font-mono)' }}>
                 {o.pnlPct >= 0 ? '+' : ''}{o.pnlPct}% · {o.tier}

@@ -163,6 +163,26 @@ Body：
 
 ### GET /market/ai-opponents — AI 对手盘（按 pnlPct 排序）
 
+10 个具名对手盘（机构/游资/散户 × 趋势/均值回归/动量/羊群/反转/噪声策略）+ 本地随机森林，零外部 API。
+`[{id,name,type,strategy,strategyName,taunt,equity,pnlPct,winRate,trades,tier,score,positions,equityHistory,adaptive}]`
+
+Phase F 新增 `adaptive` 字段（**只给聚合档位，不暴露 takeProfit/stopLoss 等裸参数**，防玩家反推套利）：
+
+```json
+{ "enabled": true, "regime": "bull", "regimeLabel": "多头市",
+  "vol": "normal", "volLabel": "常态波动",
+  "level": "aggressive", "activityMul": 1.18, "scaleMul": 1.09 }
+```
+
+- `enabled`：AI 自适应总开关（后端 `AI_ADAPTIVE_ENABLED=false` 时为 false → 参数保持默认）
+- `regime`：市场状态 `bull|bear|sideways`（与行情引擎同一来源，日终切换）；`vol`：波动档 `low|normal|high`（按最近 tick 全市场平均 |涨跌幅| 与波动率聚合）
+- `level`：心态档位 `aggressive`（活跃度 ≥1.15）/`normal`/`cautious`（≤0.85）
+- `activityMul` / `scaleMul`：参与率与单笔规模乘数（钳制带 `[0.5,1.5]` / `[0.6,1.4]`）
+
+> 自适应口径（团队定稿）：每 5 游戏日在日终按「近 5 日自身收益/胜率/回撤」平滑调参（表现差 → 更保守：活跃/规模/止盈/羊群下调、止损收紧），
+> 并叠加市场状态系数（高波动档禁止任何更激进的系数，止损只放宽不收紧）。参数与绩效全内存、重启复位；
+> 现金/持仓/挂单预算的账本闸门为硬约束，不参与参数化。
+
 ### GET /market/flow-signals?symbol=T1 — 资金流信号（OFI + 大单）
 
 ### GET /market/klines?symbol=T1&timeframe=1min — K线历史
