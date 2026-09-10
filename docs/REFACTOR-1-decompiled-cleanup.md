@@ -107,7 +107,7 @@
 - ~~**REFACTOR-2**：P0-1 → P0-5 逐项修复~~ → **已完成（Phase 13，见 §7）**
 - ~~**REFACTOR-3**：P1 批量修复~~ → **已完成 17 项（见 §7）**，剩余 P1/P2 留在台账
 - **REFACTOR-4**：`tsconfig` 开启 `strict`（需要先补 `Map<string, any>` 之类的真实类型，规模较大）
-- **REFACTOR-5（候选）**：① 赛季结算的"加分 + 打标记"改成单事务（需要按账户维度的发奖台账）；② 竞价 catch 回滚区分"已扣款/仅实体未同步"；③ 盘后固定价格交易的回滚目标修正（对手单应回 `closingBook` 而非连续竞价盘口）；④ 下单幂等键；⑤ WS 每用户连接上限；⑥ AI 账本手续费口径与挂单现金预留
+- ~~**REFACTOR-5（候选）**：① 赛季结算的"加分 + 打标记"改成单事务（需要按账户维度的发奖台账）；② 竞价 catch 回滚区分"已扣款/仅实体未同步"；③ 盘后固定价格交易的回滚目标修正（对手单应回 `closingBook` 而非连续竞价盘口）；④ 下单幂等键；⑤ WS 每用户连接上限；⑥ AI 账本手续费口径与挂单现金预留~~ → **本批已落地 11 项，见 §8**；仍留台账：① 赛季结算原子性（发奖台账）、⑥ 的「AI 手续费口径统一」、成就服务端判定
 - E2E 环境提示：`~/.dsh/browser-profile` 这个持久 profile 一旦被强杀残留会锁住/损坏（表现为浏览器崩溃退出码 `0xC0000409`）；
   跑 E2E 时可用隔离 profile：`SGP_E2E_PLAYWRIGHT_CONFIG=<指向独立 userDataDir 的配置>`（本次即用此法复现 6/6 PASS）。
 
@@ -143,5 +143,30 @@
 | P2-24 | `recordDailyEquity` 除零 / NaN 权益 | 除零防护 + 非有限跳过保存 | `phase13-gateway-settlement` ⑨⑩ |
 | 前端 | 5 条 `exhaustive-deps`（含 `MarketIndexBar` 切市场读旧值的真 bug） | 真修依赖（无 disable）：`useMemo` 稳定 `bars`、`applyAdjustmentPure` + `useCallback`、补 `marketMode`/zustand action 依赖 | `MarketIndexBar.test.tsx`、`ChartPanelAdjust.test.tsx` |
 
-**仍未修（已在 tech-debt 台账登记，见 REFACTOR-5 候选）**：赛季结算的真正原子性（加分+打标记需事务与发奖台账）、竞价回滚粒度、盘后回滚目标、登录锁 DoS、成就服务端判定、下单幂等键、WS 连接上限、做市商现金账、NAV 落库、`app.config` 的 `synchronize` 生产开关、AI 手续费口径与挂单现金预留、除权日 `dayHigh/dayLow` 口径。
+**仍未修（已在 tech-debt 台账登记，见 REFACTOR-5 候选）**：赛季结算的真正原子性（加分+打标记需事务与发奖台账）、成就服务端判定、`app.config` 的 `synchronize` 生产开关、AI 手续费口径统一。
+
+---
+
+## 8. REFACTOR-5 修复记录（Phase 14 加固批，11 项 + 1 项集成期新发现）
+
+编号沿用 REFACTOR-5 任务清单（R5-①~⑬，其中 ①/⑤ 仍在台账）。**每项都有回归用例**，文件为 `backend/test/phase14-*.test.js`。
+
+| # | 缺陷 | 修复要点 | 回归测试 |
+|---|---|---|---|
+| R5-⑪ | AI 账本挂单别名破坏（**集成期新发现**）：`refreshAiRestingValue` 重建 `ledger.restingOrders` → 调用点捕获的别名变孤儿，挂单挂出去不认账、现金占用恒 0 | `activeAiResting` 改**原地裁剪**；抽出只读 `aiRestingCash` 供市价闸门与 `restingValue` 复用 | `phase14-market-hardening`「服务自己挂出的限价买单必须留在账本」+「市价买单自动识别服务挂出的占用」 |
+| R5-② | 竞价中断把**失败条目自己**也放回盘口（可重复结算：重复扣款/重复持仓变动） | `fills.slice(idx-1)` → `fills.slice(idx)`；失败条目保持 PENDING + `rejectReason='集合竞价结算中断，需人工核对'`（新 `markAuctionFillUnreconciled`），打标失败只 error 日志 | `phase14-order-hardening` R5-② ×3 + `phase13-money-safety` ⑬ 断言更新 |
+| R5-③ | 盘后固定价格交易的对手单失败后回滚到**连续竞价盘口**（15:30 后申报变次日活单） | `settleCounterFills(..., opts.rollbackTo)`；`submitClosingOrder` 传 `'close'` → 回 `closingBook` 并按时间重排 | `phase14-order-hardening` R5-③ ×3（closingBook 回滚 / 默认连续盘口 / 方向映射） |
+| R5-④ | 登录锁定按用户名计数 → 任意 IP 可锁死他人账号 | 计数键 `${正常化用户名}\|${ip \|\| 'local'}`；成功只清本键；查库仍用正常化用户名；NAT 残留风险记台账（`TRUST_PROXY`） | `phase14-auth-ws-config` ①~⑤（5 例） |
+| R5-⑥ | 下单无幂等键（网络重试 = 第二笔真实委托） | `orders.clientOrderId` 列 + `(accountId, clientOrderId)` 索引；DTO 校验 ≤64；service 去重返回 `duplicate:true`；引擎三路径透传 + `backfillClientOrderId` 兜底；前端键复用仅限网络错误 | `phase14-order-hardening` ×5 + `orderIdempotency.test.ts` 13 例 |
+| R5-⑦ | WS 无每用户连接上限 | `MAX_CONNECTIONS_PER_USER = 5`，超限挡新连接（不踢旧）；`__counted` 守护内清理集合 | `phase14-auth-ws-config` ⑥~⑧ |
+| R5-⑧ | 做市商库存无上下限（单边行情退化为无限吸货/供货） | `MM_INVENTORY_LIMIT = ±60000`；报价值判「库存 ± 报量」收边，`onMmFill` clamp + 异常载荷拒绝 | `phase14-market-hardening` ×3 |
+| R5-⑨ | 基金 NAV 只在内存（重启市值缩水） | `fund_navs` 实体 + `onModuleInit` 回填 + 定时 upsert + 首启补基线 | `phase14-fund-nav` 13 例 |
+| R5-⑩ | `synchronize: true` 三处硬编码 | `DB_SYNCHRONIZE`（默认 true）+ 生产告警；`.env.example` 说明 | `phase14-auth-ws-config` ⑨~⑪ |
+| R5-⑪ | AI 市价买单与挂单占用叠加破 `0.8×cash` | 先扣 `aiRestingCash`（跨标的活跃买单占用）再算量 | `phase14-market-hardening` R5-⑪ ×4 |
+| R5-⑫ | 除权只调 `price/prevClose`，`dayHigh/dayLow/dayOpen` 仍是除权前值 | 按 `ratio = 新价/旧价` 同比例缩放 + `dayHigh ≥ price ≥ dayLow` 兜底 | `phase14-market-hardening` ×4 |
+| R5-⑬ | 竞价成交不触发 `virtualFillHook`（冻结要等 TTL，AI 参与率被压制） | `runOpeningAuction` 收集虚拟挂单归属，返回前统一触发（载荷同 `matchAgainstBook`） | `phase14-market-hardening` ×4（含集成：库存 + 账本 + 冻结即时释放） |
+
+**验证证据（6 层）**：`tsc` 0 error ｜ build OK ｜ 后端 **527/527** ｜ 前端 lint 0 error + `tsc` 0 error + **77/77** + 生产构建（PWA 门禁）｜ **API 形状 35 端点 PASS**（比对脚本放宽容许 `array<empty>` 运行期差异）｜ 全新临时库启动冒烟（新列/表/索引落库）+ **真实 HTTP 集成**（幂等同 `orderId`+`duplicate`、`fund_navs` 落库、登录锁 429/锁定文案）+ **E2E 6/6** + 生产冒烟（`/api/docs` 404、`DB_SYNCHRONIZE` 告警、`false` 时空库启动失败）。
+
+**残留（台账）**：市价单幂等不生效（不落订单实体）、幂等不校验 payload 差异、前端未区分 `duplicate:true` 提示、竞价中断条目孤悬 PENDING 需人工对账、`DB_SYNCHRONIZE=false` 无迁移脚本、NAT + `TRUST_PROXY` 计数塌缩、WS 上限值与 `'error'` 事件名待前端对齐、三市场共享单钩子槽位。
 

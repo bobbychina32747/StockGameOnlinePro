@@ -4,6 +4,42 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - REFACTOR-5 加固批（Refactor-5：11 项 + 1 项集成期新发现）
+
+### Fixed · 资金与结算语义（4 项）
+- **集合竞价中断回滚粒度错误（可重复结算同一失败条目）**：`settleAuctionFills` 的 catch 用 `fills.slice(idx - 1)` 回盘口，把**失败的那一条自己也放回盘口**；而 `settleFillInner` 是「校验 → 逐条 save(account/position/tx)」顺序写，失败可能发生在账户已写之后 → 放回盘口即允许它被再次撮合结算（重复扣款/重复持仓变动）。现只回滚 `fills.slice(idx)`（失败条目之后的未结算条目），失败条目**保持 PENDING** 并写 `rejectReason='集合竞价结算中断，需人工核对'` + error 日志（既不放回也不改状态，因为无法判定是否已部分落库）
+- **盘后固定价格交易的对手单回滚落点错误（15:30 后申报变次日活单）**：`settleCounterFills` 失败分支固定调 `placeRestingOrder` 写入**连续竞价盘口**。现新增 `opts.rollbackTo`，`submitClosingOrder` 传 `{rollbackTo:'close'}` → 回 `closingBook` 对应方向并按时间重排（默认分支行为不变）
+- **做市商库存无上下限（单边行情下退化为无限吸货/无限供货）**：新增 `MM_INVENTORY_LIMIT = ±60000` 股（≈75 倍单次报量）：报价时按「当前库存 ± 本次报量」判定，顶上限只报卖边、触下限只报买边（触及只打 debug，不刷屏）；成交回调 `onMmFill` 同样 clamp，且非有限/非正 `qty` 直接跳过（NaN 会让后续判定全部失效）。**定价/价差/库存偏斜一律不动**——这是库存风控不是价格干预
+- **AI 市价买单与挂单占用叠加突破 `0.8 × cash` 硬闸门**：市价分支原先按全额 `cash` 算量，同一 tick 内「挂买单（已占用一部分现金）+ 市价买单」可叠加越闸。现先扣 `aiRestingCash(ledger)`（Σ 活跃买单剩余量 × 挂单价，跨标的合计），余额 ≤ 0 则该笔直接跳过
+
+### Fixed · 集成期新发现（1 项，联调时被既有用例抓出）
+- **AI 账本挂单别名破坏 → 挂单"挂出去就不认账"**：`refreshAiRestingValue` 经 `activeAiResting` 会**重建** `ledger.restingOrders` 数组，而调用点上方已捕获同一数组的别名（`resting.push` 挂新单）→ 新挂单落进孤儿数组：账本 0 条挂单、现金占用恒 0（闸门失效）、成交回调报「挂单记录缺失」。现改为**原地裁剪**（`list.length = 0` + 回填）并抽出只读的 `aiRestingCash`，市价闸门与 `restingValue` 复用同一求和口径
+
+### Fixed · 幂等/持久化/配置（6 项）
+- **下单无幂等键（网络重试 = 第二笔真实委托）**：`orders` 新增可空 `clientOrderId` 列 + `(accountId, clientOrderId)` 索引；`PlaceOrderDto` 新增 `@IsOptional @IsString @MaxLength(64)`；service 命中既有订单直接返回 `{success:true, order, duplicate:true}` 不走引擎；引擎三条落库路径（FOK/IOC、限价/止损/冰山、盘后申报）透传该键，`backfillClientOrderId` 为引擎自建实体兜底回填（回填失败只 warn，不阻断下单）。前端新增 `orderIdempotency.ts`（键生成/复用）+ `OrderPanel` 仅在**网络错误**时复用同一键（普通失败重下会重新生成，避免"参数改了却复用旧键"）
+- **基金 NAV 只在内存且只涨不跌 → 重启后持仓者市值缩水**：新增 `fund_navs` 实体（`fundId` 主键 + `nav` + `updatedAt`），`FundService implements OnModuleInit` 启动回填（只接受有限正数、库中未知 fundId 忽略、读库失败不影响启动）、`updateNavs` 后 upsert 落库、首启用内存初值补基线
+- **`synchronize: true` 三处硬编码（生产自动改表结构风险）**：统一由 `DB_SYNCHRONIZE` 控制（默认 `true` 向后兼容），生产环境 + 开启时 `logger.warn` 提示改用迁移；`.env.example` 增说明段
+- **登录锁定按用户名计数（任意 IP 可锁死他人账号）**：计数键改为「正常化用户名 | IP」（缺 IP 退化为 `用户名|local`），成功登录只清本键；查库仍用正常化用户名（不带 IP 后缀），错误文案/防枚举口径/purge 容量不变
+- **WS 无每用户连接上限（单账号可放大连接数）**：`MAX_CONNECTIONS_PER_USER = 5`，超限**拒绝新连接**（`emit('error',{message:'连接数超限'}) + disconnect`，不计数、不踢旧连接——踢旧会让正常页面闪断且可被用于踢掉受害者会话）；断开在 `__counted` 守护内清理集合，空集合删键
+- **竞价成交不触发 `virtualFillHook`（AI/做市商账本要等 TTL 才释放冻结）**：`runOpeningAuction` 收集虚拟挂单归属并在返回前统一触发钩子（载荷与 `matchAgainstBook` 同形状，价格用竞价成交价；真实挂单不触发）
+
+### 验证（6 层，全部实跑）
+- 后端 `tsc --noEmit` 0 error ｜ build OK ｜ **527/527 全绿**（473 → +54：`phase14-order-hardening` 13 / `phase14-market-hardening` 15+2 / `phase14-fund-nav` 13 / `phase14-auth-ws-config` 11）
+- 前端 lint 0 error（93 警告）/ `tsc --noEmit` 0 error / **77/77 全绿**（含 `orderIdempotency.test.ts` 13 例）/ 生产构建（含 PWA 清单门禁）通过
+- 启动冒烟（**全新临时库**，验证新列/新表/新索引落库）：`orders.clientOrderId` + 3 索引、`fund_navs(fundId,nav,updatedAt)`、`season_entries.rewarded` 全部就位
+- **API 形状回归 35 端点 PASS**（基线 `api-shape-fixed.json`；比对脚本放宽容许 `array<empty>` ↔ 非空数组这类运行期数据差异）
+- **真实 HTTP 集成验证**：同 `clientOrderId` 两次提交 → 同一 `orderId` + 第二次 `duplicate:true`，`orders` 表仅 +1 行、库中该键仅 1 行；`fund_navs` 有 `fund-1/fund-2` 行；同 IP 连错 5 次 → 第 6 次 `尝试次数过多，账号已锁定10分钟`（正确密码同样被拒）
+- **浏览器 E2E 6/6 PASS**（登录/下单/撤单/排行/赛季/断线壳）+ 生产模式冒烟（`/api/fund` 200、`/api/docs` 404、生产 + `DB_SYNCHRONIZE=true` 打出告警）；`DB_SYNCHRONIZE=false` 行为：已有表结构的库正常启动 200，空库启动失败（SQLITE_ERROR，证明确实关闭了自动同步）
+
+### 未修（已进 tech-debt 台账）
+- 市价单不落订单实体 → 幂等键对市价单不生效（`MARKET` 分支无 `orderId` 可回填）
+- 幂等为「首次写入优先」：不校验 payload 差异；同键但改了参数仍返回旧订单
+- `clientOrderId` 命中时前端仍按「下单成功」提示（`duplicate:true` 未单独提示）
+- 竞价中断条目孤悬 PENDING，只能靠人工/日终扫描发现（`rejectReason` 承载「需人工核对」）
+- `DB_SYNCHRONIZE=false` 需自行建表/迁移（本次未附迁移脚本）；`fund_navs` 首启会写一次基线
+- 登录锁在 NAT 后未设 `TRUST_PROXY` 时会塌缩成按名计数；WS 上限 5 与 `'error'` 事件名需前端对齐
+- 共享单个 `virtualFillHook` 槽位（三市场实例共用，跨市场 tag 靠 `aiAgents` 查表丢弃）
+
 ## [Unreleased] - Phase 13 资金安全与健壮性修复（Refactor-2/3）
 
 ### Fixed · P0 资金安全（5 项，均配复现算式与回归测试）

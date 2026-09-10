@@ -28,7 +28,7 @@
 { "username": "你的用户名", "password": "你的密码" }
 ```
 返回 `{user:{...安全字段}, token}`。错误 401 `用户名或密码错误`（用户名不存在与密码错误同文案）。
-**防爆破**：同一用户名（trim 后）5 次失败锁定 10 分钟，锁定期返回 401 `尝试次数过多，账号已锁定10分钟`；登录成功清零。
+**防爆破（REFACTOR-5 口径）**：计数键为「用户名 | 客户端 IP」，同键 5 次失败锁定 10 分钟，锁定期返回 401 `尝试次数过多，账号已锁定10分钟`（正确密码同样被拒）；登录成功只清「本键」，不影响该用户在其它 IP 上的失败计数。反向代理部署需设 `TRUST_PROXY>0`，否则 `req.ip` 恒为反代地址 → 退化成按用户名计数。
 
 ---
 
@@ -97,6 +97,8 @@ Body：
 }
 ```
 
+**幂等键 `clientOrderId`（REFACTOR-5 新增，可选，≤64 字符）**：客户端网络重试时携带同一键 → 服务端按 `(账户, clientOrderId)` 命中既有订单，直接返回该订单且 `duplicate:true`，**不再走引擎**（不会二次撮合/二次扣款/二次建仓）。未传或纯空白时行为与修复前完全一致。注意：① 只有 `limit/stop/stop-limit/iceberg/fok/ioc/盘后申报` 会落订单实体，**市价单 `market` 不落实体 → 幂等键对市价单不生效**；② 命中只按键，**不校验 payload 差异**（同键但改了参数仍返回旧订单），故重下不同参数的委托请换键。
+
 **订单类型语义**：
 | type | 语义 |
 |---|---|
@@ -116,6 +118,7 @@ Body：
 **返回**：
 - `market`/`fok`/`ioc` 立即成交：`{success, fill:{symbol,side,quantity,price,totalCost,fees}, fees}`（HTTP 成交对象为 quantity/price 命名）
 - `limit`/`stop`/`stop-limit`/`iceberg`：`{success, order:{id,status,quantity,filledQty,avgFillPrice,triggerLog,displayQty,hiddenQty,postClose,...}}`
+- 幂等命中：`{success:true, order:{...既有订单}, duplicate:true}`
 - 拒绝：`{success:false, error}`（HTTP 200）
 
 ### DELETE /trading/order/:id?mode=US — 撤单
@@ -278,6 +281,8 @@ Body `{"isActive": false}`。禁自己/最后一个活跃管理员 400，目标�
 
 **认证（必填）**：handshake auth 携带 JWT；缺 token / 载荷无效 / **用户不存在或被禁用（isActive=false）** → 服务端立即断开。
 
+**连接数上限（REFACTOR-5）**：每用户最多 **5** 条并发连接。超限时服务端拒绝**新连接**：先 `emit('error', {message:'连接数超限'})` 再断开（在线人数与既有连接不受影响；断开后名额立即释放，可重连）。多标签页/多设备正常使用够用；若前端存在"切页重连但旧连接未及时回收"的模式，撞上限即表现为第 6 个连接被拒。
+
 ```js
 import { io } from 'socket.io-client';
 const socket = io('/market', {
@@ -351,6 +356,8 @@ history = requests.get(f'{BASE}/trading/history', params={'mode': 'US'}, headers
 - **跨市场划转**：动态汇率（HK/US 逐日 ±3% 随机游走）+ 0.1% 手续费；赛季报名中禁划转
 - **重置**：需无持仓/无基金份额/无挂单 + 冷却 1 游戏日；RESET_ENABLED=false（大赛中）与赛季报名中禁重置
 - **赛季**：类型轮换（双周10日/月赛20日/周赛5日）；赛季中已报名账户禁重置/划转/基金；前三名 seasonPoints +300/200/100（与段位 tierScore 分离）
+- **基金净值**：内存实时刷新（只涨不跌：`nav += nav × dailyReturn × rand[0,2)`，每 60s），并落库 `fund_navs`（重启后回填，不再复位到初值）
+- **服务端配置**：`DB_SYNCHRONIZE`（默认 `true`）控制 TypeORM 自动同步表结构，生产建议 `false` + 自建表/迁移（开启时启动打 WARN）；`TRUST_PROXY` 影响登录锁定计数键；`TICK_INTERVAL_MS < 60000` 需同时 `SANDBOX_FAST=true` 才允许启动
 - 模拟世界：宏观因子（宏观经济/行业景气/市场情绪/政策风险等）受股票表现反馈影响，新闻定向冲击个股/行业——策略可结合 `news` 事件与 `/market/flow-signals` 资金流信号
 
 ---
