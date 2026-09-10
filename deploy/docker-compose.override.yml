@@ -1,0 +1,24 @@
+# ─── 生产覆盖：显式用 -f 加载，不影响本地开发 ───
+# 用法：docker compose -f backend/docker/docker-compose.yml -f deploy/docker-compose.override.yml up -d --build
+# 需要 Docker Compose ≥ 2.24（ports 的 !override 标签）；阿里云 Ubuntu 24.04 自带 v2.27+ 满足
+services:
+  backend:
+    # 只监听宿主 127.0.0.1：公网入口一律走宿主 nginx，安全组不需要开 8000
+    ports: !override
+      - "127.0.0.1:8000:8000"
+    # 2核2G 机器：给 Node 设上限，防止 OOM 拖死整机（better-sqlite3 + NestJS 实测 300~500MB）
+    mem_limit: 1100m
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=900
+      # 容器默认 UTC，A 股开盘/收盘/交易日判断会整体偏 8 小时 → 必须钉死北京时区
+      - TZ=Asia/Shanghai
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 生产不用 frontend 容器：宿主 nginx 直接托管本地构建好的 frontend/dist，
+  # 省一个容器 + 一份内存（2核2G 上更稳）。挂到未激活的 profile 上 = 起不来。
+  frontend:
+    profiles: ["prod-disabled"]
