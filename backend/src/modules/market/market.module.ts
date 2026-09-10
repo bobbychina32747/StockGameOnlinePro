@@ -5,6 +5,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { User } from '../../infrastructure/database/entities/user.entity';
 
+import { BotModule } from '../bots/bot.module';
+
 import { MarketController } from './market.controller';
 import { MarketGateway } from './market.gateway';
 import { MarketService } from './market.service';
@@ -22,6 +24,8 @@ import { NewsService } from './news.service';
         }),
         // Phase D: WS 握手校验 isActive 需要 User repo（autoLoadEntities 下 forFeature 全局可用）
         TypeOrmModule.forFeature([User]),
+        // Phase G-2: 机器人玩家（算法盘）——挂在行情 tick 上驱动，走 OrderService 真实下单
+        BotModule,
     ],
     controllers: [MarketController],
     providers: [MarketGateway, MarketService, NewsService],

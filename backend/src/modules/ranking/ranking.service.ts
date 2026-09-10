@@ -15,6 +15,8 @@ interface RankingEntry {
     totalReturn: number;
     dayReturn: number;
     rank: number;
+    // Phase G-2: 机器人玩家标记（算法盘）——仅用于展示标识与运营统计，不影响名次与权限
+    isBot: boolean;
 }
 
 @Injectable()
@@ -71,6 +73,8 @@ export class RankingService {
                 ? (Number(a.totalEquity) - Number(a.dayStartEquity)) / Number(a.dayStartEquity)
                 : dayReturnFallback(a.userId),
             rank: 0,
+            // Phase G-2: 机器人玩家与真人同榜竞技（同权限、同费率、同规则），此处只标记来源
+            isBot: a.user?.isBot === true,
         }))
             .sort((a, b) => b.totalReturn - a.totalReturn)
             .map((e, i) => ({ ...e, rank: i + 1 }));
@@ -95,6 +99,16 @@ export class RankingService {
             const chars = Array.from(name || '未知');
             return chars.length <= 2 ? chars.join('') : chars.slice(0, 2).join('') + '*'.repeat(chars.length - 2);
         };
+        // Phase G-2: 机器人用**展示名**（去掉 bot_ 前缀，如 bot_alpha → Alpha）且不脱敏——
+        // 脱敏是给真人隐私用的，机器人没有隐私；显示"Alpha/Beta 在榜上"才看得出是在和人机同台竞技。
+        // 真人的展示名仍走 maskUsername（口径与改动前完全一致）。
+        const displayName = (e: RankingEntry): string => {
+            if (!e.isBot)
+                return maskUsername(e.username);
+            const raw = String(e.username || '').replace(/^bot_/, '');
+            const name = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : e.username;
+            return name;
+        };
         // 注：rank 仍是 cache 生成时的总收益率位次（不随 sort 重算）→ 按 equity/dayReturn 排序时，
         // 榜单先后与 rank 数字可能不一致（前端奖牌按 rank 渲染）；属既有语义，本次只修排序 key，rank 一致性问题另议
         return [...list]
@@ -103,7 +117,8 @@ export class RankingService {
             .map((e) => ({
             market: e.market,
             tier: e.tier,
-            username: maskUsername(e.username),
+            username: displayName(e),
+            isBot: e.isBot,
             totalEquity: e.totalEquity,
             totalReturn: e.totalReturn,
             dayReturn: e.dayReturn,

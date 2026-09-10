@@ -11,6 +11,8 @@ interface RankingEntry {
   rank: number;
   tier?: string;
   market?: string;
+  // 算法盘机器人玩家（后端新增字段；旧后端/缓存可能缺省 → 一律按真人渲染）
+  isBot?: boolean;
 }
 
 type SortKey = 'totalReturn' | 'dayReturn' | 'equity';
@@ -181,7 +183,7 @@ export default function Ranking() {
           <thead>
             <tr>
               <th style={{ width: 50 }}>#</th>
-              <th>用户</th>
+              <th>用户 <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)' }}>🤖 = 算法盘</span></th>
               <th style={{ textAlign: 'right' }}>{sort === 'dayReturn' ? '今日盈亏' : '总资产'}</th>
               <th style={{ textAlign: 'right' }}>{sort === 'dayReturn' ? '今日收益率' : '总收益率'}</th>
             </tr>
@@ -202,7 +204,20 @@ export default function Ranking() {
                       e.rank || '-'
                     )}
                   </td>
-                  <td>{e.username} {e.tier && <span title={`段位 ${e.tier}`} style={{ fontSize: 12 }}>{({ 王者: '🐉', 大师: '👑', 钻石: '🔷', 铂金: '💎', 黄金: '🥇', 白银: '🥈', 青铜: '🥉' } as Record<string, string>)[e.tier] || ''}</span>}</td>
+                  {/* 注：接口输出不含 userId（SECURITY(F) 剔除以防枚举），故 testid 用 userId 兜底展示名，
+                      否则整表 testid 都是 ranking-user-undefined（重复标识无法定位行） */}
+                  <td data-testid={`ranking-user-${e.userId || e.username}`}>
+                    {/* 算法盘机器人标识：仅 isBot === true 才渲染（缺字段的旧数据仍按真人渲染，不加标识不报错） */}
+                    {e.isBot === true && (
+                      <span
+                        title="算法盘（机器人玩家）"
+                        style={{ marginRight: 4, fontSize: 12, padding: '0 4px', borderRadius: 4, background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+                      >
+                        🤖
+                      </span>
+                    )}
+                    {e.username} {e.tier && <span title={`段位 ${e.tier}`} style={{ fontSize: 12 }}>{({ 王者: '🐉', 大师: '👑', 钻石: '🔷', 铂金: '💎', 黄金: '🥇', 白银: '🥈', 青铜: '🥉' } as Record<string, string>)[e.tier] || ''}</span>}
+                  </td>
                   <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
                     ¥{(sort === 'dayReturn' ? val : e.totalEquity).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
                   </td>

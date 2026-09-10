@@ -263,7 +263,8 @@ timeframe: `1min`（默认）/ `5min` / `60min` / `daily` / `weekly` / `monthly`
 ## 8. 排行与管理（需 token；管理端点需 ADMIN role，否则 403）
 
 ### GET /ranking?limit=&sort=totalReturn&market=ALL — 全服排行榜
-sort: `totalReturn|dayReturn|equity`（`equity`＝按**总权益 `totalEquity`** 排序，Phase 13 修复：原实现取不到该字段导致退化为 totalReturn 序）；limit 1~50。输出 `{market, tier, username(脱敏:前2字符+*), totalEquity, totalReturn, dayReturn, rank}`——**无 userId**。每 30s + 启动 10s 后重算缓存。
+sort: `totalReturn|dayReturn|equity`（`equity`＝按**总权益 `totalEquity`** 排序，Phase 13 修复：原实现取不到该字段导致退化为 totalReturn 序）；limit 1~50。输出 `{market, tier, username(脱敏:前2字符+*), isBot, totalEquity, totalReturn, dayReturn, rank}`——**无 userId**。每 30s + 启动 10s 后重算缓存。
+**机器人玩家（Phase G-2）**：榜单里混有算法盘假人（`isBot: true`）——它们是真实用户，与真人同权限、同费率、同规则、同榜排序，不单独分区；其 `username` 为**未脱敏展示名**（`bot_alpha` → `Alpha`，机器人无隐私需求；真人脱敏口径不变）。前端在机器人条目前渲染 🤖 标识。
 
 ### GET /admin/stats、GET /admin/users?page&limit — 管理统计/用户列表（ADMIN）
 
@@ -357,6 +358,7 @@ history = requests.get(f'{BASE}/trading/history', params={'mode': 'US'}, headers
 - **重置**：需无持仓/无基金份额/无挂单 + 冷却 1 游戏日；RESET_ENABLED=false（大赛中）与赛季报名中禁重置
 - **赛季**：类型轮换（双周10日/月赛20日/周赛5日）；赛季中已报名账户禁重置/划转/基金；前三名 seasonPoints +300/200/100（与段位 tierScore 分离）
 - **基金净值**：内存实时刷新（只涨不跌：`nav += nav × dailyReturn × rand[0,2)`，每 60s），并落库 `fund_navs`（重启后回填，不再复位到初值）
+- **机器人玩家（算法盘）**：`BOT_PLAYERS_ENABLED`（默认 true）/ `BOT_PLAYERS_COUNT`（默认 6）/ `BOT_PLAYERS_TRADE_EVERY_TICKS`（默认 10）/ `BOT_PLAYERS_MAX_ORDERS_PER_DAY`（默认 12）。假人是**真实 users 行**（`isBot=true`）+ CN/HK/US 真实账户，委托走与真人完全相同的 `POST /trading/order` 服务路径（休市/涨跌停/购买力/T+1/手续费一律照办），同榜竞技、可被抢单也可抢你的单；`users.password` 为随机强口令的 bcrypt（不可登录、不入日志）。与「AI 对手盘」（`/market/ai-opponents`，虚拟账本、不落订单、不进榜）是两套独立机制
 - **服务端配置**：`DB_SYNCHRONIZE`（默认 `true`）控制 TypeORM 自动同步表结构，生产建议 `false` + 自建表/迁移（开启时启动打 WARN）；`TRUST_PROXY` 影响登录锁定计数键；`TICK_INTERVAL_MS < 60000` 需同时 `SANDBOX_FAST=true` 才允许启动
 - 模拟世界：宏观因子（宏观经济/行业景气/市场情绪/政策风险等）受股票表现反馈影响，新闻定向冲击个股/行业——策略可结合 `news` 事件与 `/market/flow-signals` 资金流信号
 

@@ -1888,6 +1888,22 @@ export class MarketDataService {
         }
         return out;
     }
+    // Phase G-2: 机器人玩家的行情只读取数。
+    // 为什么不直接把 stocks 提成 public：那是可写 Map，外部拿到就能改价改量（等于给假人开后门改行情）。
+    // 这里只暴露"读"：标的池 + 最新价（非法/非正一律 undefined，由调用方跳过该标的）。
+    getTradableSymbols(): string[] {
+        return [...this.stocks.keys()];
+    }
+    getLastPrice(symbol: string): number | undefined {
+        const st = this.stocks.get(symbol);
+        const price = Number(st && st.price);
+        return Number.isFinite(price) && price > 0 ? price : undefined;
+    }
+    getDayOpen(symbol: string): number | undefined {
+        const st = this.stocks.get(symbol);
+        const open = Number(st && st.dayOpen);
+        return Number.isFinite(open) && open > 0 ? open : undefined;
+    }
     // P1: 开盘集合竞价结果写回 dayOpen（今开 = 竞价开盘价）
     setAuctionDayOpens(auctionPrices) {
         for (const [sym, price] of Object.entries(auctionPrices)) {

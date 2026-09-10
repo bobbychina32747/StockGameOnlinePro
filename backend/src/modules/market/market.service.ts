@@ -6,6 +6,7 @@ import { MarketDataService } from '../../core/market-data/market-data.service';
 import { TradingEngineService } from '../../core/trading-engine/trading-engine.service';
 import { RiskManagerService } from '../../core/risk-manager/risk-manager.service';
 import { runBacktest } from '../../core/backtest/backtest-engine';
+import { BotPlayerService } from '../bots/bot-player.service';
 
 import { MarketGateway } from './market.gateway';
 import { NewsService } from './news.service';
@@ -31,6 +32,8 @@ export class MarketService {
     // 全局账户结算/强平/复盘依赖，provider 缺失时为 undefined（原 @Optional() 语义）
     private readonly riskManager: RiskManagerService;
     private readonly debugMode: DebugModeService;
+    // Phase G-2: 机器人玩家（算法盘）——tick 内驱动、真实委托；provider 缺失时为 undefined（单测直接构造 MarketService）
+    private readonly botPlayers: BotPlayerService;
     // 三服务器：全局价格聚合（riskManager 需全部市场价格）
     private allPrices: Record<string, any> = {};
     private tickCounter = 0;
@@ -57,8 +60,12 @@ export class MarketService {
         @Inject('MarketDataUS') marketDataUS: MarketDataService,
         debugMode: DebugModeService,
         config: ConfigService,
+        // Phase G-2: 追加在参数表末尾 + @Optional()——既不改动既有参数顺序（手工构造的测试不受影响），
+        // 也让 BotModule 缺失/未注册时行情照常运行（机器人是可选增强，不是行情的前置依赖）
+        @Optional() botPlayers?: BotPlayerService,
     ) {
         this.debugMode = debugMode;
+        this.botPlayers = botPlayers;
         this.marketData = marketData;
         this.marketDataHK = marketDataHK;
         this.marketDataUS = marketDataUS;
@@ -166,6 +173,23 @@ export class MarketService {
             catch (e) { }
         });
         this.startTickLoop();
+        // Phase G-2: 机器人玩家的行情回调（标的池 + 最新价）。注入而非反向依赖：机器人模块不认识行情服务，
+        // 由行情侧提供只读取数，保证依赖方向仍是 行情 → 机器人 → 交易服务（无环）。
+        if (this.botPlayers) {
+            try {
+                this.botPlayers.configure({
+                    getSymbols: () => this.marketData.getTradableSymbols(),
+                    getPrice: (symbol: string) => this.marketData.getLastPrice(symbol),
+                    // 日内基准价必须与虚拟对手盘同源（dayOpen），否则机器人的"日内涨幅"信号口径会偏弱
+                    getDayOpen: (symbol: string) => this.marketData.getDayOpen(symbol),
+                });
+                const st = this.botPlayers.getState ? this.botPlayers.getState() : null;
+                this.logger.log('机器人玩家已接入: ' + (st ? `名册 ${st.rosterSize} 个（算法盘，与真人同权限同榜）` : '已配置'));
+            }
+            catch (e) {
+                this.logger.warn('机器人玩家初始化失败: ' + (e && e.message ? e.message : e));
+            }
+        }
         this.logger.log('市场行情推送已启动（交易时段同步），tickCounter=' + this.tickCounter);
     }
 
@@ -258,6 +282,17 @@ export class MarketService {
                 if (this.lastAuctionDay[market] !== marketData.gameDay) {
                     this.lastAuctionDay[market] = marketData.gameDay;
                     await this.runOpeningAuctions(market, marketData);
+                }
+            }
+            // Phase G-2: 机器人玩家（算法盘）在撮合前下单——委托走 OrderService 全量校验（休市/涨跌停/购买力/T+1 一律照办），
+            // 挂进盘口后由下方 checkPendingOrders 在本 tick 内参与撮合（与真人挂单同队列、同优先级、同费率）。
+            // 只驱动 A 股账户（主战场）；异常必须吞在机器人侧——绝不允许假人把行情 tick 打断。
+            if (market === 'CN' && this.botPlayers) {
+                try {
+                    await this.botPlayers.runTick({ gameDay: marketData.gameDay, tick: marketData.tickCount, market });
+                }
+                catch (e) {
+                    this.logger.warn('[机器人] tick 执行异常: ' + (e && e.message ? e.message : e));
                 }
             }
             const fills = await this.engine.checkPendingOrders();
