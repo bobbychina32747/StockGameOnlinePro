@@ -7,7 +7,7 @@ import { User, UserRole } from '../../infrastructure/database/entities/user.enti
 import { Account } from '../../infrastructure/database/entities/account.entity';
 import { RISK } from '../../common/constants';
 
-// 登录失败记录：trim 后的 username → 失败计数 / 锁定截止时间戳
+// 登录失败记录：计数键（用户名|IP，见 loginFailKey）→ 失败计数 / 锁定截止时间戳
 interface LoginFailRecord {
     failCount: number;
     lockedUntil: number;
@@ -16,9 +16,12 @@ interface LoginFailRecord {
 @Injectable()
 export class AuthService {
     // ─── Phase D: 账号级防爆破（纵深防御；IP 层 10次/分限流在 main.ts 挂载）───
-    // 内存 Map：trim 后的 username → { failCount, lockedUntil }，进程内单实例有效（本项目单进程部署）。
-    // 不存在用户名同样计数锁定（锁定键为不存在的名字，对真实用户无影响——teams 二档方案中
-    // 「锁 IP」需要控制器传 req.ip 且 NAT 下会误伤，现有 express IP 限流已承担该层，故统一按名计数）。
+    // 内存 Map：计数键 → { failCount, lockedUntil }，进程内单实例有效（本项目单进程部署）。
+    // R5-④: 计数键由「用户名」改为「用户名|IP」——原实现只按用户名计数，攻击者从任意 IP 对
+    // 已知用户名连错 5 次即可把真实用户锁 10 分钟（可被利用的账号锁定 DoS）；加入 IP 维度后
+    // 攻击者无法再从任意 IP 锁死他人账号。残留风险：同一 NAT 出口（校园/公司/家宽）的用户
+    // 共享 IP，极端情况下仍会互相影响失败计数；IP 层限流由 express-rate-limit（main.ts 挂载）兜底。
+    // 不存在用户名同样计数锁定（防枚举：爆破方无法区分「用户名不存在」与「密码错误」）。
     // 常量做成实例字段便于 phase10 单测覆写（如 LOGIN_LOCK_MS=1 验证锁定期外恢复）。
     private loginFails = new Map<string, LoginFailRecord>();
     private LOGIN_MAX_FAILS = 5;
@@ -116,14 +119,21 @@ export class AuthService {
         return { user: this.toSafeUser(user), token };
     }
 
-    loginFailKey(username: string) {
+    // 用户名正常化：trim 规范化（与既有实现一致），查询库与计数键共用同一口径
+    normalizeUsername(username: string) {
         // trim 规范化：拒绝 " admin " 与 "admin" 各记一次的分裂计数
         return String(username || '').trim();
     }
 
+    // R5-④: 计数键 = 正常化用户名 + '|' + IP；ip 缺省 'local' 使既有调用（单测/无 IP 场景）
+    // 退化为「用户名|local」——仍是按名共享计数，语义与旧实现等价，且不与任何真实 IP 键混用
+    loginFailKey(username: string, ip?: string) {
+        return `${this.normalizeUsername(username)}|${ip || 'local'}`;
+    }
+
     purgeExpiredLoginFails() {
         if (this.loginFails.size < 5000)
-            return; // 低于阈值不扫
+            return; // 低于阈值不扫（R5-④ 后键变为「用户名×IP」，键数增长更快，容量阈值语义不变）
         const now = Date.now();
         for (const [k, v] of this.loginFails) { // Map 迭代中 delete 安全
             if (v.lockedUntil <= now)
@@ -158,14 +168,16 @@ export class AuthService {
         this.loginFails.set(key, rec);
     }
 
-    async login(username: string, password: string) {
-        const key = this.loginFailKey(username);
+    async login(username: string, password: string, ip?: string) {
+        const name = this.normalizeUsername(username);
+        const key = this.loginFailKey(name, ip);
         // 锁定检查先于一切 IO/bcrypt：锁定期内既不查库也不跑 bcrypt（省钱省 CPU，且不可被计时旁路）
         this.checkLoginLocked(key);
-        const user = await this.userRepo.findOne({ where: { username: key } });
+        // 注意：查库仍按正常化用户名（不带 IP 后缀），计数键只用于锁定维度
+        const user = await this.userRepo.findOne({ where: { username: name } });
         if (!user) {
             // teams 定稿取舍：不存在的用户名同样计数 → 爆破方无法区分「用户名不存在」与「密码错误」；
-            // 锁定键为不存在的名字本身（惰性键），不会锁住任何真实账号
+            // 计数键是「不存在的名字|IP」这样的惰性键，到期由 purgeExpiredLoginFails 回收，不会锁住真实账号
             this.recordLoginFail(key);
             throw new UnauthorizedException('用户名或密码错误');
         }
@@ -174,7 +186,8 @@ export class AuthService {
             this.recordLoginFail(key);
             throw new UnauthorizedException('用户名或密码错误');
         }
-        this.loginFails.delete(key); // 成功登录清零
+        // R5-④: 成功登录只清「本键」（用户名|本次 IP），该用户在其他 IP 上的失败计数不受影响
+        this.loginFails.delete(key);
         const token = this.jwtService.sign({ sub: user.id, username: user.username, role: user.role });
         return { user: this.toSafeUser(user), token };
     }

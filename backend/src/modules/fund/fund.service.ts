@@ -1,9 +1,11 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
 import { Account } from '../../infrastructure/database/entities/account.entity';
 import { FundHolding } from '../../infrastructure/database/entities/fund-holding.entity';
+// Phase 14: 基金净值落库（重启后 NAV 不复位，见 FundNav 实体注释）
+import { FundNav } from '../../infrastructure/database/entities/fund-nav.entity';
 import { TradingEngineService } from '../../core/trading-engine/trading-engine.service';
 
 // Phase C: 行情引擎实例（只读 gameDay 用于赎回费持有期档位）
@@ -45,7 +47,7 @@ function floorToCent(value: number): number {
 }
 
 @Injectable()
-export class FundService {
+export class FundService implements OnModuleInit {
     private readonly logger = new Logger(FundService.name);
     private readonly funds: FundDefinition[];
 
@@ -58,6 +60,9 @@ export class FundService {
         // P0 修复（事务）：注入 DataSource 用于「账户现金 + 基金持仓」原子写；
         // 声明为可选参数，兼容既有单测的 5 参构造（无 DataSource 时退化为顺序写库）
         @Optional() @InjectDataSource() private readonly dataSource?: DataSource,
+        // Phase 14 P0 修复（重启市值缩水）：净值表 repo，用于启动回填 + 定时落库。
+        // 与 DataSource 同样声明为可选且置于参数末尾，兼容既有单测的 5/6 参构造（缺 repo 时跳过持久化）
+        @Optional() @InjectRepository(FundNav) private readonly fundNavRepo?: Repository<FundNav>,
     ) {
         this.funds = [
             // Phase C: 增加申购费率（ETF 0.15%、货基 0）；NAV 保持稳健上涨（不可跌——防重开"重置/赎回"套利窗口，teams 风控红线）
@@ -65,9 +70,51 @@ export class FundService {
             { id: 'fund-2', name: '货币基金 A', type: '货币基金', nav: 1.0, dailyReturn: 0.0001, subscribeFeeRate: 0 },
         ];
         // FIX(M6): 定期更新基金净值（模拟净值波动）；unref 防止测试进程被定时器挂住
-        const navTimer = setInterval(() => this.updateNavs(), 60 * 1000);
+        // Phase 14: updateNavs 变异步（含落库），回调补 catch 防未处理拒绝（落库失败已在内部降级为 error 日志）
+        const navTimer = setInterval(() => {
+            void this.updateNavs().catch((e) => this.logger.error(`基金净值更新异常: ${(e && e.message) ? e.message : e}`));
+        }, 60 * 1000);
         if (navTimer && typeof navTimer.unref === 'function')
             navTimer.unref();
+    }
+
+    // Phase 14 P0 修复（重启市值缩水）：启动时用库里的净值回填内存 NAV。
+    // 只覆盖已存在的 fundId、且只接受有限正数（脏数据忽略并 warn）；读库失败 catch + warn，绝不影响启动
+    async onModuleInit() {
+        const repo = this.fundNavRepo;
+        if (!repo) {
+            // 未注入 repo（既有 5/6 参单测构造、极端降级）：跳过持久化，功能仍可用，但重启会回到内存初值
+            this.logger.warn('未注入 FundNav 仓库，基金净值持久化已跳过（重启后 NAV 会回到初值）');
+            return;
+        }
+        let rows: FundNav[] = [];
+        try {
+            rows = (await repo.find()) || [];
+        }
+        catch (e) {
+            this.logger.warn('读取基金净值失败，沿用内存初值: ' + ((e && e.message) ? e.message : e));
+            return;
+        }
+        const present = new Set<string>();
+        for (const row of rows) {
+            const fund = this.funds.find((f) => f.id === (row && row.fundId));
+            // 库里有内存不认识的 fundId（历史遗留/下线基金）：忽略，避免污染内存口径
+            if (!fund)
+                continue;
+            present.add(fund.id);
+            const nav = Number(row.nav);
+            if (!Number.isFinite(nav) || nav <= 0) {
+                this.logger.warn(`基金 ${fund.id} 库中净值非法（${row.nav}），已忽略并沿用内存初值 ${fund.nav}`);
+                continue;
+            }
+            fund.nav = nav;
+        }
+        // 首启（fund_navs 为空）或后续新增基金：用内存初值补一次基线，保证下次重启有值可回填；
+        // 已有行（含脏值行）不在此覆盖，交给下个落库周期修正
+        for (const fund of this.funds) {
+            if (!present.has(fund.id))
+                await this.persistNav(fund, '初始化基线');
+        }
     }
 
     getFunds() {
@@ -210,9 +257,27 @@ export class FundService {
     }
 
     updateNavs() {
+        // 红线（teams 风控）：NAV 只涨不跌——change ≥ 0，公式与随机项分布保持不变
         for (const fund of this.funds) {
             const change = fund.nav * fund.dailyReturn * (Math.random() * 2);
             fund.nav = Number((fund.nav + change).toFixed(4));
+        }
+        // Phase 14 P0 修复（重启市值缩水）：新 NAV 立即落库 upsert（fundId 主键 → save 天然幂等）。
+        // 内存 NAV 先整体推进再落库：保持既有同步可见性，且落库失败绝不阻塞行情（persistNav 内部只记 error）
+        return Promise.all(this.funds.map((fund) => this.persistNav(fund, '定时落库'))).then(() => undefined);
+    }
+
+    // Phase 14: 把某只基金的当前 NAV 落库（repo.save({ fundId, nav })，主键冲突即更新）。
+    // 落库失败只 logger.error、不向上抛：NAV 是内存行情态，不能因 DB 抖动中断行情或启动
+    private async persistNav(fund: FundDefinition, scene: string) {
+        const repo = this.fundNavRepo;
+        if (!repo)
+            return; // 未注入 repo：跳过持久化（onModuleInit 已 warn 过一次，避免定时器周期刷日志）
+        try {
+            await repo.save({ fundId: fund.id, nav: fund.nav });
+        }
+        catch (e) {
+            this.logger.error(`基金净值落库失败（${scene}）${fund.id}=${fund.nav}: ` + ((e && e.message) ? e.message : e));
         }
     }
 }

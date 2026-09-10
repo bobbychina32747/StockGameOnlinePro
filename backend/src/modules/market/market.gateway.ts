@@ -52,6 +52,15 @@ export class MarketGateway {
 
     clients = 0;
 
+    // R5-⑦: 单用户并发 WS 连接上限——5 个足够覆盖多标签页/多设备正常使用，同时限制
+    // 单账号连接放大（每次连接都要跑一次 JWT verify + User 查询，无上限时可被单账号刷爆 DB/句柄）。
+    // 与 auth 侧常量同样做成实例字段，便于单测覆写。
+    MAX_CONNECTIONS_PER_USER = 5;
+
+    // R5-⑦: userId → 该用户当前生效的 socket.id 集合（上限判定 + 断开时收缩），
+    // 集合空时删除对应键，避免长期运行累积空 Set
+    userConnections = new Map<string, Set<string>>();
+
     constructor(
         private readonly jwtService: JwtService,
         @InjectRepository(User) private readonly userRepo: Repository<User>,
@@ -61,6 +70,7 @@ export class MarketGateway {
         // SECURITY(C): WS 必须携带 JWT（前端 socket.io 使用 auth: { token } 传参），校验失败直接断开
         // Phase D: verify 后再查 User 校验 isActive——用户被禁用后其存量 WS 立即断开
         // （HTTP 侧由 JwtStrategy.validate 每次请求兜底；WS 无请求概念，故在此补 DB 检查）
+        let userId: string; // R5-⑦: 认证通过后才有值（payload.sub 即已查到的用户 id）
         try {
             const token = client.handshake && client.handshake.auth ? client.handshake.auth.token : null;
             if (!token) {
@@ -80,12 +90,28 @@ export class MarketGateway {
                 client.disconnect(true);
                 return;
             }
+            userId = String(payload.sub);
         }
         catch (e) {
             this.logger.warn(`WS 认证失败: ${client.id} - ${e.message}`);
             client.disconnect(true);
             return;
         }
+        let conns = this.userConnections.get(userId);
+        if (!conns) {
+            conns = new Set<string>();
+            this.userConnections.set(userId, conns);
+        }
+        if (conns.size >= this.MAX_CONNECTIONS_PER_USER) {
+            // R5-⑦: 超限则拒绝「新连接」（不踢旧连接）——踢旧会让正常页面闪断，且攻击者拿到
+            // 一个有效账号后反而能借此踢掉受害者现有会话；此处只挡第 6 个及以后。
+            // 该分支不计数、不打 __counted 标记，故其 handleDisconnect 不会误减 clients。
+            this.logger.warn(`WS 连接数超限（用户 ${userId} 已有 ${conns.size} 个连接）: ${client.id}`);
+            client.emit('error', { message: '连接数超限' });
+            client.disconnect(true);
+            return;
+        }
+        conns.add(client.id);
         this.clients++;
         // FIX(P1): 给「真正计过数」的连接打标记——认证失败分支在 return 前从不计数，
         // 但 socket.io 对它们照样触发 handleDisconnect；无标记时自减会把合法连接一起扣掉
@@ -93,7 +119,9 @@ export class MarketGateway {
         if (!client.data)
             client.data = {};
         client.data.__counted = true;
-        this.logger.log(`WS 客户端已连接: ${client.id} (在线: ${this.clients})`);
+        // R5-⑦: 断开时据此从 per-user 集合中移除（与 __counted 同一标记守护，保证只清理一次）
+        client.data.__userId = userId;
+        this.logger.log(`WS 客户端已连接: ${client.id} (在线: ${this.clients}, 用户 ${userId} 连接数: ${conns.size})`);
     }
 
     handleDisconnect(client: Socket) {
@@ -102,6 +130,14 @@ export class MarketGateway {
         if (client.data && client.data.__counted) {
             client.data.__counted = false;
             this.clients = Math.max(0, this.clients - 1);
+            // R5-⑦: 仅「已计数」连接持有 per-user 集合条目，同一标记保证只清理一次
+            const userId = client.data.__userId;
+            const conns = userId ? this.userConnections.get(userId) : null;
+            if (conns) {
+                conns.delete(client.id);
+                if (conns.size === 0)
+                    this.userConnections.delete(userId); // 空集合回收，断开后计数收缩
+            }
         }
         this.logger.log(`WS 客户端已断开: ${client.id} (在线: ${this.clients})`);
     }

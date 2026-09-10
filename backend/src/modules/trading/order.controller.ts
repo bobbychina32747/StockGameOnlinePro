@@ -50,6 +50,12 @@ class PlaceOrderDto {
     @IsInt()
     @Min(1)
     displayQty?: number;
+
+    // R5-⑥: 客户端幂等键（网络重试去重，最长 64 字符）；未传时行为与修复前一致
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    clientOrderId?: string;
 }
 
 @Controller('trading')
@@ -63,7 +69,7 @@ export class OrderController {
         @Body() dto: PlaceOrderDto,
         @Query('mode') mode: string,
     ) {
-        return this.orderService.placeOrder(user.id, mode || 'US', dto.symbol, dto.type, dto.side, dto.quantity, dto.price, dto.triggerPrice, dto.displayQty);
+        return this.orderService.placeOrder(user.id, mode || 'US', dto.symbol, dto.type, dto.side, dto.quantity, dto.price, dto.triggerPrice, dto.displayQty, dto.clientOrderId);
     }
 
     @Delete('order/:id')

@@ -41,6 +41,8 @@ export enum OrderStatus {
 // Phase F: 挂单扫描索引——checkPendingOrders 按 (status=PENDING, type IN [limit,stop,stop-limit]) 过滤，
 // 原仅有 (accountId,status) 复合索引无法命中该等值+枚举查询（挂单量增长后全表扫）
 @Index(['status', 'type'])
+// R5-⑥: 幂等键索引——下单去重按 (accountId, clientOrderId) 单查命中，复用既有订单（防网络重试重复下单）
+@Index(['accountId', 'clientOrderId'])
 export class Order {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -104,6 +106,11 @@ export class Order {
     // Phase B: 盘后固定价格交易标记（15:00-15:30 收盘价撮合，15:30 未成交自动撤销）
     @Column({ default: false })
     postClose: boolean;
+
+    // R5-⑥: 客户端幂等键（网络重试去重）——同一账户同一 clientOrderId 只落一笔订单；
+    // 空/未传时不生成任何默认值（行为与修复前完全一致，存量订单该列为 NULL）
+    @Column({ type: 'varchar', nullable: true })
+    clientOrderId?: string;
 
     @CreateDateColumn()
     createdAt: Date;

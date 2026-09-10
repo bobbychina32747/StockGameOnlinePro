@@ -30,7 +30,7 @@ export class OrderService {
         private readonly debugMode: DebugModeService,
     ) {}
 
-    async placeOrder(userId: string, mode: string, symbol: string, type: OrderType, side: OrderSide, quantity: number, price: number, triggerPrice: number, displayQty: number) {
+    async placeOrder(userId: string, mode: string, symbol: string, type: OrderType, side: OrderSide, quantity: number, price: number, triggerPrice: number, displayQty: number, clientOrderId?: string) {
         // S2 休市校验：非交易时段拒绝下单
         // 调试模式仅对开启它的管理员（canBypassHours 白名单）跳过休市检查
         // P1 三阶段竞价（A股）：9:15-9:20 可申报可撤 / 9:20-9:25 可申报不可撤 / 9:25-9:30 撮合中不接受申报
@@ -45,6 +45,14 @@ export class OrderService {
         const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });
         if (!account)
             throw new NotFoundException(`账户不存在（${mode}）`);
+        // R5-⑥: 下单幂等键——客户端网络重试携带同一 clientOrderId 时直接返回既有订单，不再走引擎
+        // （否则重试 = 二次撮合/二次扣款/二次建仓）。空/未传（含纯空白）不生成默认键，行为与修复前完全一致。
+        const idempotencyKey = typeof clientOrderId === 'string' && clientOrderId.trim() ? clientOrderId.trim() : null;
+        if (idempotencyKey) {
+            const existing = await this.orderRepo.findOne({ where: { accountId: account.id, clientOrderId: idempotencyKey } });
+            if (existing)
+                return { success: true, order: existing, duplicate: true };
+        }
         if (account.marketMode === 'CN' && (side === OrderSide.SHORT || side === OrderSide.COVER)) {
             return { success: false, error: 'A股模式不支持做空/融券' };
         }
@@ -67,22 +75,41 @@ export class OrderService {
                 throw new BadRequestException(`盘后固定价格交易限以收盘价 ${Number(close).toFixed(2)} 申报`);
             }
             // 引擎返回值的字段随分支不同（success/error/order/fill 非同一形状），保持原动态取值语义
-            const result: any = await this.engine.submitClosingOrder({ userId, accountId: account.id, symbol, type: OrderType.LIMIT, side, quantity, price: Number(Number(close).toFixed(2)) }, account, close);
+            const result: any = await this.engine.submitClosingOrder({ userId, accountId: account.id, symbol, type: OrderType.LIMIT, side, quantity, price: Number(Number(close).toFixed(2)), clientOrderId: idempotencyKey || undefined }, account, close);
             if (!result.success) {
                 return { success: false, error: result.error };
             }
+            await this.backfillClientOrderId(result, idempotencyKey);
             return { success: true, order: result.order, fill: result.fill || null };
         }
         // 同上：success 分支或带 settle、或仅带 order，沿用原动态取值
-        const result: any = await this.engine.submitOrder({ userId, accountId: account.id, symbol, type, side, quantity, price, triggerPrice, displayQty }, account);
+        const result: any = await this.engine.submitOrder({ userId, accountId: account.id, symbol, type, side, quantity, price, triggerPrice, displayQty, clientOrderId: idempotencyKey || undefined }, account);
         if (!result.success) {
             return { success: false, error: result.error };
         }
         if (type === OrderType.MARKET) {
             // P0: 本方与对手方结算已由引擎 submitOrder 完成（返回 settle），避免二次撮合
+            // R5-⑥: 市价单该路径不落订单实体（无 orderId 可回填），幂等键对市价单不生效——见 REFACTOR-5 备注
             return result.settle || result;
         }
+        await this.backfillClientOrderId(result, idempotencyKey);
         return { success: true, order: result.order };
+    }
+
+    // R5-⑥: 幂等键兜底回填——引擎在成交/挂单路径自建并落库订单实体（FOK/IOC 甚至不向上返回该实体），
+    // 故提交成功后按返回的 order 实体补写 clientOrderId，保证下一次重试能被上面的去重查询命中。
+    private async backfillClientOrderId(result: any, clientOrderId: string | null) {
+        const order = result && result.order;
+        if (!clientOrderId || !order || !order.id || order.clientOrderId === clientOrderId)
+            return;
+        try {
+            order.clientOrderId = clientOrderId;
+            await this.orderRepo.save(order);
+        }
+        catch (e) {
+            // 回填失败不阻断下单（订单已成交/已挂单），仅告警：该键此后的重试仍可能重复下单
+            this.logger.warn(`幂等键回填失败（orderId=${order.id}）: ${e && e.message ? e.message : e}`);
+        }
     }
 
     async cancelOrder(userId: string, orderId: string, mode: string) {
