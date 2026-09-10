@@ -22,6 +22,8 @@ export interface BookEntry {
     virtual?: boolean;
     expiresAtTick?: number;
     mmId?: string | null;
+    // P0-3: 虚拟挂单归属标识（AI 账本回调按 tag 定位对手盘）；做市商挂单不用此字段
+    tag?: string | null;
 }
 export interface Fill {
     orderId: string | null;
@@ -31,6 +33,8 @@ export interface Fill {
     qty: number;
     virtual: boolean;
     mmId?: string | null;
+    // P0-3: 与盘口条目同源（虚拟挂单成交时带出，非虚拟挂单恒为 null）
+    tag?: string | null;
 }
 export interface OrderBook {
     bids: BookEntry[];
@@ -195,11 +199,14 @@ export class MatchingEngine {
             if (!priceOk)
                 break; // 按价格有序，后续档位只会更差
             const fillQty = Math.min(remaining, entry.qty);
-            fills.push({ orderId: entry.orderId, accountId: entry.accountId, side: entry.side, price: entry.price, qty: fillQty, virtual: !!entry.virtual, mmId: entry.mmId || null });
-            // P2 做市商成交回调（库存更新），失败不影响撮合
-            if (entry.virtual && entry.mmId && this.virtualFillHook) {
+            fills.push({ orderId: entry.orderId, accountId: entry.accountId, side: entry.side, price: entry.price, qty: fillQty, virtual: !!entry.virtual, mmId: entry.mmId || null, tag: entry.tag ?? null });
+            // P0-3 虚拟成交回调：触发条件从 entry.virtual && entry.mmId 放宽为 entry.virtual——
+            // AI 限价挂单（tag=AI id，无 mmId）成交后原先完全无回调，AI 账本不动 →
+            // 持仓不冻结、现金不入账，可跨日重复卖出同一批股票且与用户挂单成交时股数/资金不守恒。
+            // 载荷扩展 { mmId, tag, orderId, symbol, side, qty, price }；做市商消费方只读 mmId，保持兼容。
+            if (entry.virtual && this.virtualFillHook) {
                 try {
-                    this.virtualFillHook({ mmId: entry.mmId, symbol, side: entry.side, qty: fillQty, price: entry.price });
+                    this.virtualFillHook({ mmId: entry.mmId || null, tag: entry.tag ?? null, orderId: entry.orderId, symbol, side: entry.side, qty: fillQty, price: entry.price });
                 }
                 catch (e) { }
             }
@@ -381,7 +388,8 @@ export class MatchingEngine {
         };
     }
     // P2: AI 虚拟限价挂单（进入盘口排队，TTL tick 到期自动撤单，无账户不结算）
-    // opts.orderId 供做市商报价撤换；opts.mmId 触发做市商成交回调（库存更新）
+    // opts.orderId 供做市商报价撤换 / AI 挂单追踪；opts.mmId 触发做市商成交回调（库存更新）
+    // P0-3: opts.tag 为任意标识（AI 侧放 agent.id）——AI 限价单成交同样触发 virtualFillHook，供账本回调定位
     placeVirtualOrder(symbol, side, price, qty, expiresAtTick, opts?) {
         if (!Number.isFinite(Number(price)) || Number(price) <= 0 || !Number.isFinite(Number(qty)) || Number(qty) <= 0)
             return;
@@ -394,7 +402,7 @@ export class MatchingEngine {
         const list = isBid ? book.bids : book.asks;
         list.push({
             orderId: opts?.orderId ?? null, accountId: null, side, price: Number(price), qty: Number(qty),
-            time: Date.now(), virtual: true, expiresAtTick, mmId: opts?.mmId ?? null,
+            time: Date.now(), virtual: true, expiresAtTick, mmId: opts?.mmId ?? null, tag: opts?.tag ?? null,
         });
         list.sort((a, b) => isBid ? (b.price - a.price) || (a.time - b.time) : (a.price - b.price) || (a.time - b.time));
     }

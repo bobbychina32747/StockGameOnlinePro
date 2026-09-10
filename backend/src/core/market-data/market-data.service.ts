@@ -82,7 +82,8 @@ export class MarketDataService {
     private poolBySymbol: Map<string, any>;
     // P2 做市商：每市场 2 个，双边报价 + 库存管理（mmQuote 定价，虚拟挂单进真实盘口）
     private marketMakers: { id: string; inventory: Map<string, number> }[];
-    private mmHookRegistered: boolean;
+    // P0-3: 虚拟成交回调注册标志（统一钩子：做市商 + AI 限价单共用，原先只注册做市商回调）
+    private virtualHookRegistered: boolean;
     // P3 基本面：行业景气周期（四阶段马尔可夫）、新闻持久影响档案、宏观数据日历
     private industryCycles: Map<string, string>;
     private newsImpacts: any[];
@@ -138,6 +139,8 @@ export class MarketDataService {
                 cash: def.cash, initialCash: def.cash,
                 positions: new Map<string, { qty: number, cost: number }>(),
                 restingValue: 0, trades: 0, wins: 0, losses: 0, realizedPnl: 0,
+                // P0-3: AI 限价挂单账本（orderId 追踪 + 冻结依据：活跃挂单剩余量/占用现金）
+                restingOrders: [], restingSeq: 0,
                 equityHistory: [],
                 // Phase F 在线自适应状态（全内存，冷启原子复位为默认值；团队 C2/C10）
                 params: ai_opponents_1.defaultAiParams(),
@@ -161,7 +164,7 @@ export class MarketDataService {
             { id: 'MM1', inventory: new Map<string, number>() },
             { id: 'MM2', inventory: new Map<string, number>() },
         ];
-        this.mmHookRegistered = false;
+        this.virtualHookRegistered = false;
         // P3 基本面：行业景气周期（四阶段马尔可夫）、新闻持久影响档案、宏观数据日历
         this.industryCycles = new Map<string, string>();
         this.newsImpacts = [];
@@ -691,6 +694,23 @@ export class MarketDataService {
         }
         return false;
     }
+    // ─── P1-13/14/15: CN 涨跌停带（与撮合引擎/委托校验同一实现 cnPriceLimits：昨收基准 + 新股首日 ±44%/-36%） ───
+    // 基准优先级与 generateTick 的日带宽闸门一致（昨收 > 今开 > 现价）；非 CN 返回 null → 调用方保持既有行为
+    cnBandOf(stock) {
+        if (!stock)
+            return null;
+        // HK/US（市场字段或 H/U 前缀代码）不夹紧，保持既有生成/跳空口径
+        if (stock.market === 'HK' || stock.market === 'US')
+            return null;
+        if (!market_utils_1.isCnSymbol(stock.symbol))
+            return null;
+        const firstDay = Number(stock.listedDay) === Number(this.gameDay);
+        const base = Number(stock.prevClose) > 0 ? Number(stock.prevClose)
+            : (Number(stock.dayOpen) > 0 ? Number(stock.dayOpen) : Number(stock.price));
+        if (!(base > 0))
+            return null;
+        return market_utils_1.cnPriceLimits(base, firstDay);
+    }
     // ─── B1 用户成交计入行情：价格冲击 + 成交量并入当前 tick K 线 ───
     applyUserFill(fill) {
         const stock = this.stocks.get(fill.symbol);
@@ -707,7 +727,18 @@ export class MarketDataService {
         if (dir < 0 && stock.industry) {
             this.checkSellTrigger(stock.industry);
         }
-        stock.price = Math.max(0.5, stock.price * (1 + dir * impact));
+        let newPrice = Math.max(0.5, stock.price * (1 + dir * impact));
+        // P1-14: 冲击后成交价必须受涨跌停夹紧——原实现直接写回，同 tick 多笔成交可叠加越带，
+        // 成交价越界会让日高/日低与前端涨跌幅失真（基准与引擎/委托校验同源）
+        const band = this.cnBandOf(stock);
+        if (band)
+            newPrice = this.clamp(newPrice, band.down, band.up);
+        stock.price = newPrice;
+        // P1-14: 成交价计入日内高低（原实现只有 generateTick 的随机行情进 dayHigh/dayLow）
+        if (!Number.isFinite(Number(stock.dayHigh)) || stock.price > Number(stock.dayHigh))
+            stock.dayHigh = stock.price;
+        if (!Number.isFinite(Number(stock.dayLow)) || stock.price < Number(stock.dayLow))
+            stock.dayLow = stock.price;
         // 成交量并入当前 K 线（本 tick 的购买售出纳入图表与总额计算）
         const qty = Number(fill.filledQuantity) || 0;
         stock.lastVolume += qty;
@@ -763,9 +794,113 @@ export class MarketDataService {
             }
         }
     }
+    // ─── P0-3 虚拟成交回调：统一注册 + 按载荷分发 ───
+    // 原先只在做市商块里注册（gate 在 mmHookRegistered）且只处理 mmId，AI 限价单成交无任何回调。
+    // 现在只注册一个钩子：有 mmId → 做市商库存；否则有 tag → AI 账本（找不到就忽略）。
+    ensureVirtualFillHook() {
+        if (this.virtualHookRegistered || !this.engine)
+            return;
+        try {
+            this.engine.setVirtualFillHook((f) => this.onVirtualFill(f));
+            this.virtualHookRegistered = true;
+        }
+        catch (e) {
+            this.logger.warn('虚拟成交回调注册失败: ' + (e && e.message ? e.message : e));
+        }
+    }
+    onVirtualFill(f) {
+        if (!f)
+            return;
+        if (f.mmId)
+            this.onMmFill(f);
+        else if (f.tag)
+            this.onAiVirtualFill(f);
+    }
+    // P0-3: AI 账本活跃挂单（未过期口径与引擎 pruneExpiredVirtualOrders 一致：expiresAtTick > tickCount）；
+    // 顺手清理到期/已吃完的记录——冻结的持仓与现金只在活跃期内占用
+    activeAiResting(ledger) {
+        const list = Array.isArray(ledger.restingOrders) ? ledger.restingOrders : (ledger.restingOrders = []);
+        const tick = Number(this.tickCount) || 0;
+        ledger.restingOrders = list.filter((o) => Number(o.expiresAtTick) > tick
+            && Number(o.qty) - Number(o.filledQty || 0) > 0);
+        return ledger.restingOrders;
+    }
+    // P0-3: restingValue 兼容字段——旧口径是"未平挂单市值 ×0.97 指数衰减近似"，已由精确占用取代；
+    // 保留字段但改写为活跃买单的现金占用 Σ(剩余量 × 挂单价)，读到的值不再陈旧
+    refreshAiRestingValue(ledger) {
+        let sum = 0;
+        for (const o of this.activeAiResting(ledger)) {
+            const side = String(o.side || '').toLowerCase();
+            if (side === 'buy' || side === 'cover')
+                sum += (Number(o.qty) - Number(o.filledQty || 0)) * Number(o.price);
+        }
+        ledger.restingValue = Number.isFinite(sum) ? sum : 0;
+        return ledger.restingValue;
+    }
+    // ─── P0-3: AI 限价挂单成交入账（本次修复的核心：原先只有做市商回调，AI 挂单成交后账本完全不动） ───
+    // 口径与 AI 市价单路径完全一致：不扣手续费（AI 无真实账户，费用口径差异见 applyAiTrading 注释）
+    onAiVirtualFill(f) {
+        const tag = f ? f.tag : null;
+        if (!tag)
+            return;
+        const idx = this.aiAgents.findIndex((a) => a && a.id === tag);
+        if (idx < 0)
+            return; // 找不到 AI（历史挂单/其他市场实例）→ 忽略
+        const ledger = this.aiLedger[idx];
+        if (!ledger)
+            return;
+        const qty = Number(f.qty);
+        const price = Number(f.price);
+        // 载荷异常（NaN/非正数）必须挡在账本外——原实现无校验，一旦写进去就是 NaN 污染且不可回滚
+        if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price <= 0) {
+            this.logger.warn(`AI 限价单成交载荷异常，跳过账本更新: tag=${tag} orderId=${f.orderId} qty=${f.qty} price=${f.price}`);
+            return;
+        }
+        const symbol = f.symbol;
+        const side = String(f.side || '').toLowerCase();
+        if (side === 'buy' || side === 'cover') {
+            ledger.cash = Number(ledger.cash) - qty * price;
+            const pos = ledger.positions.get(symbol) || { qty: 0, cost: 0 };
+            const newQty = Number(pos.qty) + qty;
+            pos.cost = Number(pos.qty) > 0 ? (Number(pos.cost) * Number(pos.qty) + price * qty) / newQty : price;
+            pos.qty = newQty;
+            ledger.positions.set(symbol, pos);
+        }
+        else {
+            ledger.cash = Number(ledger.cash) + qty * price;
+            const pos = ledger.positions.get(symbol);
+            if (pos) {
+                // 平仓盈亏入账（平均成本法，与市价单路径同一口径）
+                ai_opponents_1.recordAiTrade(ledger, (price - Number(pos.cost)) * qty);
+                pos.qty = Number(pos.qty) - qty;
+                if (pos.qty <= 0)
+                    ledger.positions.delete(symbol);
+                else
+                    ledger.positions.set(symbol, pos);
+            }
+            else {
+                // 无持仓的卖单成交：不再有持仓可减，仅提示（现金照记，与市价单路径口径一致）
+                this.logger.warn(`AI 限价卖单成交但无对应持仓: tag=${tag} ${symbol} ${qty}股`);
+            }
+        }
+        // 挂单簿记：部分成交累加 filledQty，全成则移出活跃集合（释放冻结）
+        const list = Array.isArray(ledger.restingOrders) ? ledger.restingOrders : (ledger.restingOrders = []);
+        const order = list.find((o) => o.orderId === f.orderId);
+        if (order) {
+            order.filledQty = Number(order.filledQty || 0) + qty;
+            if (order.filledQty >= Number(order.qty) - 1e-9)
+                ledger.restingOrders = list.filter((o) => o !== order);
+        }
+        else {
+            this.logger.warn(`AI 限价单成交但挂单记录缺失（账本已入账）: tag=${tag} orderId=${f.orderId}`);
+        }
+        this.refreshAiRestingValue(ledger);
+    }
     // ─── AI 对手盘（P4）：具名对手 + 本地策略（趋势/均值回归/动量/羊群/反转/噪声）+ 本地随机森林 ───
     // 完全本地运行，零外部 API。市价单吃掉真实挂单（AI 虚拟挂单 + 用户挂单），用户挂单触发真实结算；
     // 价格冲击与成交量走 applyUserFill；机构/游资成交计入大单净流入（订单流信号）。
+    // 费用口径说明：AI 账本不扣手续费/印花税（历史口径，与市价单路径一致），因此 AI 与真实玩家的
+    // 成本口径存在差异——若要统一，应作为独立口径变更（需同步调整 initialCash/绩效基准），不在本次修复范围。
     async applyAiTrading() {
         const arr = [...this.stocks.values()];
         if (arr.length === 0)
@@ -777,6 +912,8 @@ export class MarketDataService {
             }
             catch (e) { }
         }
+        // P0-3: 成交回调统一注册（做市商 + AI 限价单共用；必须在挂单前完成，否则同 tick 成交无回调）
+        this.ensureVirtualFillHook();
         // 每 tick 特征缓存（所有对手盘共用）：日内涨幅/波动率/OFI/行业周期/市场情绪
         const features = new Map<string, any>();
         for (const st of arr) {
@@ -802,8 +939,9 @@ export class MarketDataService {
             // 确定性随机：salt 隔离用途 → 同一 (gameDay, tick, agent) 必然重放同一决策序列
             if (ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'act')() > eff.activity)
                 continue;
-            // 未平挂单市值指数衰减（近似 TTL 到期释放预算）
-            ledger.restingValue = (ledger.restingValue || 0) * 0.97;
+            // P0-3: 原「未平挂单市值 ×0.97 指数衰减近似」删除，改为按活跃挂单精确占用
+            // （见下方 pendingBuyCash / pendingSellQty，以及成交回调里的 filledQty 更新）
+            const resting = this.activeAiResting(ledger);
             // 选股：羊群/动量策略追热点行业（概率随 hotBias/regime 缩放）；均值回归选超跌；其余随机
             const pickRng = ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'pick');
             let target;
@@ -853,6 +991,20 @@ export class MarketDataService {
                 }
             }
             const side = dir > 0 ? 'buy' : 'sell';
+            // P0-3: 该 AI 在同一标的上的活跃挂单占用（卖单冻结持仓、买单占用现金）
+            let pendingSellQty = 0;
+            let pendingBuyCash = 0;
+            for (const o of resting) {
+                if (o.symbol !== target.symbol)
+                    continue;
+                const left = Number(o.qty) - Number(o.filledQty || 0);
+                if (left <= 0)
+                    continue;
+                if (String(o.side || '').toLowerCase() === 'sell')
+                    pendingSellQty += left;
+                else
+                    pendingBuyCash += left * Number(o.price);
+            }
             // P3 资金约束：买单受现金约束、卖单受持仓约束（Phase F: 规模随自适应系数缩放；
             // 账本闸门 0.8×cash 为硬约束，不参与参数化——团队 C9 红线）
             let qty = Math.round(eff.scale * (0.5 + ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'qty')()));
@@ -860,33 +1012,45 @@ export class MarketDataService {
                 qty = Math.min(qty, Math.floor((ledger.cash * 0.8) / Math.max(priceNow, 0.01)));
             }
             else {
-                qty = Math.min(qty, heldQty);
+                // P0-3: 可卖量 = 持仓 − 活跃卖单剩余量（卖单冻结）。市价分支也走这条口径，
+                // 否则同一批股票会「挂单 + 市价单」重复卖出（原缺陷：跨日重复供货、股数不守恒）
+                qty = Math.min(qty, heldQty - pendingSellQty);
             }
             if (qty <= 0)
                 continue;
             if (!this.engine)
                 continue;
-            const isCN = target.market !== 'HK' && target.market !== 'US';
-            const base = Number(target.dayOpen) || 1;
-            const limitUp = isCN && base > 0 ? base * 1.10 : null;
-            const limitDown = isCN && base > 0 ? base * 0.90 : null;
+            // P1-13: 报价区间改用与撮合引擎/委托校验同基准的涨跌停工具（昨收 + 新股首日 ±44%/-36%）——
+            // 原实现用 dayOpen ±10% 硬编码，与引擎封板/委托校验口径不一致
+            const band = this.cnBandOf(target);
             if (ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'route')() < 0.67) {
                 // 限价挂单进入盘口排队：机构贴价大单、游资中等、散户偏远小单；TTL 8~30 tick
                 // Phase F: 挂单预算上限 = eff.restBudget（默认 0.6 = 现状；硬闸门 0.8×cash 在市价单侧不变）
-                if (ledger.restingValue + qty * priceNow > ledger.cash * eff.restBudget)
-                    continue; // 挂单预算约束
                 const offsetRng = ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'offset');
                 const offsetPct = agent.type === '机构' ? 0.0005 + offsetRng() * 0.001
                     : agent.type === '游资' ? 0.001 + offsetRng() * 0.0015
                         : 0.0015 + offsetRng() * 0.002;
                 let price = priceNow * (1 + dir * offsetPct);
-                if (isCN && limitUp !== null && limitDown !== null) {
-                    price = Math.min(Math.max(price, limitDown), limitUp);
+                if (band) {
+                    price = Math.min(Math.max(price, band.down), band.up);
                 }
                 const ttlTicks = 8 + Math.floor(ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'ttl')() * 22);
+                // P0-3: 买单现金占用用精确值校验（Σ活跃买单占用 + 本单金额 ≤ cash × restBudget），
+                // 卖单只受持仓冻结约束（不额外占用现金）
+                if (side === 'buy' && pendingBuyCash + qty * price > ledger.cash * eff.restBudget)
+                    continue; // 挂单预算约束
+                // P0-3: 确定性 orderId（ai-<agentId>-<seq>）+ tag=agent.id —— 成交回调据此定位账本与挂单
+                const seq = Number(ledger.restingSeq || 0) + 1;
+                const orderId = `ai-${agent.id}-${seq}`;
+                const orderPrice = Number(price.toFixed(2));
                 try {
-                    this.engine.placeVirtualOrder(target.symbol, side, Number(price.toFixed(2)), qty, this.tickCount + ttlTicks);
-                    ledger.restingValue += qty * Number(price.toFixed(2));
+                    this.engine.placeVirtualOrder(target.symbol, side, orderPrice, qty, this.tickCount + ttlTicks, { orderId, tag: agent.id });
+                    ledger.restingSeq = seq;
+                    resting.push({
+                        orderId, symbol: target.symbol, side, qty, price: orderPrice,
+                        expiresAtTick: this.tickCount + ttlTicks, filledQty: 0,
+                    });
+                    this.refreshAiRestingValue(ledger);
                 }
                 catch (e) { }
             }
@@ -896,9 +1060,20 @@ export class MarketDataService {
                     const fill = this.engine.executeVirtualMarketOrder(target.symbol, side, qty);
                     if (!fill)
                         continue;
-                    const realFills = (fill.counterFills || []).filter((f) => f.orderId);
+                    // P0-3: 只结算真实挂单（virtual 单本身无账户，settleCounterFills 内部也会跳过；
+                    // 这里先过滤，避免 AI 挂单成交被当成"结算失败"而误判——AI 挂单现在带 orderId 了）
+                    const realFills = (fill.counterFills || []).filter((f) => f.orderId && !f.virtual);
                     if (realFills.length > 0) {
-                        await this.engine.settleCounterFills(target.symbol, this.market, realFills);
+                        const settle = await this.engine.settleCounterFills(target.symbol, this.market, realFills);
+                        // P1-9: 对手方结算失败 → 本笔对 AI 账本与行情都不生效（原实现被 catch 静默吞掉：
+                        // 显示已成交却未入账，且仍改 AI 现金/持仓与价格冲击 → 股数资金不守恒）
+                        if (settle && settle.ok === false) {
+                            const detail = Array.isArray(settle.failed)
+                                ? settle.failed.map((x) => (x && x.orderId ? `${x.orderId}:${x.error || ''}` : String(x))).join('; ')
+                                : '';
+                            this.logger.error(`AI 市价单对手方结算失败，本笔放弃入账: ${target.symbol} ${side} ${fill.filledQuantity}股 ${detail}`);
+                            continue;
+                        }
                     }
                     // 价格冲击 + 成交量并入 K 线（与用户成交同一路径，AI 抛售可戳破泡沫）
                     this.applyUserFill({ symbol: target.symbol, side, filledQuantity: fill.filledQuantity, avgPrice: fill.avgPrice });
@@ -1406,7 +1581,12 @@ export class MarketDataService {
                 market: overnightCfg.market || this.market,
                 beta: Math.max(0.4, Math.min(2.5, (Number(overnightCfg.sigma) || 0.02) / 0.02)),
             }, overnightMarketShock, undefined, this.randn.bind(this));
-            const gappedOpen = Math.max(0.5, lastClose * (1 + overnight.gap));
+            let gappedOpen = Math.max(0.5, lastClose * (1 + overnight.gap));
+            // P1-15: 开盘价写回前按涨跌停夹紧（与引擎/委托校验同基准，prevClose 已更新为 lastClose）——
+            // 原实现不夹紧：新股首日（±44%）/旧口径下可写出越带开盘价；HK/US 仍走 market-math 的 ±25% 缺口口径
+            const openBand = this.cnBandOf(stock);
+            if (openBand)
+                gappedOpen = this.clamp(gappedOpen, openBand.down, openBand.up);
             stock.price = gappedOpen;
             stock.dayOpen = gappedOpen;
             stock.lastReturn = overnight.gap;
@@ -1615,15 +1795,8 @@ export class MarketDataService {
     refreshMarketMakers() {
         if (!this.engine)
             return;
-        if (!this.mmHookRegistered) {
-            try {
-                this.engine.setVirtualFillHook((f) => this.onMmFill(f));
-                this.mmHookRegistered = true;
-            }
-            catch (e) {
-                this.logger.warn('做市商成交回调注册失败: ' + (e && e.message ? e.message : e));
-            }
-        }
+        // P0-3: 成交回调统一注册（做市商库存 + AI 账本共用同一钩子，去掉原先只注册做市商回调的局部 gate）
+        this.ensureVirtualFillHook();
         const currentTick = this.tickCount;
         const p = market_maker_1.MM_PARAMS;
         for (const mm of this.marketMakers) {
@@ -2000,17 +2173,45 @@ export class MarketDataService {
     }
     // 分红：财报日登记（announceDay），除权在 exDay 开盘执行，发息按 exDay-1 收盘持仓快照
     // Phase A P0#3: 修复"除权日买入白拿全额股息"的无风险套利——A股式：登记日（exDay-1）收盘持有者享息
+    // P1-10: 落库不再 fire-and-forget——Promise 挂在 ev.persist 上，由 applyExRights 除权前 await，
+    // 保证 ev.id 已回填、DB 行确实被标 applied（原实现重启后 init 重载 applied:false → 重复除权 + 复权因子二次累计）
     recordDividend(symbol, perShare, announceDay) {
+        const perShareNum = Number(perShare);
+        // 异常分红额直接拒绝登记：NaN/非正数会污染 price/prevClose/复权因子，且无法回滚
+        if (!Number.isFinite(perShareNum) || perShareNum <= 0) {
+            this.logger.warn(`分红登记忽略异常金额: ${symbol} perShare=${perShare}`);
+            return null;
+        }
         const exDay = Number(announceDay) + 1;
-        const ev: any = { perShare: Number(perShare), announceDay: Number(announceDay), exDay, applied: false };
         const list = this.dividends.get(symbol) || [];
+        // P1-10: 同 (symbol, exDay) 重复登记 → 复用已有事件（幂等，防同一天二次除权）
+        const dup = list.find((d) => Number(d.exDay) === exDay);
+        if (dup)
+            return dup;
+        const ev: any = { perShare: perShareNum, announceDay: Number(announceDay), exDay, applied: false, persist: null };
         list.push(ev);
         this.dividends.set(symbol, list);
-        // 落库防重启丢失（除权/发息事件持久化，幂等 UNIQUE(symbol, exDay) 冲突时忽略）
+        ev.persist = this.persistDividendEvent(symbol, ev);
+        return ev;
+    }
+    // P1-10: 幂等落库（DB UNIQUE(symbol, exDay)）——已有行只同步 id/applied 状态，不重复插入
+    async persistDividendEvent(symbol, ev) {
+        if (!this.dividendEventRepo)
+            return ev;
         try {
-            this.dividendEventRepo.save(this.dividendEventRepo.create({
-                symbol, perShare: Number(perShare), announceDay: Number(announceDay), exDay, applied: false,
-            })).then((row) => { if (row && row.id) ev.id = row.id; }).catch(() => undefined);
+            const existing = await this.dividendEventRepo.findOne({ where: { symbol, exDay: Number(ev.exDay) } });
+            if (existing) {
+                if (existing.id)
+                    ev.id = existing.id;
+                // 库中已除权过（重启恢复场景）→ 直接继承 applied，applyExRights 不再重复执行
+                ev.applied = !!existing.applied;
+                return ev;
+            }
+            const row = await this.dividendEventRepo.save(this.dividendEventRepo.create({
+                symbol, perShare: Number(ev.perShare), announceDay: Number(ev.announceDay), exDay: Number(ev.exDay), applied: false,
+            }));
+            if (row && row.id)
+                ev.id = row.id;
         }
         catch (e) {
             this.logger.warn('分红事件落库失败: ' + (e && e.message ? e.message : e));
@@ -2022,6 +2223,8 @@ export class MarketDataService {
     async applyExRights(gameDay) {
         let applied = 0;
         const appliedIds = [];
+        // P1-10: 落库失败/未回填 id 的事件按幂等键 (symbol, exDay) 兜底标记
+        const appliedKeys = [];
         for (const [symbol, list] of this.dividends.entries()) {
             const st = this.stocks.get(symbol);
             if (!st)
@@ -2029,9 +2232,32 @@ export class MarketDataService {
             for (const ev of list) {
                 if (ev.applied || Number(ev.exDay) !== Number(gameDay))
                     continue;
+                const perShare = Number(ev.perShare);
+                if (!Number.isFinite(perShare) || perShare <= 0) {
+                    this.logger.warn(`除权跳过异常分红额: ${symbol} perShare=${ev.perShare}`);
+                    continue;
+                }
+                // P1-10: 先等落库 Promise 结算（回填 id / 同步库中 applied）再执行除权，
+                // 否则除权时 ev.id 常为空 → 按 id 的 applied 更新落空 → 重启后重复除权
+                if (ev.persist) {
+                    try {
+                        await ev.persist;
+                    }
+                    catch (e) { }
+                }
+                if (ev.applied)
+                    continue; // 库中该事件已 applied=true → 幂等跳过
                 const before = Number(st.price);
-                st.price = Math.max(0.5, before - Number(ev.perShare));
-                // P1 复权：累计前复权因子（除权当日起历史价格按新因子折算，消除分红跳空）
+                st.price = Math.max(0.5, before - perShare);
+                // P1-15: 除权同时按每股分红下调昨收（prevClose -= perShare，保底 >0），
+                // 使除权日涨跌幅/涨跌停基准不含分红缺口（原实现只调 price，次日开盘即"凭空跌"一块钱）
+                const prevBefore = Number(st.prevClose);
+                if (Number.isFinite(prevBefore) && prevBefore > 0) {
+                    const newPrev = prevBefore - perShare;
+                    if (newPrev > 0)
+                        st.prevClose = newPrev;
+                }
+                // P1 复权：累计前复权因子（除权当日起历史价格按新因子折算，消除分红跳空）——口径不变
                 if (before > 0) {
                     const info = this.adjFactors.get(symbol) || { factor: 1, series: [] };
                     info.factor = info.factor * (st.price / before);
@@ -2042,13 +2268,19 @@ export class MarketDataService {
                 applied++;
                 if (ev.id)
                     appliedIds.push(ev.id);
+                else
+                    appliedKeys.push({ symbol, exDay: Number(ev.exDay) });
             }
         }
-        if (appliedIds.length > 0) {
+        if (this.dividendEventRepo && (appliedIds.length > 0 || appliedKeys.length > 0)) {
             try {
                 // 按 id 精确标记，避免误标其他市场同 exDay 的事件
                 for (const id of appliedIds) {
                     await this.dividendEventRepo.update({ id }, { applied: true });
+                }
+                // P1-10: 无 id 时按 UNIQUE(symbol, exDay) 兜底更新，避免库里留下 applied:false 脏行
+                for (const key of appliedKeys) {
+                    await this.dividendEventRepo.update({ symbol: key.symbol, exDay: key.exDay }, { applied: true });
                 }
             }
             catch (e) {

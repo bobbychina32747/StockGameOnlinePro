@@ -122,7 +122,8 @@ export class TradingEngineService {
     executeMarketOrderLimited(symbol: string, side: string, quantity: number, limitPrice: number, excludeAccountId?: string) {
         return this.matching.executeMarketOrderLimited(symbol, side, quantity, limitPrice, excludeAccountId);
     }
-    placeVirtualOrder(symbol: string, side: string, price: number, qty: number, expiresAtTick: number, opts?: { orderId?: string; mmId?: string }) {
+    // P0-3: opts 增加 tag 透传（AI 虚拟挂单归属标识，成交回调按 tag 定位 AI 账本）
+    placeVirtualOrder(symbol: string, side: string, price: number, qty: number, expiresAtTick: number, opts?: { orderId?: string; mmId?: string; tag?: string }) {
         this.matching.placeVirtualOrder(symbol, side, price, qty, expiresAtTick, opts);
     }
     pruneExpiredVirtualOrders(currentTick: number) {
@@ -171,8 +172,13 @@ export class TradingEngineService {
     }
     // ─── 撮合/盘口逻辑已迁移至 MatchingEngine（见上方委托区与 matching-engine.ts） ───
     // P0: 结算对手方真实挂单成交（对方账户走统一结算队列，并同步订单实体的 filledQty/status）
+    // P0-2 修复：返回结构化结算结果 { ok, settled, failed }，并把"结算失败"从静默吞掉改为"对手单放回盘口 + 告警"。
+    // 修复根因：原实现丢弃 settleFill 的返回值，对手方结算失败时仍累加其 filledQty 甚至置 FILLED——
+    // 制造"对手单显示已成交、其账户却没扣款/没出货"的坏账（语义现与同文件 settleCounterFillsInner 对齐）。
     async settleCounterFills(symbol: string, mode: string, counterFills: any[]) {
-        for (const cf of counterFills) {
+        const failed: Array<{ orderId: string; error: string }> = [];
+        let settled = 0;
+        for (const cf of counterFills || []) {
             // P2: AI 虚拟挂单（virtual 标记或 orderId=null）无账户，跳过结算
             if (cf.virtual || !cf.orderId)
                 continue;
@@ -183,7 +189,16 @@ export class TradingEngineService {
                 avgPrice: cf.price,
                 totalCost: Number((cf.qty * cf.price).toFixed(2)),
             };
-            await this.settleFill(cf.accountId, symbol, cf.side, cfFill, mode);
+            const result = await this.settleFill(cf.accountId, symbol, cf.side, cfFill, mode);
+            if (!result.success) {
+                // 结算失败 → 对手单放回盘口，且不累加 filledQty / 不置 FILLED（订单实体保持 PENDING，等待下次撮合）
+                this.placeRestingOrder(symbol, cf.orderId, cf.accountId, cf.side, cf.price, cf.qty);
+                const error = String(result.error || '对手方结算失败');
+                this.logger.warn(`对手单结算失败已回滚盘口: ${cf.orderId} - ${error}`);
+                failed.push({ orderId: cf.orderId, error });
+                continue;
+            }
+            settled++;
             const cfOrder = await this.orderRepo.findOne({ where: { id: cf.orderId } });
             if (cfOrder) {
                 cfOrder.filledQty = Number(cfOrder.filledQty || 0) + cf.qty;
@@ -194,6 +209,7 @@ export class TradingEngineService {
                 await this.orderRepo.save(cfOrder);
             }
         }
+        return { ok: failed.length === 0, settled, failed };
     }
     // order 既可能是 DB 订单实体（挂单触发路径）也可能是下单 DTO（提交路径），两者字段超集不同，故用宽松类型
     async submitOrder(orderData: any, account: Account) {
@@ -211,6 +227,10 @@ export class TradingEngineService {
             if (!settle.success) {
                 if (fill.counterFills && fill.counterFills.length > 0) {
                     for (const cf of fill.counterFills) {
+                        // P1-6 修复：AI/做市商虚拟挂单（无 orderId、无账户）不得被固化成无主真实挂单，
+                        // 否则盘口出现永远无人结算的幽灵单（与 settleCounterFillsInner 的过滤口径一致）
+                        if (cf.virtual || !cf.orderId)
+                            continue;
                         this.placeRestingOrder(orderData.symbol, cf.orderId, cf.accountId, cf.side, cf.price, cf.qty);
                     }
                 }
@@ -229,6 +249,9 @@ export class TradingEngineService {
             const rollback = () => {
                 if (fill && fill.counterFills) {
                     for (const cf of fill.counterFills) {
+                        // P1-6 修复：虚拟挂单不进真实盘口（同上）
+                        if (cf.virtual || !cf.orderId)
+                            continue;
                         this.placeRestingOrder(orderData.symbol, cf.orderId, cf.accountId, cf.side, cf.price, cf.qty);
                     }
                 }
@@ -249,6 +272,11 @@ export class TradingEngineService {
                 await this.settleCounterFills(orderData.symbol, account.marketMode, fill.counterFills);
             }
             // 记录成交订单实体（不排队）
+            // P2 修复：IOC 部分成交必须落 PARTIAL（原实现无条件 FILLED，把未成交的剩余量谎报为全部成交）；
+            // FOK 语义不变——上方已保证 filledQuantity >= quantity 才会走到这里，仍为 FILLED（要么全成要么撤）
+            const filledQty = Number(fill.filledQuantity);
+            const requestedQty = Number(orderData.quantity);
+            const orderStatus = filledQty >= requestedQty ? OrderStatus.FILLED : OrderStatus.PARTIAL;
             const order = this.orderRepo.create({
                 userId: orderData.userId,
                 accountId: orderData.accountId,
@@ -258,7 +286,7 @@ export class TradingEngineService {
                 price: orderData.price,
                 triggerPrice: orderData.triggerPrice,
                 quantity: orderData.quantity,
-                status: OrderStatus.FILLED,
+                status: orderStatus,
                 filledQty: fill.filledQuantity,
                 avgFillPrice: fill.avgPrice,
             });
@@ -317,6 +345,9 @@ export class TradingEngineService {
                 const settle = await this.settleFill(account.id, orderData.symbol, orderData.side, ownFill, account.marketMode);
                 if (!settle.success) {
                     for (const f of crossed.fills) {
+                        // P1-6 修复：虚拟挂单不入真实盘口（同上）
+                        if (f.virtual || !f.orderId)
+                            continue;
                         this.placeRestingOrder(orderData.symbol, f.orderId, f.accountId, f.side, f.price, f.qty);
                     }
                     saved.status = OrderStatus.CANCELLED;
@@ -549,12 +580,17 @@ export class TradingEngineService {
             account.borrowed = Number(account.borrowed || 0) + borrow;
         } else {
             // SELL：卖出回笼现金，并按持仓原始负债比例偿还融资
+            // P0-1 修复（资金安全核心）：偿还额必须从卖券所得中扣除。
+            // 修复根因：买入口径下借入资金从未进入 cash（cash 只扣自有部分 ownCash，差额只加到 borrowed），
+            // 若卖出时仅减 borrowed 而不扣现金，等于同一笔融资款被"还了债又留在手里"——杠杆 2 买卖一轮权益凭空 +50%。
             const borrowBefore = Number(account.borrowed || 0);
+            let repay = 0;
             if (borrowBefore > 0) {
-                const repay = Math.min(borrowBefore, totalCost * (1 - 1 / (Number(account.leverage) || 1)));
+                repay = Math.min(borrowBefore, totalCost * (1 - 1 / (Number(account.leverage) || 1)));
                 account.borrowed = borrowBefore - repay;
             }
-            account.cash = Number(account.cash) + totalCost - fees.totalFees;
+            // leverage === 1 时 repay 恒为 0（公式天然为 0），行为与修复前完全一致
+            account.cash = Number(account.cash) + totalCost - fees.totalFees - repay;
         }
         // FIX(H4): 现金规范化到分，减少浮点累积误差
         account.cash = Math.round(account.cash * 100) / 100;
@@ -737,6 +773,9 @@ export class TradingEngineService {
                     // 结算失败 → 对手方订单放回盘口
                     if (fill.counterFills && fill.counterFills.length > 0) {
                         for (const cf of fill.counterFills) {
+                            // P1-6 修复：虚拟挂单（AI/做市商）无账户无订单实体，不得固化成无主真实挂单
+                            if (cf.virtual || !cf.orderId)
+                                continue;
                             this.placeRestingOrder(order.symbol, cf.orderId, cf.accountId, cf.side, cf.price, cf.qty);
                             dirtyAccountIds.add(cf.accountId);
                         }
@@ -802,6 +841,18 @@ export class TradingEngineService {
         log.push({ ...entry, at: new Date().toISOString() });
         order.triggerLog = JSON.stringify(log.slice(-20));
     }
+    // P0-4: 写库前资金防线——cash 一旦变成 NaN/Infinity 并入库，该账户的资金体系即彻底不可用（读出来全是 NaN）。
+    // 返回 null 表示校验不通过：此时把账户内存对象恢复原值并由调用方跳过保存（宁可少发一笔息，也不写脏数据）
+    applyCashDelta(account: any, delta: number): number | null {
+        const cashBefore = Number(account.cash);
+        const nextCash = Math.round((cashBefore + delta) * 100) / 100;
+        if (!Number.isFinite(nextCash)) {
+            account.cash = cashBefore;
+            return null;
+        }
+        account.cash = nextCash;
+        return nextCash;
+    }
     // Phase A P0#3: 分红按"登记日（exDay-1）收盘持仓快照"发放（A股式），封堵除权日买入套利；
     // 净空头按每股扣息（真实市场做空者在除权日需支付股息）；paid 标记幂等防重复发放
     // Phase C: 红利税二档制（dividendTaxRate）——CN ≤7交易日20%/>7日0%，HK 20%，US 30%；流水记税后净额（UI 口径一致）
@@ -821,6 +872,12 @@ export class TradingEngineService {
             const perShare = perShareBy.get(snap.symbol);
             if (perShare === undefined)
                 continue;
+            // P0-4 修复：每股分红金额非有限数（NaN/Infinity）会让 cash 变成 NaN 并入库，
+            // 该账户资金体系随即彻底失效 → 记错误日志并整条事件跳过（不扣现金、不记账、继续下一条）
+            if (!Number.isFinite(perShare)) {
+                this.logger.error(`分红事件金额非法，已跳过该条（symbol=${snap.symbol}, perShare=${perShare}, account=${snap.accountId}）`);
+                continue;
+            }
             const account = await this.accountRepo.findOne({ where: { id: snap.accountId } });
             if (!account)
                 continue;
@@ -832,7 +889,16 @@ export class TradingEngineService {
             if (netQty > 0) {
                 const gross = Number((netQty * perShare).toFixed(2));
                 const amount = Number((gross * (1 - taxRate)).toFixed(2));
-                account.cash = Math.round((Number(account.cash) + amount) * 100) / 100;
+                // P0-4: 金额非有限（快照净额/税率脏数据）同样整条跳过，绝不把 NaN 写进 cash
+                if (!Number.isFinite(gross) || !Number.isFinite(amount)) {
+                    this.logger.error(`分红金额非有限数，已跳过该条（symbol=${snap.symbol}, gross=${gross}, amount=${amount}, account=${snap.accountId}）`);
+                    continue;
+                }
+                // P0-4 防线：写库前校验算出的现金为有限数，非有限则保持原值、不保存该账户（返回失败而非写脏数据）
+                if (this.applyCashDelta(account, amount) === null) {
+                    this.logger.error(`分红到账后现金非有限数，已跳过保存（account=${snap.accountId}, 到账=${amount}）`);
+                    continue;
+                }
                 await this.accountRepo.save(account);
                 try {
                     await this.txRepo.save(this.txRepo.create({
@@ -853,7 +919,16 @@ export class TradingEngineService {
             else if (netQty < 0) {
                 // 做空者除权日付息（真实市场规则），负数流水
                 const amount = Number((Math.abs(netQty) * perShare).toFixed(2));
-                account.cash = Math.round((Number(account.cash) - amount) * 100) / 100;
+                // P0-4: 扣息金额非有限 → 整条事件跳过（不扣现金、不记账、继续下一条）
+                if (!Number.isFinite(amount)) {
+                    this.logger.error(`空头付息金额非有限数，已跳过该条（symbol=${snap.symbol}, amount=${amount}, account=${snap.accountId}）`);
+                    continue;
+                }
+                // P0-4 防线：写库前校验算出的现金为有限数（同上，非有限保持原值不保存）
+                if (this.applyCashDelta(account, -amount) === null) {
+                    this.logger.error(`空头付息后现金非有限数，已跳过保存（account=${snap.accountId}, 扣息=${amount}）`);
+                    continue;
+                }
                 await this.accountRepo.save(account);
                 try {
                     await this.txRepo.save(this.txRepo.create({
@@ -963,23 +1038,28 @@ export class TradingEngineService {
     async settleAuctionFills(symbol: string, fills: any[]) {
         if (!fills || fills.length === 0)
             return { success: true, settled: 0 };
-        // 阶段1：全量预校验
-        for (const f of fills) {
-            if (f.virtual || !f.orderId)
-                continue;
-            const cfFill = {
-                symbol,
-                side: f.side,
-                filledQuantity: f.qty,
-                avgPrice: f.price,
-                totalCost: Number((f.qty * f.price).toFixed(2)),
-            };
-            const ok = await this.precheckFill(f.accountId, symbol, f.side, cfFill);
-            if (!ok.success)
-                return this.rollbackAuctionFills(symbol, fills);
-        }
-        // 阶段2：进结算队列逐条结算（预校验已过，settleFillInner 确定性成功；DB 异常中断时未结算部分放回盘口）
+        // P1-7 修复：预校验与结算必须同处本互斥队列内。
+        // 修复根因：原预校验在 runExclusive 之外执行，读的是队列外快照——与并发成交/强平/分红交错时会
+        // 用过期资金持仓放行，队列内 settleFillInner 再失败，产生"部分结算 + 部分挂单凭空消失"的半个竞价。
         return this.runExclusive(async () => {
+            // 阶段1：全量预校验（队列内重读账户/持仓后再校验）
+            for (const f of fills) {
+                if (f.virtual || !f.orderId)
+                    continue;
+                const preFill = {
+                    symbol,
+                    side: f.side,
+                    filledQuantity: f.qty,
+                    avgPrice: f.price,
+                    totalCost: Number((f.qty * f.price).toFixed(2)),
+                };
+                const ok = await this.precheckFill(f.accountId, symbol, f.side, preFill);
+                if (!ok.success) {
+                    const rollback = await this.rollbackAuctionFills(symbol, fills);
+                    // P1-7: 预校验失败同样以 success:false 上报（一条未结算）
+                    return { success: false, settled: 0, error: rollback.error };
+                }
+            }
             let settled = 0;
             let idx = 0;
             try {
@@ -1011,11 +1091,15 @@ export class TradingEngineService {
             }
             catch (e) {
                 // 已结算部分保留（流水可对账），未结算部分放回盘口（显式降级：日志含完整凭据）
-                this.logger.error(`集合竞价结算中断（已结算 ${settled} 条）: ${e.message}`);
+                const message = e && e.message ? e.message : String(e);
+                this.logger.error(`集合竞价结算中断（已结算 ${settled} 条）: ${message}`);
                 for (const f of fills.slice(idx - 1)) {
                     if (!f.virtual && f.orderId)
                         this.placeRestingOrder(symbol, f.orderId, f.accountId, f.side, f.price, f.qty);
                 }
+                // P1-7 修复：异常必须上报为失败（原实现 catch 后仍返回 success:true，调用方以为竞价已完整结算）；
+                // 已结算条目数随 settled 一起返回，供调用方对账
+                return { success: false, settled, error: message };
             }
             return { success: true, settled };
         });
@@ -1197,6 +1281,27 @@ export class TradingEngineService {
         // Phase A P0#4: 强平进入结算互斥队列，与用户成交串行，防止 read-modify-write 互相覆盖
         return this.runExclusive(() => this.forceLiquidateInner(account));
     }
+    // P1-8 修复：强平/追保的每笔实际成交都要落交易流水。
+    // 修复根因：原实现直接改 acc.cash / pos.* 后 save，被强平者"钱变了却没有任何成交记录"，
+    // 对账（账户流水页 / FIFO 绩效 / 风控复盘）全部缺这一笔，玩家看到资金凭空消失且无从解释。
+    // 字段口径与 settleFillInner 的 txRepo.create 完全一致（费用用该笔的 calcFees 结果）。
+    async recordLiquidationTx(accountId: string, symbol: string, side: OrderSide, fill: any, fees: any) {
+        try {
+            await this.txRepo.save(this.txRepo.create({
+                accountId,
+                symbol,
+                side,
+                quantity: fill.filledQuantity,
+                price: fill.avgPrice,
+                turnover: fill.totalCost,
+                ...fees,
+            }));
+        }
+        catch (e) {
+            // 流水写入失败不影响强平本身（资金已按真实成交变更，流水属审计补记，失败仅告警）
+            this.logger.error(`强平流水写入失败 ${accountId} ${symbol} ${side}: ${e && e.message ? e.message : e}`);
+        }
+    }
     async forceLiquidateInner(account: Account) {
         // 队列内重读账户与持仓（入队前读到的可能是过期数据）
         const acc = await this.accountRepo.findOne({ where: { id: account.id } });
@@ -1210,11 +1315,15 @@ export class TradingEngineService {
             if (pos.longQty > 0) {
                 const fill = this.executeMarketOrder(pos.symbol, OrderSide.SELL, pos.longQty, acc.id);
                 if (fill) {
-                    recovered += fill.totalCost;
-                    totalFees += this.calcFees(OrderSide.SELL, fill.totalCost, fill.filledQuantity, symbolMarket(pos.symbol)).totalFees;
+                    const fees = this.calcFees(OrderSide.SELL, fill.totalCost, fill.filledQuantity, symbolMarket(pos.symbol));
                     // Phase B: 卖出回笼现金同时按比例偿还融资负债
                     const repay = Math.min(Number(acc.borrowed || 0), fill.totalCost * (1 - 1 / (Number(acc.leverage) || 1)));
                     acc.borrowed = Number(acc.borrowed || 0) - repay;
+                    // P0-1 修复：偿还额必须从回收额里扣掉（recovered 最终整体加到 cash）。
+                    // 与 settleFillInner SELL 同口径——卖券所得先还债，只有净额才算现金回收，否则强平反而凭空造钱
+                    recovered += fill.totalCost - repay;
+                    totalFees += fees.totalFees;
+                    await this.recordLiquidationTx(acc.id, pos.symbol, OrderSide.SELL, fill, fees);
                     // Phase A P0#4: 按实际成交量扣减，剩余持仓保留（跌停/无流动性时不得凭空蒸发）
                     pos.longQty = Number(pos.longQty) - fill.filledQuantity;
                     if (pos.longQty <= 0) {
@@ -1228,8 +1337,10 @@ export class TradingEngineService {
                 const before = Number(pos.shortQty);
                 const fill = this.executeMarketOrder(pos.symbol, OrderSide.COVER, pos.shortQty, acc.id);
                 if (fill) {
+                    const fees = this.calcFees(OrderSide.COVER, fill.totalCost, fill.filledQuantity, symbolMarket(pos.symbol));
                     recovered -= fill.totalCost;
-                    totalFees += this.calcFees(OrderSide.COVER, fill.totalCost, fill.filledQuantity, symbolMarket(pos.symbol)).totalFees;
+                    totalFees += fees.totalFees;
+                    await this.recordLiquidationTx(acc.id, pos.symbol, OrderSide.COVER, fill, fees);
                     pos.shortQty = Number(pos.shortQty) - fill.filledQuantity;
                     if (pos.shortQty <= 0) {
                         pos.shortQty = 0;
@@ -1316,11 +1427,14 @@ export class TradingEngineService {
                 // 自成交防护：追保市价单不与本人挂单撮合
                 const fill = this.executeMarketOrder(pos.symbol, OrderSide.SELL, qty, acc.id);
                 if (fill) {
-                    const fees = this.calcFees(OrderSide.SELL, fill.totalCost, fill.filledQuantity, symbolMarket(pos.symbol)).totalFees;
-                    netCash += fill.totalCost - fees;
+                    const fees = this.calcFees(OrderSide.SELL, fill.totalCost, fill.filledQuantity, symbolMarket(pos.symbol));
                     // Phase B: 追保卖出同步按比例偿还融资负债（降杠杆）
                     const repay = Math.min(Number(acc.borrowed || 0), fill.totalCost * (1 - 1 / (Number(acc.leverage) || 1)));
                     acc.borrowed = Number(acc.borrowed || 0) - repay;
+                    // P0-1 修复：偿还额必须从净现金里扣除（与 settleFillInner SELL 同口径），否则追保卖出凭空造钱
+                    netCash += fill.totalCost - fees.totalFees - repay;
+                    // P1-8 修复：追保成交同样要落流水
+                    await this.recordLiquidationTx(acc.id, pos.symbol, OrderSide.SELL, fill, fees);
                     pos.longQty = Number(pos.longQty) - fill.filledQuantity;
                     if (pos.longQty <= 0) {
                         pos.longQty = 0;
@@ -1334,11 +1448,13 @@ export class TradingEngineService {
                 const qty = Math.ceil(before * 0.5);
                 const fill = this.executeMarketOrder(pos.symbol, OrderSide.COVER, qty, acc.id);
                 if (fill) {
-                    const fees = this.calcFees(OrderSide.COVER, fill.totalCost, fill.filledQuantity, symbolMarket(pos.symbol)).totalFees;
+                    const fees = this.calcFees(OrderSide.COVER, fill.totalCost, fill.filledQuantity, symbolMarket(pos.symbol));
                     const released = Number(acc.shortCollateral || 0) * (fill.filledQuantity / before);
                     releasedCollateral += released;
                     acc.shortCollateral = Number(acc.shortCollateral || 0) - released;
-                    netCash += released - fill.totalCost - fees;
+                    netCash += released - fill.totalCost - fees.totalFees;
+                    // P1-8 修复：平空回补同样要落流水
+                    await this.recordLiquidationTx(acc.id, pos.symbol, OrderSide.COVER, fill, fees);
                     pos.shortQty = Number(pos.shortQty) - fill.filledQuantity;
                     if (pos.shortQty <= 0) {
                         pos.shortQty = 0;

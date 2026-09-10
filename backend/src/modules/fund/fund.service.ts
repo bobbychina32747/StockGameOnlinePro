@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 
 import { Account } from '../../infrastructure/database/entities/account.entity';
 import { FundHolding } from '../../infrastructure/database/entities/fund-holding.entity';
@@ -34,6 +34,16 @@ function redeemFeeRate(holdDays: number): number {
     return 0;
 }
 
+// P0 修复（赎回舍入）：到账金额只向「分」结算，且只取「对平台不亏、对用户不占便宜」的一侧（向下取整）。
+// 四舍五入会把 0.005 份（净值 1.0，应值 0.005）白送成 0.01，用户可用细分份额反复赎回印钱；
+// toFixed(6) 仅用于抹掉浮点噪声（如 98.5*100=9849.999999999998），不改变真实的分以下数值
+function floorToCent(value: number): number {
+    const v = Number(value);
+    if (!Number.isFinite(v))
+        return 0;
+    return Math.floor(Number((v * 100).toFixed(6))) / 100;
+}
+
 @Injectable()
 export class FundService {
     private readonly logger = new Logger(FundService.name);
@@ -45,6 +55,9 @@ export class FundService {
         private readonly engine: TradingEngineService,
         private readonly marketData: MarketDataService,
         private readonly seasonService: SeasonService,
+        // P0 修复（事务）：注入 DataSource 用于「账户现金 + 基金持仓」原子写；
+        // 声明为可选参数，兼容既有单测的 5 参构造（无 DataSource 时退化为顺序写库）
+        @Optional() @InjectDataSource() private readonly dataSource?: DataSource,
     ) {
         this.funds = [
             // Phase C: 增加申购费率（ETF 0.15%、货基 0）；NAV 保持稳健上涨（不可跌——防重开"重置/赎回"套利窗口，teams 风控红线）
@@ -84,10 +97,12 @@ export class FundService {
         return Number(cny) / (Number(fx[mode]) || 1);
     }
 
-    async subscribe(userId: string, mode: string, fundId: string, amount: number) {
+    async subscribe(userId: string, mode: string, fundId: string, rawAmount: number) {
+        // P0 修复（舍入套利）：金额先规范化到「分」，扣款与份额必须基于同一个 amount。
+        // 旧实现按请求原始值（如 0.014）算份额、却只按 Math.round 扣 0.01，循环调用可抽干现金（等价印钱）
+        const amount = Math.round(Number(rawAmount) * 100) / 100;
         // SECURITY: Number('abc')=NaN 会绕过 NaN<=0 的判断并永久损坏 account.cash，必须先校验有限性
-        const amt = Number(amount);
-        if (!Number.isFinite(amt) || amt <= 0) {
+        if (!Number.isFinite(amount) || amount <= 0) {
             return { success: false, error: '申购金额必须为大于0的数字' };
         }
         const fund = this.getFund(fundId);
@@ -104,30 +119,34 @@ export class FundService {
             const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode || 'US' } });
             if (!account)
                 return { success: false, error: '账户不存在' };
-            if (Number(account.cash) < amt)
+            if (Number(account.cash) < amount)
                 return { success: false, error: '账户余额不足' };
-            const cny = this.toCny(amt, mode || 'US');
+            // 事务前算好计价口径（汇率/费率/份额），事务内只写库，避免事务内重读与队列互斥语义冲突
+            const cny = this.toCny(amount, mode || 'US');
             const fee = cny * (Number(fund.subscribeFeeRate) || 0);
             const shares = (cny - fee) / fund.nav;
-            account.cash = Math.round((Number(account.cash) - amt) * 100) / 100;
-            await this.accountRepo.save(account);
+            account.cash = Math.round((Number(account.cash) - amount) * 100) / 100;
             // FIX(H5): 份额落库，重启不丢失
             let holding = await this.holdingRepo.findOne({ where: { userId, marketMode: mode || 'US', fundId } });
             if (!holding) {
                 holding = this.holdingRepo.create({ userId, marketMode: mode || 'US', fundId, shares: 0, totalInvested: 0, firstBuyDay: this.gameDay() });
             }
             holding.shares = Number(holding.shares) + shares;
-            holding.totalInvested = Number(holding.totalInvested) + amt;
+            // Phase C 重构前口径：totalInvested 记本币 amt，与 CNY 计价的 shares/nav 不一致 → 统一按 CNY 累计
+            holding.totalInvested = Number(holding.totalInvested) + cny;
             if (Number(holding.firstBuyDay || 0) <= 0)
                 holding.firstBuyDay = this.gameDay();
-            await this.holdingRepo.save(holding);
-            this.logger.log(`用户 ${userId} 申购 ${fund.name} ${shares.toFixed(4)} 份 (${mode || 'US'} ${amt.toFixed(2)}，申购费 ${this.fromCny(fee, mode || 'US').toFixed(2)})`);
+            // P0 修复（事务）：现金扣减与份额落库放同一事务，中途崩溃不再出现「钱已扣、份额未记」
+            await this.persistFundMutation(account, holding);
+            this.logger.log(`用户 ${userId} 申购 ${fund.name} ${shares.toFixed(4)} 份 (${mode || 'US'} ${amount.toFixed(2)}，申购费 ${this.fromCny(fee, mode || 'US').toFixed(2)})`);
             return { success: true, shares: Number(shares.toFixed(4)), nav: fund.nav, fee: Number(this.fromCny(fee, mode || 'US').toFixed(2)) };
         });
     }
 
-    async redeem(userId: string, mode: string, fundId: string, shares: number) {
-        const sh = Number(shares);
+    async redeem(userId: string, mode: string, fundId: string, rawShares: number) {
+        // P0 修复（赎回舍入）：份额先规范化到 4 位小数（与持仓展示/日志同精度），份额扣减与到账金额同源，
+        // 避免旧实现按请求原始精度计价、金额另行舍入造成的反向套利（0.005 份 → 到账 0.01）
+        const sh = Math.round(Number(rawShares) * 10000) / 10000;
         if (!Number.isFinite(sh) || sh <= 0) {
             return { success: false, error: '赎回份额必须为大于0的数字' };
         }
@@ -152,19 +171,42 @@ export class FundService {
             const holdDays = Math.max(0, this.gameDay() - Number(holding.firstBuyDay || 0));
             const feeRate = redeemFeeRate(holdDays);
             const cnyValue = sh * fund.nav * (1 - feeRate);
-            const amount = this.fromCny(cnyValue, mode || 'US');
+            // P0 修复（金额取整方向）：本币到账额按「分」结算，只取对平台不亏的一侧（向下取整）
+            const amount = floorToCent(this.fromCny(cnyValue, mode || 'US'));
+            // 不足 1 分不予赎回：否则用户份额被扣而到账 0，构成反向吃亏
+            if (amount <= 0)
+                return { success: false, error: '赎回金额不足0.01，无法赎回' };
             account.cash = Math.round((Number(account.cash) + amount) * 100) / 100;
-            await this.accountRepo.save(account);
             holding.shares = Number(holding.shares) - sh;
-            if (Number(holding.shares) <= 0) {
-                await this.holdingRepo.delete(holding.id);
-            }
-            else {
-                await this.holdingRepo.save(holding);
-            }
+            // P0 修复（事务）：现金增加与份额扣减（或清仓删行）必须同一事务，中途崩溃不再凭空造钱
+            await this.persistFundMutation(account, holding, Number(holding.shares) <= 0);
             this.logger.log(`用户 ${userId} 赎回 ${fund.name} ${sh.toFixed(4)} 份 (${mode || 'US'} ${amount.toFixed(2)}，持有 ${holdDays} 日，赎回费 ${(feeRate * 100).toFixed(1)}%)`);
             return { success: true, amount: Number(amount.toFixed(2)), nav: fund.nav, holdDays, feeRate };
         });
+    }
+
+    // P0 修复（事务）：把「账户现金 + 基金持仓」两次写库收敛到同一个数据库事务，
+    // 消除「先写 account 再写 holding」中间崩溃导致的资金/份额不一致（申购丢份额、赎回凭空造钱）。
+    // 抽成独立小方法，便于单测注入 fake DataSource 断言事务边界。
+    private async persistFundMutation(account: Account, holding: FundHolding, removeHolding = false) {
+        const ds = this.dataSource;
+        // 事务内只做写：nav/份额/汇率已在事务前算好，不在事务内重读账户或持仓
+        if (ds && typeof ds.transaction === 'function') {
+            await ds.transaction(async (mgr) => {
+                await mgr.save(account);
+                if (removeHolding)
+                    await mgr.delete(FundHolding, holding.id);
+                else
+                    await mgr.save(holding);
+            });
+            return;
+        }
+        // 未注入 DataSource（纯单测/极端降级）：保持旧的顺序写库语义，功能可用
+        await this.accountRepo.save(account);
+        if (removeHolding)
+            await this.holdingRepo.delete(holding.id);
+        else
+            await this.holdingRepo.save(holding);
     }
 
     updateNavs() {

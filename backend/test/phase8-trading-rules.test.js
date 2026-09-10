@@ -273,7 +273,9 @@ describe('Phase B 真杠杆（P1#9）', () => {
     expect(r.success).toBe(true);
     const acct = accountRepo.rows.find((a) => a.id === 'AC1');
     expect(Number(acct.borrowed)).toBeCloseTo(0, 2); // 全卖 → 负债还清
-    expect(Number(acct.cash)).toBeCloseTo(50000 + 100000 - r.fees.totalFees, 2);
+    // P0-1 修复：卖券所得先还债，只有净额进现金（原实现漏扣 repay → 权益凭空 +50000，可反复买卖刷钱）
+    const repay = 50000;
+    expect(Number(acct.cash)).toBeCloseTo(50000 + 100000 - repay - r.fees.totalFees, 2);
   });
   test('强平检查基于记账负债（不再由持仓市值推导）', async () => {
     const accountRepo = fakeRepo([{ id: 'AC1', cash: 1000, marketMode: 'CN', leverage: 1, totalTrades: 0, shortCollateral: 0, borrowed: 0 }]);

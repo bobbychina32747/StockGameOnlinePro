@@ -195,7 +195,8 @@ describe('P2 做市商模型', () => {
     m.placeVirtualOrder('T1', 'sell', 10.0, 200, 999999, { orderId: 'MMA-MM1-T1', mmId: 'MM1' });
     const res = m.executeVirtualMarketOrder('T1', 'buy', 120);
     expect(res.filledQuantity).toBe(120);
-    expect(fills).toEqual([{ mmId: 'MM1', symbol: 'T1', side: 'sell', qty: 120, price: 10.0 }]);
+    // P0-3: 回调载荷扩展为 { mmId, tag, orderId, symbol, side, qty, price }（AI 虚拟挂单走同一钩子，靠 tag 区分）
+    expect(fills).toEqual([{ mmId: 'MM1', tag: null, orderId: 'MMA-MM1-T1', symbol: 'T1', side: 'sell', qty: 120, price: 10.0 }]);
     // 按 orderId 撤单
     m.removeRestingOrder('T1', 'MMA-MM1-T1');
     expect(m.realBooks.get('T1').asks.length).toBe(0);
