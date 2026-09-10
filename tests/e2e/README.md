@@ -1,7 +1,9 @@
 # E2E 冒烟（Phase F-4）
 
-浏览器级主链路冒烟：一条命令跑通「登录/注册 → 下单 → 撤单 → 排行 → 赛季报名 → 断线后外壳非白屏」，
+浏览器级主链路冒烟：一条命令跑通「登录/注册 → 下单 → 撤单 → 排行 → 赛季报名 → 断线后外壳非白屏 → 语言切换」，
 落盘截图 + `result.json` 证据。**可选门禁**：不被 `npm test` / CI 强依赖，失败不影响 build/test 通道。
+
+> 链路 ⑦（语言切换）是 Phase G-1 增补：断言点 English 后**顶栏与设置面板就地变英文**（不刷新）、`sgp.lang` 落 localStorage、`reload` 后仍为英文，最后切回简体避免污染后续运行；截图 `07-language-en.png`。
 
 ## 前置
 
@@ -12,7 +14,7 @@
 ## 跑
 
 ```bat
-node tests/e2e/smoke.mjs              :: 完整 6 条链路，总超时 300s
+node tests/e2e/smoke.mjs              :: 完整 7 条链路，总超时 300s
 node tests/e2e/smoke.mjs --help        :: 用法与环境变量
 node tests/e2e/smoke.mjs --strict      :: SKIP 也返回 1（可当门禁）
 node tests/e2e/smoke.mjs --clean       :: 开始前清理 7 天前的旧产物目录（默认不删）

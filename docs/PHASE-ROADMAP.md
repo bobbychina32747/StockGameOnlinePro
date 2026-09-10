@@ -8,6 +8,9 @@
 > 强平候选裁剪 + `orders(status,type)` 索引（实测 SCAN→SEARCH，2.19ms→1.35ms，见 `docs/phaseF-plans/evidence/`）+ `sliceRecentAsc` 口径统一、
 > PWA 构建期 precache manifest（双向差集门禁 + 体积红线）、E2E 冒烟脚本入仓（可选门禁）。
 > 方案与裁决存档：`docs/phaseF-plans/01-ai-adaptive-risk-pwa-e2e.md`。下一批：Phase G（多语言 + 离线数据层 + v0.3.0 发布）。
+>
+> **Phase G-1 已交付**（2026-09-10，frontend 77→92 全绿，E2E 6→7 条链路）：i18n 基础设施（零依赖字典 + `useI18n` + localStorage 切换 + **覆盖面门禁**：已登记文件不得残留硬编码中文、用到的 key 必须三语齐备）
+> ｜覆盖面 1/3：**导航 + 设置面**（交易/排行两面待续，`COVERED_FILES` 逐批登记即逐批收紧门禁）｜沿路修复真实 UI 缺陷：设置弹窗因 `.top-bar` 的 `backdrop-filter` 变成顶栏的固定包含块 → 遮罩只有 1440×72、无整屏遮罩与点外关闭，现 portal 到 `body`（1440×900），并把该几何不变量写成 E2E 永久断言。
 
 ---
 

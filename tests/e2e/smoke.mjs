@@ -15,9 +15,9 @@
  *   5. **产物**：tests/e2e/artifacts/<YYYYMMDD-HHmmss>/ 下 NN-<name>.png 截图 + result.json
  *      （步骤名/状态/耗时/断言值，**不写密码**）+ server.log（后端 stdout）。默认保留产物，
  *      `--clean` 才在开始前清理 7 天前的旧目录。
- *   6. **主链路 6 条**：登录/注册（含 Phase E 重名 200+success:false → 转登录）/ 下单 / 撤单 /
- *      排行 / 赛季报名 / 断线→reload→外壳非白屏。单条失败不阻断后续（记录 FAIL 继续），
- *      最终若有 FAIL → exit 1。
+ *   6. **主链路 7 条**：登录/注册（含 Phase E 重名 200+success:false → 转登录）/ 下单 / 撤单 /
+ *      排行 / 赛季报名 / 断线→reload→外壳非白屏 / 语言切换（Phase G-1：就地生效 + localStorage 持久化 + 切回）。
+ *      单条失败不阻断后续（记录 FAIL 继续），最终若有 FAIL → exit 1。
  *   7. **无交互阻塞**：每次 playwright-cli 调用都有超时；脚本整体有总超时（默认 300s，--timeout= 可调）。
  *
  * 硬约束：纯 Node 内置模块、零新依赖、中文注释、ESM、UTF-8 无 BOM。
@@ -1041,6 +1041,114 @@ async function chainOfflineShell(A) {
   return {};
 }
 
+// 链路 ⑦：i18n 语言切换（Phase G-1）——顶栏/设置面板文案就地切换 + localStorage 持久化 + 切回
+async function chainLanguageSwitch(A) {
+  await goto(`${state.frontendUrl}/`);
+  const zhNav = await waitUntil(page(`
+    const nav = document.querySelector('.nav-links');
+    return { ok: !!nav, text: nav ? nav.innerText.replace(/\\s+/g, ' ').trim() : '' };
+  `), 25000, 500);
+  must(zhNav.ok, '顶栏导航未渲染');
+  must(zhNav.text.includes('交易'), `默认语言应为简体中文（顶栏实际 "${zhNav.text}"）`);
+  A.ok('默认导航文案(zh-CN)', zhNav.text);
+
+  // 打开设置面板（顶栏第一个 .theme-toggle-btn 即设置按钮）
+  const openSettings = async () => {
+    const r = await evalJs(`
+      const btn = document.querySelector('.theme-toggle-btn');
+      if (!btn) return { ok: false };
+      btn.click();
+      return { ok: true };
+    `);
+    return !!(r.ok && r.value && r.value.ok);
+  };
+  const clickLang = async (id) => {
+    const r = await evalJs(`
+      const btn = document.querySelector('[data-testid="lang-${id}"]');
+      if (!btn) return { ok: false };
+      btn.click();
+      return { ok: true };
+    `);
+    return !!(r.ok && r.value && r.value.ok);
+  };
+
+  must(await openSettings(), '未找到设置按钮（.theme-toggle-btn）');
+  await waitUntil(page(`return { ok: !!document.querySelector('[data-testid="lang-en"]') };`), 12000, 400);
+
+  // 可见性断言（防"DOM 里有、屏幕上没有/没遮罩"）：.modal 必须真的落在视口内，且**遮罩覆盖整屏**。
+  // 背景：.top-bar 带 backdrop-filter，会使其内部 position:fixed 的后代以顶栏为包含块 —— 弹窗曾因此
+  // 只有 72px 高的遮罩（无背景遮罩、点窗外不关闭、位置随顶栏漂移）。只查 DOM 存在是查不出来的。
+  const modalBox = await evalJs(`
+    const m = document.querySelector('.modal');
+    if (!m) return { ok: false };
+    const r = m.getBoundingClientRect();
+    const overlay = document.querySelector('.modal-overlay');
+    const or = overlay ? overlay.getBoundingClientRect() : null;
+    return {
+      ok: true,
+      top: Math.round(r.top), left: Math.round(r.left), width: Math.round(r.width), height: Math.round(r.height),
+      overlayHeight: or ? Math.round(or.height) : -1,
+      overlayWidth: or ? Math.round(or.width) : -1,
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth,
+      parentTag: overlay && overlay.parentElement ? overlay.parentElement.tagName : '',
+    };
+  `);
+  must(modalBox.ok, '设置弹窗未渲染（.modal 缺失）');
+  // 注意：evalJs 返回 {ok, value} 包装，字段在 .value 里（page() 才会自动解包）
+  const box = modalBox.value || {};
+  must(box.width > 200 && box.height > 150, `设置弹窗尺寸异常（${box.width}×${box.height}）`);
+  must(box.top >= 0 && box.top + box.height <= box.viewportHeight,
+    `设置弹窗超出视口（top=${box.top} height=${box.height} 视口=${box.viewportHeight} 遮罩高=${box.overlayHeight}）`);
+  must(box.overlayHeight >= box.viewportHeight - 4 && box.overlayWidth >= box.viewportWidth - 4,
+    `设置弹窗遮罩未覆盖整屏（遮罩 ${box.overlayWidth}×${box.overlayHeight}，视口 ${box.viewportWidth}×${box.viewportHeight}，父节点 ${box.parentTag}）`);
+  A.ok('设置弹窗位置/尺寸', `top=${box.top} ${box.width}×${box.height}；遮罩 ${box.overlayWidth}×${box.overlayHeight}（父 ${box.parentTag}）`);
+
+  must(await clickLang('en'), '语言按钮 lang-en 不可点');
+
+  // 关键断言：点击后**就地**生效（不刷新也要变），且落 localStorage
+  const en = await waitUntil(page(`
+    const nav = document.querySelector('.nav-links');
+    const title = document.querySelector('.modal-header h3');
+    const text = nav ? nav.innerText.replace(/\\s+/g, ' ').trim() : '';
+    return {
+      ok: text.includes('Trade') && !!title && title.innerText.includes('Settings'),
+      text,
+      title: title ? title.innerText.trim() : '',
+      stored: localStorage.getItem('sgp.lang'),
+    };
+  `), 15000, 400);
+  must(en.ok, `切到 English 后界面未就地更新（nav="${en && en.text}" title="${en && en.title}"）`);
+  must(en.stored === 'en', `localStorage 未持久化语言（sgp.lang=${en.stored}）`);
+  A.ok('切换后导航文案(en)', en.text);
+  A.ok('切换后面板标题(en)', en.title);
+  A.ok('localStorage sgp.lang', en.stored);
+  A.ok('语言切换截图', await shot('07-language-en.png'));
+
+  // 刷新后仍是 English（证明是持久化而不是内存态）
+  await cli(['reload'], { timeoutMs: 45000 });
+  const reloaded = await waitUntil(page(`
+    const nav = document.querySelector('.nav-links');
+    const text = nav ? nav.innerText.replace(/\\s+/g, ' ').trim() : '';
+    return { ok: text.includes('Trade'), text, stored: localStorage.getItem('sgp.lang') };
+  `), 25000, 500);
+  must(reloaded.ok, `刷新后语言未保持（nav="${reloaded && reloaded.text}"）`);
+  A.ok('刷新后导航文案', reloaded.text);
+
+  // 切回简体，避免污染后续运行与人工复看
+  must(await openSettings(), '复开设置按钮失败');
+  await waitUntil(page(`return { ok: !!document.querySelector('[data-testid="lang-zh-CN"]') };`), 12000, 400);
+  must(await clickLang('zh-CN'), '语言按钮 lang-zh-CN 不可点');
+  const back = await waitUntil(page(`
+    const nav = document.querySelector('.nav-links');
+    const text = nav ? nav.innerText.replace(/\\s+/g, ' ').trim() : '';
+    return { ok: text.includes('交易'), text, stored: localStorage.getItem('sgp.lang') };
+  `), 15000, 400);
+  must(back.ok, `切回简体失败（nav="${back && back.text}"）`);
+  A.ok('切回简体文案', back.text);
+  return {};
+}
+
 // ─────────────────────────── result.json 落盘与退出 ───────────────────────────
 
 function writeResult(exitCode, note) {  const summary = { PASS: 0, FAIL: 0, SKIP: 0 };
@@ -1153,6 +1261,7 @@ async function main() {
   await runChain(4, 'ranking', chainRanking);
   await runChain(5, 'season-enroll', chainSeason);
   await runChain(6, 'offline-shell', chainOfflineShell);
+  await runChain(7, 'language-switch', chainLanguageSwitch);
 
   const failed = state.chains.filter((c) => c.status === 'FAIL');
   clearTimeout(hardTimer);

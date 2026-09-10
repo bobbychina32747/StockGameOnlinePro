@@ -4,6 +4,29 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase G-1 i18n V1（基础设施 + 导航/设置面）
+
+### Added
+- **i18n 核心（零依赖，未引 i18next）**：`frontend/src/i18n/`
+  - `dict.zh-CN.ts` 为**唯一真源**（点分键），`dict.en.ts` / `dict.zh-Hant.ts` 以 `Record<I18nKey, string>` 声明 → **漏译 = 编译期报错**
+  - `index.ts`：`translate(lang, key, params)` 纯函数（`{name}` 占位替换、缺 key 返回 key 本身）、模块级语言 store（`getLang/setLang/subscribeLang`，`useSyncExternalStore` 驱动重渲染）、`useI18n()` / 非组件用 `t()`；语言持久化在 `localStorage: sgp.lang` 并同步 `<html lang>`；**默认恒为 zh-CN**（不跟随 navigator，避免只有两面抽取时界面中英混杂）
+  - `coverage.ts` + `i18n.test.ts` **覆盖面门禁**：已登记文件（`COVERED_FILES`）中①不允许残留任何硬编码中文（去注释后按字符扫描）②`t('key')` 用到的 key 必须存在于三份字典——i18n 最容易出的不是"翻错"而是"漏了"，这类漏检无法靠人工 review 拦住
+- **语言切换入口**：设置面板新增「语言」行（简体中文 / English / 繁體中文，endonym 显示），点击**就地生效**（不刷新）；本轮覆盖面 = 顶栏导航/状态区/按钮 + 设置面板全量文案（含周期名）
+
+### Fixed（本轮沿路发现并修复的真实 UI 缺陷）
+- **设置弹窗没有整屏遮罩、位置被顶栏牵着走（`SettingsModal`）**：`.top-bar` 带 `backdrop-filter`，按 CSS 规范它会成为其后代 `position: fixed` 的**包含块**，于是 `.modal-overlay` 的 `inset: 0` 只等于顶栏那一条（实测遮罩 **1440×72** 而非 1440×900）——没有背景遮罩、点窗外不关闭，弹窗纵向位置随顶栏高度漂移（内容变高时可能整块跑到视口上方看不见）。现在弹窗 `createPortal` 到 `document.body`（遮罩恢复 1440×900，父节点 BODY）
+  - 该缺陷此前**一直存在但未被任何测试发现**：E2E 旧断言只查 DOM 存在 + 文案，看不见"能点到但没遮罩/错位"。已把「弹窗必须完全落在视口内 **且**遮罩覆盖整屏」写成 E2E 永久断言（见链路 ⑦）
+
+### 验证
+- 前端 lint 0 error（93 警告）/ `tsc --noEmit` 0 error / **92/92 全绿**（77 → +15：`i18n.test.ts` 12 例 + `SettingsModal.test.tsx` 3 例）/ 生产构建（含 PWA 清单门禁）通过
+- **浏览器 E2E 7/7 PASS**（新增链路 ⑦ 语言切换）：默认简体 → 点 English 后顶栏 `Trade Ranking Profile` + 面板标题 `⚙️ Settings` **就地更新** → `sgp.lang=en` 落 localStorage → `reload` 后仍为英文 → 切回简体；并断言弹窗几何（`top=257 420×385；遮罩 1440×900（父 BODY）`）
+- 截图 `07-language-en.png` 经视觉复核：面板的确整屏居中可见且为英文（Settings / Language / Theme / Default interval / Voice alerts），确认 portal 修复前的"看不见"已消除
+
+### 待办（Phase G 续）
+- 覆盖面还差「交易 / 排行」两大面（`OrderPanel`/`ChartPanel`/`AccountPanel`/`StockDetailModal`/`Ranking`/`Dashboard` 等，中文量最大的是 ChartPanel 1063 字、OrderPanel 764 字）——按面逐批登记进 `COVERED_FILES`，门禁会逐批收紧
+- 字典自动化抽取（当前为手工抽取 + 门禁兜底）、i18n 覆盖面补齐后再评估是否按 `navigator.language` 自动选语言
+- 离线数据层（IndexedDB 快照 + 只读模式）与 v0.3.0 发布工程未动
+
 ## [Unreleased] - REFACTOR-5 加固批（Refactor-5：11 项 + 1 项集成期新发现）
 
 ### Fixed · 资金与结算语义（4 项）
