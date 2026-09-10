@@ -4,6 +4,19 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Refactor-1 反编译风格 TS 清理（零行为变更）
+
+### Changed
+- **后端 56 个源文件由"反编译产物风格"改写为地道 NestJS/TypeORM TypeScript**：删除 `__decorate/__metadata/__param` 帮派与底部装饰器应用块（改为真装饰器语法）、`import x_1 = require()` → ESM 具名导入、`let X = class X { [key: string]: any }` → `export class X` 并补齐全部显式字段声明；Phase A–F 的中文历史注记逐字保留。净变化 **+2376 / −3746 行**，`__decorate|require(|[key: string]: any` 在 `backend/src/**` 已 0 命中
+- **验证（7 层，全部实跑）**：`tsc --noEmit` 0 error ｜ build OK ｜ **后端 368/368 全绿** ｜ DI 启动冒烟通过 ｜ **API 形状等价 35/35**（重构前后各抓 35 个端点的状态码与响应结构逐一对齐）｜ 装饰器/元数据序列比对（唯一功能性差异即下方 DI 修正）｜ **浏览器 E2E 6/6 PASS** + 生产模式冒烟（`/api/prices` 200、`/api/docs` 404）
+
+### Fixed
+- **`MarketDataService` 的 DI 回归（重构过程中被元数据比对抓出）**：反编译版签名的 `design:paramtypes` 只有 4 项（第 5 参 `market` Nest 不解析 → 默认值 `'CN'`），真装饰器会补一项 `Object` 元数据，Nest 将其当令牌解析导致**启动失败**；现以 `@Optional() market = 'CN'` 保持原行为（解析不到 → `undefined` → 默认值生效）
+- 测试升级：`phase11` 的"实体源码含 seasonPoints 列"断言由**读源码文本**改为**读 TypeORM 列元数据**（更强、且不再受源码风格影响）
+
+### 取舍说明
+- 本次严格零行为变更：沿路发现的 **30 项既有缺陷**（含 5 项 P0 资金安全：卖出偿还融资权益虚增/对手单结算失败无回滚/AI 挂单成交无账本回调/分红 NaN 污染现金/基金申购舍入套利）**只登记不修改**，清单与复现算式见 `docs/REFACTOR-1-decompiled-cleanup.md` §5，并已进 tech-debt 台账
+
 ## [Unreleased] - Phase F 对手盘智能 + 工程精修
 
 ### Added
