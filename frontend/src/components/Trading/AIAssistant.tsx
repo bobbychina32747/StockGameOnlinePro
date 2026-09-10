@@ -39,7 +39,13 @@ export function AIAssistant() {
 
   const price = prices[selectedSymbol];
   const stock = stocks.find((s: any) => s.symbol === selectedSymbol);
-  const bars = (klines[selectedSymbol]?.['1min'] || []) as any[];
+  // 根因：`klines[sym]?.['1min'] || []` 每次渲染都新建数组，作为 advice 的依赖会让 useMemo 每次渲染都失效，
+  // 闭包里的 bars 与本次渲染的 klines 不同步。用 useMemo 把引用钉在 klines/selectedSymbol 上，
+  // 依赖只在 store 真正写入新 klines 对象时变化（store 的 setKlines/addTicks 都是不可变替换），不会自激循环。
+  const bars = useMemo(
+    () => ((klines[selectedSymbol]?.['1min'] || []) as any[]),
+    [klines, selectedSymbol],
+  );
 
   // 指标计算
   const advice = useMemo(() => {

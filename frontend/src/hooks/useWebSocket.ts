@@ -38,5 +38,8 @@ export function useWebSocket() {
     return () => {
       disconnectWebSocket();
     };
-  }, []);
+    // addTicks / addNotification 是 zustand `create` 初始化时一次性定义、永不重建的 action 引用，
+    // 选择器每次返回同一个函数指针，所以把它们放进依赖不会导致 effect 反复重订阅；
+    // 同时消除了"闭包里抓到旧 action 引用"的隐患（connectWebSocket/disconnectWebSocket 成对，重跑安全）。
+  }, [addTicks, addNotification]);
 }

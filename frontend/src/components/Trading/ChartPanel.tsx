@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactEChartsCore from 'echarts-for-react';
 import { useMarketStore, useUIStore } from '../../store';
 import { PriceText } from './PriceText';
@@ -53,6 +53,32 @@ function lodResample(bars: KlineData[], bucketSize: number): KlineData[] {
   return out;
 }
 
+// 复权只需要股票上的分红序列；stores 里 stocks 本身是宽松结构，这里只收紧本函数用到的字段
+export interface StockForAdjust {
+  adjustmentSeries?: { day: number; factor: number }[];
+  [key: string]: unknown;
+}
+
+// P1 复权（纯函数）：前复权（默认）/ 后复权 / 不复权 三档；P5 后复权 = 前复权价 ÷ 最新因子
+// 提到组件外是为了让组件内 useCallback/useMemo 能安全地把引用放进依赖数组（纯函数无闭包副作用）
+export function applyAdjustmentPure(bars: KlineData[], adjMode: 'none' | 'forward' | 'backward', stock: StockForAdjust | null | undefined): KlineData[] {
+  if (adjMode === 'none') return bars;
+  const series: { day: number; factor: number }[] = stock?.adjustmentSeries || [];
+  if (!series || series.length === 0) return bars;
+  const base = new Date(2024, 0, 1).getTime();
+  const fNow = series[series.length - 1].factor || 1;
+  return bars.map((b) => {
+    const day = Math.floor((new Date(b.time).getTime() - base) / 86400000);
+    let f = 1;
+    for (const s of series) {
+      if (s.day <= day) f = s.factor;
+      else break;
+    }
+    const mul = adjMode === 'backward' ? f / fNow : f;
+    return mul === 1 ? b : { ...b, open: b.open * mul, high: b.high * mul, low: b.low * mul, close: b.close * mul };
+  });
+}
+
 export function ChartPanel() {
   const klines = useMarketStore((s) => s.klines);
   const prices = useMarketStore((s) => s.prices);
@@ -67,28 +93,18 @@ export function ChartPanel() {
   const marketMode = useUIStore((s) => s.marketMode);
 
   const stock = stocks.find((s: any) => s.symbol === selectedSymbol);
-  // P1 复权：前复权（默认）/ 后复权 / 不复权 三档；P5 后复权 = 前复权价 ÷ 最新因子
+  // P1 复权：前复权（默认）/ 后复权 / 不复权 三档
   const [adjMode, setAdjMode] = useState<'none' | 'forward' | 'backward'>('forward');
-  const applyAdjustment = (bars: KlineData[]): KlineData[] => {
-    if (adjMode === 'none') return bars;
-    const series: { day: number; factor: number }[] = (stock as any)?.adjustmentSeries || [];
-    if (!series || series.length === 0) return bars;
-    const base = new Date(2024, 0, 1).getTime();
-    const fNow = series[series.length - 1].factor || 1;
-    return bars.map((b) => {
-      const day = Math.floor((new Date(b.time).getTime() - base) / 86400000);
-      let f = 1;
-      for (const s of series) {
-        if (s.day <= day) f = s.factor;
-        else break;
-      }
-      const mul = adjMode === 'backward' ? f / fNow : f;
-      return mul === 1 ? b : { ...b, open: b.open * mul, high: b.high * mul, low: b.low * mul, close: b.close * mul };
-    });
-  };
-  const klineData: KlineData[] = useMemo(() => applyAdjustment((klines[selectedSymbol]?.[selectedTimeframe] || []) as KlineData[]), [klines, selectedSymbol, selectedTimeframe, adjMode, stock]);
+  // 复权函数用 useCallback 固定引用并进入两个 K 线 useMemo 的依赖：
+  // 它只依赖 adjMode（用户点击切换）与 stock（随 stocks/symbol 变化），两者都由外部输入驱动，
+  // 不会在 effect/setState 链里被反向改写，所以依赖数组不会自激，也不会出现无限重算。
+  const applyAdjustment = useCallback(
+    (bars: KlineData[]): KlineData[] => applyAdjustmentPure(bars, adjMode, stock),
+    [adjMode, stock],
+  );
+  const klineData: KlineData[] = useMemo(() => applyAdjustment((klines[selectedSymbol]?.[selectedTimeframe] || []) as KlineData[]), [klines, selectedSymbol, selectedTimeframe, applyAdjustment]);
   // 分时图数据源：1min K 线
-  const intradaySrc: KlineData[] = useMemo(() => applyAdjustment((klines[selectedSymbol]?.['1min'] || []) as KlineData[]), [klines, selectedSymbol, adjMode, stock]);
+  const intradaySrc: KlineData[] = useMemo(() => applyAdjustment((klines[selectedSymbol]?.['1min'] || []) as KlineData[]), [klines, selectedSymbol, applyAdjustment]);
   const price = prices[selectedSymbol];
   const isIntraday = selectedTimeframe === 'intraday';
 

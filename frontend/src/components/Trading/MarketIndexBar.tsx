@@ -56,7 +56,11 @@ export function MarketIndexBar() {
     load();
     const timer = setInterval(load, 5000);
     return () => { alive = false; clearInterval(timer); };
-  }, []);
+    // marketMode 必须进依赖：load 闭包里按 marketMode 取 st.markets[marketMode]，
+    // 缺依赖时切市场（CN/HK/US）后会一直读切换前的市场状态 = 脏数据。
+    // 循环性：effect 只 setIndices/setHotTopics/setLocalRegime 等本地 state，绝不回写 marketMode，
+    // 因此依赖变化只由用户切换市场触发；marketMode 是 string，引用比较天然稳定。
+  }, [marketMode]);
 
   // 涨跌家数（S3，Q3 实时）
   const prices = useMarketStore((s) => s.prices);
