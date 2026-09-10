@@ -1,0 +1,7 @@
+﻿── Phase F 启动冒烟（SANDBOX_FAST + 临时库 8111，绝不触碰真实 103MB 库）──
+时间: 2026-09-10 17:38:06
+命令: SQLITE_PATH=<scratch>/smoke.db PORT=8111 SANDBOX_FAST=true TICK_INTERVAL_MS=1000 node dist/src/main.js
+GET /api/market/state → 200 gameDay=30 marketRegime=bull tickCount=7200
+GET /api/market/prices → 200 覆盖标的 68 个（CN+HK+US 三市场）
+GET /api/market/ai-opponents → 30 个对手盘；AI1.adaptive={"enabled":true,"regime":"bull","regimeLabel":"多头市","vol":"normal","volLabel":"常态波动","level":"normal","activityMul":0.95,"scaleMul":0.97}
+证据行: 三市场 AI 对手盘已按 Phase F 自适应逻辑运行 30 游戏日（warm-up 6 次重训），/market/state 暴露 regime，/market/ai-opponents 暴露聚合档位（activityMul/scaleMul/level/regime/vol）

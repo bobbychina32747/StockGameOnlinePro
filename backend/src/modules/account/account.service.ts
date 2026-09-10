@@ -37,6 +37,9 @@ import season_service_1 = require("../season/season.service");
 
 import risk_manager_service_1 = require("../../core/risk-manager/risk-manager.service");
 
+// Phase F: 流水「最近 N 笔」口径单一来源
+import perf_1 = require("../../core/risk-manager/perf");
+
 import trading_engine_service_1 = require("../../core/trading-engine/trading-engine.service");
 
 import constants_1 = require("../../common/constants");
@@ -103,12 +106,14 @@ let AccountService = class AccountService {
     }
     async getMetrics(userId, mode) {
         const account = await this.getAccount(userId, mode);
-        // P5 配对级绩效：取最近 500 笔流水（升序）做 FIFO 配对
-        const txs = await this.transactionRepo.find({
+        // P5 配对级绩效：最近 500 笔流水（升序）做 FIFO 配对
+        // Phase F 修复：原「升序 + take 500」在 SQLite 下取到的是最旧 500 笔（与注释/日终段位口径相反）
+        // → 统一走 perf.sliceRecentAsc（拉全量升序后截尾），与 settleAllAccounts 段位指标同口径
+        const allTxs = await this.transactionRepo.find({
             where: { accountId: account.id },
             order: { createdAt: 'ASC' },
-            take: 500,
         });
+        const txs = perf_1.sliceRecentAsc(allTxs);
         const metrics = await this.riskManager.calculateMetrics(account, txs);
         return { account, metrics };
     }

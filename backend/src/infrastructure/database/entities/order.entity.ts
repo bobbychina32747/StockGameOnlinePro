@@ -132,7 +132,10 @@ Order = __decorate(
 [
     (0, typeorm_1.Entity)('orders'),
     // Phase D: 账户维订单查询索引（getPendingOrders/账户重置查挂单/订单历史页）
-    (0, typeorm_1.Index)(['accountId', 'status'])
+    (0, typeorm_1.Index)(['accountId', 'status']),
+    // Phase F: 挂单扫描索引——checkPendingOrders 按 (status=PENDING, type IN [limit,stop,stop-limit]) 过滤，
+    // 原仅有 (accountId,status) 复合索引无法命中该等值+枚举查询（挂单量增长后全表扫）
+    (0, typeorm_1.Index)(['status', 'type'])
 ],
 Order
 );

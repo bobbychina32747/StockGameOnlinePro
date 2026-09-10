@@ -2,6 +2,16 @@
 // 输入：该账户全部交易流水（按时间升序，side ∈ buy/sell/short/cover，含 price/quantity/turnover）。
 // 口径：同一 symbol 内 FIFO 配对；多头 buy→sell，空头 short→cover；盈亏 = 卖出/平空成交额 - 买入/开空成本（按数量比例摊）。
 
+// Phase F: 统一「最近 N 笔（升序）」口径单一来源——UI metrics 与日终段位指标共用，
+// 避免 account.service(take 500 ASC 实为最旧 500) 与 settleAllAccounts(slice(-500)) 两套口径漂移。
+export const RECENT_TX_LIMIT = 500;
+
+export function sliceRecentAsc(txs, limit = RECENT_TX_LIMIT) {
+    const arr = Array.isArray(txs) ? txs : [];
+    const n = Number(limit) > 0 ? Number(limit) : RECENT_TX_LIMIT;
+    return arr.length > n ? arr.slice(-n) : arr;
+}
+
 export function pairedMetrics(txs) {
     const lots = new Map(); // symbol -> {long: [{qty, cost}], short: [{qty, proceeds}]}
     let wins = 0;

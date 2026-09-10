@@ -189,7 +189,7 @@ let RiskManagerService = class RiskManagerService {
                 byAcct.set(t.accountId, arr);
             }
             for (const [acid, arr] of byAcct) {
-                txsByAccount.set(acid, arr.length > 500 ? arr.slice(-500) : arr); // 最近 500 且保持升序
+                txsByAccount.set(acid, perf_1.sliceRecentAsc(arr)); // 最近 500 且保持升序（Phase F: 口径单一来源）
             }
         }
         catch (e) {

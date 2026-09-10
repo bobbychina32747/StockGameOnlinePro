@@ -1,0 +1,15 @@
+── Phase F-2 证据：orders(status,type) 复合索引（临时库副本，真实 103MB 库未被触碰）──
+样本：orders 共 30000 行（造量 +30000，其中 pending+limit 1200 行 = 4.0%）
+建索引前 orders 索引清单：sqlite_autoindex_orders_1,IDX_c8a1438c794694ab8a2b50c844
+
+[1] 未建 (status,type)：SCAN orders
+    平均耗时 2.191 ms/次（300 次采样）
+[2] 建 (status,type) 后：SEARCH orders USING INDEX IDX_orders_status_type (status=? AND type=?)
+    平均耗时 1.350 ms/次（300 次采样）
+
+结论（按实测计划字符串判定）：查询计划由 SCAN 变为 SEARCH（索引命中）；耗时 2.191 ms → 1.350 ms。
+注：索引是否被选中取决于 status 选择性与表规模；挂单占比高的极端盘面 SQLite 可能仍走全扫（此时全扫等价或更优），本索引面向"长尾挂单 + 大表"的真实形态。
+
+复现方式：`node docs/phaseF-plans/evidence/index-evidence.cjs`（脚本自动复制临时库副本到 E:\Files\.agent-work\sgp-iter，绝不触碰 backend/data/stockgame.db）
+被测查询（checkPendingOrders，trading-engine.service.ts）：
+  SELECT * FROM orders WHERE status='pending' AND type IN ('limit','stop','stop-limit') AND postClose=0

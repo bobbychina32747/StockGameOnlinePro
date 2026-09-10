@@ -1112,8 +1112,10 @@ let TradingEngineService = class TradingEngineService {
             order: { createdAt: 'DESC' },
         });
     }
-    async checkMarginLevel(account, prices) {
-        const positions = await this.positionRepo.find({ where: { accountId: account.id } });
+    async checkMarginLevel(account, prices, preloadedPositions) {
+        // Phase F: 支持调用方批量预载持仓（In 查询），避免逐账户 find 的 N+1；
+        // 缺省（undefined）时保持原逐账户查询语义，存量调用/测试零改动
+        const positions = preloadedPositions || await this.positionRepo.find({ where: { accountId: account.id } });
         // SECURITY: 冻结保证金属于用户资产，计入权益（避免误判过早强平）
         let totalEquity = Number(account.cash) + Number(account.shortCollateral || 0);
         // Phase B P1#9: 多仓负债按记账口径（account.borrowed，买入时按杠杆借入、卖出时偿还），不再由持仓市值推导
@@ -1344,9 +1346,33 @@ let TradingEngineService = class TradingEngineService {
             priceObj[sym] = price;
         }
         const liquidated = [];
-        for (const account of accounts) {
+        // ── Phase F 精修：无负债账户免估值（N+1 裁剪）──
+        // checkMarginLevel 的 totalBorrowed = borrowed + Σ 空头市值×折算率，三者皆 0 时恒返回 safe：
+        // 这些账户（绝大多数玩家）无需查持仓，直接跳过（marginUsed 一并纳入守卫，兼容 Phase B 前的存量口径）
+        const candidates = accounts.filter((a) => Number(a.borrowed || 0) > 0 || Number(a.shortCollateral || 0) > 0 || Number(a.marginUsed || 0) > 0);
+        // 候选账户持仓一次 In 预载（原每账户一次 find → 1 次查询）
+        const positionsByAccount = new Map();
+        if (candidates.length > 0) {
+            for (const a of candidates)
+                positionsByAccount.set(a.id, []);
             try {
-                const margin = await this.checkMarginLevel(account, priceObj);
+                const rows = await this.positionRepo.find({ where: { accountId: (0, typeorm_2.In)(candidates.map((a) => a.id)) } });
+                for (const p of rows) {
+                    const arr = positionsByAccount.get(p.accountId);
+                    if (arr)
+                        arr.push(p);
+                }
+            }
+            catch (e) {
+                // 预载失败退回逐账户查询（clear 让 checkMarginLevel 走原路径），风控绝不因查询优化漏检
+                positionsByAccount.clear();
+                this.logger.warn('强平持仓预载失败，退回逐账户查询: ' + (e && e.message ? e.message : e));
+            }
+        }
+        for (const account of candidates) {
+            try {
+                const preloaded = positionsByAccount.has(account.id) ? positionsByAccount.get(account.id) : undefined;
+                const margin = await this.checkMarginLevel(account, priceObj, preloaded);
                 if (margin.action === 'liquidate') {
                     await this.forceLiquidate(account);
                     liquidated.push({ accountId: account.id, marginLevel: Number(margin.marginLevel.toFixed(4)) });
