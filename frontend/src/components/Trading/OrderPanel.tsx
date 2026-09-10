@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { tradingApi } from '../../services/api.client';
+import { newClientOrderId, shouldKeepClientOrderId } from '../../services/orderIdempotency';
 import { useAccountStore, useMarketStore, useUIStore } from '../../store';
 import { CollapsibleCard } from './CollapsibleCard';
 import { auctionStageFor, isTradingTimeFor, sessionLabel } from '../../utils/marketSessions';
@@ -46,6 +47,9 @@ export function OrderPanel() {
   const [orderSubmitting, setOrderSubmitting] = useState(false);
   const account = useAccountStore((s) => s.account);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  // REFACTOR-5 E：下单幂等键。仅当上一次提交是"网络失败（结果未知）"时才保留并复用，
+  // 其余情况（成功/业务拒绝）在结算处清空，下一次提交自然生成新 id。
+  const clientOrderIdRef = useRef<string | null>(null);
 
   const loadOrders = useCallback(async () => {
     try {
@@ -118,6 +122,9 @@ export function OrderPanel() {
       }
     }
     setOrderSubmitting(true);
+    // 幂等键：首次提交生成，网络失败后重试沿用同一个（服务端据此去重，避免重复下单）
+    if (!clientOrderIdRef.current) clientOrderIdRef.current = newClientOrderId();
+    const clientOrderId = clientOrderIdRef.current;
     try {
       // Phase B: 盘后窗口内强制限价 + 价格=收盘价（服务端二次校验，此处锁定输入口径）
       const effType = inPostClose ? 'limit' : orderType;
@@ -130,8 +137,11 @@ export function OrderPanel() {
         price: effOrderPrice,
         triggerPrice: orderTriggerPrice ? parseFloat(orderTriggerPrice) : undefined,
         displayQty: orderType === 'iceberg' ? parseInt(orderDisplayQty) : undefined,
+        clientOrderId,
       });
       if (result.success) {
+        // 成功：本次链路已终结，换新 id，避免"下一笔单"被服务端当成上一笔的重复
+        clientOrderIdRef.current = null;
         const filledQty = result.fill?.quantity;
         if (filledQty != null && filledQty < orderQty) {
           addNotification(`⚠️ 部分成交: ${selectedSymbol} ${orderSide} 仅成交 ${filledQty}/${orderQty}股`, 'info');
@@ -141,9 +151,16 @@ export function OrderPanel() {
         fetchAccount(mode);
         loadOrders();
       } else {
+        // 业务拒绝（success:false）：服务端明确没受理，订单不存在 → 换新 id，
+        // 否则用户改对参数后再提交会被旧 id 误判为重复，静默返回上一笔失败订单
+        clientOrderIdRef.current = null;
         addNotification(`下单失败: ${result.error}`, 'error');
       }
     } catch (error) {
+      // 网络类失败（超时/断网/5xx）：请求可能已到达服务端并成交，只是结果未知 → 保留 id，
+      // 用户再点提交即复用同一 id 被服务端去重返回既有订单，这是防重复下单的关键路径；
+      // 4xx 校验错误等业务拒绝则明确未受理 → 换新 id。
+      if (!shouldKeepClientOrderId(error)) clientOrderIdRef.current = null;
       const axiosErr = error as { response?: { data?: { message?: string } } };
       addNotification(`下单失败: ${axiosErr?.response?.data?.message || '网络错误'}`, 'error');
     } finally {

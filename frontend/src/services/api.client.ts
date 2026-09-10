@@ -75,6 +75,8 @@ export const accountApi = {
 export const tradingApi = {
   placeOrder: (mode: string, data: {
     symbol: string; type: string; side: string; quantity: number; price?: number; triggerPrice?: number; displayQty?: number;
+    // REFACTOR-5 E：可选幂等键（同账户同 id 重复提交 → 服务端返回既有订单 + duplicate:true）
+    clientOrderId?: string;
   }) => api.post(`/trading/order?mode=${mode}`, data).then((r) => r.data),
   cancelOrder: (mode: string, id: string) =>
     api.delete(`/trading/order/${id}?mode=${mode}`).then((r) => r.data),
