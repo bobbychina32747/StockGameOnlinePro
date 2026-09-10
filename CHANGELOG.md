@@ -4,6 +4,43 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase F 对手盘智能 + 工程精修
+
+### Added
+- **AI 对手盘在线自适应（REALISM #20 收官，团队评审 C1-C16/R1-R13 定稿）**：10 个具名对手盘在保留人设的同时按自身战绩与市场状态调参——
+  - 绩效反馈（`perfScoreOf`/`applyPerfFeedback`）：近窗口收益(±5% 打满, 权重 0.55) + 胜率(50%±25pt, 0.15) − 窗口回撤(12% 扣满, 0.30) → 分位 s ∈ [-1,1]；**单调性钉死「表现差 → 更保守」**（活跃/规模/止盈/羊群下调、止损收紧；s=0 恰好回默认，稳态无偏置）
+  - 状态系数（`regimeCoef`/`volBucketOf`）：复用行情引擎既有 `marketRegime`(bull/bear/sideways) + 波动档(低/常态/高，由当 tick features 聚合)；**高波动档禁止任何更激进系数（activity/scale/tp/herd/hot 复合后一律 ≤1），止损只放宽不收紧（slK ≥ 1）**，高波动档追热点概率封顶 0.5
+  - 本地 RF 在线学习（`treeVotes`/`rfScoreWeighted`/`adaptTreeWeights`）：每 5 游戏日按各树"决策方向命中率"重加权（带 [0.5,1.5]、样本门槛 60、树结构/阈值/叶值冻结）；**权重为 null / 全 1 时与 Phase E 的 `rfScore` 严格相等（零回归）**
+  - 节奏与成本：全部在日终 `markAiEquityDaily` 内完成（O(10×8)），tick 路径零新增开销、每日仅一条 debug 日志；参数/绩效/树权重**全内存**（冷启原子复位为默认值）
+  - 确定性与可回滚：8 处 `Math.random` 直调全部替换为 `agentRng(gameDay, tick, agentId, salt)` 种子随机（同盘面必然重放同一决策序列；noise 分支由两次随机数改一次，修复可复现性）；新增 `AI_ADAPTIVE_ENABLED` 应急开关（false → 参数回默认 + 系数全 1 + 树权重 null）
+  - 风控红线：现金/持仓/挂单预算账本闸门保持硬约束、不参与参数化（买单恒 ≤ `floor(cash×0.8/price)`）；自适应只调行为倾向
+- **`GET /market/ai-opponents` 新增 `adaptive` 聚合字段**（`enabled/regime/regimeLabel/level/activityMul/scaleMul`）——只给档位不给裸参数（防玩家反推套利）；前端 AI 助手面板显示「⚡激进 / ➖稳健 / 🛡收缩」档位标签 + 市场状态（一句话可解释）
+- 新增测试 `phase12-ai-adaptive.test.js` 25 例（默认值=现状/钳制带/单调性/平滑漂移包络/regime×波动复合/RF 零回归/树权重门槛/种子确定性/20 游戏日长跑不变量/冷启复位/开关回滚/API 可见面）
+- **E2E 冒烟脚本入仓（团队 C12）**：新增 `tests/e2e/smoke.mjs`（纯 Node 内置模块，零依赖）——
+  - 6 条主链路：① 登录/注册（注册重名走 Phase E 的 200+`success:false` 语义回退登录）② 下单（购买力/持仓校验 + 后端 `GET /trading/orders/pending` 对账）③ 撤单 ④ 排行榜 ⑤ 赛季报名（区域缺失记 SKIP）⑥ **断线 → 横幅出现 → reload 后外壳非白屏**（`.ws-offline-tip` 文案断言）
+  - 可选门禁：不进 CI 强依赖；`--strict` 时 SKIP 也返回 1；`--clean` 清理 7 天前产物；`--timeout=` 可调总超时
+  - 安全红线：后端强制临时 SQLite（`%TEMP%\sgp-e2e-<pid>.db`）+ `SANDBOX_FAST=true`，**绝不触碰 `backend/data/stockgame.db`**（`result.json` 落 `realDbTouched:false` 声明）；退出（含异常/信号）杀净自己起的子进程并删临时库
+  - 端口不写死：后端/preview/网关自动挑空闲端口；preview 的 `/api` 代理 target 固定 8000，端口不同源时脚本起同源内置网关（`/api` + `/socket.io`）兜底
+  - 产物：`tests/e2e/artifacts/<runId>/`（`NN-<name>.png` 截图 + `result.json` + 各子进程日志），目录已 gitignore；**实测一轮 6 条链路全 PASS（exit 0）**
+- **PWA 构建期 precache manifest（销 P2 债 #4，团队 C13/C14 定稿）**：新增 `frontend/scripts/build-sw.mjs`（零依赖，只用 node:fs/path/crypto）在 `vite build` 后扫描 dist 真实产物（`/assets/*.js|css` + 图标 + manifest + 壳）注入 `public/sw.js` 模板 → 产出 `dist/sw.js`；
+  - 体积红线：单文件 >2MB **显式跳过并打日志**（禁止静默）、清单总量 >3MB **构建失败**、打印总字节与最大单文件
+  - 缓存名 `VERSION = ${pkg.version}-${sha256(清单文件内容).slice(0,8)}`（同内容同缓存名、改内容必换名，配合既有 activate 清旧壳）
+  - 新增 `frontend/scripts/check-sw-manifest.mjs` 双向差集门禁并串进 build（`tsc -b && vite build && build-sw && check-sw`）：① index.html 引用的每个 `/assets/*` 必须在清单内 ② 清单每项必须在 dist 存在 ③ 清单不得含 `/api/` 路径 ④ VERSION 含 8 位内容哈希
+  - 新增 `frontend/src/pwa/precache-manifest.test.ts` 5 例（`dist` 缺失自动 skip，适配 jest 早于 vite build 的执行序）；负向验证实跑：缺项/幽灵项/超限三类样例均非零退出
+  - 实测清单：9 项 / 1.41MB（echarts 1.01MB 为最大单文件，未触发 2MB 跳过线）
+
+### Changed
+- **强平候选裁剪（销 P2 债）**：`forceLiquidateMarginalAccounts` 先按 `borrowed/shortCollateral/marginUsed` 过滤无负债账户（零负债账户恒 safe，无需查持仓），候选账户持仓一次 `In` 批量预载，`checkMarginLevel` 新增可选第 3 参（缺省走原查询，存量调用零影响）；预载失败自动降级逐账户查询（风控不漏检）；配套"优化前后判定输入等价"断言
+- **挂单扫描索引（销 P2 债）**：`orders` 新增 `(status, type)` 复合索引（`checkPendingOrders` 的等值+枚举过滤）；实测证据（3 万行、4% 挂单）查询计划 `SCAN orders` → `SEARCH ... USING INDEX IDX_orders_status_type`，2.191ms → 1.350ms（见 `docs/phaseF-plans/evidence/orders-status-type-index.txt`）
+- **流水「最近 500 笔」口径单一来源（销 P2 债）**：新增 `perf.sliceRecentAsc`；修复 `account.service.getMetrics` 原「`order: ASC` + `take: 500`」在 SQLite 下实取**最旧** 500 笔（与注释/日终段位口径相反）→ 统一为最近 500 笔升序（`/account/metrics` 配对绩效口径与段位一致）
+
+### 取舍说明
+- AI 自适应状态不落库（重启按默认参数复位）：换取确定性可测与零迁移成本，登记 tech-debt（触发条件=玩家要求 AI 成长档案延续）- 绩效反馈未做横截面去均值（R7）：本 Phase 记为长跑观察项 + tech-debt（抑制 bull 期全体 AI 顺周期加码）
+- 胜率项取"终身胜率 + 权重降至 0.15"方案（R9 二选一），窗口胜率口径登记 tech-debt
+- 树权重重加权无时间衰减（R8 采纳"门槛 60"方案），登记 tech-debt
+- 强平候选守卫未单独做"裸空头"体检查询（`shortQty>0` 且三项负债全 0 的存量脏数据；正常路径空头必有 `shortCollateral`），登记 tech-debt
+- E2E 过程中实测到的三条产品/环境事实（未改码，写入 `tests/e2e/README.md` 与本文档备查）：① `vite preview` 默认只绑 `::1`，手工验收写 `http://127.0.0.1:<port>` 会 ECONNREFUSED（脚本已用 `--host 127.0.0.1` 规避）；② 休市时段下单默认被禁用，需管理员开启"全服休市交易"（脚本自动开启）；③ 撤单链路的挂单价需挂在涨跌停带内离现价更远的一侧，否则会被立即成交导致无单可撤
+
 ## [Unreleased] - Phase E 竞技化：模拟大赛 V2 + 债务清理
 
 ### Changed

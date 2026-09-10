@@ -108,14 +108,14 @@ npm run dev
 ### 开发与质量门禁
 
 ```bash
-# 后端：类型构建 + 单元测试（322 例）+ 数据库迁移校验（sql.js → better-sqlite3，已完成）
+# 后端：类型构建 + 单元测试（368 例）+ 数据库迁移校验（sql.js → better-sqlite3，已完成）
 cd backend
 npm run build && npm test -- --runInBand
 npm run db:migrate          # 备份 + integrity_check + 逐表行数核对 + 切换 WAL
 
-# 前端：lint + 类型检查 + 单元测试（Jest + Testing Library）
+# 前端：lint + 类型检查 + 单元测试（Jest + Testing Library，59 例）+ 生产构建（含 PWA 预缓存清单门禁）
 cd frontend
-npm run lint && npx tsc -b && npm test -- --runInBand
+npm run lint && npx tsc -b && npm test -- --runInBand && npm run build
 ```
 
 - **CI**：push/PR 自动触发 `.github/workflows/ci.yml`（后端构建/测试/启动冒烟 + 前端 lint/tsc/jest/vite build）
@@ -212,13 +212,16 @@ docs/
 - [x] 盘后固定价格交易：A股 15:00-15:30 以收盘价申报撮合（REALISM #3 最后一环）
 - [x] 指数权重动态化：自由流通市值加权 + 新股纳入指数（REALISM #12）
 - [x] 基金/ETF 费率模型：申购/赎回费、ETF 免印花税、分级佣金（REALISM #17）
-- [ ] 融券展期 + 券息按日结算（REALISM #15 最后一环）
+- [~] 融券展期（REALISM #15）：**明确裁剪不做**——已隐式展期（无固定期限）+ 日终利息含券息，见 [docs/PHASE-ROADMAP.md](docs/PHASE-ROADMAP.md) 不做清单
 - [x] 红利税按持有期分档：CN 二档 / HK / US 分市场税率（REALISM #19 除权日细节）
 - [x] 复盘系统数据驱动：教训卡/成就/段位基于真实绩效与交易行为（REALISM #25）
+- [x] AI 对手盘在线自适应：按自身战绩 + 市场状态调参（REALISM #20 收官，Phase F）
 
 **体验与生态**
 - [x] 移动端 PWA 打包（离线可用、添加到主屏）
-- [ ] 模拟大赛深化：多人同场 / 周赛赛季
+- [x] PWA 构建期预缓存清单（发版后半白屏窗口收口 + 体积红线门禁，Phase F）
+- [x] 模拟大赛深化：周赛/月赛/双周赛、赛季积分榜、战绩档案（Phase E）
+- [x] 浏览器级 E2E 冒烟脚本（登录→下单→撤单→排行→断线壳，可选门禁，Phase F）
 - [ ] 多语言（EN / 繁中）
 
 ### 🎯 真实性差距与路线图

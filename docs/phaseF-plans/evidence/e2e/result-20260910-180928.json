@@ -1,0 +1,280 @@
+{
+  "runId": "20260910-180928",
+  "phase": "F-4 浏览器级 E2E 冒烟（可选门禁）",
+  "startedAt": "2026-09-10T10:09:28.366Z",
+  "finishedAt": "2026-09-10T10:11:46.703Z",
+  "durationMs": 138337,
+  "strict": false,
+  "skippedAtSetup": null,
+  "note": "全部通过",
+  "env": {
+    "frontendUrl": "http://127.0.0.1:62789",
+    "backendPort": 62671,
+    "previewPort": 62786,
+    "gatewayPort": 62789,
+    "previewProxiedApi": false,
+    "tempSqlite": "C:\\Users\\lenovo\\AppData\\Local\\Temp\\sgp-e2e-9968.db",
+    "realDbTouched": false,
+    "tickIntervalMs": 1000,
+    "sandboxFast": true,
+    "testUser": "e2e_mtvd93u2",
+    "nodeVersion": "v24.18.0",
+    "platform": "win32 10.0.26200"
+  },
+  "summary": {
+    "PASS": 6,
+    "FAIL": 0,
+    "SKIP": 0
+  },
+  "exitCode": 0,
+  "chains": [
+    {
+      "index": 1,
+      "name": "auth-login",
+      "status": "PASS",
+      "durationMs": 24932,
+      "screenshot": "01-auth-login.png",
+      "skipReason": null,
+      "error": null,
+      "assertions": [
+        {
+          "label": "登录页表单可见",
+          "ok": true,
+          "value": true
+        },
+        {
+          "label": "切换到注册态按钮文案",
+          "ok": true,
+          "value": "注册"
+        },
+        {
+          "label": "注册后进入主界面（.app-layout + .dashboard）",
+          "ok": true,
+          "value": true
+        },
+        {
+          "label": "主界面首屏文案",
+          "ok": true,
+          "value": "📈 StockSim Pro\n交易\n排行榜\n个人中心\n⏩ 高速回放（1秒=1分钟）\n688001 芯澜: 40.86\n"
+        },
+        {
+          "label": "重名注册错误文案（Phase E 200+success:false）",
+          "ok": true,
+          "value": "注册失败，请更换用户名"
+        },
+        {
+          "label": "重名后仍停留登录页（未误跳转）",
+          "ok": true,
+          "value": true
+        },
+        {
+          "label": "转登录后顶栏用户名",
+          "ok": true,
+          "value": "e2e_mtvd93u2"
+        },
+        {
+          "label": "转登录进入主界面",
+          "ok": true,
+          "value": true
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "name": "place-order",
+      "status": "PASS",
+      "durationMs": 22930,
+      "screenshot": "02-place-order.png",
+      "skipReason": null,
+      "error": null,
+      "assertions": [
+        {
+          "label": "确认下单按钮可用（休市解锁生效）",
+          "ok": true,
+          "value": "确认下单"
+        },
+        {
+          "label": "下单标的",
+          "ok": true,
+          "value": "T1"
+        },
+        {
+          "label": "下单现价",
+          "ok": true,
+          "value": 43.09
+        },
+        {
+          "label": "挂单类型/价格（远离现价以保证留存）",
+          "ok": true,
+          "value": "stop-limit @ 43.86（触发价 43.86）"
+        },
+        {
+          "label": "选股后下单面板标的",
+          "ok": true,
+          "value": "📝 下单 (T1)▾"
+        },
+        {
+          "label": "下单数量",
+          "ok": true,
+          "value": "100"
+        },
+        {
+          "label": "委托价写入",
+          "ok": true,
+          "value": "43.86"
+        },
+        {
+          "label": "成功提示文案",
+          "ok": true,
+          "value": "下单成功: T1 buy 100股"
+        },
+        {
+          "label": "pending 含该单",
+          "ok": true,
+          "value": {
+            "id": "16dcbc42-9a12-4bd4-ab32-4edea1dc7f9d",
+            "symbol": "T1",
+            "side": "buy",
+            "quantity": 100,
+            "price": 43.86,
+            "status": "pending"
+          }
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "name": "cancel-order",
+      "status": "PASS",
+      "durationMs": 12594,
+      "screenshot": "03-cancel-order.png",
+      "skipReason": null,
+      "error": null,
+      "assertions": [
+        {
+          "label": "挂单列表已空（UI）",
+          "ok": true,
+          "value": true
+        },
+        {
+          "label": "后端 pending 条数",
+          "ok": true,
+          "value": 0
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "name": "ranking",
+      "status": "PASS",
+      "durationMs": 10071,
+      "screenshot": "04-ranking.png",
+      "skipReason": null,
+      "error": null,
+      "assertions": [
+        {
+          "label": "排行榜 tab 文案",
+          "ok": true,
+          "value": "🏆 赛季榜 / 🌐 全服榜"
+        },
+        {
+          "label": "存在赛季榜/全服榜切换",
+          "ok": true,
+          "value": true
+        },
+        {
+          "label": "全服榜视图 tab 文案",
+          "ok": true,
+          "value": "🏆 赛季榜 / 🌐 全服榜 / 🏆 跨服总榜 / 🇨🇳 A股服 / 🇭🇰 港股服 / 🇺🇸 美股服 / 总收益 / 今日 / 总资产"
+        },
+        {
+          "label": "存在排序切换",
+          "ok": true,
+          "value": true
+        },
+        {
+          "label": "全服排行有效行数",
+          "ok": true,
+          "value": 6
+        },
+        {
+          "label": "首行内容",
+          "ok": true,
+          "value": "🥇e2******* 🥉¥100,000.00+0.00%"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "name": "season-enroll",
+      "status": "PASS",
+      "durationMs": 9004,
+      "screenshot": "05-season-enroll.png",
+      "skipReason": null,
+      "error": null,
+      "assertions": [
+        {
+          "label": "赛季报名区存在",
+          "ok": true,
+          "value": true
+        },
+        {
+          "label": "赛季标题/状态文案",
+          "ok": true,
+          "value": "🏆 第 1 赛季双周赛 · 10 游戏日报名中 · 首位报名者开赛"
+        },
+        {
+          "label": "报名结果提示",
+          "ok": true,
+          "value": "🏆 报名成功！第 1 赛季 已开赛"
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "name": "offline-shell",
+      "status": "PASS",
+      "durationMs": 15149,
+      "screenshot": "06-offline-shell.png",
+      "skipReason": null,
+      "error": null,
+      "assertions": [
+        {
+          "label": "__wsSocket 已连接",
+          "ok": true,
+          "value": true
+        },
+        {
+          "label": "离线横幅文案",
+          "ok": true,
+          "value": "⚠️ 实时行情连接已断开，正在通过轮询获取数据..."
+        },
+        {
+          "label": "离线横幅截图",
+          "ok": true,
+          "value": "06-offline-banner.png"
+        },
+        {
+          "label": "#root 可见 DOM 节点数",
+          "ok": true,
+          "value": 586
+        },
+        {
+          "label": "#root 高度(px)",
+          "ok": true,
+          "value": 900
+        },
+        {
+          "label": "#root 首屏文案",
+          "ok": true,
+          "value": "📈 StockSim Pro 交易 排行榜 个人中心 ⏩ 高速回放（1秒=1分钟） 688001 芯澜: 43.87 600809 杏花: 175.51 30"
+        },
+        {
+          "label": "reload 后外壳非白屏",
+          "ok": true,
+          "value": true
+        }
+      ]
+    }
+  ]
+}

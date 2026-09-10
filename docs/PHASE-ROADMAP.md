@@ -3,6 +3,12 @@
 > 基线：Phase A–D 已全量推送 origin/main（后端 304 例、前端 52 例全绿，双路启动冒烟 + 索引落库实测通过）。
 > 本文档用途：下一批迭代（Phase E 起）的范围决策与验收依据。由主 agent 汇总（评估证据来自各 Phase CHANGELOG/commit/tech-debt 台账/docs 方案）。
 
+> **Phase E 已交付**（2026-09-08，backend 327 / frontend 52 全绿）。
+> **Phase F 已交付**（2026-09-10，backend 368 / frontend 见 CI 结果）：AI 对手盘在线自适应（REALISM #20 收官，团队评审 C1-C16/R1-R13 定稿）、
+> 强平候选裁剪 + `orders(status,type)` 索引（实测 SCAN→SEARCH，2.19ms→1.35ms，见 `docs/phaseF-plans/evidence/`）+ `sliceRecentAsc` 口径统一、
+> PWA 构建期 precache manifest（双向差集门禁 + 体积红线）、E2E 冒烟脚本入仓（可选门禁）。
+> 方案与裁决存档：`docs/phaseF-plans/01-ai-adaptive-risk-pwa-e2e.md`。下一批：Phase G（多语言 + 离线数据层 + v0.3.0 发布）。
+
 ---
 
 ## 一、截至 Phase D 的交付评估
