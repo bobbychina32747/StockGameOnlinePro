@@ -23,7 +23,7 @@ import { RiskManagerService } from '../../core/risk-manager/risk-manager.service
 // Phase F: 流水「最近 N 笔」口径单一来源
 import { sliceRecentAsc } from '../../core/risk-manager/perf';
 import { TradingEngineService } from '../../core/trading-engine/trading-engine.service';
-import { FX_TRANSFER_FEE_RATE, RISK, getFxRates } from '../../common/constants';
+import { FX_CNY_PER_UNIT, FX_TRANSFER_FEE_RATE, RISK, getFxRates } from '../../common/constants';
 
 @Injectable()
 export class AccountService {
@@ -79,7 +79,9 @@ export class AccountService {
             return this.transactionRepo.find({
                 where: { accountId: acct.id },
                 order: { createdAt: 'DESC' },
-                take: Math.min(Number(limit) || 100, 300),
+                // SECURITY: 必须先钳下界再钳上界——原式 Math.min(Number(limit) || 100, 300) 对 limit=-1 得到 take=-1，
+                // 而 SQLite 的 LIMIT 负值等于「无上限」，可拉走该账户全部流水（越权读放大）；现统一落在 [1,300]，默认 100 不变
+                take: Math.min(Math.max(1, Number(limit) || 100), 300),
             });
         });
     }
@@ -128,7 +130,10 @@ export class AccountService {
             '机构': { cash: 500000, leverage: 2 },
             '日内交易者': { cash: 200000, leverage: 3 },
         };
-        const cfg = presets[preset];
+        // SECURITY: 必须按自有键判定——presets[preset] 会命中原型链上的函数（'constructor'/'__proto__'/'toString' 均 truthy），
+        // 绕过「未知的角色预设」校验后把 cash/leverage/totalEquity/peakEquity/initialEquity/dayStartEquity 写成 undefined
+        // 并清零 dailyPnl/totalPnl/marginUsed/shortCollateral/borrowed（已登录用户可自我损坏账户数据，P1）
+        const cfg = Object.prototype.hasOwnProperty.call(presets, preset) ? presets[preset] : null;
         if (!cfg)
             throw new BadRequestException('未知的角色预设');
         // Phase A: 大赛进行中（RESET_ENABLED=false）禁止重置，保证赛季公平
@@ -218,6 +223,13 @@ export class AccountService {
         }
         // P5 动态汇率：用实时汇率（行情引擎每日演化）而非固定基准
         const fx = getFxRates();
+        // SECURITY: 取汇率前先按市场白名单校验（FX_CNY_PER_UNIT 的自有键即 CN/HK/US）+ hasOwnProperty 双保险——
+        // 原实现直接 fx[fromMode] 会让 '__proto__'/'constructor'/'toString' 命中原型链上的 truthy 值，绕过「不支持的市场」校验
+        const isFxMarket = (m: string) => Object.prototype.hasOwnProperty.call(FX_CNY_PER_UNIT, m)
+            && Object.prototype.hasOwnProperty.call(fx, m);
+        if (!isFxMarket(fromMode) || !isFxMarket(toMode)) {
+            throw new BadRequestException('不支持的划转市场（仅支持 CN/HK/US）');
+        }
         const fromRate = fx[fromMode];
         const toRate = fx[toMode];
         if (!fromRate || !toRate) {

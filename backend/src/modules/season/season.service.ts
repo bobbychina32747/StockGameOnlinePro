@@ -15,6 +15,19 @@ import { MarketDataService } from '../../core/market-data/market-data.service';
 const SEASON_TYPE_CYCLE: SeasonType[] = [SeasonType.BIWEEKLY, SeasonType.MONTHLY, SeasonType.WEEKLY];
 const TYPE_DURATION_DAYS: Record<SeasonType, number> = { weekly: 5, biweekly: 10, monthly: 20 };
 
+// Phase 13 P2: 判定"唯一约束冲突"这一种可幂等化的插入失败（仅此一类才做重查兜底，其余错误照抛不吞）
+// better-sqlite3 → SQLITE_CONSTRAINT / SQLITE_CONSTRAINT_UNIQUE；postgres → 23505；mysql → ER_DUP_ENTRY(1062)
+function isUniqueViolation(err: any): boolean {
+    const e = (err && err.driverError) || err || {};
+    const code = String(e.code || e.errno || '');
+    const message = String(e.message || '');
+    return /SQLITE_CONSTRAINT/i.test(code)
+        || code === '23505'
+        || code === 'ER_DUP_ENTRY'
+        || code === '1062'
+        || /UNIQUE constraint failed|duplicate key value|Duplicate entry/i.test(message);
+}
+
 @Injectable()
 export class SeasonService {
     private readonly logger = new Logger(SeasonService.name);
@@ -48,15 +61,31 @@ export class SeasonService {
             const seq = (settled.length ? Number(settled[0].seq) : 0) + 1;
             // Phase E: type 轮换决定 durationDays（durationDays 列保留供读侧零改动）
             const type = SEASON_TYPE_CYCLE[(seq - 1) % SEASON_TYPE_CYCLE.length];
-            season = await this.seasonRepo.save(this.seasonRepo.create({
-                seq,
-                name: `第 ${seq} 赛季`,
-                status: SeasonStatus.ENROLLING,
-                anchorDay: '{}',
-                type,
-                durationDays: TYPE_DURATION_DAYS[type],
-            }));
-            this.logger.log(`🏆 新赛季开启: 第 ${seq} 赛季（${type}，${TYPE_DURATION_DAYS[type]} 游戏日）`);
+            try {
+                season = await this.seasonRepo.save(this.seasonRepo.create({
+                    seq,
+                    name: `第 ${seq} 赛季`,
+                    status: SeasonStatus.ENROLLING,
+                    anchorDay: '{}',
+                    type,
+                    durationDays: TYPE_DURATION_DAYS[type],
+                }));
+                this.logger.log(`🏆 新赛季开启: 第 ${seq} 赛季（${type}，${TYPE_DURATION_DAYS[type]} 游戏日）`);
+            }
+            catch (err) {
+                // P2 并发：两个请求同时判定"无 enrolling/running 赛季"→ 各自算出同一 seq 并插入，
+                // 后到者撞 @Unique(['seq']) 抛 DB 异常（对外 500）。唯一约束冲突即"对手已建好这一届"，
+                // 重查并返回已存在的那一届（幂等：并发双方拿到同一赛季对象）。
+                // 其它错误（DB 断连/锁超时/列缺失…）原样抛出，不用兜底掩盖真实故障
+                if (!isUniqueViolation(err))
+                    throw err;
+                season = await this.seasonRepo.findOne({
+                    where: [{ status: SeasonStatus.ENROLLING }, { status: SeasonStatus.RUNNING }],
+                }) || await this.seasonRepo.findOne({ where: { seq } });
+                if (!season)
+                    throw err; // 冲突却查不到（对手已把它结算掉等极端时序）→ 保留原始错误现场
+                this.logger.warn(`🏆 第 ${seq} 赛季并发创建冲突 → 复用已存在的赛季 ${season.id}`);
+            }
         }
         return season;
     }
@@ -170,6 +199,7 @@ export class SeasonService {
     }
 
     // 结算：active 报名固化 finalEquity/finalReturn/排名；前三 seasonPoints +300/200/100；幂等（RUNNING 才执行，串行锁防并发）
+    // Phase 13 P1: 发奖幂等改由持久化标记 entry.rewarded 承担（串行锁只覆盖进程内并发，覆盖不了中断重放），重放安全依据见 settleSeasonInner 内注释
     // Phase E: 奖励改记 seasonPoints（荣誉积分独立列）——tierScore 由 computeTier 每日覆盖为段位分，
     // 双语义冲突见 phaseE 方案 01；积分按用户计一次，账户层三市场同额累加仅为 V1 记账语义兼容
     rewardFor(rank: number) {
@@ -209,18 +239,31 @@ export class SeasonService {
         const ranking = [...byUser.values()]
             .map((r) => ({ userId: r.userId, ret: r.startSum > 0 ? (r.equitySum - r.startSum) / r.startSum : 0 }))
             .sort((a, b) => b.ret - a.ret);
-        // 前三 seasonPoints 奖励（荣誉体系，不印钱；与 V1 一致：该用户全部市场账户同额累加）
-        for (let i = 0; i < Math.min(3, ranking.length); i++) {
-            const reward = this.rewardFor(i + 1);
-            const accounts = await this.accountRepo.find({ where: { userId: ranking[i].userId } });
-            for (const account of accounts) {
-                account.seasonPoints = Number(account.seasonPoints || 0) + reward.points;
-                await this.accountRepo.save(account);
-            }
-        }
+        // P1 结算幂等（重放安全）：settleChain 只防进程内并发重入，不防"中断后重放"——旧实现把发奖放在
+        // "读 RUNNING 赛季"之后、"落 season.status=SETTLED"之前，中途抛错/进程重启会再次读到 RUNNING 并重复发分。
+        // 依据：entry.rewarded 与 finalRank/finalEquity 在同一次 save 落库，标记即"本届该用户已发分"的持久凭据，
+        // 重放时命中已标记 → 跳过发分（不重复）；未标记的 entry 照常发分（不丢发）。
+        // 这里整届读取全部 entries（而非仅 active）是为了覆盖"上一轮只落库了一部分 entry（status=settled, rewarded=true），
+        // 其余仍是 active"的半成品状态：只看 active 会把已发分的用户当新人再发一次。
+        const seasonEntries = await this.entryRepo.find({ where: { seasonId: season.id } });
+        const rewardedUsers = new Set(seasonEntries.filter((e) => e.rewarded).map((e) => e.userId));
         for (const e of entries) {
             const row = ranking.find((r) => r.userId === e.userId);
             e.finalRank = row ? ranking.indexOf(row) + 1 : null;
+            // 前三 seasonPoints 奖励（荣誉体系，不印钱；与 V1 一致：该用户全部市场账户同额累加，用户级每届只发一次）
+            if (e.finalRank !== null && e.finalRank <= 3) {
+                if (!rewardedUsers.has(e.userId)) {
+                    const reward = this.rewardFor(e.finalRank);
+                    const accounts = await this.accountRepo.find({ where: { userId: e.userId } });
+                    for (const account of accounts) {
+                        account.seasonPoints = Number(account.seasonPoints || 0) + reward.points;
+                        await this.accountRepo.save(account);
+                    }
+                    rewardedUsers.add(e.userId); // 同用户其余市场 entry（同一循环后续命中）不再二次发分
+                }
+                e.rewarded = true; // 幂等标记：与 finalRank 同一次 save 落库，重放时上一分支不再进入
+            }
+            // 同一实体一次 save：status/finalEquity/finalReturn/finalRank/rewarded 一起落库（无中间半状态）
             await this.entryRepo.save(e);
         }
         season.status = SeasonStatus.SETTLED;

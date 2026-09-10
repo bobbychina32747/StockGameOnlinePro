@@ -87,12 +87,22 @@ export class MarketGateway {
             return;
         }
         this.clients++;
+        // FIX(P1): 给「真正计过数」的连接打标记——认证失败分支在 return 前从不计数，
+        // 但 socket.io 对它们照样触发 handleDisconnect；无标记时自减会把合法连接一起扣掉
+        // （1 合法 + 1 坏 token 被拒 → clients 归 0，监控/日志失真）
+        if (!client.data)
+            client.data = {};
+        client.data.__counted = true;
         this.logger.log(`WS 客户端已连接: ${client.id} (在线: ${this.clients})`);
     }
 
     handleDisconnect(client: Socket) {
-        // 认证失败的连接未计入 clients，避免计数变负
-        this.clients = Math.max(0, this.clients - 1);
+        // FIX(P1): 只在「已计数」标记存在时自减并清除标记（防重复断连事件重复扣减）；
+        // 认证失败连接从未 ++，此处不得 --。Math.max(0, ...) 作为最后兜底保留。
+        if (client.data && client.data.__counted) {
+            client.data.__counted = false;
+            this.clients = Math.max(0, this.clients - 1);
+        }
         this.logger.log(`WS 客户端已断开: ${client.id} (在线: ${this.clients})`);
     }
 

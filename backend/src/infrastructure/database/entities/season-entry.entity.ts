@@ -42,6 +42,12 @@ export class SeasonEntry {
     @Column('int', { nullable: true })
     finalRank?: number;
 
+    // Phase 13 P1: 结算发奖幂等标记——旧实现"先发 seasonPoints、最后才落 season.status=SETTLED"，
+    // 中途抛错/进程重启会再次读到 RUNNING 并重复发分；该列随 synchronize 自动加列，
+    // 存量行 default false（视为未发奖，下次结算按正常规则补发一次）
+    @Column({ default: false })
+    rewarded: boolean;
+
     @CreateDateColumn()
     enrolledAt: Date;
 }

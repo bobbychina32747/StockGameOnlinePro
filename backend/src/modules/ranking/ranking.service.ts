@@ -83,7 +83,10 @@ export class RankingService {
         // sort: totalReturn(总收益) | dayReturn(今日) | equity(总资产)
         // SECURITY(F): limit 钳制到 1..50，非法值回退 20
         const n = Math.min(Math.max(Number(limit) || 20, 1), 50);
-        const key = sort === 'dayReturn' ? 'dayReturn' : sort === 'equity' ? 'equity' : 'totalReturn';
+        // FIX(P1 排序)：条目真实字段名是 totalEquity，旧代码取 'equity' → (b[key] ?? 0) - (a[key] ?? 0) 恒为 0，
+        // sort=equity 退化成 cache 原顺序（= 总收益率序）。本行 key 与真实字段对齐；dayReturn/totalReturn 分支不变。
+        // 稳定性：Array#sort 自 V8 7.0 起稳定 → 同值保持 cache 内原次序（cache 按 totalReturn 降序生成），与改前一致
+        const key = sort === 'dayReturn' ? 'dayReturn' : sort === 'equity' ? 'totalEquity' : 'totalReturn';
         const list = market && market !== 'ALL'
             ? this.cache.filter((e) => e.market === market)
             : this.cache;
@@ -92,6 +95,8 @@ export class RankingService {
             const chars = Array.from(name || '未知');
             return chars.length <= 2 ? chars.join('') : chars.slice(0, 2).join('') + '*'.repeat(chars.length - 2);
         };
+        // 注：rank 仍是 cache 生成时的总收益率位次（不随 sort 重算）→ 按 equity/dayReturn 排序时，
+        // 榜单先后与 rank 数字可能不一致（前端奖牌按 rank 渲染）；属既有语义，本次只修排序 key，rank 一致性问题另议
         return [...list]
             .sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0))
             .slice(0, n)
@@ -106,6 +111,8 @@ export class RankingService {
         }));
     }
 
+    // P3: 本方法返回内部缓存条目（含 userId 这类内部标识）。grep 确认当前无调用点（controller 只调 getRankings），
+    // 故保留方法不改签名；将来若被控制器直接返回，须先裁剪成公开字段（去掉 userId）再输出
     getUserRank(userId: string) {
         return this.cache.find((e) => e.userId === userId);
     }

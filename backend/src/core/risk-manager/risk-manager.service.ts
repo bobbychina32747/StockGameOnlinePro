@@ -32,10 +32,16 @@ export class RiskManagerService {
     async recordDailyEquity(account, day) {
         const history = this.equityHistory.get(account.id) || [];
         const prevEquity = history.length > 0 ? history[history.length - 1].equity : Number(account.initialEquity);
-        const dailyReturn = (Number(account.totalEquity) - prevEquity) / prevEquity;
+        const equity = Number(account.totalEquity);
+        // FIX(P1): prevEquity=0（initialEquity 未初始化/赛季重置）时原式算出 ±Infinity 或 NaN，
+        // 并被写进 equityHistory 与 daily_snapshots.dailyReturn，污染 VaR/sharpe → 除零口径记 0 收益
+        let dailyReturn = prevEquity > 0 ? (equity - prevEquity) / prevEquity : 0;
+        // FIX(P1): 落库前再兜一层有限性校验（prevEquity 来自历史样本时仍可能非有限），非有限一律记 0
+        if (!Number.isFinite(dailyReturn))
+            dailyReturn = 0;
         history.push({
             day,
-            equity: Number(account.totalEquity),
+            equity,
             return: dailyReturn,
         });
         if (history.length > 365)
@@ -100,7 +106,10 @@ export class RiskManagerService {
 
     async dailySettlement(account, day, preloadedPositions) {
         // SECURITY: 幂等保护——当日已结算的账户直接跳过（防出错重跑导致重复计息/重复快照）
-        if (Number(account.currentDay) === Number(day)) {
+        // FIX(P1): 原判等（===）只挡住「同一天」重放，用更早的 day 重放（day < currentDay）会击穿守卫：
+        // 重复计息、再写一条当日快照、currentDay 被回退、净值历史追加乱序样本 → 改为「当日或更晚已结算过就跳过」。
+        // 注意 currentDay 初值 0、首个结算日 day=1 时 0 >= 1 为假，首日结算照常执行。
+        if (Number(account.currentDay) >= Number(day)) {
             return account;
         }
         const positions = await this.getPositionsValue(account, preloadedPositions);
@@ -111,6 +120,13 @@ export class RiskManagerService {
             account.cash = Math.round((Number(account.cash) - interest) * 100) / 100;
         }
         account.totalEquity = Number(account.cash) + positions.holdValue + Number(account.shortCollateral || 0) - Number(account.borrowed || 0);
+        // FIX(P2): 净值非有限（脏数据/异常估值）时 Math.max(peak, NaN) 会得到 NaN 并污染 peakEquity；
+        // 记 error 并跳过本账户本次保存（不写快照、不回退 currentDay），peakEquity 等字段保持原值。
+        // 调用方（settleAllAccounts）用同一个 `!Number.isFinite(totalEquity)` 条件识别本分支，不再依赖临时属性。
+        if (!Number.isFinite(Number(account.totalEquity))) {
+            this.logger.error(`日终结算跳过 account=${account.id}：totalEquity 非有限值（${account.totalEquity}），peakEquity 等保持原值不落库`);
+            return account;
+        }
         // 复盘：单日大亏损 >10% → 生成教训卡
         if (Number(account.dayStartEquity) > 0) {
             const dayRet = (Number(account.totalEquity) - Number(account.dayStartEquity)) / Number(account.dayStartEquity);
@@ -169,6 +185,9 @@ export class RiskManagerService {
         // Phase D 批量 3：流水（1 次全局 ASC 拉取 + JS 分组截最近 500；
         // 不用 find({take})：better-sqlite3 下 take 生成全局 LIMIT，按 uuid 排序靠后账户会拿不满）
         const txsByAccount = new Map();
+        // FIX(P1): 预载成功与否必须显式记录——原实现失败后 map 为空，逐账户按「0 流水口径」算分
+        // （tier.ts 保底 23 分=白银），再 save 覆盖写库，一次瞬时 DB 抖动即把全体账户段位降级。
+        let txPreloadOk = true;
         try {
             const txRows = await this.txRepo.find({ order: { createdAt: 'ASC' } });
             const byAcct = new Map();
@@ -182,12 +201,20 @@ export class RiskManagerService {
             }
         }
         catch (e) {
-            this.logger.warn('日终批量预载流水失败，段位指标按 0 流水口径: ' + e.message);
+            txPreloadOk = false;
+            this.logger.error('日终批量预载流水失败，本日段位保持不变（流水预载失败），其余日终结算照常: ' + e.message);
         }
         for (const account of accounts) {
             try {
                 const posRows = positionsByAccount ? positionsByAccount.get(account.id) : undefined;
                 settled.push(await this.dailySettlement(account, day, posRows));
+                // FIX(P2): 权益非有限时 dailySettlement 已跳过保存，此处同理不得因段位再 save 一次（否则 NaN 权益仍回写）
+                if (!Number.isFinite(Number(account.totalEquity))) {
+                    continue;
+                }
+                // FIX(P1): 流水预载失败 → 不调用 computeTier、不因段位再 save 一次（段位保持上一次的值）
+                if (!txPreloadOk)
+                    continue;
                 // Phase D：数据驱动段位（收益/回撤/盈亏因子/胜率/活跃）
                 const metrics = this.buildTierMetrics(account, txsByAccount.get(account.id) || []);
                 this.computeTier(account, metrics);
