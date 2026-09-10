@@ -16,3 +16,6 @@ backend/data.bak/
 
 # 百度云盘上传残留
 *.baiduyun.uploading.cfg
+
+# E2E 冒烟产物（截图 / result.json / server.log，非源码；Phase F-4）
+tests/e2e/artifacts/
