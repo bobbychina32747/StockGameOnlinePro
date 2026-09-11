@@ -51,6 +51,12 @@ export class MarketService {
     private tickStartedAt = 0;
     private hungRecoveries = 0;
     private watchdogHandle: NodeJS.Timeout | null = null;
+    // G-5: 可观测性——分阶段耗时 / tick 心跳 / 慢阶段计数（"哪一步慢、哪一步卡"事后可查）
+    private stageTimings: Record<string, number> = {};
+    private lastTickMs = 0;
+    private lastTickCompletedAt = 0;
+    private slowStageCount = 0;
+    private completedTicks = 0;
     private lastTickAt = 0;
     private tickIntervalMs = 60000;
     // P1 开盘竞价：各市场最近一次竞价开盘价（dayOpen 基准合并用）+ 每市场当日竞价已执行标记
@@ -248,7 +254,7 @@ export class MarketService {
             // G-4: 细粒度阶段标签——看门狗报「卡在哪一步」时，粗粒度的 "CN" 不足以定位，
             // 这里把 tick 内每个可能长时间阻塞的 await 都标出来（行情生成/后处理/机器人/撮合/日初日终）
             this.tickStage = `${market}:generate`;
-            const ticks = await marketData.generateTick();
+            const ticks = await this.timeStage(`${market}:generate`, () => marketData.generateTick());
             if (ticks.length === 0) return;
             advanceCounter = true;
             const prices = {};
@@ -266,8 +272,8 @@ export class MarketService {
             // P5 性能：价格先广播，AI 对手盘/行业传导/做市商等重计算随后串行执行
             // （不阻塞 WebSocket 推送；仍在 tick 循环内 await，与下一 tick 不交叠）
             try {
-                this.tickStage = `${market}:postTick`; // G-4: AI 对手盘/做市商/行业传导
-                await marketData.postTickProcessing();
+                // G-4: AI 对手盘/做市商/行业传导
+                await this.timeStage(`${market}:postTick`, () => marketData.postTickProcessing());
             }
             catch (e) {
                 this.logger.warn(`[` + market + `] 行情后处理异常: ` + (e && e.message ? e.message : e));
@@ -306,11 +312,11 @@ export class MarketService {
             // 若其中某个 await 永不返回，串行递归的 tick 循环会永久停更（现象：进程活着、HTTP 正常、行情不动）。
             if (market === 'CN' && this.botPlayers) {
                 try {
-                    this.tickStage = `${market}:bots`; // G-4: 机器人真实下单链路（下单→撮合→结算→落库）
-                    const r = await withTimeout(
+                    // G-4: 机器人真实下单链路（下单→撮合→结算→落库）
+                    const r = await this.timeStage(`${market}:bots`, () => withTimeout(
                         this.botPlayers.runTick({ gameDay: marketData.gameDay, tick: marketData.tickCount, market }),
                         BOT_TICK_TIMEOUT_MS,
-                    );
+                    ));
                     if (r === TIMEOUT)
                         this.logger.warn(`[机器人] runTick 超过 ${BOT_TICK_TIMEOUT_MS}ms 未返回，本 tick 放弃机器人动作（行情继续）`);
                 }
@@ -318,8 +324,8 @@ export class MarketService {
                     this.logger.warn('[机器人] tick 执行异常: ' + (e && e.message ? e.message : e));
                 }
             }
-            this.tickStage = `${market}:checkPending`; // G-4: 挂单撮合 + 结算
-            const fills = await this.engine.checkPendingOrders();
+            // G-4: 挂单撮合 + 结算
+            const fills = await this.timeStage(`${market}:checkPending`, () => this.engine.checkPendingOrders());
             // Phase D: 广播前脱敏——剥离 counterFills 中对手方 accountId/orderId/mmId（全量广播泄露）
             fills.forEach((f) => { this.gateway.broadcastFill(market_utils_1.sanitizeFill(f)); });
             // 经济泡沫破灭广播
@@ -339,8 +345,7 @@ export class MarketService {
             }
             if (counter === 0) {
                 // 玩法：热点/IPO/黑天鹅（各市场独立）
-                this.tickStage = `${market}:dayStart`; // G-4
-                await marketData.startNewDay();
+                await this.timeStage(`${market}:dayStart`, () => marketData.startNewDay());
                 // P5 新股首日 ±44% 带宽（挂牌当日生效，次日自动恢复 ±10%）
                 try {
                     this.engine.setIpoFirstDays(marketData.getIpoFirstDaySymbols());
@@ -408,8 +413,8 @@ export class MarketService {
                 this.flushNewsQueue(market);
             }
             if (counter === 239) { // 日终结算
-                this.tickStage = `${market}:dayEnd`; // G-4: 日终（分红/利息/快照/强平，最重的一段）
-                await marketData.endOfDay();
+                // G-4: 日终（分红/利息/快照/强平，最重的一段）
+                await this.timeStage(`${market}:dayEnd`, () => marketData.endOfDay());
                 const day = marketData.gameDay;
                 // FIX(H1): 全局账户日终结算只执行一次（三市场同 tick 到达日终，避免重复扣息/记快照/强平）
                 if (market === 'CN') {
@@ -473,23 +478,31 @@ export class MarketService {
             this.processing = true;
             this.lastTickAt = Date.now();
             this.tickStartedAt = Date.now(); // G-4: 看门狗基准
+            const tickT0 = Date.now();
             try {
                 // P1: 全局不再统一门控，由 processMarket 按各市场独立时段判断
                 // 三服务器：轮流处理 CN/HK/US（各自独立 gameDay/因子/事件/时段）
-                this.tickStage = 'CN';
-                await this.processMarket('CN', this.marketData, 'tickCounter');
-                this.tickStage = 'HK';
-                await this.processMarket('HK', this.marketDataHK, 'tickCounterHK');
-                this.tickStage = 'US';
-                await this.processMarket('US', this.marketDataUS, 'tickCounterUS');
+                // G-5: 每个市场总耗时 + 内部子阶段耗时都记（见 stageTimings）
+                await this.timeStage('market:CN', () => this.processMarket('CN', this.marketData, 'tickCounter'));
+                await this.timeStage('market:HK', () => this.processMarket('HK', this.marketDataHK, 'tickCounterHK'));
+                await this.timeStage('market:US', () => this.processMarket('US', this.marketDataUS, 'tickCounterUS'));
                 // 全局价格聚合 → 风控/保证金
                 if (this.riskManager) {
-                    this.tickStage = 'riskManager';
-                    this.riskManager.setMarketPrices(this.allPrices);
+                    await this.timeStage('riskManager', () => { this.riskManager.setMarketPrices(this.allPrices); });
                 }
+                // G-5: 整轮耗时 + 心跳（含"落后于 tick 间隔"的早期预警）
+                this.lastTickMs = Date.now() - tickT0;
+                this.lastTickCompletedAt = Date.now();
+                this.completedTicks++;
+                if (this.lastTickMs > this.tickIntervalMs) {
+                    this.logger.warn(`[tick 落后] 本次 tick 用时 ${this.lastTickMs}ms > 间隔 ${this.tickIntervalMs}ms`
+                        + `（第 ${this.completedTicks} 次完成）——行情节奏已跟不上，查 tickHealth.stageTimings 定位慢阶段`);
+                }
+                this.logTickHeartbeat();
             }
             catch (e) {
-                this.logger.error('Tick处理异常', e);
+                // G-5: 异常必须带"卡在哪一步 + 已经跑了多久"，否则排障只能靠猜
+                this.logger.error(`Tick处理异常（阶段 ${this.tickStage}，已用时 ${Date.now() - tickT0}ms，第 ${this.completedTicks + 1} 次 tick）`, e);
             }
             finally {
                 this.tickStage = 'idle';
@@ -510,8 +523,11 @@ export class MarketService {
             if (stalledMs <= budget)
                 return;
             this.hungRecoveries++;
+            const missed = Math.max(1, Math.floor(stalledMs / Math.max(this.tickIntervalMs, 1)));
             this.logger.error(`[看门狗] 行情 tick 卡在「${this.tickStage}」已达 ${Math.round(stalledMs / 1000)}s`
-                + `（预算 ${Math.round(budget / 1000)}s，第 ${this.hungRecoveries} 次）→ 丢弃该 tick 并强制恢复调度`);
+                + `（预算 ${Math.round(budget / 1000)}s，第 ${this.hungRecoveries} 次，约丢掉 ${missed} 个 tick，`
+                + `上次完成 ${this.lastTickCompletedAt ? new Date(this.lastTickCompletedAt).toLocaleTimeString() : '—'}）`
+                + ` → 丢弃该 tick 并强制恢复调度；各阶段耗时见 /api/market/state 的 tickHealth.stageTimings`);
             this.tickStage = 'idle';
             this.processing = false;
             this.lastTickAt = Date.now();
@@ -525,13 +541,67 @@ export class MarketService {
     }
 
     // G-4: 只读诊断（供 /api/market/state 或运维查看：当前阶段 / 是否在处理 / 自愈次数）
+    // G-5: 扩充为"卡点 + 上次耗时 + 各阶段耗时 + 慢阶段计数"，出问题不必再靠猜
     getTickHealth() {
         return {
             stage: this.tickStage,
             processing: !!this.processing,
             sinceMs: this.processing ? Math.max(0, Date.now() - (this.tickStartedAt || 0)) : 0,
             hungRecoveries: this.hungRecoveries,
+            completedTicks: this.completedTicks,
+            lastTickMs: this.lastTickMs,
+            lastTickAt: this.lastTickCompletedAt ? new Date(this.lastTickCompletedAt).toISOString() : null,
+            slowStageCount: this.slowStageCount,
+            stageTimings: { ...this.stageTimings },
+            tickIntervalMs: this.tickIntervalMs,
         };
+    }
+
+    // G-5: 阶段计时包装——每个可能变慢/卡住的 await 都过这里，耗时自动进 stageTimings；
+    // 超过"慢阶段阈值"（tick 间隔的一半，且 ≥3s）就打 WARN：这是"行情越跑越慢"的早期预警，
+    // 早于看门狗的硬阈值（3×间隔）触发，便于在彻底停更前就发现问题。
+    private async timeStage<T>(stage: string, work: () => Promise<T> | T): Promise<T> {
+        const t0 = Date.now();
+        this.tickStage = stage;
+        try {
+            return await work();
+        }
+        finally {
+            this.recordStageTiming(stage, Date.now() - t0);
+        }
+    }
+
+    // 单独抽出来便于单测（也便于将来把耗时上报到外部监控）
+    recordStageTiming(stage: string, ms: number) {
+        this.stageTimings[stage] = Math.max(0, Math.round(ms));
+        const budget = Math.max(this.tickIntervalMs * 0.5, 3000);
+        if (ms > budget) {
+            this.slowStageCount++;
+            this.logger.warn(`[慢阶段] ${stage} 耗时 ${Math.round(ms)}ms（阈值 ${Math.round(budget)}ms，tick 间隔 ${this.tickIntervalMs}ms）`
+                + `——若持续变慢会拖垮行情节奏，可查 tickHealth.stageTimings`);
+        }
+    }
+
+    // G-5: tick 心跳——每 N 个 tick 一行汇总日志（默认 5，TICK_HEARTBEAT_EVERY=0 关闭）。
+    // 作用：行情正常时它只占极少量日志；卡死时"心跳停了"本身就是最直接的证据，
+    // 且最后一行心跳里的阶段耗时能说明此前是否已经在变慢。
+    logTickHeartbeat() {
+        const every = Number(process.env.TICK_HEARTBEAT_EVERY ?? 5);
+        if (!Number.isFinite(every) || every <= 0 || this.completedTicks % every !== 0)
+            return;
+        // 只列"有意义的"子阶段（≥ SUB_STAGE_LOG_MS）：60s 档下心跳每 5 tick 一行，
+        // 若把所有 0ms 阶段都打出来会刷屏且淹没有效信息；完整耗时可随时查 tickHealth.stageTimings
+        const SUB_STAGE_LOG_MS = 20;
+        const markets = Object.entries(this.stageTimings)
+            .filter(([k]) => k.startsWith('market:'))
+            .map(([k, v]) => `${k}=${v}ms`);
+        const slowSubs = Object.entries(this.stageTimings)
+            .filter(([k, v]) => !k.startsWith('market:') && Number(v) >= SUB_STAGE_LOG_MS)
+            .sort((a, b) => b[1] - a[1])
+            .map(([k, v]) => `${k}=${v}ms`);
+        this.logger.log(`[tick#${this.completedTicks}] 总耗时 ${this.lastTickMs}ms | ${markets.join(' ')}`
+            + ` | 子阶段${slowSubs.length ? '：' + slowSubs.join(' ') : `均 <${SUB_STAGE_LOG_MS}ms`}`
+            + ` | 自愈 ${this.hungRecoveries} 慢阶段 ${this.slowStageCount}`);
     }
 
     // P4 新闻错峰：入队 + 每 tick 播报一条

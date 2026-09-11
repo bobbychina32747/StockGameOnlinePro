@@ -4,6 +4,39 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase G-5 排障可观测性：分阶段耗时 / tick 心跳 / 进程级异常兜底
+
+### Added
+- **tick 分阶段耗时埋点**：`CN/HK/US` 每个市场内部的关键 `await` 都过 `timeStage()` 计时并进 `stageTimings`——
+  `:generate`（行情生成）/`:postTick`（AI 对手盘·做市商·行业传导）/`:bots`（机器人真实下单链路）/
+  `:checkPending`（挂单撮合+结算）/`:dayStart`/`:dayEnd`（日终：分红·利息·快照·强平，最重的一段）
+- **慢阶段预警**：任一阶段超过 `max(tickInterval×0.5, 3s)` 打 WARN（比看门狗 3× 间隔的硬阈值更早），
+  累计进 `slowStageCount`——"行情越跑越慢"能在彻底停更前发现
+- **tick 心跳日志**：每 N 次完成的 tick 打一行汇总（`TICK_HEARTBEAT_EVERY`，默认 5，0=关闭）：
+  `[tick#40] 总耗时 3ms | market:CN=1ms market:HK=1ms market:US=1ms | 子阶段均 <20ms | 自愈 0 慢阶段 0`
+  （只列 ≥20ms 的子阶段，避免刷屏；完整耗时随时可查 API）。**卡死时"心跳停了"本身就是最直接的证据**
+- **tick 落后预警**：单次 tick 用时超过 tick 间隔时 WARN，并提示去查 `stageTimings`
+- **看门狗日志增强**：除阶段与时长外，再报"约丢掉几个 tick""上次完成时间"，并指向 `tickHealth.stageTimings`
+- **进程级异常兜底**（`main.ts`）：此前既无 `unhandledRejection` 也无 `uncaughtException` 处理器——
+  未处理的 async 异常会让 Node **直接结束进程**、控制台只留半截日志。现在统一记录
+  `事件类型 + 完整堆栈 + heap/rss/uptime/node 版本`，并保持进程存活（游戏服务器"少一个 tick"远好于"整场停摆"）
+- **`GET /api/market/state` → `tickHealth` 扩充**：`stage / processing / sinceMs / hungRecoveries /
+  completedTicks / lastTickMs / lastTickAt / slowStageCount / stageTimings / tickIntervalMs`
+- **`run-backend-log.bat`（新增启动脚本）**：把后端 stdout+stderr 同时 tee 到
+  `backend/data/backend-console.log`（追加+启动分隔行，已被 .gitignore 覆盖）——以前直接跑
+  `node dist\src\main.js`，一旦关窗口，崩溃/卡死现场就永久丢失
+
+### 说明
+- 心跳与埋点开销可忽略（每次 tick 十几次 `Date.now()`）；实时档（60s）下心跳约每 5 分钟一行
+- 排障三步：① `curl http://127.0.0.1:8000/api/market/state` 看 `tickHealth`（`processing=true` 且 `sinceMs` 大 = 卡在某阶段）
+  ② 日志搜 `看门狗` / `慢阶段` / `tick 落后` ③ 搜 `ProcessFault` 看是否有未处理异常
+
+### 验证
+- 后端 `tsc` 0 error ｜ build OK ｜ **567/567 全绿**（563 → +4：慢阶段 WARN 与计数、正常耗时不误报、
+  心跳节流与内容、看门狗日志含丢失 tick 数与上次完成时间）
+- 实跑样例（1s tick）：`[tick#45] 总耗时 2ms | market:CN=1ms market:HK=1ms market:US=0ms | 子阶段均 <20ms | 自愈 0 慢阶段 0`；
+  `tickHealth` 返回全部字段（含 17 个阶段的耗时表）
+
 ## [Unreleased] - Phase G-4 修复：行情 tick "永久停更"防护（看门狗自愈 + 机器人旁路超时）
 
 ### Fixed

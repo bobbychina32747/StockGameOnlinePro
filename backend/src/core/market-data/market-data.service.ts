@@ -71,7 +71,19 @@ export interface MarketStateSnapshot {
     tickIntervalMs?: number;
     offHoursTrading?: boolean;
     // G-4: tick 健康度（当前阶段 / 是否卡住 / 自愈次数），由 MarketService 聚合时附加
-    tickHealth?: { stage: string; processing: boolean; sinceMs: number; hungRecoveries: number };
+    // G-5: 扩充可观测字段（上次耗时 / 各阶段耗时 / 慢阶段计数 / 心跳基准）
+    tickHealth?: {
+        stage: string;
+        processing: boolean;
+        sinceMs: number;
+        hungRecoveries: number;
+        completedTicks?: number;
+        lastTickMs?: number;
+        lastTickAt?: string | null;
+        slowStageCount?: number;
+        stageTimings?: Record<string, number>;
+        tickIntervalMs?: number;
+    };
     markets?: any;
 }
 

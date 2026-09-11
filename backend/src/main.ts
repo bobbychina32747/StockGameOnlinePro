@@ -10,6 +10,24 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 import app_module_1 = require("./app.module");
 
+// G-5: 进程级异常兜底（排障用）。
+// 背景：之前既没有 unhandledRejection 也没有 uncaughtException 处理器——一旦某处 async 抛出而没人 await，
+// Node 会**直接结束进程**，控制台里只剩半截日志（用户看到的就是"忽然没了/忽然不动了"，无从下手）。
+// 现在统一记录：事件类型 + 原因 + 完整堆栈 + 常驻内存快照，并且**保持进程存活**
+// （对游戏服务器来说，"少一个 tick" 远好于 "整场停摆"；看门狗会把卡住的 tick 捞回来）。
+function logProcessFault(kind) {
+    return (err) => {
+        const logger = new common_1.Logger('ProcessFault');
+        const reason = err && err.stack ? err.stack : (err && err.message ? err.message : String(err));
+        const mem = process.memoryUsage();
+        logger.error(`[${kind}] ${reason}\n`
+            + `  heapUsed=${Math.round(mem.heapUsed / 1048576)}MB heapTotal=${Math.round(mem.heapTotal / 1048576)}MB`
+            + ` rss=${Math.round(mem.rss / 1048576)}MB external=${Math.round(mem.external / 1048576)}MB`
+            + ` uptime=${Math.round(process.uptime())}s node=${process.version}`);
+    };
+}
+process.on('unhandledRejection', logProcessFault('未处理的 Promise 拒绝'));
+process.on('uncaughtException', logProcessFault('未捕获异常'));
 import stock_entity_1 = require("./infrastructure/database/entities/stock.entity");
 
 import constants_1 = require("./common/constants");
