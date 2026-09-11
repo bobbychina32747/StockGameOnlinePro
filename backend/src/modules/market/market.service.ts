@@ -245,6 +245,9 @@ export class MarketService {
             if (!this.debugMode.isMarketActive() && !constants_1.isTradingTimeFor(market)) {
                 return;
             }
+            // G-4: 细粒度阶段标签——看门狗报「卡在哪一步」时，粗粒度的 "CN" 不足以定位，
+            // 这里把 tick 内每个可能长时间阻塞的 await 都标出来（行情生成/后处理/机器人/撮合/日初日终）
+            this.tickStage = `${market}:generate`;
             const ticks = await marketData.generateTick();
             if (ticks.length === 0) return;
             advanceCounter = true;
@@ -263,6 +266,7 @@ export class MarketService {
             // P5 性能：价格先广播，AI 对手盘/行业传导/做市商等重计算随后串行执行
             // （不阻塞 WebSocket 推送；仍在 tick 循环内 await，与下一 tick 不交叠）
             try {
+                this.tickStage = `${market}:postTick`; // G-4: AI 对手盘/做市商/行业传导
                 await marketData.postTickProcessing();
             }
             catch (e) {
@@ -302,6 +306,7 @@ export class MarketService {
             // 若其中某个 await 永不返回，串行递归的 tick 循环会永久停更（现象：进程活着、HTTP 正常、行情不动）。
             if (market === 'CN' && this.botPlayers) {
                 try {
+                    this.tickStage = `${market}:bots`; // G-4: 机器人真实下单链路（下单→撮合→结算→落库）
                     const r = await withTimeout(
                         this.botPlayers.runTick({ gameDay: marketData.gameDay, tick: marketData.tickCount, market }),
                         BOT_TICK_TIMEOUT_MS,
@@ -313,6 +318,7 @@ export class MarketService {
                     this.logger.warn('[机器人] tick 执行异常: ' + (e && e.message ? e.message : e));
                 }
             }
+            this.tickStage = `${market}:checkPending`; // G-4: 挂单撮合 + 结算
             const fills = await this.engine.checkPendingOrders();
             // Phase D: 广播前脱敏——剥离 counterFills 中对手方 accountId/orderId/mmId（全量广播泄露）
             fills.forEach((f) => { this.gateway.broadcastFill(market_utils_1.sanitizeFill(f)); });
@@ -333,6 +339,7 @@ export class MarketService {
             }
             if (counter === 0) {
                 // 玩法：热点/IPO/黑天鹅（各市场独立）
+                this.tickStage = `${market}:dayStart`; // G-4
                 await marketData.startNewDay();
                 // P5 新股首日 ±44% 带宽（挂牌当日生效，次日自动恢复 ±10%）
                 try {
@@ -401,6 +408,7 @@ export class MarketService {
                 this.flushNewsQueue(market);
             }
             if (counter === 239) { // 日终结算
+                this.tickStage = `${market}:dayEnd`; // G-4: 日终（分红/利息/快照/强平，最重的一段）
                 await marketData.endOfDay();
                 const day = marketData.gameDay;
                 // FIX(H1): 全局账户日终结算只执行一次（三市场同 tick 到达日终，避免重复扣息/记快照/强平）
