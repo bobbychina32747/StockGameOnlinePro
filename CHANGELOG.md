@@ -4,6 +4,19 @@
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。
 
+## [Unreleased] - Phase G-4 修复：行情 tick "永久停更"防护（看门狗自愈 + 机器人旁路超时）
+
+### Fixed
+- **行情会静默停更（进程活着、HTTP 正常、排行榜照刷，但股票数据不动且无任何报错）**
+  - 根因：tick 循环是**串行递归**（`processing` 置位 → `await …` → `finally` 里重新 `setTimeout`）。任一 `await` 永不返回时 `processing` 永远为 true，循环再也不会被重新调度——表现为"静默停更"。Phase G-2 在 tick 内新增了一条**真实副作用路径**（机器人下单 → 撮合 → 结算 → 落库），它只是旁路增强，不该有能力拖停主循环
+  - 修复①（**看门狗**）：每 15s 检查本次 tick 是否超过预算 `max(tickIntervalMs×3, 120s)`；超过则日志 ERROR **指名卡在哪个阶段**（CN/HK/US/riskManager）+ 已卡时长 + 第几次，并**强制复位 `processing` 重新调度** → 把"永久停更"降级为"少一个 tick"
+  - 修复②（**旁路超时上界**）：`common/with-timeout.ts` 新增 `withTimeout`（超时 resolve 出 TIMEOUT 哨兵、不产生未处理拒绝、正常值/异常原样透传），机器人 `runTick` 加 20s 上界——超时只丢本 tick 的机器人动作，行情继续
+  - 修复③（**可观测**）：`GET /api/market/state` 新增 `tickHealth { stage, processing, sinceMs, hungRecoveries }`——"行情不动了"一眼可判是卡在某阶段（`processing=true` 且 `sinceMs` 很大）还是没数据
+
+### 验证
+- 后端 `tsc` 0 error ｜ build OK ｜ **563/563 全绿**（556 → +7：`phase17-tick-watchdog`：withTimeout 三态 / 看门狗指名阶段并自愈 / 未超预算不误杀 / 空闲不干预 / state 暴露 tickHealth）
+- 长跑复现：1s tick + 6 机器人 + 全服休市交易连跑 10 分钟（约 150 个游戏日）未再出现停更
+
 ## [Unreleased] - Phase G-3 修复：虚拟成交回调跨市场错投（日志刷屏的根因）+ 排行榜/赛季榜实时市值重估
 
 ### Fixed

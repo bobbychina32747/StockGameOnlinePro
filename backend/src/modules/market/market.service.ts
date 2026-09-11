@@ -7,6 +7,12 @@ import { TradingEngineService } from '../../core/trading-engine/trading-engine.s
 import { RiskManagerService } from '../../core/risk-manager/risk-manager.service';
 import { runBacktest } from '../../core/backtest/backtest-engine';
 import { BotPlayerService } from '../bots/bot-player.service';
+import { TIMEOUT, withTimeout } from '../../common/with-timeout';
+
+// G-4: 机器人旁路动作的硬上界（ms）——超过即放弃本 tick 的机器人动作，保证行情 tick 一定能往下走
+const BOT_TICK_TIMEOUT_MS = 20000;
+// G-4: tick 看门狗——检测"某个阶段卡住导致循环不再被调度"，并在日志里指名卡点后强制恢复调度
+const TICK_WATCHDOG_INTERVAL_MS = 15000;
 
 import { MarketGateway } from './market.gateway';
 import { NewsService } from './news.service';
@@ -40,6 +46,11 @@ export class MarketService {
     private tickCounterHK = 0;
     private tickCounterUS = 0;
     private processing = false;
+    // G-4: tick 看门狗状态（当前阶段 / 本次 tick 起始时间 / 自愈次数）
+    private tickStage = 'idle';
+    private tickStartedAt = 0;
+    private hungRecoveries = 0;
+    private watchdogHandle: NodeJS.Timeout | null = null;
     private lastTickAt = 0;
     private tickIntervalMs = 60000;
     // P1 开盘竞价：各市场最近一次竞价开盘价（dayOpen 基准合并用）+ 每市场当日竞价已执行标记
@@ -287,9 +298,16 @@ export class MarketService {
             // Phase G-2: 机器人玩家（算法盘）在撮合前下单——委托走 OrderService 全量校验（休市/涨跌停/购买力/T+1 一律照办），
             // 挂进盘口后由下方 checkPendingOrders 在本 tick 内参与撮合（与真人挂单同队列、同优先级、同费率）。
             // 只驱动 A 股账户（主战场）；异常必须吞在机器人侧——绝不允许假人把行情 tick 打断。
+            // G-4: 再加一道**上界**——机器人是 tick 循环内的旁路副作用路径（下单→撮合→结算→落库），
+            // 若其中某个 await 永不返回，串行递归的 tick 循环会永久停更（现象：进程活着、HTTP 正常、行情不动）。
             if (market === 'CN' && this.botPlayers) {
                 try {
-                    await this.botPlayers.runTick({ gameDay: marketData.gameDay, tick: marketData.tickCount, market });
+                    const r = await withTimeout(
+                        this.botPlayers.runTick({ gameDay: marketData.gameDay, tick: marketData.tickCount, market }),
+                        BOT_TICK_TIMEOUT_MS,
+                    );
+                    if (r === TIMEOUT)
+                        this.logger.warn(`[机器人] runTick 超过 ${BOT_TICK_TIMEOUT_MS}ms 未返回，本 tick 放弃机器人动作（行情继续）`);
                 }
                 catch (e) {
                     this.logger.warn('[机器人] tick 执行异常: ' + (e && e.message ? e.message : e));
@@ -446,14 +464,19 @@ export class MarketService {
             }
             this.processing = true;
             this.lastTickAt = Date.now();
+            this.tickStartedAt = Date.now(); // G-4: 看门狗基准
             try {
                 // P1: 全局不再统一门控，由 processMarket 按各市场独立时段判断
                 // 三服务器：轮流处理 CN/HK/US（各自独立 gameDay/因子/事件/时段）
+                this.tickStage = 'CN';
                 await this.processMarket('CN', this.marketData, 'tickCounter');
+                this.tickStage = 'HK';
                 await this.processMarket('HK', this.marketDataHK, 'tickCounterHK');
+                this.tickStage = 'US';
                 await this.processMarket('US', this.marketDataUS, 'tickCounterUS');
                 // 全局价格聚合 → 风控/保证金
                 if (this.riskManager) {
+                    this.tickStage = 'riskManager';
                     this.riskManager.setMarketPrices(this.allPrices);
                 }
             }
@@ -461,14 +484,46 @@ export class MarketService {
                 this.logger.error('Tick处理异常', e);
             }
             finally {
+                this.tickStage = 'idle';
                 this.processing = false;
                 // 递归必须在 finally 内：try 内 return（休市）会跳过其后的 setTimeout
                 setTimeout(tick, 500);
             }
         };
+        // G-4: 看门狗——串行递归的 tick 循环一旦有 await 永不返回，processing 会永远为 true，
+        // 循环再也不会被重新调度（现象：进程活着、HTTP 正常、排行榜照刷，但行情彻底不动且无报错）。
+        // 这里周期性检查"本次 tick 是否已远超预算"，超了就指名卡在哪个阶段并**强制恢复调度**，
+        // 把"永久停更"降级为"少一个 tick"。
+        this.watchdogHandle = setInterval(() => {
+            if (!this.processing)
+                return;
+            const budget = Math.max(this.tickIntervalMs * 3, 120000);
+            const stalledMs = Date.now() - (this.tickStartedAt || Date.now());
+            if (stalledMs <= budget)
+                return;
+            this.hungRecoveries++;
+            this.logger.error(`[看门狗] 行情 tick 卡在「${this.tickStage}」已达 ${Math.round(stalledMs / 1000)}s`
+                + `（预算 ${Math.round(budget / 1000)}s，第 ${this.hungRecoveries} 次）→ 丢弃该 tick 并强制恢复调度`);
+            this.tickStage = 'idle';
+            this.processing = false;
+            this.lastTickAt = Date.now();
+            setTimeout(() => { void tick(); }, 500);
+        }, TICK_WATCHDOG_INTERVAL_MS);
+        if (this.watchdogHandle && typeof this.watchdogHandle.unref === 'function')
+            this.watchdogHandle.unref();
         // P4 修复：初始调度同样以 5s 为上限——实时档（60s）休眠期每 5s 醒来检查一次节奏，
         // 调试模式开启后首个 tick 在 5s 内生效（旧实现要等满第一个 60s 定时器）
         setTimeout(tick, Math.min(this.tickDelay(), 5000));
+    }
+
+    // G-4: 只读诊断（供 /api/market/state 或运维查看：当前阶段 / 是否在处理 / 自愈次数）
+    getTickHealth() {
+        return {
+            stage: this.tickStage,
+            processing: !!this.processing,
+            sinceMs: this.processing ? Math.max(0, Date.now() - (this.tickStartedAt || 0)) : 0,
+            hungRecoveries: this.hungRecoveries,
+        };
     }
 
     // P4 新闻错峰：入队 + 每 tick 播报一条
@@ -590,6 +645,9 @@ export class MarketService {
         cn.tickIntervalMs = constants_1.tickDelayMs(this.debugMode.isMarketActive(), anyTradingNow, this.tickIntervalMs);
         // P6: 全服休市交易状态（所有客户端据此解锁休市下单）
         cn.offHoursTrading = !!this.debugMode.getGlobalBypass();
+        // G-4: 暴露 tick 健康度（当前阶段/是否卡住/自愈次数）——"行情不动了"这类问题一眼可判：
+        // processing=true 且 sinceMs 很大 = 某个阶段卡住；hungRecoveries 增长 = 看门狗已自愈过
+        cn.tickHealth = this.getTickHealth();
         // 浅拷贝避免循环引用（markets.CN 不能引用 cn 自身）
         cn.markets = {
             CN: { ...cn },

@@ -70,6 +70,8 @@ export interface MarketStateSnapshot {
     isPostCloseTrading: boolean;
     tickIntervalMs?: number;
     offHoursTrading?: boolean;
+    // G-4: tick 健康度（当前阶段 / 是否卡住 / 自愈次数），由 MarketService 聚合时附加
+    tickHealth?: { stage: string; processing: boolean; sinceMs: number; hungRecoveries: number };
     markets?: any;
 }
 
