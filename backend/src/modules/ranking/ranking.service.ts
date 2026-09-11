@@ -1,9 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { Account } from '../../infrastructure/database/entities/account.entity';
 import { DailySnapshot } from '../../infrastructure/database/entities/daily-snapshot.entity';
+import { RiskManagerService } from '../../core/risk-manager/risk-manager.service';
+import { computeLiveEquity } from '../../common/live-equity';
 
 // 榜单缓存条目（内部保留 userId 供 getUserRank 查询，对外输出时在 getRankings 中剔除）
 interface RankingEntry {
@@ -27,10 +29,23 @@ export class RankingService {
     constructor(
         @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
         @InjectRepository(DailySnapshot) private readonly snapshotRepo: Repository<DailySnapshot>,
+        // G-3: 实时价来源（RiskManagerService 是 @Global 模块导出的，注入不需要额外 imports）。
+        // @Optional()：既有单测用 2 参构造 RankingService，缺它时退化为存量 totalEquity（行为与修复前一致）。
+        @Optional() private readonly riskManager?: RiskManagerService,
     ) {}
 
+    // G-3 修复：排行榜"赚钱了不显示"——原实现直接读 accounts.totalEquity，而该字段只在
+    // ①开户 ②账户重置 ③**日终结算** 三处写库；两次日终之间（实时档约 4 小时）所有人的市值重估都不反映，
+    // 于是刚买入并上涨的账户在榜上仍是 0.00%。现按最新价做市值重估（口径与日终结算一致，
+    // 见 common/live-equity.ts）；日终落库的老口径保持不动（它仍是历史快照的来源）。
+    private liveEquity(account: Account, positions: any[]): number | null {
+        const prices = this.riskManager?.getCurrentPrices ? this.riskManager.getCurrentPrices() : null;
+        return computeLiveEquity(account, positions, prices);
+    }
+
     async calculateRankings() {
-        const accounts = await this.accountRepo.find({ relations: ['user'] });
+        // 'positions' 一并取出：实时市值重估需要持仓（一账户持仓数量级很小，join 成本可忽略）
+        const accounts = await this.accountRepo.find({ relations: ['user', 'positions'] });
         // Q2 优化：只取每用户最近 2 天的快照（按 max(day) 裁剪），避免全量快照参与计算
         const snaps = await this.snapshotRepo.find({ order: { day: 'ASC' } });
         const byUser = new Map();
@@ -59,23 +74,28 @@ export class RankingService {
         };
         const entries = accounts
             .filter((a) => Number(a.initialEquity) > 0)
-            .map((a) => ({
-            // cache 内部保留 userId 供 getUserRank 查询，对外输出时在 getRankings 中剔除
-            userId: a.userId,
-            market: a.marketMode || 'CN',
-            tier: a.tier || '青铜',
-            username: a.user?.username || '未知',
-            totalEquity: Number(a.totalEquity),
-            totalReturn: (Number(a.totalEquity) - Number(a.initialEquity)) / Number(a.initialEquity),
-            // FIX(F): 今日盈亏按账户计算（accountId 维度，dayStartEquity 为该账户当日基准），
-            // 避免多市场账户共用同一 userId 快照导致跨账户混算
-            dayReturn: Number(a.dayStartEquity) > 0
-                ? (Number(a.totalEquity) - Number(a.dayStartEquity)) / Number(a.dayStartEquity)
-                : dayReturnFallback(a.userId),
-            rank: 0,
-            // Phase G-2: 机器人玩家与真人同榜竞技（同权限、同费率、同规则），此处只标记来源
-            isBot: a.user?.isBot === true,
-        }))
+            .map((a) => {
+            // G-3: 实时市值重估优先；估值不完整（行情未就绪/缺报价）时回退日终落库值
+            const live = this.liveEquity(a, a.positions || []);
+            const equity = live === null ? Number(a.totalEquity) : live;
+            const initial = Number(a.initialEquity);
+            const dayStart = Number(a.dayStartEquity);
+            return {
+                // cache 内部保留 userId 供 getUserRank 查询，对外输出时在 getRankings 中剔除
+                userId: a.userId,
+                market: a.marketMode || 'CN',
+                tier: a.tier || '青铜',
+                username: a.user?.username || '未知',
+                totalEquity: equity,
+                totalReturn: initial > 0 ? (equity - initial) / initial : 0,
+                // FIX(F): 今日盈亏按账户计算（accountId 维度，dayStartEquity 为该账户当日基准），
+                // 避免多市场账户共用同一 userId 快照导致跨账户混算
+                dayReturn: dayStart > 0 ? (equity - dayStart) / dayStart : dayReturnFallback(a.userId),
+                rank: 0,
+                // Phase G-2: 机器人玩家与真人同榜竞技（同权限、同费率、同规则），此处只标记来源
+                isBot: a.user?.isBot === true,
+            };
+        })
             .sort((a, b) => b.totalReturn - a.totalReturn)
             .map((e, i) => ({ ...e, rank: i + 1 }));
         this.cache = entries;

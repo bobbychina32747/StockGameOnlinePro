@@ -126,8 +126,9 @@ export class TradingEngineService {
     placeVirtualOrder(symbol: string, side: string, price: number, qty: number, expiresAtTick: number, opts?: { orderId?: string; mmId?: string; tag?: string }) {
         this.matching.placeVirtualOrder(symbol, side, price, qty, expiresAtTick, opts);
     }
-    pruneExpiredVirtualOrders(currentTick: number) {
-        this.matching.pruneExpiredVirtualOrders(currentTick);
+    // G-3: matchSymbol 可选（按市场清理，避免跨市场 tick 基准互相误删），不传则保持原全量语义
+    pruneExpiredVirtualOrders(currentTick: number, matchSymbol?: (symbol: string) => boolean) {
+        this.matching.pruneExpiredVirtualOrders(currentTick, matchSymbol);
     }
     executeVirtualMarketOrder(symbol: string, side: string, quantity: number) {
         return this.matching.executeVirtualMarketOrder(symbol, side, quantity);

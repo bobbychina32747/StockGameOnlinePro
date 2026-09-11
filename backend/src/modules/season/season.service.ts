@@ -1,10 +1,11 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 
 import { Season, SeasonStatus, SeasonType } from '../../infrastructure/database/entities/season.entity';
 import { EntryStatus, SeasonEntry } from '../../infrastructure/database/entities/season-entry.entity';
 import { Account } from '../../infrastructure/database/entities/account.entity';
+import { computeLiveEquity } from '../../common/live-equity';
 
 // Phase C: 模拟大赛 V1（快照净值赛 MVP：10 游戏日滚动赛季、手动报名、收益率排序、荣誉奖励、赛季中禁重置/划转/基金）
 // 行情引擎注入：默认 CN 实例 + HK/US 字符串 token（与 market-data.module 工厂一致）
@@ -49,6 +50,22 @@ export class SeasonService {
             HK: Number((this.marketDataHK && this.marketDataHK.gameDay) || 0),
             US: Number((this.marketDataUS && this.marketDataUS.gameDay) || 0),
         };
+    }
+
+    // G-3: 三市场最新价合并表（标的代码前缀 H*/U*/其余 天然不重叠，合并安全）。
+    // 只读行情实例的公开访问器，不碰内部可变状态。
+    private livePrices(): Record<string, number> {
+        const prices: Record<string, number> = {};
+        for (const md of [this.marketData, this.marketDataHK, this.marketDataUS]) {
+            if (!md || typeof md.getTradableSymbols !== 'function')
+                continue;
+            for (const symbol of md.getTradableSymbols()) {
+                const price = md.getLastPrice(symbol);
+                if (price !== undefined)
+                    prices[symbol] = price;
+            }
+        }
+        return prices;
     }
 
     async ensureSeason() {
@@ -151,6 +168,26 @@ export class SeasonService {
         if (!season)
             return [];
         const entries = await this.entryRepo.find({ where: { seasonId: season.id } });
+        // G-3 修复（与排行榜同一根因）：赛季榜原先直接读 accounts.totalEquity，而该字段只在日终结算时重估，
+        // 于是赛季收益率在盘中永远是 0.00%（用户反馈"赚钱了榜上看不到"）。现按最新价重估，口径见 common/live-equity.ts。
+        // 顺带消掉 N+1：原先每条 entry 各查一次账户 → 现在批量取账户（含持仓）一次查询。
+        const accountIds = [...new Set(entries.map((e) => e.accountId).filter(Boolean))];
+        const acctById = new Map<string, any>();
+        if (accountIds.length) {
+            const batch = await this.accountRepo.find({ where: { id: In(accountIds) }, relations: ['positions'] });
+            for (const a of batch || [])
+                acctById.set(a.id, a);
+            // 补齐兜底：简化仓储（单测 fake 的 where 比较是"按值相等"，认不出 In()）批量查不到时逐条查，
+            // 原实现本来就是逐条 findOne——这里的批量只是省查询，语义不能依赖它
+            for (const id of accountIds) {
+                if (acctById.has(id))
+                    continue;
+                const one = await this.accountRepo.findOne({ where: { id }, relations: ['positions'] });
+                if (one)
+                    acctById.set(one.id, one);
+            }
+        }
+        const prices = this.livePrices();
         const byUser = new Map();
         for (const e of entries) {
             if (market !== 'ALL' && e.marketMode !== market)
@@ -160,8 +197,9 @@ export class SeasonService {
             }
             const row = byUser.get(e.userId);
             row.startSum += Number(e.startEquity);
-            const account = await this.accountRepo.findOne({ where: { id: e.accountId } });
-            row.equitySum += Number(account ? account.totalEquity : e.startEquity);
+            const account = acctById.get(e.accountId);
+            const live = account ? computeLiveEquity(account, account.positions || [], prices) : null;
+            row.equitySum += live === null ? Number(account ? account.totalEquity : e.startEquity) : live;
         }
         const rows = [...byUser.values()].map((r) => ({
             userId: r.userId,

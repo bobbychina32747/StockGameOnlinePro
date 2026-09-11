@@ -29,6 +29,11 @@ export class RiskManagerService {
         this.currentPrices = prices;
     }
 
+    // G-3: 只读暴露最新价快照（排行榜要按实时价做市值重估；返回浅拷贝，避免外部改写内部行情态）
+    getCurrentPrices(): Record<string, number> {
+        return { ...(this.currentPrices || {}) };
+    }
+
     async recordDailyEquity(account, day) {
         const history = this.equityHistory.get(account.id) || [];
         const prevEquity = history.length > 0 ? history[history.length - 1].equity : Number(account.initialEquity);

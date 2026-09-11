@@ -407,8 +407,12 @@ export class MatchingEngine {
         list.sort((a, b) => isBid ? (b.price - a.price) || (a.time - b.time) : (a.price - b.price) || (a.time - b.time));
     }
     // P2: 清理到期的 AI 虚拟挂单（每 tick 由行情引擎调用）
-    pruneExpiredVirtualOrders(currentTick) {
-        for (const book of this.realBooks.values()) {
+    // G-3: 可选 matchSymbol 过滤——三市场共享同一个引擎、tickCount 各自独立（闭市市场不前进），
+    // 用别市场的 tick 去清理会把本市场"还没到期"的挂单提前删掉（虚拟流动性凭空消失）。
+    pruneExpiredVirtualOrders(currentTick, matchSymbol?: (symbol: string) => boolean) {
+        for (const [symbol, book] of this.realBooks) {
+            if (matchSymbol && !matchSymbol(symbol))
+                continue;
             for (const sideKey of ['bids', 'asks']) {
                 const arr = book[sideKey];
                 for (let i = arr.length - 1; i >= 0; i--) {

@@ -25,6 +25,37 @@ let klineDedupDone = false;
 // 注：这是库存风控（触边只收窄报价边），不是价格干预——mmQuote 的定价/价差/库存偏斜一律不动。
 const MM_INVENTORY_LIMIT = 60000;
 
+// ─── G-3 修复：虚拟成交回调的"跨市场错投" ───────────────────────────────────
+// 症状（线上日志高频刷屏）：
+//   `AI 限价单成交但挂单记录缺失（账本已入账）` / `AI 限价卖单成交但无对应持仓`
+// 根因：**三个市场共用一个撮合引擎**，而每个 MarketDataService 实例各自持有一份 AI 账本与做市商，
+//   三份名册的 agent id 完全相同（AI1…AI10）。原实现每个实例各注册一次 `setVirtualFillHook`，
+//   后注册者覆盖先注册者 → 哪个实例抢到钩子，就把**所有市场**的成交都记到自己的账本里：
+//   港股 AI9 的卖单成交被记到 A 股 AI9 的账本上 → 挂单记录找不到（正常）且持仓也不存在（正常），
+//   于是刷屏，同时做市商库存也被记到错误市场的做市商头上（真实账目被污染）。
+// 修复：钩子只注册一次，且**按成交标的所属市场路由**到对应实例（symbolMarket：H*=HK / U*=US / 其余 CN）。
+const marketDataInstances = new Map<string, any>();
+const virtualHookOwner = new WeakMap<object, any>();
+
+function dispatchVirtualFill(f: any) {
+    if (!f)
+        return;
+    const market = market_utils_1.symbolMarket(f.symbol);
+    // 只投给"成交标的所属市场"的实例：宁可漏更新也不能错投（错投 = 别的市场的账本被凭空改写）。
+    // 单实例场景（单测/单市场部署）回退到唯一实例，保持既有行为。
+    const target = marketDataInstances.get(market)
+        || (marketDataInstances.size === 1 ? marketDataInstances.values().next().value : null);
+    if (!target)
+        return;
+    try {
+        target.onVirtualFill(f);
+    }
+    catch (e) {
+        // 回调异常绝不能冒泡回撮合（否则一笔成交能把整个 tick 打断）
+        target.logger?.warn?.('虚拟成交回调异常: ' + (e && e.message ? e.message : e));
+    }
+}
+
 // 单市场状态快照（getState 返回值）；后三个可选字段由 MarketService 聚合三市场状态时附加
 export interface MarketStateSnapshot {
     gameDay: number;
@@ -805,11 +836,16 @@ export class MarketDataService {
     // ─── P0-3 虚拟成交回调：统一注册 + 按载荷分发 ───
     // 原先只在做市商块里注册（gate 在 mmHookRegistered）且只处理 mmId，AI 限价单成交无任何回调。
     // 现在只注册一个钩子：有 mmId → 做市商库存；否则有 tag → AI 账本（找不到就忽略）。
+    // G-3 修复：注册前先把自己登记到「市场 → 实例」表；同一引擎只允许挂一次分发器（见文件头注释）。
     ensureVirtualFillHook() {
-        if (this.virtualHookRegistered || !this.engine)
+        if (!this.engine)
             return;
+        marketDataInstances.set(this.market || 'CN', this);
+        if (virtualHookOwner.get(this.engine))
+            return; // 该引擎已有分发器（三市场共享同一引擎）——重复注册会互相覆盖，绝不能做
         try {
-            this.engine.setVirtualFillHook((f) => this.onVirtualFill(f));
+            this.engine.setVirtualFillHook((f) => dispatchVirtualFill(f));
+            virtualHookOwner.set(this.engine, this);
             this.virtualHookRegistered = true;
         }
         catch (e) {
@@ -934,9 +970,11 @@ export class MarketDataService {
         if (arr.length === 0)
             return;
         // 先清理过期的 AI 虚拟挂单（TTL 到期自动撤单）
+        // G-3: 只清理**本市场**标的——三市场共享引擎但 tickCount 各自独立（闭市市场不前进），
+        // 全量清理会用本市场较大的 tick 把别市场尚未到期的虚拟挂单误删（虚拟流动性凭空消失）。
         if (this.engine) {
             try {
-                this.engine.pruneExpiredVirtualOrders(this.tickCount);
+                this.engine.pruneExpiredVirtualOrders(this.tickCount, (s: string) => market_utils_1.symbolMarket(s) === this.market);
             }
             catch (e) { }
         }
