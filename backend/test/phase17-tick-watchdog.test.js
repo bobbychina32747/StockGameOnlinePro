@@ -39,6 +39,10 @@ function makeService() {
   const debugMode = { isMarketActive: () => true, getGlobalBypass: () => true };
   const config = { get: (k, d) => (k === 'TICK_INTERVAL_MS' ? 60000 : d) };
   const svc = new MarketService(marketData, engine, gateway, news, risk, marketData, marketData, debugMode, config, undefined);
+  // 固定 tick 节奏：tickDelay() 依赖真实时钟（交易时段才 60s，休市期为 1s 快放），
+  // 不固定的话 advanceTimersByTime(16s) 窗口内会再起一次 tick 把 processing 重新置 true，
+  // 断言随时间漂移（白天过、晚上挂）。看门狗测试只关心"卡死后是否被复位"，节奏固定为 60s。
+  svc.tickDelay = () => 60000;
   const logs = { errors: [], warns: [] };
   svc.logger = {
     error: (m) => logs.errors.push(String(m)),

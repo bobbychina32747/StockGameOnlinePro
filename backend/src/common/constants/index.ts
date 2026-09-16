@@ -144,13 +144,26 @@ export const RISK = {
     marginCallTarget: 1.5,
 };
 
+// 稳定符号哈希（原先在 shortMarginRateFor / matching-engine.initShortPool / market-data.floatSharesOf 三处复制）
+// SECURITY(CodeQL js/loop-bound-injection)：循环上界固定为常量 HASH_WINDOW，与传入字符串长度解耦——
+// 原写法 for (i < s.length) 的循环上界取自用户请求里的 symbol，可被超长输入放大循环次数（DoS）。
+// i >= s.length 时保持 h 不变 = 旧实现「循环提前结束」的逐位等价语义；窗口只取前 8 位
+//（本项目代码最长 6 位：600519/00700/AAPL，真实代码结果与旧实现完全一致）。
+const HASH_WINDOW = 8;
+export function symbolHash(symbol) {
+    const s = String(symbol || '');
+    let h = 0;
+    for (let i = 0; i < HASH_WINDOW; i++) {
+        if (i < s.length)
+            h = (h * 31 + s.charCodeAt(i)) % 100000;
+    }
+    return h;
+}
+
 // P3 个股折算率/保证金率：按股票代码稳定哈希在区间内取值（做空保证金率 0.5~0.65）
 // P5 动态折算：波动率升高 → 保证金率上浮（风险敏感），仍钳制在 [0.5, 0.65]
 export function shortMarginRateFor(symbol, volatility) {
-    let h = 0;
-    const s = String(symbol || '');
-    for (let i = 0; i < s.length; i++)
-        h = (h * 31 + s.charCodeAt(i)) % 100000;
+    const h = symbolHash(symbol);
     const base = 0.5 + (h % 16) / 100; // 0.50 ~ 0.65
     const vol = Number.isFinite(Number(volatility)) ? Number(volatility) : 0.02;
     const adjusted = base + Math.max(0, vol - 0.02) * 0.5;

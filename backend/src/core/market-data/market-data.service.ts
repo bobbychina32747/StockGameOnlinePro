@@ -1394,15 +1394,11 @@ export class MarketDataService {
             };
         });
     }
-    // Phase C: hash 稳定流通股本（万股，8000~12000）
+    // Phase C: hash 稳定流通股本（万股，8000~12000）——公共 symbolHash（原内联循环上界取自 symbol.length）
     floatSharesOf(st) {
         if (st.floatShares && Number(st.floatShares) > 0)
             return Number(st.floatShares);
-        let h = 0;
-        const s = String(st.symbol || '');
-        for (let i = 0; i < s.length; i++)
-            h = (h * 31 + s.charCodeAt(i)) % 100000;
-        st.floatShares = 8000 + (h % 4000);
+        st.floatShares = 8000 + (constants_1.symbolHash(st.symbol) % 4000);
         return st.floatShares;
     }
     // Phase C: 新股阶梯纳入——上市次日起 5 个游戏日内权重 0→1 线性（避免指数跳变，teams 定稿）

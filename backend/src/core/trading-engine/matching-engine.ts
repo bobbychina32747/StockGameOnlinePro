@@ -9,6 +9,9 @@ import market_utils_1 = require("../../common/market-utils");
 // Phase B: 动态滑点唯一实现（实盘/回测共用）
 import slippage_1 = require("./slippage");
 
+// 公共常量/工具（symbolHash：券源池等按代码稳定取值，循环上界常量见 constants）
+import constants_1 = require("../../common/constants");
+
 // P5 类型安全：盘口条目 / 成交明细 / 盘口结构接口（替换裸 any）
 export interface BookEntry {
     orderId: string | null;
@@ -69,10 +72,8 @@ export class MatchingEngine {
     initShortPool(symbol) {
         if (this.shortPool.has(symbol))
             return;
-        let h = 0;
-        const s = String(symbol || '');
-        for (let i = 0; i < s.length; i++)
-            h = (h * 31 + s.charCodeAt(i)) % 100000;
+        // 券源池量化：改用公共 symbolHash（原内联循环上界取自用户输入的 symbol.length，CodeQL js/loop-bound-injection）
+        const h = constants_1.symbolHash(symbol);
         const available = 30000 + (h % 20) * 5000;
         this.shortPool.set(symbol, { available, initial: available, feeRate: Number((0.04 + (h % 60) / 1000).toFixed(4)) });
     }

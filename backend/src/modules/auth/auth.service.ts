@@ -71,7 +71,8 @@ export class AuthService {
                     });
                     await this.accountRepo.save(account);
                 }
-                console.log('[Seed] 管理员账号已创建: ' + adminUsername);
+                // SECURITY(C3): 不回显账号名（CodeQL js/clear-text-logging：process.env 派生的凭证类信息不进日志）
+                console.log('[Seed] 默认管理员账号已创建（用户名/密码见 ADMIN_USERNAME、ADMIN_PASSWORD 环境变量）');
             }
             // 注：若 admin 用户已存在但密码较弱，此处不强制重置（避免影响既有登录会话），请运维手动轮换密码
         }

@@ -26,6 +26,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
@@ -537,7 +538,8 @@ async function startBackend() {
   const free = await portFree(state.backendPort);
   if (!free) throw new Error(`后端端口 ${state.backendPort} 已被占用：为免误连他人后端（可能是真实库），请换端口或先停掉该服务`);
   // 每次运行都用独立临时库 + 独立管理员密码（密码只存在于内存，绝不出现在产物里）
-  state.adminPass = `E2e_${Math.random().toString(36).slice(2, 12)}Aa1`;
+  // SECURITY(CodeQL js/insecure-randomness)：临时管理员密码是凭证，必须用 CSPRNG（randomBytes）而非 Math.random
+  state.adminPass = `E2e_${randomBytes(8).toString('hex')}Aa1`;
   spawnToLog('server', process.execPath, [BACKEND_ENTRY], {
     cwd: BACKEND_DIR,
     env: {
@@ -668,7 +670,7 @@ function pageFetchStmt(pathAndQuery, init = '{}') {
 // 链路 ①：打开首页 → 注册（或重名 200+success:false → 转登录）→ 断言进入主界面（DOM 断言）
 async function chainAuth(A) {
   state.user = `e2e_${Date.now().toString(36)}`;
-  state.userPass = `Pw_${Math.random().toString(36).slice(2, 12)}A9`;
+  state.userPass = `Pw_${randomBytes(8).toString('hex')}A9`; // 同 adminPass：注册密码走 CSPRNG
 
   // a) 登录页可见
   await goto(`${state.frontendUrl}/login`);

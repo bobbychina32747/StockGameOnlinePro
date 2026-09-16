@@ -5,6 +5,10 @@ on:
     branches: [main, master]
   pull_request:
 
+# SECURITY(CodeQL actions/missing-workflow-permissions)：显式声明最小权限，GITHUB_TOKEN 默认只读
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: 后端（tsc + jest + 启动冒烟）
