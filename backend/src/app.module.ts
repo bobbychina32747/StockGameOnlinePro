@@ -7,6 +7,14 @@ import { TradingEngineModule } from './core/trading-engine/trading-engine.module
 import { RiskManagerModule } from './core/risk-manager/risk-manager.module';
 
 import { AuthModule } from './modules/auth/auth.module';
+// 2026-09-28：统一身份模块（与既有 auth 并存，端点暂挂 /api/auth/identity/* 以避免路由遮蔽）
+import { IdentityModule } from './modules/identity/identity.module';
+// 2026-09-28：站内写作台（博客）—— /api/admin/blog/*
+import { BlogAdminModule } from './modules/blog-admin/blog-admin.module';
+// 2026-09-29：博客对外能力—— /api/blog/*（浏览量 + 评论；nginx 需把该前缀反代到本机）
+import { BlogPublicModule } from './modules/blog-public/blog-public.module';
+// 2026-09-29：游戏厅凭据桥—— /api/games/*（站点身份登录后免二次登录游戏厅）
+import { ArcadeModule } from './modules/arcade/arcade.module';
 import { UserModule } from './modules/user/user.module';
 import { AccountModule } from './modules/account/account.module';
 import { TradingModule } from './modules/trading/trading.module';
@@ -90,6 +98,14 @@ const logger = new Logger('AppModule');
         TradingEngineModule,
         RiskManagerModule,
         AuthModule,
+        // 统一身份模块：端点挂在 /api/auth/identity/*（避开与既有 AuthController 的路由遮蔽）
+        IdentityModule,
+        // 站内写作台：/api/admin/blog/*
+        BlogAdminModule,
+        // 博客对外：/api/blog/*（浏览量、评论）
+        BlogPublicModule,
+        // 游戏厅凭据桥：/api/games/*（站点身份 → 游戏厅免二次登录）
+        ArcadeModule,
         UserModule,
         AccountModule,
         TradingModule,

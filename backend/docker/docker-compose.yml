@@ -20,7 +20,10 @@ services:
       # - ../data:/app/data
     healthcheck:
       # teams 定稿：公开无认证端点（Swagger 交互文档仅 development 挂载，生产不可依赖）
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/api/market/prices", "||", "exit", "1"]
+      # 2026-09-28 修：原写法 ["CMD", "wget", …, "||", "exit", "1"] 是 exec 形式，
+      # "||"/"exit"/"1" 会被当成 wget 的额外参数 → 永远失败、容器长期 unhealthy。
+      # 要么 CMD-SHELL 让 shell 解释 ||，要么干脆去掉这段；这里用 CMD-SHELL。
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/api/market/prices || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5

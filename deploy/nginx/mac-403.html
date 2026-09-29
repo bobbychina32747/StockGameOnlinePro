@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>403 · 本站不支持 macOS</title></head>
+<body style="margin:0;background:#0a0e14;color:#d7e2ea;font:14px/1.7 'Segoe UI',system-ui,-apple-system,sans-serif">
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
+<div style="max-width:560px;width:100%;background:#10151d;border:1px solid #1f2733;border-radius:14px;padding:26px 28px">
+<div style="font:600 12px/1 ui-monospace,Consolas,monospace;color:#3fd07a;letter-spacing:.14em">HTTP 403 · PLATFORM NOT SUPPORTED</div>
+<h1 style="margin:14px 0 6px;font-size:20px;color:#ff8f8f">⛔ 本站不支持 macOS</h1>
+<p style="margin:0;color:#9fb0c0">macOS is not supported on this site.</p>
+<p style="margin:14px 0 0;color:#c8d4de">这条 403 是<b style="color:#3fd07a">服务器直接返回</b>的：请求在 nginx 这一层就被拒绝，页面与游戏资源一个字节都没下发（响应头 <code style="color:#8b9aa9">x-blocked-platform: macos</code>）。原因：站长实测 Mac 上的浏览器（Safari / Chrome / Firefox）在本站游戏里存在<b style="color:#ffd166">安全隐患</b>与<b style="color:#ffd166">兼容性问题</b>。</p>
+<div style="margin:18px 0 0;padding:12px 14px;background:#0d1219;border:1px solid #1f2733;border-radius:10px">
+<div style="color:#7b8a9c;font-size:12px;margin-bottom:6px">请换一个平台访问 / Please use another platform</div>
+<div style="color:#c8d4de">Windows · Linux · Android · iOS（iPad 不在拦截范围）</div></div>
+<div style="margin:18px 0 0;font-size:12px;color:#6b7a8c">判定口径与客户端脚本 <code>mac-block.js</code> 一致：<code>sec-ch-ua-platform: macOS</code> 或 UA 含 <code>Macintosh / Mac OS X</code>，且不是 iPad。</div>
+<div style="margin:18px 0 0"><a href="https://github.com/Bobbychina/Bobbychina.github.io/issues" style="color:#5cc8ff;text-decoration:none">→ 有异议 / 想让我重新评估？开个 issue</a></div>
+</div></div></body></html>

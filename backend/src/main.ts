@@ -62,6 +62,8 @@ async function bootstrap() {
     app.use(express.json({ limit: '1mb' }));
     app.use(express.urlencoded({ limit: '1mb', extended: true }));
     // 登录/注册频率限制：每 IP 每分钟最多 10 次
+    // 2026-09-28 收窄：原来挂在 /api/auth 全前缀，会把 identity 模块的 verify（点邮件链接）与
+    // GitHub 回调一起限住——用户在同一个 NAT 下点几下链接就 429。只限"确实要防爆破"的写入口。
     const authLimiter = rateLimit({
         windowMs: 60 * 1000,
         max: 10,
@@ -69,7 +71,14 @@ async function bootstrap() {
         standardHeaders: true,
         legacyHeaders: false,
     });
-    app.use('/api/auth', authLimiter);
+    app.use([
+        '/api/auth/login',
+        '/api/auth/register',
+        '/api/auth/identity/login',
+        '/api/auth/identity/register',
+        '/api/auth/identity/password/reset-request',
+        '/api/auth/identity/password/reset',
+    ], authLimiter);
     // Phase D: /market/backtest 为无认证公共计算接口（逐根 K 线跑策略），单 IP 限流防滥用；
     // app.use 匹配原始请求路径（含 /api 前缀），与上方 authLimiter 同款先例
     const backtestLimiter = rateLimit({

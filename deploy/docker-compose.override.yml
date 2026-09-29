@@ -12,6 +12,23 @@ services:
       - NODE_OPTIONS=--max-old-space-size=900
       # 容器默认 UTC，A 股开盘/收盘/交易日判断会整体偏 8 小时 → 必须钉死北京时区
       - TZ=Asia/Shanghai
+      # 站内写作台：内容源目录（含 build.mjs 与 content/）与静态产物目录
+      # 用 !override 显式列出全部挂载，避免与基础 compose 的 sgp-data 合并歧义
+      - BLOG_DIR=/blog
+      - BLOG_DIST=/blog-dist
+      # 统一身份：Ed25519 令牌私钥（只读挂载，见 deploy/AUTH-CONTRACT.md §4）
+      - IDENTITY_JWT_KEY_FILE=/keys/identity-ed25519.pem
+      # 邮件里链接的前缀（必须与冻结契约一致）
+      - APP_BASE_URL=https://bobbycn.cc
+    volumes: !override
+      # 游戏/账号/文章数据（同一个 SQLite 库，每日 .backup 覆盖）
+      - sgp-data:/app/data
+      # 宿主 /opt/stockgame/blog：build.mjs + content/（渲染时把文章导出为 Markdown 再构建）
+      - /opt/stockgame/blog:/blog
+      # 宿主 /opt/stockgame/blog-dist：静态产物（posts/、feed.xml、sitemap.xml、media/），由 nginx 直出
+      - /opt/stockgame/blog-dist:/blog-dist
+      # 宿主 /opt/stockgame/keys：身份令牌私钥（0600，仓库里零副本）
+      - /opt/stockgame/keys:/keys:ro
     logging:
       driver: json-file
       options:
