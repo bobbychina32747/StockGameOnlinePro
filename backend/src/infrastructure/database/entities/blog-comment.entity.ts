@@ -1,9 +1,11 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-/** published = 对外可见；hidden = 站长在后台藏起来（保留原文与时间，便于复核） */
+/** published = 对外可见；hidden = 站长在后台藏起来（保留原文与时间，便于复核）；
+ *  pending = 机器人审核觉得可疑（带外链 / 重复度异常），先挂着等站长过一眼（2026-09-29 加） */
 export enum CommentStatus {
     PUBLISHED = 'published',
     HIDDEN = 'hidden',
+    PENDING = 'pending',
 }
 
 /**

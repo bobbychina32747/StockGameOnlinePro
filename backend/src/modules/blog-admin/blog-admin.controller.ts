@@ -1,26 +1,64 @@
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { CurrentUser, JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { ArrayMaxSize, IsArray, IsBoolean, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { CurrentUser } from '../../common/guards/jwt-auth.guard';
 import { User, UserRole } from '../../infrastructure/database/entities/user.entity';
 import { BlogPublicService } from '../blog-public/blog-public.service';
+import { BlogAdminGuard } from './blog-admin.guard';
 import { BlogAdminService, BlogPostDto } from './blog-admin.service';
 
+/**
+ * 写作台保存入参。
+ *
+ * ⚠️ 每个字段都**必须**带 class-validator 装饰器：全局 ValidationPipe 开了
+ *    `whitelist: true` + `forbidNonWhitelisted: true`，**没有装饰器的属性会被当成"未声明的字段"直接拒掉**，
+ *    报错长这样：`property title should not exist, property slug should not exist, …`（2026-09-30 站主发帖时踩到）。
+ *    slug 的格式与 BlogAdminService.upsert 里的判定保持一致（字母/数字/中划线），否则前端生成的中文 slug 会在服务层再抛一次。
+ */
 class SavePostDto implements BlogPostDto {
+    @IsString()
+    @MaxLength(120)
+    @Matches(/^[a-zA-Z0-9][a-zA-Z0-9-]*$/, { message: 'slug 只能包含字母、数字与中划线（中文标题请自拟英文短链）' })
     slug: string;
+
+    @IsString()
+    @MaxLength(200)
     title: string;
+
+    /** YYYY-MM-DD；空串也允许（服务层会兜底成今天） */
+    @IsString()
+    @MaxLength(10)
     date: string;
+
+    // 注：类型上保持必填（与 BlogPostDto 接口一致），运行时用 @IsOptional() 放行缺省 ——
+    // 前端 collect() 每次都会带上这些字段，但脚本/老客户端可能省略，别因此 400。
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(20)
+    @IsString({ each: true })
+    @MaxLength(40, { each: true })
     tags: string[];
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(1000)
     summary: string;
+
+    @IsString()
+    @MaxLength(200000)
     body: string;
+
+    @IsOptional()
+    @IsBoolean()
     draft: boolean;
 }
 
 /**
  * 站内写作台后端（/api/admin/blog/*）
- * 鉴权与现网一致：JwtAuthGuard + 显式 role 检查（写作台只给站长用）。
- * 注：identity 模块上线后，登录端点会统一到 /api/auth/*，本控制器只需换 guard，端点不变。
+ * 鉴权：BlogAdminGuard —— **站点身份（站主）优先**，旧的写作台管理员 JWT 继续可用。
+ * 2026-09-29 改：站主统一账号后不该再记一套独立口令，"登录站点 → /admin/ 就能写"。
  */
 @Controller('admin/blog')
-@UseGuards(JwtAuthGuard)
+@UseGuards(BlogAdminGuard)
 export class BlogAdminController {
     constructor(
         private readonly blog: BlogAdminService,

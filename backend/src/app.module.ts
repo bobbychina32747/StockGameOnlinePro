@@ -15,6 +15,8 @@ import { BlogAdminModule } from './modules/blog-admin/blog-admin.module';
 import { BlogPublicModule } from './modules/blog-public/blog-public.module';
 // 2026-09-29：游戏厅凭据桥—— /api/games/*（站点身份登录后免二次登录游戏厅）
 import { ArcadeModule } from './modules/arcade/arcade.module';
+// 2026-09-30：站内发信—— /api/admin/mail/*（站主以 contact@bobbycn.cc 回信）
+import { WebmailModule } from './modules/webmail/webmail.module';
 import { UserModule } from './modules/user/user.module';
 import { AccountModule } from './modules/account/account.module';
 import { TradingModule } from './modules/trading/trading.module';
@@ -106,6 +108,8 @@ const logger = new Logger('AppModule');
         BlogPublicModule,
         // 游戏厅凭据桥：/api/games/*（站点身份 → 游戏厅免二次登录）
         ArcadeModule,
+        // 站内发信：/api/admin/mail/*（以 contact@bobbycn.cc 发信）
+        WebmailModule,
         UserModule,
         AccountModule,
         TradingModule,

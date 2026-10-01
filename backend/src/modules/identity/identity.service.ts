@@ -282,9 +282,26 @@ export class IdentityService {
         return { token, expiresAt, sessionId: saved.id };
     }
 
+    /**
+     * 最早注册且已验证的身份 id（个人站的"站主"判据，写作台鉴权用）。
+     * 缓存 60 秒：这是个每请求都要问的问题，但答案几乎不变。
+     * 为什么不新加一个配置项：站主要的是"登录站点就能写博客"，不该再让他维护一份白名单。
+     */
+    private oldestActive: { id: string; at: number } | null = null;
+    async findOldestActiveIdentityId(): Promise<string> {
+        if (this.oldestActive && Date.now() - this.oldestActive.at < 60_000)
+            return this.oldestActive.id;
+        const row = await this.identityRepo.findOne({
+            where: { status: IdentityStatus.ACTIVE },
+            order: { createdAt: 'ASC' },
+        });
+        const id = row ? row.id : '';
+        this.oldestActive = { id, at: Date.now() };
+        return id;
+    }
+
     /** 会话解析（守卫用）：哈希查表 → 未撤销未过期 → 身份仍 active */
-    async resolveSession(token: string): Promise<Session> {
-        const invalid = new UnauthorizedException('会话已失效，请重新登录');
+    async resolveSession(token: string): Promise<Session> {        const invalid = new UnauthorizedException('会话已失效，请重新登录');
         if (!token)
             throw invalid;
         const session = await this.sessionRepo.findOne({

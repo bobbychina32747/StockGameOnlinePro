@@ -5,6 +5,7 @@ import { BlogComment } from '../../infrastructure/database/entities/blog-comment
 import { BlogPost } from '../../infrastructure/database/entities/blog-post.entity';
 import { BlogView } from '../../infrastructure/database/entities/blog-view.entity';
 import { IdentityModule } from '../identity/identity.module';
+import { BlogModerationService } from './blog-moderation.service';
 import { BlogPublicController } from './blog-public.controller';
 import { BlogPublicService } from './blog-public.service';
 
@@ -16,7 +17,7 @@ import { BlogPublicService } from './blog-public.service';
 @Module({
     imports: [TypeOrmModule.forFeature([BlogView, BlogComment, BlogPost]), IdentityModule],
     controllers: [BlogPublicController],
-    providers: [BlogPublicService],
-    exports: [BlogPublicService],
+    providers: [BlogPublicService, BlogModerationService],
+    exports: [BlogPublicService, BlogModerationService],
 })
 export class BlogPublicModule {}

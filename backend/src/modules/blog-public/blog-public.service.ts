@@ -6,6 +6,7 @@ import { In, Repository } from 'typeorm';
 import { BlogComment, CommentStatus } from '../../infrastructure/database/entities/blog-comment.entity';
 import { BlogPost } from '../../infrastructure/database/entities/blog-post.entity';
 import { BlogView } from '../../infrastructure/database/entities/blog-view.entity';
+import { BlogModerationService } from './blog-moderation.service';
 
 // 博客公开接口的两个能力：浏览量 + 评论。
 //
@@ -45,6 +46,7 @@ export class BlogPublicService {
         @InjectRepository(BlogView) private readonly views: Repository<BlogView>,
         @InjectRepository(BlogComment) private readonly comments: Repository<BlogComment>,
         @InjectRepository(BlogPost) private readonly posts: Repository<BlogPost>,
+        private readonly moderation: BlogModerationService,
     ) {}
 
     /** IP 只以哈希形式参与去重/限流，不落原始值（日志里也不打） */
@@ -163,6 +165,11 @@ export class BlogPublicService {
             throw new BadRequestException('这个网络今天评论太多了，换个时间再来');
         }
 
+        // ⑨ 机器人审核：只有两档 —— 放行 或 当场拒收（没有人审队列，站主不参与）
+        const mod = this.moderation.review({ body });
+        if (mod.verdict === 'block')
+            throw new BadRequestException(`这条被自动审核拦下了：${mod.reasons.join('、')}`);
+
         const saved = await this.comments.save(this.comments.create({
             slug, body, author, identityId: input.identityId, ipHash,
             status: CommentStatus.PUBLISHED,
@@ -192,19 +199,20 @@ export class BlogPublicService {
     /** 后台列表：带 identityId 与状态，便于站长判断要不要处理 */
     async listForAdmin(status?: string, take = 100): Promise<any[]> {
         const where: any = {};
-        if (status === 'published' || status === 'hidden')
+        if (status === 'published' || status === 'hidden' || status === 'pending')
             where.status = status;
         const rows = await this.comments.find({ where, order: { createdAt: 'DESC' }, take: Math.min(Number(take) || 100, 300) });
         return rows.map((c) => ({ ...this.toPublic(c), slug: c.slug, status: c.status, identityId: c.identityId }));
     }
 
     async setStatus(id: string, status: string): Promise<any> {
-        if (status !== 'published' && status !== 'hidden')
-            throw new BadRequestException('状态只能是 published / hidden');
+        if (status !== 'published' && status !== 'hidden' && status !== 'pending')
+            throw new BadRequestException('状态只能是 published / hidden / pending');
         const row = await this.comments.findOne({ where: { id } });
         if (!row)
             throw new BadRequestException('评论不存在');
-        row.status = status === 'hidden' ? CommentStatus.HIDDEN : CommentStatus.PUBLISHED;
+        row.status = status === 'hidden' ? CommentStatus.HIDDEN
+            : (status === 'pending' ? CommentStatus.PENDING : CommentStatus.PUBLISHED);
         await this.comments.save(row);
         return { id: row.id, status: row.status };
     }

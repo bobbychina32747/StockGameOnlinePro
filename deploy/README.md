@@ -612,6 +612,38 @@ CF 橙云（缓存/防打/证书）
 
 **坑**：`games/account.js` 也得跳 `?v=`（坑 17 的老毛病）——只 bump `site.js` 忘了它，浏览器拿的是 4 小时缓存的旧文件，症状是 `A.signInSite is not a function`、账号条永远停在"正在读账号状态…"。
 
+### 14.10 评论机器人审核 + 写作台零口令（2026-09-29）
+
+**机器人审核**（站主："添加一个机器人审核评论，禁止 dddd 那些违规内容" + "不要让我自己审核，我懒"）：
+`blog-moderation.service.ts`，规则引擎（不调大模型：低价值高频输入、可解释、不加外部依赖），**只有两档结论、没有人审队列**：
+
+| 拦下（400，附可读理由） | 放行 |
+|---|---|
+| 纯灌水（整条只有 `d/顶/1/6/哈/啊/。` 之类）、单字符连打 ≥6、字符重复度 <25%、违禁词（加微信/代刷/博彩/色情…）、只有符号表情、一次 ≥3 个外链、全大写英文长串、长度 <2 | 其余一切，**包括带 1~2 个链接的**（链接渲染成纯文本、点不了也没 SEO 收益，误杀正常读者更亏） |
+
+`赌博` 故意不在违禁词里（正常讨论游戏机制会用到）。另有既有的两道网：评论必须登录（邮箱验证过的身份）、同身份 20 秒 1 条 / 同 IP 每小时 12 条。后台仍可手动 hide/delete（`/api/admin/blog/comments`）。
+实测：`dddd`/`顶顶顶顶`/`1111111111`/`哈哈哈哈`/`加微信…`/3 外链 → **400**；正常中文 → **200**。
+
+**写作台零口令**（站主："我如何写博客"）：`BlogAdminGuard` 让**站点身份优先**——登录站点账号后打开 `/admin/` 直接进编辑器，不用再记 `ADMIN_USERNAME/ADMIN_PASSWORD`（旧 JWT 通道保留给脚本）。站主判据：`ADMIN_EMAILS`（可选）命中，或**最早注册且已验证的身份**（个人站，第一次注册的就是本人；判定缓存 60 秒）。实测：匿名 401、非站主身份 401、库里的最早身份 = 站主本人。
+
+**踩坑**：新 service 忘了加进 `providers` → Nest 启动直接崩、容器 `Restarting`、全站 502。症状是日志里 `Nest can't resolve dependencies of ... (?,)`；改完 module 一定要重启容器看 `healthy`，别只看 `npm run build` 通过。
+
+### 14.11 站内发信（写作台里的「✉ 发信」）（2026-09-30）
+
+需求链：站主要"以 `contact@bobbycn.cc` 回信" → Cloudflare **Email Routing 只收不发** → 新版 QQ 邮箱把"自定义域发信"做成了**付费会员**功能（免费的「其他邮箱」入口已下线）→ 所以直接在站上做一个发信页。
+
+| 项 | 实现 |
+|---|---|
+| 后端 | `backend/src/modules/webmail/**`：`GET /api/admin/mail/config`、`POST /api/admin/mail/send`（走 Resend API，From = `WEBMAIL_FROM`，默认 `contact@bobbycn.cc`） |
+| 鉴权 | 复用 `BlogAdminGuard`（站点身份=站主 或 写作台管理员 JWT）——**必须在 BlogAdminModule 里把 guard 和它注入的 JwtAuthGuard 都 export**，且 WebmailModule 要自己 import IdentityModule |
+| 前端 | **并入写作台**（站主要求"只记一个页面"）：`/admin/` 右上角「✉ 发信」，`#mailView` 与文章编辑器互斥切换；`/mail/` 只留一个跳转到 `/admin/` 的页面（旧书签不失效） |
+| nginx | `location ^~ /api/admin/mail/` 打本机 Nest（漏了就会命中门户的 `/api/` 中继 → Worker 401） |
+| 接收侧 | CF Email Routing：`contact@bobbycn.cc → bobby_minecraft@qq.com`（destination 必须 Verified，否则 CF 在 SMTP 层直接拒，Resend 侧记 `bounced`，之后还会把该地址拉进**抑制名单**继续 `suppressed`） |
+
+**线上验收**：`/admin/` 200 且点「✉ 发信」切换正常（浏览器实测：点击后 mailView 显示、editView 隐藏）；匿名调接口 401；管理员令牌 → config 显示 `Bobby · bobbycn.cc <contact@bobbycn.cc>`；**真发一封到站主 QQ 成功**（`{"ok":true,"id":"01a0f12b-…"}`）；非法收件人 400。
+
+**踩坑（本轮两次 502 都是它）**：跨模块复用 guard 时，Nest 在**导入方模块的上下文**里实例化它 —— 需要 `exports` 里有 guard 本身、它注入的依赖（JwtAuthGuard）、以及那些依赖的来源模块（IdentityModule）。少一个就是启动期 `Nest can't resolve dependencies` + 容器 `Restarting`。
+
 ### 13.8 个人主页站迁移实录（2026-09-28）
 
 来源仓库 `bobbychina-pages`（原 GitHub Pages 主站），落点 **`/var/www/portal`**（62 个文件 / 3.0MB）。
