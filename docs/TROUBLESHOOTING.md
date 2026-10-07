@@ -154,9 +154,13 @@ listen 443 ssl http2;      # ✅ 1.24 可用
 **正确的排查顺序（从下往上，最快的先做）：**
 
 ```bash
-# ① 先看有没有 IPv4 监听者 —— 这一步应该在查任何防火墙之前做
-sudo ss -4 -ltnp | grep ':22'          # 空 = 没有 IPv4 监听者 → 后面都不用查了
-sudo ss -ltnp  | grep ':22'            # 显示 [::]:22 = 只绑 IPv6；显示 *:22 = 双栈
+# ① 先看绑定形式 —— 这一步应该在查任何防火墙之前做
+sudo ss -ltnp | grep ':22'
+#    [::]:22   → 只绑 IPv6，IPv4 客户端必然被拒（就是本病）
+#    *:22      → dual-stack，IPv4+IPv6 都在听（正常）
+#    0.0.0.0:22→ 只绑 IPv4
+# ⚠️ 不要用 `ss -4 -ltnp | grep ':22'` 判断：dual-stack 的 *:22 不会出现在 -4 列表里，
+#    拿它当判据会得出"IPv4 没监听"的假结论（本次踩过）。
 
 # ② 服务器内部自测（绕开安全组/运营商，直接暴露服务本身）
 ssh -o StrictHostKeyChecking=no ubuntu@127.0.0.1 "echo IPV4_OK"
