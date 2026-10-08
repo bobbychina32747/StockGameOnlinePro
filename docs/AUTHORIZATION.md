@@ -204,9 +204,18 @@ JWKS 本地验签、撤销后旧令牌立刻被拒。
   `game_saves` / `identity_secrets` 六张新表，靠既有 `autoLoadEntities + synchronize` 自动创建
   （与身份模块原来的四张表同一套口径）。生产若已 `DB_SYNCHRONIZE=false`，需要手工建表。
 - **环境变量**：新功能不强制任何新变量。可选：
-  `SAVES_MASTER_KEY`（存档主密钥，建议配）、`APP_BASE_URL`（邮件链接前缀）。
+  `SAVES_MASTER_KEY`（存档主密钥，建议配）、`APP_BASE_URL`（邮件链接前缀）、
+  `SITE_LOGIN_BASE`（登录页与授权端点不同源时才需要，本机开发用）。
+- **前端静态资源的缓存（2026-10-09 实测踩到）**：Cloudflare 会给 `/games/`、`/i18n/*.js`
+  这类静态资源加 4 小时 TTL，改了页面/词典后**线上可能要等几小时才变**。
+  改词典时除了跳 `i18n.js` 里的 `VER`（同时跳页面里的 `?v=`），最好顺手在 CF 清一次缓存：
+  Dashboard → Caching → Configuration → Purge Everything，或
+  `curl -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE/purge_cache" -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" --data '{"purge_everything":true}'`。
 - **回滚**：前端 `site-auth.js` 探测不到 `/oauth/clients` 会显示"站点登录暂不可用"并禁用按钮
   （**不会**偷偷退回本机账号）；后端把新端点当作纯新增，回滚镜像即恢复原状（新表留着不碍事）。
+  线上后端发布 = 同步源码到 `/opt/stockgame/backend` 后
+  `docker compose -f docker/docker-compose.yml -f deploy/docker-compose.override.yml up -d --build`
+  （本机脚本：`powershell -File scripts/_sync-backend.ps1 -Prod`；不带 `-Prod` 只动 staging）。
 
 ---
 
