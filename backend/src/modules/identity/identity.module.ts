@@ -6,12 +6,19 @@ import { Identity } from '../../infrastructure/database/entities/identity.entity
 import { Credential } from '../../infrastructure/database/entities/credential.entity';
 import { Session } from '../../infrastructure/database/entities/session.entity';
 import { IdentityToken } from '../../infrastructure/database/entities/identity-token.entity';
+// 2026-10-08 授权系统：客户端注册 / 授权码 / 授权关系 / 刷新令牌（四张新表）
+import { OAuthClient } from '../../infrastructure/database/entities/oauth-client.entity';
+import { OAuthCode } from '../../infrastructure/database/entities/oauth-code.entity';
+import { OAuthGrant } from '../../infrastructure/database/entities/oauth-grant.entity';
+import { OAuthRefreshToken } from '../../infrastructure/database/entities/oauth-refresh-token.entity';
 
 import { IdentityController } from './identity.controller';
 import { IdentityService } from './identity.service';
 import { IdentityJwtService } from './jwt.service';
 import { KeysService } from './keys.service';
 import { LogMailerService, MAILER, ResendMailerService } from './mailer.service';
+import { OauthController } from './oauth.controller';
+import { OauthService } from './oauth.service';
 import { PasswordService } from './password.service';
 import { RateLimitService } from './rate-limit.service';
 import { SessionAuthGuard } from './session-auth.guard';
@@ -38,9 +45,13 @@ const mailerProvider = {
 @Module({
     imports: [
         ConfigModule,
-        TypeOrmModule.forFeature([Identity, Credential, Session, IdentityToken]),
+        TypeOrmModule.forFeature([
+            Identity, Credential, Session, IdentityToken,
+            // 授权系统四张表（autoLoadEntities 会自动建表，与既有身份表同一套 synchronize 口径）
+            OAuthClient, OAuthCode, OAuthGrant, OAuthRefreshToken,
+        ]),
     ],
-    controllers: [IdentityController],
+    controllers: [IdentityController, OauthController],
     providers: [
         IdentityService,
         PasswordService,
@@ -51,11 +62,13 @@ const mailerProvider = {
         IdentityJwtService,
         TokenExchangeService,
         TurnstileService,
+        OauthService,
         mailerProvider,
     ],
     // 导出供其它模块（如把身份挂到业务账号上）复用；MVP 暂无人消费
     // 阶段一追加：密钥/JWT 服务导出，便于后续在同进程内做"内部服务间验签"
     // 2026-09-29 追加：SessionAuthGuard 导出，博客评论（blog-public）用它做"登录才能发"
-    exports: [IdentityService, PasswordService, TokenService, RateLimitService, KeysService, IdentityJwtService, TokenExchangeService, TurnstileService, SessionAuthGuard],
+    // 2026-10-08 追加：OauthService 导出，云存档等资源服务用它做 "Bearer 访问令牌 + scope" 鉴权
+    exports: [IdentityService, PasswordService, TokenService, RateLimitService, KeysService, IdentityJwtService, TokenExchangeService, TurnstileService, SessionAuthGuard, OauthService],
 })
 export class IdentityModule {}

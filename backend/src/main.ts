@@ -9,6 +9,7 @@ import typeorm_1 = require("typeorm");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 import app_module_1 = require("./app.module");
+import { formBodyMiddleware } from "./modules/identity/oauth-form";
 
 // G-5: 进程级异常兜底（排障用）。
 // 背景：之前既没有 unhandledRejection 也没有 uncaughtException 处理器——一旦某处 async 抛出而没人 await，
@@ -46,7 +47,11 @@ async function autoSeed(ds) {
     }
 }
 async function bootstrap() {
-    const app = await core_1.NestFactory.create(app_module_1.AppModule);
+    // bodyParser: false —— 关掉 Nest 自带的 body 解析器，下面按「json → 表单体」自己装（顺序可控）。
+    // 原因：OAuth 令牌端点必须收 application/x-www-form-urlencoded（RFC 6749 §4.1.3），
+    // 而 Nest 默认那套在本应用里收不到表单体（流被消费、req.body 变空对象，端点表现成"参数全缺"）。
+    // 关掉之后流的归属完全确定，不会再出现这种静默失败。JSON 解析器随后照旧装上，既有端点不受影响。
+    const app = await core_1.NestFactory.create(app_module_1.AppModule, { bodyParser: false });
     const logger = new common_1.Logger('Bootstrap');
     const config = app.get(config_1.ConfigService);
     try {
@@ -57,10 +62,37 @@ async function bootstrap() {
         logger.warn('种子数据初始化跳过（数据库可能未就绪）');
     }
     app.setGlobalPrefix('api');
-    app.use(helmet());
+    // 安全响应头。2026-10-08：默认 helmet() 会给每个响应加 `Cross-Origin-Resource-Policy: same-origin`
+    // 与 `Content-Security-Policy: connect-src 'self'` —— 这两条会把**跨源的 API 调用**全部拦死：
+    // 门户的 GitHub Pages 镜像、本机前后端分端口开发都靠跨源调 /api。被拦时浏览器只报
+    // "TypeError: Failed to fetch"，看一眼像网络挂了，实际是响应头。
+    // 所以这里保留其它安全头（nosniff / frameguard / referrer-policy / HSTS…），
+    // 只放开"资源可被跨源读取"与"允许跨源 fetch"，并允许通过环境变量加白名单。
+    const extraOrigins = String(process.env.CORS_ORIGIN || '')
+        .split(',').map((s) => s.trim()).filter(Boolean);
+    app.use(helmet({
+        crossOriginResourcePolicy: { policy: 'cross-origin' },
+        // HSTS 只在生产开：它会把浏览器对**这个主机**的 http 请求永久升级成 https，
+        // 本机开发（http://127.0.0.1:8099）一旦收到这个头，之后浏览器直接报 ERR_SSL_PROTOCOL_ERROR，
+        // 而且清不掉（浏览器记 31536000 秒）。线上由 nginx 也有 HSTS，这里保留生产开关。
+        strictTransportSecurity: process.env.NODE_ENV === 'production'
+            ? { maxAge: 31536000, includeSubDomains: true }
+            : false,
+        contentSecurityPolicy: {
+            useDefaults: true,
+            directives: {
+                // 默认 null = 保留 helmet 的 default-src 'self'（本站页面自身的脚本/样式策略不变）
+                'connect-src': process.env.CSP_CONNECT_SRC
+                    ? ["'self'", ...String(process.env.CSP_CONNECT_SRC).split(',').map((s) => s.trim()).filter(Boolean)]
+                    : null,
+            },
+        },
+    }));
     const express = require('express');
     app.use(express.json({ limit: '1mb' }));
-    app.use(express.urlencoded({ limit: '1mb', extended: true }));
+    // 表单体（application/x-www-form-urlencoded）由自己的解析器收：见 oauth-form.ts 的注释。
+    // json 在前、表单在后，两者类型互斥，顺序不影响既有端点。
+    app.use(formBodyMiddleware);
     // 登录/注册频率限制：每 IP 每分钟最多 10 次
     // 2026-09-28 收窄：原来挂在 /api/auth 全前缀，会把 identity 模块的 verify（点邮件链接）与
     // GitHub 回调一起限住——用户在同一个 NAT 下点几下链接就 429。只限"确实要防爆破"的写入口。

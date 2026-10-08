@@ -141,8 +141,43 @@ npx jest src/modules/identity # 6 个 suite / 54 个用例
 4. **注册端点用「静默受理」替代显式冲突错误**：重复注册（含邮箱已激活）统一返回 `{success:true}`，不区分「已存在 / 可注册」，与既有 `auth.service.register` 的防枚举口径一致；pending 未过期时幂等重发邮件并作废旧链接。
 5. **口令兜底**：`@node-rs/argon2@2.2.1` 在本机**安装成功**（含 `argon2-win32-x64-msvc` 预编译包），真机实测落库串为 `$argon2id$v=19$m=19456,t=2,p=1$…` ⇒ **本机已满足 argon2id 规格，未启用兜底**。`password.service.ts` 仍保留 `crypto.scrypt` 兜底路径（原生模块在目标平台加载失败时降级并**打 error 日志**），此时须在本 README「未达规格」条目标注；`PasswordService.algorithm` 可直接读出当前生效算法，单测对此有断言。
 
-## 7. 待办 / 风险
+## 7. 授权系统（OAuth 2.0，2026-10-08 追加）
 
+> 账号 → **可复用的授权系统**。站内游戏与以后自己做的独立游戏都用"站点账号授权登录"，
+> 不再各自维护账号表。架构与接入指南见仓库 `docs/AUTHORIZATION.md`；这里只列与身份模块的接线点。
+
+| 文件 | 职责 |
+|---|---|
+| `oauth.service.ts` | 客户端注册/种子、`/authorize` 校验、授权码、令牌兑换、刷新轮换、`/userinfo`、撤销 |
+| `oauth.controller.ts` | HTTP 层 + **同意页**（后端自己渲染的 HTML，不依赖门户页面） |
+| `oauth-form.ts` | 表单体解析（RFC 6749 要求 `application/x-www-form-urlencoded`） |
+| `entities/oauth-{client,code,grant,refresh-token}.entity.ts` | 四张新表 |
+
+端点前缀：`/api/auth/identity/oauth/*`（复用既有 nginx 反代规则，零 nginx 改动）。
+
+**与既有能力的关系（都保持向后兼容）**：
+
+- `jwt.service.ts#issue()` 新增可选的 `client_id` / `scope` 两个 claim；不传时行为与以前**逐字节一致**
+  （`/auth/identity/token` 与 `/introspect` 的契约不变）。
+- 令牌仍是同一把 Ed25519 密钥、同一份 JWKS —— 授权流程与"下游本地验签"共用一条信任链。
+- `identity.controller.ts` 的 `github/start|callback` 仍是 501 占位：**GitHub 只作为登录方式时的
+  备选**，现在的主路径是站点账号本身（`provider=email`）。
+
+**实测踩到的两个坑（别再踩）**：
+
+1. `repository.save()` 在 SQLite 下会因"datetime 列读回来是字符串"判定"没变化"而**跳过 UPDATE** ——
+   授权撤销一度完全写不进库。凡是要改 datetime 列，用 `repository.update()`（见 `oauth.service.ts` 注释）。
+2. Nest 默认的 body-parser 在这套组合里收不到表单体（流被消费、`req.body` 变空对象，
+   表现为"参数全缺"）。`main.ts` 因此改为 `NestFactory.create(AppModule, { bodyParser: false })`
+   并自行按「json → 表单体」装载解析器（`oauth-form.ts#formBodyMiddleware`）。
+
+新增单测：`__tests__/oauth-flow.test.js`（授权码/PKCE/刷新轮换/撤销/scope 裁剪/降级共 60+ 例）、
+`__tests__/_oauth-harness.js`（带授权表的公共装置）、
+`src/modules/game-saves/__tests__/game-saves.test.js`（云存档密钥托管与迁移）。
+
+---
+
+## 8. 待办 / 风险
 - [ ] **GitHub OAuth 正式实现**：`/github/start` 与 `/github/callback` 目前恒 501。需要 `GH_CLIENT_ID` / `GH_CLIENT_SECRET` + 已注册的回调地址；实体侧 `provider`/`providerUid` + `UNIQUE(provider, providerUid)` 已就绪，`claim_account` 用途枚举已预留。
 - [ ] **TOTP**：`credentials.totpSecretEnc`、`IDENTITY_ENC_KEY`、`PasswordService.encryptTotpSecret/decryptTotpSecret`、`recoveryCodes`（哈希数组 + `hashRecoveryCode/verifyRecoveryCode`）均已就绪，缺 2FA 业务流程（绑定/校验/恢复码一次性消费）。
 - [ ] **迁移脚本**：`DB_SYNCHRONIZE=false` 的生产环境需要建表 SQL / TypeORM migration（四张表 + 三个唯一索引）。

@@ -19,3 +19,6 @@ backend/data.bak/
 
 # E2E 冒烟产物（截图 / result.json / server.log，非源码；Phase F-4）
 tests/e2e/artifacts/
+
+# 本机授权相关的一次性产物（开发用数据库与签名私钥，绝不入库）
+.local-oauth/

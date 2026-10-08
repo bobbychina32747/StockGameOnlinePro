@@ -32,6 +32,16 @@ export interface JwtClaims {
     exp: number;
     /** 验签命中的 kid（来自 header；令牌轮换期用来判断该用哪把公钥） */
     kid: string;
+    /** OAuth 授权：授权的客户端 id（站点内部令牌交换不带该字段） */
+    client_id?: string;
+    /** OAuth 授权：本张令牌被授到的 scopes（空格分隔，与 RFC 6749 一致） */
+    scope?: string;
+}
+
+/** 授权码换来的令牌要带上的附加 claim（不传则与既有内部交换完全一致） */
+export interface JwtExtraClaims {
+    client_id?: string;
+    scope?: string;
 }
 
 export interface IssuedToken {
@@ -68,8 +78,12 @@ function decodeSegment(part: string): Json {
 export class IdentityJwtService {
     constructor(private readonly keys: KeysService) {}
 
-    /** 签发：header{alg:EdDSA,typ:JWT,kid} + payload{iss,aud,sub,sid,iat,exp} */
-    issue(sub: string, sid: string, now = Date.now()): IssuedToken {
+    /**
+     * 签发：header{alg:EdDSA,typ:JWT,kid} + payload{iss,aud,sub,sid,iat,exp[,client_id,scope]}。
+     * extra 只允许追加 OAuth 授权字段（client_id/scope），不得改动核心语义——
+     * 既有 /auth/identity/token 与 introspect 的契约因此一字不变。
+     */
+    issue(sub: string, sid: string, now = Date.now(), extra?: JwtExtraClaims): IssuedToken {
         const kid = this.keys.currentKid();
         if (!kid || !this.keys.isReady())
             throw new TokenSigningUnavailableError();
@@ -79,7 +93,11 @@ export class IdentityJwtService {
         const iat = Math.floor(now / 1000);
         const exp = iat + JWT_TTL_SEC;
         const header = { alg: SIGNING_ALG, typ: 'JWT', kid };
-        const payload = { iss: JWT_ISSUER, aud: JWT_AUDIENCE, sub: String(sub), sid: String(sid), iat, exp };
+        const payload: Record<string, any> = { iss: JWT_ISSUER, aud: JWT_AUDIENCE, sub: String(sub), sid: String(sid), iat, exp };
+        if (extra && extra.client_id)
+            payload.client_id = String(extra.client_id);
+        if (extra && extra.scope)
+            payload.scope = String(extra.scope);
         const signingInput = `${encodeSegment(header)}.${encodeSegment(payload)}`;
         const signature = b64url(this.keys.sign(Buffer.from(signingInput, 'utf8')));
         return { token: `${signingInput}.${signature}`, kid, expiresIn: JWT_TTL_SEC };
@@ -130,6 +148,8 @@ export class IdentityJwtService {
         return {
             iss: payload.iss, aud: payload.aud, sub: payload.sub, sid: payload.sid,
             iat, exp, kid,
+            ...(typeof payload.client_id === 'string' && payload.client_id ? { client_id: payload.client_id } : {}),
+            ...(typeof payload.scope === 'string' && payload.scope ? { scope: payload.scope } : {}),
         };
     }
 
