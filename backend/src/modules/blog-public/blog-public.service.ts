@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
 import { In, Repository } from 'typeorm';
 
+import { BLOG_SLUG_RE } from '../../common/blog-slug';
 import { BlogComment, CommentStatus } from '../../infrastructure/database/entities/blog-comment.entity';
 import { BlogPost } from '../../infrastructure/database/entities/blog-post.entity';
 import { BlogView } from '../../infrastructure/database/entities/blog-view.entity';
@@ -15,8 +16,11 @@ import { BlogModerationService } from './blog-moderation.service';
 //   · 这两块是**对外**能力（任何人可读、登录用户可写），与写作台（只有站长）的信任级别不同；
 //   · 但两者共用同一张库、同一套 slug 契约，所以管理端通过 BlogPublicModule 导出的本 service 复用逻辑。
 
-/** slug 形状与应用发布口径一致：小写字母数字与连字符 */
-const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,119}$/;
+/**
+ * slug 形状：**与写作台共用同一份契约**（见 common/blog-slug.ts）。
+ * 曾经这里只认小写、写作台却发得出大写 slug，导致《WeirdStuff2》的浏览量/评论在线上全废（2026-10-08）。
+ */
+const SLUG_RE = BLOG_SLUG_RE;
 /** 单条评论长度上限（前端也会拦，这里是最后一道） */
 export const COMMENT_MAX_LEN = 2000;
 /** 同一 IP 看同一篇文章的去重窗口 */

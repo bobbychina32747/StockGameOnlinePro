@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ArrayMaxSize, IsArray, IsBoolean, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { BLOG_SLUG_HINT, BLOG_SLUG_RE } from '../../common/blog-slug';
 import { CurrentUser } from '../../common/guards/jwt-auth.guard';
 import { User, UserRole } from '../../infrastructure/database/entities/user.entity';
 import { BlogPublicService } from '../blog-public/blog-public.service';
@@ -12,12 +13,13 @@ import { BlogAdminService, BlogPostDto } from './blog-admin.service';
  * ⚠️ 每个字段都**必须**带 class-validator 装饰器：全局 ValidationPipe 开了
  *    `whitelist: true` + `forbidNonWhitelisted: true`，**没有装饰器的属性会被当成"未声明的字段"直接拒掉**，
  *    报错长这样：`property title should not exist, property slug should not exist, …`（2026-09-30 站主发帖时踩到）。
- *    slug 的格式与 BlogAdminService.upsert 里的判定保持一致（字母/数字/中划线），否则前端生成的中文 slug 会在服务层再抛一次。
+ *    slug 的格式来自 common/blog-slug.ts（写作台与公开接口**共用同一份**），否则会出现
+ *    "写得进去、读不出来"：写作台发得出大写 slug，公开接口却判 400（2026-10-08 的《WeirdStuff2》就是这样）。
  */
 class SavePostDto implements BlogPostDto {
     @IsString()
     @MaxLength(120)
-    @Matches(/^[a-zA-Z0-9][a-zA-Z0-9-]*$/, { message: 'slug 只能包含字母、数字与中划线（中文标题请自拟英文短链）' })
+    @Matches(BLOG_SLUG_RE, { message: BLOG_SLUG_HINT })
     slug: string;
 
     @IsString()

@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { execFile } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { BLOG_SLUG_HINT, BLOG_SLUG_RE } from '../../common/blog-slug';
 import { BlogPost } from '../../infrastructure/database/entities/blog-post.entity';
 
 export interface BlogPostDto {
@@ -49,9 +50,10 @@ export class BlogAdminService {
 
     /** 新建或按 slug 覆盖（写作台只有一个作者，不做冲突合并） */
     async upsert(dto: BlogPostDto) {
-        if (!dto.slug || !/^[a-z0-9][a-z0-9-]*$/i.test(dto.slug)) {
+        if (!dto.slug || !BLOG_SLUG_RE.test(dto.slug)) {
             // slug 会变成 URL 片段与文件名，先卡住格式（中文标题由前端/调用方转写成拼音或英文）
-            throw new Error('slug 只能包含字母、数字与中划线');
+            // 判定与对外接口共用 common/blog-slug.ts —— 否则"写得进去、读不出来"（见该文件注释）
+            throw new Error(BLOG_SLUG_HINT);
         }
         let row = await this.postRepo.findOne({ where: { slug: dto.slug } });
         const published = !dto.draft;
