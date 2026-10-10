@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -10,9 +10,13 @@ import { Account } from '../../infrastructure/database/entities/account.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { IdentityModule } from '../identity/identity.module';
+import { SiteGameAuthService } from './site-game-auth.service';
 
+@Global()
 @Module({
     imports: [
+        IdentityModule,
         PassportModule.register({ defaultStrategy: 'jwt' }),
         TypeOrmModule.forFeature([User, Account]),
         JwtModule.registerAsync({
@@ -26,7 +30,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
         }),
     ],
     controllers: [AuthController],
-    providers: [AuthService, JwtStrategy],
-    exports: [AuthService, JwtModule],
+    providers: [AuthService, JwtStrategy, SiteGameAuthService],
+    exports: [AuthService, JwtModule, SiteGameAuthService],
 })
 export class AuthModule {}

@@ -1,14 +1,15 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { useAuthStore } from './store';
 import { AppLayout } from './components/Layout/AppLayout';
 import ErrorBoundary from './components/UI/ErrorBoundary';
-import Login from './pages/Login/Login';
-import Dashboard from './pages/Dashboard/Dashboard';
-import Ranking from './pages/Ranking/Ranking';
-import Profile from './pages/Profile/Profile';
-import Backtest from './pages/Backtest/Backtest';
-import Transactions from './pages/Transactions/Transactions';
+import { useSiteSession } from './hooks/useSiteSession';
+const Login = lazy(() => import('./pages/Login/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
+const Ranking = lazy(() => import('./pages/Ranking/Ranking'));
+const Profile = lazy(() => import('./pages/Profile/Profile'));
+const Backtest = lazy(() => import('./pages/Backtest/Backtest'));
+const Transactions = lazy(() => import('./pages/Transactions/Transactions'));
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = useAuthStore((s) => s.token);
@@ -18,8 +19,11 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
 export default function App() {
   const token = useAuthStore((s) => s.token);
+  const ready = useSiteSession();
+  if (!ready) return <div role="status">正在连接站点账号…</div>;
 
   return (
+    <Suspense fallback={<div role="status" aria-live="polite">加载中…</div>}>
     <Routes>
       <Route path="/login" element={token ? <Navigate to="/" replace /> : <Login />} />
       <Route
@@ -74,5 +78,6 @@ export default function App() {
         />
       </Route>
     </Routes>
+    </Suspense>
   );
 }

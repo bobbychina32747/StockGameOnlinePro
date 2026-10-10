@@ -4,7 +4,7 @@ import { io, Socket } from 'socket.io-client';
 let socket: Socket | null = null;
 
 export function connectWebSocket(): Socket {
-  if (socket?.connected) return socket;
+  if (socket) return socket;
 
   // 始终同源连接：开发走 Vite 代理 /socket.io，生产走 nginx 代理 /socket.io
   const s = io('/market', {
@@ -39,8 +39,10 @@ export function connectWebSocket(): Socket {
 
 export function disconnectWebSocket(): void {
   if (socket) {
+    socket.removeAllListeners();
     socket.disconnect();
     socket = null;
+    (window as any).__wsSocket = null;
   }
 }
 

@@ -30,7 +30,11 @@ api.interceptors.response.use(
     // 登录/注册接口的 401 由业务层处理（展示错误信息），不触发登出
     const url = err.config?.url || '';
     const isAuthRequest = url.includes('/auth/login') || url.includes('/auth/register');
-    if (err.response?.status === 401 && !isAuthRequest) {
+    const currentToken = localStorage.getItem('token');
+    const requestAuthorization = err.config?.headers?.Authorization;
+    // 旧账号请求迟到时，不能清掉已切换的新账号会话。
+    const belongsToCurrentSession = !!currentToken && requestAuthorization === `Bearer ${currentToken}`;
+    if (err.response?.status === 401 && !isAuthRequest && belongsToCurrentSession) {
       if (unauthorizedHandler) unauthorizedHandler();
     }
     return Promise.reject(err);

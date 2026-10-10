@@ -20,6 +20,9 @@ services:
       - IDENTITY_JWT_KEY_FILE=/keys/identity-ed25519.pem
       # 邮件里链接的前缀（必须与冻结契约一致）
       - APP_BASE_URL=https://bobbycn.cc
+      # 主站与游戏子域共用 sid；缺省 host-only Cookie 无法传到 game 子域
+      - COOKIE_DOMAIN=.bobbycn.cc
+      - COOKIE_SECURE=1
     volumes: !override
       # 游戏/账号/文章数据（同一个 SQLite 库，每日 .backup 覆盖）
       - sgp-data:/app/data

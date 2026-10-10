@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import ReactEChartsCore from 'echarts-for-react';
+import ReactEChartsCore from 'echarts-for-react/lib/core';
+import * as echarts from 'echarts/core';
+import { BarChart, CandlestickChart, LineChart } from 'echarts/charts';
+import { DataZoomComponent, GridComponent, LegendComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
 import { useMarketStore, useUIStore } from '../../store';
 import { PriceText } from './PriceText';
 import { isTradingTimeFor, usSessionsFor } from '../../utils/marketSessions';
 import { barsForDay, nextReplaySpeed, replayDaysOf, replayTimeLabelOf } from '../../utils/replay';
+import { marketDateFor } from '../../data/trading-calendar';
+
+echarts.use([BarChart, CandlestickChart, LineChart, DataZoomComponent, GridComponent, LegendComponent, MarkLineComponent, TooltipComponent, CanvasRenderer]);
 
 interface KlineData {
   time: Date;
@@ -110,7 +117,7 @@ export function ChartPanel() {
 
   // ─── P1 盘后回放加速器：分时图按历史交易日倍速重放（1x/4x/16x，模拟盘中逐步揭示） ───
   const [replay, setReplay] = useState({ enabled: false, playing: true, day: '', index: 0, speed: 4 });
-  const replayDays = useMemo(() => replayDaysOf(intradaySrc), [intradaySrc]);
+  const replayDays = useMemo(() => replayDaysOf(intradaySrc, marketMode), [intradaySrc, marketMode]);
   // 数据变化时：默认回放日 = 最近一个交易日，游标归零
   useEffect(() => {
     if (replayDays.length && !replayDays.includes(replay.day)) {
@@ -118,22 +125,22 @@ export function ChartPanel() {
     }
   }, [replayDays, replay.day]);
   const activeReplayBars = useMemo(
-    () => (replay.enabled && replay.day ? barsForDay(intradaySrc, replay.day) : []),
-    [intradaySrc, replay.enabled, replay.day],
+    () => (replay.enabled && replay.day ? barsForDay(intradaySrc, replay.day, marketMode) : []),
+    [intradaySrc, replay.enabled, replay.day, marketMode],
   );
   // 播放推进：每 250ms 推进 speed 根（1x=4根/秒≈完整交易日 60 秒；4x≈15 秒；16x≈4 秒）
   useEffect(() => {
     if (!replay.enabled || !replay.playing) return;
     const id = setInterval(() => {
       setReplay((r) => {
-        const dayBars = barsForDay(intradaySrc, r.day);
+        const dayBars = barsForDay(intradaySrc, r.day, marketMode);
         if (dayBars.length === 0) return { ...r, playing: false };
         const next = Math.min(dayBars.length - 1, r.index + r.speed);
         return { ...r, index: next, playing: next < dayBars.length - 1 };
       });
     }, 250);
     return () => clearInterval(id);
-  }, [replay.enabled, replay.playing, replay.speed, replay.day, intradaySrc]);
+  }, [replay.enabled, replay.playing, replay.speed, replay.day, intradaySrc, marketMode]);
   const replayTimeLabel = replayTimeLabelOf(activeReplayBars, replay.index);
 
   // P5 亮色主题适配：图表轴/网格/提示框/滑条颜色随主题切换
@@ -221,8 +228,8 @@ export function ChartPanel() {
       if (bars.length > 0) {
         const activeDay = replay.enabled && replay.day
           ? replay.day
-          : new Date(bars[bars.length - 1].time).toDateString();
-        bars = bars.filter((k) => new Date(k.time).toDateString() === activeDay);
+          : marketDateFor(marketMode, new Date(bars[bars.length - 1].time)).toDateString();
+        bars = barsForDay(bars, activeDay, marketMode);
         // 回放：只揭示到当前游标为止的 K 线（逐步播放效果）
         if (replay.enabled) bars = bars.slice(0, Math.min(replay.index + 1, bars.length));
       }
@@ -401,7 +408,7 @@ export function ChartPanel() {
       ],
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [klineData, selectedTimeframe, intradaySrc, isIntraday, zoom, containerWidth, theme, replay.enabled, replay.day, replay.index]);
+  }, [klineData, selectedTimeframe, intradaySrc, isIntraday, zoom, containerWidth, theme, replay.enabled, replay.day, replay.index, marketMode]);
 
   const prevClose = stock?.dayOpen != null ? Number(stock.dayOpen) : (stock?.price ?? price ?? 0);
   const changePct = prevClose > 0 && price != null ? ((price - prevClose) / prevClose) * 100 : 0;
@@ -548,6 +555,7 @@ export function ChartPanel() {
       </div>
       <div className="chart-container" ref={containerRef}>
         <ReactEChartsCore
+          echarts={echarts}
           ref={chartRef}
           key={`${selectedSymbol}-${selectedTimeframe}`}
           option={chartOption}

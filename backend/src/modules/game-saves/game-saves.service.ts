@@ -68,19 +68,15 @@ export class GameSavesService implements OnModuleInit {
             this.cachedMaster = Buffer.from(String(row.value).trim(), 'hex');
             return this.cachedMaster;
         }
-        const fresh = randomBytes(32).toString('hex');
-        try {
-            if (row)
-                await this.appSecrets.update({ name: MASTER_SECRET_NAME }, { value: fresh });
-            else
-                await this.appSecrets.insert({ name: MASTER_SECRET_NAME, value: fresh });
-            this.logger.warn('未配置 SAVES_MASTER_KEY：已生成随机主密钥并写入 app_secrets（随数据库备份走）。建议部署侧配置环境变量');
-        }
-        catch (e: any) {
-            // 落库失败也不能 500：本次进程内可用，重启后旧存档会解不开 —— 必须显著告警
-            this.logger.error(`存档主密钥落库失败（${e && e.message}）：本次使用临时密钥，重启后旧存档将无法解封`);
-        }
-        this.cachedMaster = Buffer.from(fresh, 'hex');
+        // Never overwrite existing key material or serve an unpersisted key.
+        if (row) throw new Error('存档主密钥格式损坏，已拒绝重新生成');
+        await this.appSecrets.createQueryBuilder().insert()
+            .values({ name: MASTER_SECRET_NAME, value: randomBytes(32).toString('hex') })
+            .orIgnore().execute();
+        const persisted = await this.appSecrets.findOne({ where: { name: MASTER_SECRET_NAME } });
+        if (!persisted || !/^[0-9a-f]{64}$/i.test(String(persisted.value).trim()))
+            throw new Error('存档主密钥未能持久化');
+        this.cachedMaster = Buffer.from(String(persisted.value).trim(), 'hex');
         return this.cachedMaster;
     }
 
@@ -105,11 +101,15 @@ export class GameSavesService implements OnModuleInit {
         }
         const fresh = randomBytes(32);
         const wrapped = this.wrap(master, fresh);
-        if (row)
-            await this.secrets.update({ identityId: id }, { saveKey: wrapped });
-        else
-            await this.secrets.insert({ identityId: id, saveKey: wrapped });
-        return fresh;
+        // The primary key and conditional update arbitrate across requests/processes.
+        await this.secrets.createQueryBuilder().insert()
+            .values({ identityId: id, saveKey: wrapped }).orIgnore().execute();
+        await this.secrets.createQueryBuilder().update()
+            .set({ saveKey: wrapped }).where('identityId = :id', { id })
+            .andWhere('saveKey IS NULL').execute();
+        const persisted = await this.secrets.findOne({ where: { identityId: id } });
+        if (!persisted || !persisted.saveKey) throw new BadRequestException('存档密钥未能持久化');
+        return this.unwrap(master, persisted.saveKey);
     }
 
     /** 客户端取密钥（仅在已授权 + saves scope 的请求下调用） */

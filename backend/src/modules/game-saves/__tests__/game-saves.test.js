@@ -42,6 +42,24 @@ describe('云存档 · 密钥托管', () => {
       .not.toBe((await h.saves.keyForClient(two.identity.id)).key);
   });
 
+  test('多个服务实例同时首次取密钥，全部返回同一份持久化密钥', async () => {
+    const { identity } = await h.activeIdentity('race@example.com', 'race');
+    const { GameSavesService } = require('../../../../dist/src/modules/game-saves/game-saves.service');
+    const services = Array.from({ length: 8 }, () => new GameSavesService(h.repos.save, h.repos.secret, h.repos.appSecret));
+    const keys = await Promise.all(services.map(s => s.keyForClient(identity.id)));
+    expect(new Set(keys.map(k => k.key)).size).toBe(1);
+    const restarted = new GameSavesService(h.repos.save, h.repos.secret, h.repos.appSecret);
+    expect((await restarted.keyForClient(identity.id)).key).toBe(keys[0].key);
+  });
+
+  test('主密钥落库失败时拒绝提供临时密钥', async () => {
+    const { GameSavesService } = require('../../../../dist/src/modules/game-saves/game-saves.service');
+    const unavailable = { findOne: async () => null, createQueryBuilder: () => { throw new Error('database unavailable'); } };
+    const service = new GameSavesService(h.repos.save, h.repos.secret, unavailable);
+    await expect(service.masterKey()).rejects.toThrow('database unavailable');
+    expect(service.cachedMaster).toBeNull();
+  });
+
   test('环境变量配置主密钥时优先使用（部署侧可控）', async () => {
     process.env.SAVES_MASTER_KEY = 'a'.repeat(64);
     const { GameSavesService } = require('../../../../dist/src/modules/game-saves/game-saves.service');

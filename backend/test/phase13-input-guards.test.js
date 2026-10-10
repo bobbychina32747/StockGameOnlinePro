@@ -129,11 +129,12 @@ describe('Phase 13 输入校验加固（account.service）', () => {
       const res = await svc.transferCash('U1', 'CN', 'US', 10000);
       const expected = (10000 * fx.CN / fx.US) * (1 - FX_TRANSFER_FEE_RATE);
       expect(res.success).toBe(true);
-      expect(res.received).toBeCloseTo(Number(expected.toFixed(2)), 2);
+      const credited = Math.floor(expected * 100) / 100;
+      expect(res.received).toBe(credited);
       const from = accountRepo.rows.find((a) => a.marketMode === 'CN');
       const to = accountRepo.rows.find((a) => a.marketMode === 'US');
       expect(from.cash).toBe(40000);
-      expect(to.cash).toBeCloseTo(Number((100000 + Number(expected.toFixed(2))).toFixed(2)), 2);
+      expect(to.cash).toBeCloseTo(100000 + credited, 2);
     });
 
     test('返回结构不变：合法市场但转出账户不存在仍返回 success:false（不抛异常）', async () => {

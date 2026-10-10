@@ -214,8 +214,8 @@ timeframe: `1min`（默认）/ `5min` / `60min` / `daily` / `weekly` / `monthly`
 
 ### GET /fund（公开）/ GET /fund/:id（公开）
 ```json
-[{ "id":"fund-1","name":"沪深300 ETF","type":"ETF","nav":4.5,"dailyReturn":0.001,"subscribeFeeRate":0.0015 },
- { "id":"fund-2","name":"货币基金 A","type":"货币基金","nav":1.0,"dailyReturn":0.0001,"subscribeFeeRate":0 }]
+[{ "id":"fund-1","name":"模拟A股指数 ETF","type":"ETF","nav":4.5,"dailyReturn":0,"subscribeFeeRate":0.0015 },
+ { "id":"fund-2","name":"货币基金 A","type":"货币基金","nav":1.0,"dailyReturn":0.0000979914,"subscribeFeeRate":0 }]
 ```
 
 ### POST /fund/:id/subscribe?amount=1000&mode=CN（**参数在 Query**，需 token）
@@ -357,7 +357,7 @@ history = requests.get(f'{BASE}/trading/history', params={'mode': 'US'}, headers
 - **跨市场划转**：动态汇率（HK/US 逐日 ±3% 随机游走）+ 0.1% 手续费；赛季报名中禁划转
 - **重置**：需无持仓/无基金份额/无挂单 + 冷却 1 游戏日；RESET_ENABLED=false（大赛中）与赛季报名中禁重置
 - **赛季**：类型轮换（双周10日/月赛20日/周赛5日）；赛季中已报名账户禁重置/划转/基金；前三名 seasonPoints +300/200/100（与段位 tierScore 分离）
-- **基金净值**：内存实时刷新（只涨不跌：`nav += nav × dailyReturn × rand[0,2)`，每 60s），并落库 `fund_navs`（重启后回填，不再复位到初值）
+- **基金净值**：仅在 A 股游戏日收盘时结算；ETF 跟踪模拟 A 股等权组合总回报（包含分红，可涨可跌，`dailyReturn=0` 表示无固定收益），货币基金按 2.5% 年化、252 交易日折算。净值、结算日和组合基准一起落库，重启不会重置存量净值或重复计息。
 - **机器人玩家（算法盘）**：`BOT_PLAYERS_ENABLED`（默认 true）/ `BOT_PLAYERS_COUNT`（默认 6）/ `BOT_PLAYERS_TRADE_EVERY_TICKS`（默认 10）/ `BOT_PLAYERS_MAX_ORDERS_PER_DAY`（默认 12）。假人是**真实 users 行**（`isBot=true`）+ CN/HK/US 真实账户，委托走与真人完全相同的 `POST /trading/order` 服务路径（休市/涨跌停/购买力/T+1/手续费一律照办），同榜竞技、可被抢单也可抢你的单；`users.password` 为随机强口令的 bcrypt（不可登录、不入日志）。与「AI 对手盘」（`/market/ai-opponents`，虚拟账本、不落订单、不进榜）是两套独立机制
 - **服务端配置**：`DB_SYNCHRONIZE`（默认 `true`）控制 TypeORM 自动同步表结构，生产建议 `false` + 自建表/迁移（开启时启动打 WARN）；`TRUST_PROXY` 影响登录锁定计数键；`TICK_INTERVAL_MS < 60000` 需同时 `SANDBOX_FAST=true` 才允许启动
 - 模拟世界：宏观因子（宏观经济/行业景气/市场情绪/政策风险等）受股票表现反馈影响，新闻定向冲击个股/行业——策略可结合 `news` 事件与 `/market/flow-signals` 资金流信号

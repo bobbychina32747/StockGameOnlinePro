@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api, { setUnauthorizedHandler } from '../services/api.client';
+import { gameTradingTime, tradingMinutesFor } from '../data/trading-calendar';
 
 // localStorage 安全解析：数据损坏时回退默认值，避免整站崩溃
 function safeParse<T>(raw: string | null, fallback: T): T {
@@ -22,11 +23,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   token: localStorage.getItem('token'),
   user: safeParse<AuthState['user']>(localStorage.getItem('user'), null),
   setAuth: (token, user) => {
+    if (useAuthStore.getState().user?.id !== user.id) {
+      accountRequestVersion++;
+      useAccountStore.setState({ account: null, positions: [] });
+      useMarketStore.setState({ prices: {}, ticks: [], klines: {}, orderBook: {} });
+    }
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
     set({ token, user });
   },
   logout: () => {
+    accountRequestVersion++;
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     set({ token: null, user: null });
@@ -42,6 +49,7 @@ interface TickData {
   price: number;
   volume: number;
   timestamp: number;
+  time?: string;
 }
 
 interface MarketState {
@@ -91,11 +99,10 @@ export const useMarketStore = create<MarketState>((set) => ({
       // S2 时段同步：TICKS_PER_DAY=240，1min 时间映射真实A股时段(0-119→9:30-11:30, 120-239→13:00-15:00)
       const klines = { ...state.klines };
       for (const tick of valid) {
-        const gameDay = Math.floor(tick.timestamp / 240);
-        const dayTick = tick.timestamp % 240;
-        const time = (dayTick < 120
-          ? new Date(2024, 0, 1 + gameDay, 9, 30 + dayTick)
-          : new Date(2024, 0, 1 + gameDay, 13, dayTick - 120)).toISOString();
+        const market = tick.symbol.startsWith('H') ? 'HK' : tick.symbol.startsWith('U') ? 'US' : 'CN';
+        const minutes = tradingMinutesFor(market);
+        const time = tick.time && Number.isFinite(Date.parse(tick.time)) ? tick.time
+          : gameTradingTime(market, Math.floor(tick.timestamp / minutes), tick.timestamp % minutes).toISOString();
         const symKlines = { ...(klines[tick.symbol] || {}) };
         const arr = (symKlines['1min'] || []).slice();
         const last = arr[arr.length - 1];
@@ -138,18 +145,25 @@ interface AccountState {
   setAccount: (data: any) => void;
 }
 
+let accountRequestVersion = 0;
+
 export const useAccountStore = create<AccountState>((set) => ({
   account: null,
   positions: [],
   fetchAccount: async (mode: string = 'US') => {
+    const requestVersion = ++accountRequestVersion;
     try {
       const data = await api.get(`/account?mode=${mode}`).then((r) => r.data);
+      if (requestVersion !== accountRequestVersion) return;
       set({ account: data.account, positions: data.positions || [] });
     } catch (e) {
       console.error('获取账户失败', e);
     }
   },
-  setAccount: (data) => set({ account: data.account, positions: data.positions || [] }),
+  setAccount: (data) => {
+    accountRequestVersion++;
+    set({ account: data.account, positions: data.positions || [] });
+  },
 }));
 
 // ─── UI Store ───

@@ -656,7 +656,7 @@ CF 橙云（缓存/防打/证书）
 | `functions/[[path]].js` 的 `/api/*` 分支 | `location /api/` → `proxy_pass $api_up$request_uri` | 上游仍是那台 Worker；**将来把云后端搬进本机 NestJS，只需把 `$api_up` 换成 `http://127.0.0.1:8000`** |
 | 同文件的 `ALLOW` 表（OAuth 两条） | `location = /oauth/access_token`、`= /login/device/code` → github.com | 只允许 POST；OPTIONS 204、其余 405（与函数一致） |
 | 同文件的 `ALLOW_ORIGINS` | `map $http_origin $origin_ok`（`deploy/nginx/site-maps.conf`） | 白名单外 403；Origin 缺失（curl 自测）放行 |
-| `functions/_middleware.js`（macOS 403） | `map` 判定 + `if ($block_mac) { return 403; }` + `error_page` → `/.deny/mac-403.html` | 服务端拒绝、静态资源零下发；iPad 不挡。**要关就删 `site-maps.conf` 里 `$block_mac` 的 `"10" 1;`** |
+| `functions/_middleware.js`（macOS 403） | `map` 判定 + `if ($block_mac) { return 403; }` + `error_page` → `/.deny/mac-403.html` | 2026-10-10 已在部署源配置与主站生产环境关闭平台拦截，所有平台放行；已备份旧配置，`nginx -t` 与 reload 通过。 |
 
 **客户端配置改动**（`bobbychina-pages/games/auth-config.js`）：`relay` 由 `bobbychina-games.pages.dev` → `https://bobbycn.cc`；`redirect` → `https://bobbycn.cc/games/oauth-callback.html`。
 ⚠️ **GitHub OAuth App 的 Authorization callback URL 要同步改成新域名**，否则授权码流程回不来（设备码流程不受影响）。

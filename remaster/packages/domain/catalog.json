@@ -1,0 +1,966 @@
+{
+  "instruments": [
+    {
+      "symbol": "T1",
+      "code": "688001",
+      "name": "芯澜半导体",
+      "industry": "半导体",
+      "market": "CN",
+      "listedAt": "2019-08-12",
+      "description": "专注 AI 推理芯片与低功耗算力，为游戏主机与智能终端提供边缘计算方案，自研架构已流片三代。",
+      "initialPrice": 4500,
+      "volatility": 0.028
+    },
+    {
+      "symbol": "T2",
+      "code": "300750",
+      "name": "星语智能",
+      "industry": "人工智能",
+      "market": "CN",
+      "listedAt": "2016-03-25",
+      "description": "大语言模型与虚拟角色对话引擎开发商，旗下「星语」平台面向情感陪伴与内容创作，月活过亿。",
+      "initialPrice": 12000,
+      "volatility": 0.032
+    },
+    {
+      "symbol": "T3",
+      "code": "688021",
+      "name": "帧光软件",
+      "industry": "软件服务",
+      "market": "CN",
+      "listedAt": "2018-11-05",
+      "description": "实时渲染引擎与视频剪辑工具厂商，服务游戏工作室与短视频创作者，引擎授权收入高速增长。",
+      "initialPrice": 3500,
+      "volatility": 0.025
+    },
+    {
+      "symbol": "T4",
+      "code": "002189",
+      "name": "微波通信",
+      "industry": "通信设备",
+      "market": "CN",
+      "listedAt": "2011-06-30",
+      "description": "5G 射频前端与卫星通信终端供应商，为电竞场馆与低空经济提供高速低时延网络设备。",
+      "initialPrice": 1800,
+      "volatility": 0.022
+    },
+    {
+      "symbol": "F1",
+      "code": "600001",
+      "name": "江城银行",
+      "industry": "银行",
+      "market": "CN",
+      "listedAt": "1999-12-28",
+      "description": "区域股份制商业银行，深耕长三角普惠金融与科创贷，不良率连续五年低于行业均值。",
+      "initialPrice": 1100,
+      "volatility": 0.01
+    },
+    {
+      "symbol": "F2",
+      "code": "601788",
+      "name": "云帆证券",
+      "industry": "券商",
+      "market": "CN",
+      "listedAt": "2007-09-21",
+      "description": "互联网券商，自研极速交易系统毫秒级撮合，两融与量化经纪业务市占率居前。",
+      "initialPrice": 2200,
+      "volatility": 0.018
+    },
+    {
+      "symbol": "F3",
+      "code": "601318",
+      "name": "磐石保险",
+      "industry": "保险",
+      "market": "CN",
+      "listedAt": "2004-06-15",
+      "description": "综合金融保险集团，健康险与养老社区布局领先，投资端以长期价值股为主。",
+      "initialPrice": 3800,
+      "volatility": 0.014
+    },
+    {
+      "symbol": "M1",
+      "code": "300026",
+      "name": "青囊医药",
+      "industry": "创新药",
+      "market": "CN",
+      "listedAt": "2010-04-23",
+      "description": "中药创新与化药仿制并重，聚焦心脑血管与代谢领域，两款创新药进入医保放量期。",
+      "initialPrice": 2800,
+      "volatility": 0.024
+    },
+    {
+      "symbol": "M2",
+      "code": "688029",
+      "name": "白泽医疗",
+      "industry": "医疗器械",
+      "market": "CN",
+      "listedAt": "2017-08-18",
+      "description": "手术机器人与高端影像设备厂商，微创手术机器人已获证上市，海外装机量快速爬坡。",
+      "initialPrice": 6500,
+      "volatility": 0.026
+    },
+    {
+      "symbol": "M3",
+      "code": "688276",
+      "name": "澜生生物",
+      "industry": "生物疫苗",
+      "market": "CN",
+      "listedAt": "2019-12-30",
+      "description": "mRNA 疫苗与细胞治疗平台公司，新一代呼吸道联合疫苗进入临床三期。",
+      "initialPrice": 5200,
+      "volatility": 0.03
+    },
+    {
+      "symbol": "C1",
+      "code": "600809",
+      "name": "杏花酿",
+      "industry": "白酒",
+      "market": "CN",
+      "listedAt": "1994-03-10",
+      "description": "清香型白酒龙头，百年老窖陈酿，高端系列供不应求，全国化渠道持续下沉。",
+      "initialPrice": 15800,
+      "volatility": 0.02
+    },
+    {
+      "symbol": "C2",
+      "code": "600887",
+      "name": "牧野食品",
+      "industry": "食品饮料",
+      "market": "CN",
+      "listedAt": "1996-07-25",
+      "description": "乳制品与休闲零食企业，冷链物流全国覆盖，联名 IP 零食深受年轻群体欢迎。",
+      "initialPrice": 2400,
+      "volatility": 0.016
+    },
+    {
+      "symbol": "C3",
+      "code": "000333",
+      "name": "蓝湾家电",
+      "industry": "家电",
+      "market": "CN",
+      "listedAt": "2004-03-05",
+      "description": "智能家电与清洁机器人厂商，扫地机器人海外市占率第一，全屋智能生态成型。",
+      "initialPrice": 3200,
+      "volatility": 0.015
+    },
+    {
+      "symbol": "E1",
+      "code": "300274",
+      "name": "日曜能源",
+      "industry": "光伏",
+      "market": "CN",
+      "listedAt": "2012-01-12",
+      "description": "光伏逆变器与储能系统龙头，全球出货量连续八年第一，工商业储能订单饱满。",
+      "initialPrice": 2600,
+      "volatility": 0.03
+    },
+    {
+      "symbol": "E2",
+      "code": "300450",
+      "name": "电芯动力",
+      "industry": "锂电池",
+      "market": "CN",
+      "listedAt": "2015-05-14",
+      "description": "动力电池与固态电解质研发商，半固态电池已装车验证，产能规划翻倍。",
+      "initialPrice": 4200,
+      "volatility": 0.034
+    },
+    {
+      "symbol": "E3",
+      "code": "601633",
+      "name": "追光汽车",
+      "industry": "新能源车",
+      "market": "CN",
+      "listedAt": "2018-09-17",
+      "description": "智能电动车新势力，主打「游戏座舱」概念，车机可运行 3A 大作，年轻用户占比高。",
+      "initialPrice": 8800,
+      "volatility": 0.028
+    },
+    {
+      "symbol": "D1",
+      "code": "600760",
+      "name": "长空防务",
+      "industry": "军工",
+      "market": "CN",
+      "listedAt": "2003-11-20",
+      "description": "军用无人机与机载雷达制造商，察打一体无人机出口多国，订单能见度高。",
+      "initialPrice": 3000,
+      "volatility": 0.026
+    },
+    {
+      "symbol": "R1",
+      "code": "601899",
+      "name": "金川有色",
+      "industry": "有色金属",
+      "market": "CN",
+      "listedAt": "2008-04-28",
+      "description": "铜锂资源与稀有金属开采商，拥有亚洲最大铜矿之一，锂盐产能爬坡。",
+      "initialPrice": 1500,
+      "volatility": 0.022
+    },
+    {
+      "symbol": "R2",
+      "code": "601225",
+      "name": "墨石能源",
+      "industry": "煤炭",
+      "market": "CN",
+      "listedAt": "2010-02-08",
+      "description": "焦煤与清洁能源化工企业，长协价占比高，分红率稳定在 40% 以上。",
+      "initialPrice": 900,
+      "volatility": 0.02
+    },
+    {
+      "symbol": "P1",
+      "code": "600048",
+      "name": "广厦置业",
+      "industry": "房地产",
+      "market": "CN",
+      "listedAt": "2002-07-09",
+      "description": "城市更新与长租公寓运营商，聚焦核心城市存量改造，轻资产输出提速。",
+      "initialPrice": 600,
+      "volatility": 0.024
+    },
+    {
+      "symbol": "G1",
+      "code": "300999",
+      "name": "星界游戏",
+      "industry": "游戏",
+      "market": "CN",
+      "listedAt": "2017-11-16",
+      "description": "手游研发发行双轮驱动，旗舰射击手游全球月流水破十亿，海外市场高歌猛进。",
+      "initialPrice": 4800,
+      "volatility": 0.033
+    },
+    {
+      "symbol": "G2",
+      "code": "002777",
+      "name": "幻光互娱",
+      "industry": "影视传媒",
+      "market": "CN",
+      "listedAt": "2015-06-08",
+      "description": "动画电影与短剧制作商，多部国漫票房口碑双收，虚拟偶像企划上线。",
+      "initialPrice": 1400,
+      "volatility": 0.027
+    },
+    {
+      "symbol": "G3",
+      "code": "300233",
+      "name": "云端电竞",
+      "industry": "电竞",
+      "market": "CN",
+      "listedAt": "2019-03-21",
+      "description": "电竞赛事运营与俱乐部投资，承办多款主流游戏职业联赛，商业化全面提速。",
+      "initialPrice": 2200,
+      "volatility": 0.031
+    },
+    {
+      "symbol": "G4",
+      "code": "688888",
+      "name": "像素工坊",
+      "industry": "云游戏",
+      "market": "CN",
+      "listedAt": "2016-09-09",
+      "description": "云游戏与沙盒创作平台，千万玩家共建虚拟世界，UGC 内容生态繁荣。",
+      "initialPrice": 3300,
+      "volatility": 0.03
+    },
+    {
+      "symbol": "G5",
+      "code": "300031",
+      "name": "天籁音乐",
+      "industry": "数字音乐",
+      "market": "CN",
+      "listedAt": "2014-04-17",
+      "description": "数字音乐与直播平台，版权曲库超五千万，音频社交新业务快速增长。",
+      "initialPrice": 1200,
+      "volatility": 0.021
+    },
+    {
+      "symbol": "V1",
+      "code": "301666",
+      "name": "霓虹引擎",
+      "industry": "游戏引擎",
+      "market": "CN",
+      "listedAt": "2021-07-30",
+      "description": "自研游戏引擎与 AI NPC 技术商，向独立开发者开放订阅，助力游戏工业化。",
+      "initialPrice": 5800,
+      "volatility": 0.036
+    },
+    {
+      "symbol": "V2",
+      "code": "600120",
+      "name": "次元文创",
+      "industry": "动漫IP",
+      "market": "CN",
+      "listedAt": "2013-10-25",
+      "description": "动漫 IP 运营与衍生品制造，手握多个国民级动漫形象，谷子经济浪潮受益者。",
+      "initialPrice": 900,
+      "volatility": 0.026
+    },
+    {
+      "symbol": "V3",
+      "code": "002120",
+      "name": "速鹰物流",
+      "industry": "物流",
+      "market": "CN",
+      "listedAt": "2012-05-18",
+      "description": "综合物流与供应链服务商，无人机配送试点城市超五十座，时效承诺行业领先。",
+      "initialPrice": 700,
+      "volatility": 0.019
+    },
+    {
+      "symbol": "H1",
+      "code": "00700",
+      "name": "云顶网络",
+      "industry": "互联网",
+      "market": "HK",
+      "listedAt": "2004-06-16",
+      "description": "社交平台与游戏巨头，旗下「云讯」国民级应用覆盖超十亿用户，游戏与广告双轮驱动。",
+      "initialPrice": 32000,
+      "volatility": 0.022
+    },
+    {
+      "symbol": "H2",
+      "code": "00941",
+      "name": "金港电信",
+      "industry": "通信",
+      "market": "HK",
+      "listedAt": "2002-10-09",
+      "description": "粤港澳大湾区主导运营商，5G 基建与云计算业务稳步扩张，派息稳定著称。",
+      "initialPrice": 6800,
+      "volatility": 0.018
+    },
+    {
+      "symbol": "H3",
+      "code": "09988",
+      "name": "云帆电商",
+      "industry": "电商",
+      "market": "HK",
+      "listedAt": "2019-11-26",
+      "description": "跨境电商平台，海外仓网络覆盖 40+ 国家，新兴市场 GMV 高速增长。",
+      "initialPrice": 8800,
+      "volatility": 0.026
+    },
+    {
+      "symbol": "H4",
+      "code": "03690",
+      "name": "美图生活",
+      "industry": "消费",
+      "market": "HK",
+      "listedAt": "2018-09-20",
+      "description": "本地生活服务龙头，外卖与到店业务双线并进，即时零售打开第二曲线。",
+      "initialPrice": 12800,
+      "volatility": 0.024
+    },
+    {
+      "symbol": "H5",
+      "code": "01398",
+      "name": "华融银行",
+      "industry": "银行",
+      "market": "HK",
+      "listedAt": "2005-10-27",
+      "description": "大湾区跨境金融服务平台，绿色金融与数字银行转型，分红率常年领先同业。",
+      "initialPrice": 520,
+      "volatility": 0.012
+    },
+    {
+      "symbol": "H6",
+      "code": "00002",
+      "name": "港能集团",
+      "industry": "公用事业",
+      "market": "HK",
+      "listedAt": "1990-01-02",
+      "description": "香港电力与燃气双牌照运营商，新能源业务占比提升，现金牛属性突出。",
+      "initialPrice": 5200,
+      "volatility": 0.01
+    },
+    {
+      "symbol": "H7",
+      "code": "01093",
+      "name": "辉腾医药",
+      "industry": "医药",
+      "market": "HK",
+      "listedAt": "2000-12-19",
+      "description": "创新药出海先锋，多款药物获海外上市批准，license-out 收入持续落地。",
+      "initialPrice": 4200,
+      "volatility": 0.02
+    },
+    {
+      "symbol": "H8",
+      "code": "01113",
+      "name": "长桥地产",
+      "industry": "地产",
+      "market": "HK",
+      "listedAt": "1972-11-01",
+      "description": "港岛核心商业地产持有者，写字楼与零售组合穿越周期，低估值高股息。",
+      "initialPrice": 3600,
+      "volatility": 0.025
+    },
+    {
+      "symbol": "H9",
+      "code": "01299",
+      "name": "裕丰保险",
+      "industry": "保险",
+      "market": "HK",
+      "listedAt": "2004-06-24",
+      "description": "亚太寿险龙头，代理人渠道转型数字化，健康险与养老险双赛道扩张，内含价值持续增长。",
+      "initialPrice": 5800,
+      "volatility": 0.018
+    },
+    {
+      "symbol": "H10",
+      "code": "01919",
+      "name": "环球航运",
+      "industry": "航运",
+      "market": "HK",
+      "listedAt": "2005-06-30",
+      "description": "全球集装箱航运巨头，运力规模前三，运价周期弹性大，长协与自有码头平滑波动。",
+      "initialPrice": 1400,
+      "volatility": 0.028
+    },
+    {
+      "symbol": "H11",
+      "code": "01929",
+      "name": "皇冠珠宝",
+      "industry": "消费",
+      "market": "HK",
+      "listedAt": "2011-12-15",
+      "description": "黄金珠宝零售龙头，门店超 7000 家，婚嫁与保值需求双驱动，金价上行周期受益。",
+      "initialPrice": 960,
+      "volatility": 0.02
+    },
+    {
+      "symbol": "H13",
+      "code": "00981",
+      "name": "恒芯科技",
+      "industry": "半导体",
+      "market": "HK",
+      "listedAt": "2004-03-18",
+      "description": "内地晶圆代工龙头，成熟制程产能满载，国产替代加速，先进封装布局领先。",
+      "initialPrice": 2600,
+      "volatility": 0.03
+    },
+    {
+      "symbol": "H14",
+      "code": "06808",
+      "name": "百佳零售",
+      "industry": "零售",
+      "market": "HK",
+      "listedAt": "2011-07-15",
+      "description": "大卖场与会员店双业态，供应链效率提升，自有品牌占比扩大，O2O 即时达覆盖全城。",
+      "initialPrice": 380,
+      "volatility": 0.022
+    },
+    {
+      "symbol": "H15",
+      "code": "01728",
+      "name": "港汽集团",
+      "industry": "汽车",
+      "market": "HK",
+      "listedAt": "2005-12-20",
+      "description": "自主品牌乘用车出海先锋，东南亚与中东市占率攀升，混动平台降本增效显著。",
+      "initialPrice": 1120,
+      "volatility": 0.026
+    },
+    {
+      "symbol": "H16",
+      "code": "02269",
+      "name": "康达医疗",
+      "industry": "医疗",
+      "market": "HK",
+      "listedAt": "2017-07-18",
+      "description": "高值耗材与影像设备双平台，集采压力消化后创新品种放量，海外认证持续落地。",
+      "initialPrice": 3400,
+      "volatility": 0.024
+    },
+    {
+      "symbol": "H17",
+      "code": "00293",
+      "name": "国泰航空",
+      "industry": "航空",
+      "market": "HK",
+      "listedAt": "1986-05-15",
+      "description": "区域枢纽航空龙头，国际航线恢复至疫情前九成，货运与飞机维修贡献稳定利润。",
+      "initialPrice": 840,
+      "volatility": 0.028
+    },
+    {
+      "symbol": "H18",
+      "code": "00388",
+      "name": "港联交易所",
+      "industry": "金融",
+      "market": "HK",
+      "listedAt": "2000-06-27",
+      "description": "亚太核心交易所集团，现货与衍生品双轮驱动，南向资金持续活跃，互联互通扩容。",
+      "initialPrice": 28500,
+      "volatility": 0.02
+    },
+    {
+      "symbol": "H19",
+      "code": "00345",
+      "name": "维他食品",
+      "industry": "食品饮料",
+      "market": "HK",
+      "listedAt": "1994-03-30",
+      "description": "植物蛋白饮品龙头，内地渠道下沉叠加海外扩张，健康化转型打开估值空间。",
+      "initialPrice": 720,
+      "volatility": 0.018
+    },
+    {
+      "symbol": "H20",
+      "code": "00857",
+      "name": "南海能源",
+      "industry": "能源",
+      "market": "HK",
+      "listedAt": "2000-04-07",
+      "description": "上游油气生产龙头，储量接替率高，天然气与新能源业务双轨并进，分红稳定。",
+      "initialPrice": 660,
+      "volatility": 0.02
+    },
+    {
+      "symbol": "H12",
+      "code": "02333",
+      "name": "湾区制造",
+      "industry": "制造业",
+      "market": "HK",
+      "listedAt": "2003-12-30",
+      "description": "高端装备制造集团，工程机械出口全球前五，氢能设备与电动重卡打开第二曲线。",
+      "initialPrice": 1280,
+      "volatility": 0.022
+    },
+    {
+      "symbol": "U1",
+      "code": "NVDA",
+      "name": "NovaChip",
+      "industry": "半导体",
+      "market": "US",
+      "listedAt": "1999-01-22",
+      "description": "AI 算力芯片霸主，GPU 数据中心营收爆发式增长，先进制程代工产能紧俏。",
+      "initialPrice": 48000,
+      "volatility": 0.035
+    },
+    {
+      "symbol": "U2",
+      "code": "META",
+      "name": "GalaxyNet",
+      "industry": "人工智能",
+      "market": "US",
+      "listedAt": "2012-05-18",
+      "description": "社交网络与元宇宙平台，AI 推荐引擎提升广告效率，VR 生态初见规模。",
+      "initialPrice": 21000,
+      "volatility": 0.03
+    },
+    {
+      "symbol": "U3",
+      "code": "TSLA",
+      "name": "VoltAuto",
+      "industry": "新能源",
+      "market": "US",
+      "listedAt": "2010-06-29",
+      "description": "电动车与储能巨头，全球超级工厂产能爬坡，Robotaxi 与机器人业务点燃想象。",
+      "initialPrice": 18000,
+      "volatility": 0.04
+    },
+    {
+      "symbol": "U4",
+      "code": "MSFT",
+      "name": "CloudPeak",
+      "industry": "软件",
+      "market": "US",
+      "listedAt": "1986-03-13",
+      "description": "云与企业软件双巨头，Copilot 全线渗透，Azure 增速领先主要对手。",
+      "initialPrice": 31000,
+      "volatility": 0.02
+    },
+    {
+      "symbol": "U5",
+      "code": "VISA",
+      "name": "QuantumPay",
+      "industry": "金融科技",
+      "market": "US",
+      "listedAt": "2008-03-19",
+      "description": "全球支付网络，跨境清算壁垒深，消费复苏与数字钱包打开增量空间。",
+      "initialPrice": 26000,
+      "volatility": 0.018
+    },
+    {
+      "symbol": "U6",
+      "code": "JNJ",
+      "name": "MedForge",
+      "industry": "医药",
+      "market": "US",
+      "listedAt": "1944-09-05",
+      "description": "医疗健康巨头，制药+器械+消费健康三引擎，创新管线后劲充足。",
+      "initialPrice": 15000,
+      "volatility": 0.015
+    },
+    {
+      "symbol": "U7",
+      "code": "BA",
+      "name": "FalconAero",
+      "industry": "军工",
+      "market": "US",
+      "listedAt": "1934-09-05",
+      "description": "航空航天与防务龙头，窄体机订单积压创纪录，国防预算上行周期受益。",
+      "initialPrice": 19000,
+      "volatility": 0.028
+    },
+    {
+      "symbol": "U8",
+      "code": "JPM",
+      "name": "RiverBank",
+      "industry": "银行",
+      "market": "US",
+      "listedAt": "1969-01-02",
+      "description": "全能银行巨头，投行与财富管理双轮驱动，利率高位净息差改善明显。",
+      "initialPrice": 14000,
+      "volatility": 0.016
+    },
+    {
+      "symbol": "U9",
+      "code": "AAPL",
+      "name": "PixelSoft",
+      "industry": "消费电子",
+      "market": "US",
+      "listedAt": "1980-12-12",
+      "description": "消费电子与生态服务巨头，硬件+软件+服务三位一体，高端市场护城河深厚，现金储备雄厚。",
+      "initialPrice": 17500,
+      "volatility": 0.022
+    },
+    {
+      "symbol": "U10",
+      "code": "GOOGL",
+      "name": "AlphaSearch",
+      "industry": "互联网",
+      "market": "US",
+      "listedAt": "2004-08-19",
+      "description": "搜索引擎与广告之王，AI 大模型重塑搜索体验，云业务扭亏为盈，Waymo 商业化提速。",
+      "initialPrice": 14200,
+      "volatility": 0.024
+    },
+    {
+      "symbol": "U11",
+      "code": "MCD",
+      "name": "GoldenFry",
+      "industry": "餐饮",
+      "market": "US",
+      "listedAt": "1965-04-21",
+      "description": "全球快餐连锁之王，特许经营模式轻资产扩张，门店超 4 万家，穿越周期稳健现金流。",
+      "initialPrice": 25000,
+      "volatility": 0.014
+    },
+    {
+      "symbol": "U13",
+      "code": "AMZN",
+      "name": "Amazonia",
+      "industry": "电商",
+      "market": "US",
+      "listedAt": "1997-05-15",
+      "description": "全球电商与云服务双龙头，Prime 会员粘性深厚，AWS 利润率修复，广告业务高增长。",
+      "initialPrice": 17800,
+      "volatility": 0.03
+    },
+    {
+      "symbol": "U14",
+      "code": "PYPL",
+      "name": "CryptoPay",
+      "industry": "金融科技",
+      "market": "US",
+      "listedAt": "2015-07-20",
+      "description": "数字支付与钱包巨头，跨境结算网络覆盖全球，商户收单份额领先，成本优化见效。",
+      "initialPrice": 6200,
+      "volatility": 0.028
+    },
+    {
+      "symbol": "U15",
+      "code": "DIS",
+      "name": "WaltRealm",
+      "industry": "传媒",
+      "market": "US",
+      "listedAt": "1962-09-20",
+      "description": "娱乐帝国，流媒体用户破 2 亿，主题乐园与 IP 授权全链条变现，内容库无出其右。",
+      "initialPrice": 9600,
+      "volatility": 0.024
+    },
+    {
+      "symbol": "U16",
+      "code": "PFE",
+      "name": "PfizerLab",
+      "industry": "医药",
+      "market": "US",
+      "listedAt": "1942-06-19",
+      "description": "制药巨头，肿瘤与疫苗管线密集，重磅新品获批节奏加快，专利悬崖后重回增长。",
+      "initialPrice": 2800,
+      "volatility": 0.018
+    },
+    {
+      "symbol": "U17",
+      "code": "HD",
+      "name": "HomeCraft",
+      "industry": "零售",
+      "market": "US",
+      "listedAt": "1981-09-22",
+      "description": "家装建材零售龙头，门店网络全美第一，专业客户业务高增长，股息连续 14 年上调。",
+      "initialPrice": 33500,
+      "volatility": 0.016
+    },
+    {
+      "symbol": "U18",
+      "code": "NFLX",
+      "name": "StreamRealm",
+      "industry": "传媒",
+      "market": "US",
+      "listedAt": "2002-05-23",
+      "description": "流媒体之王，全球订阅用户超 2.7 亿，广告分层模式打开 ARPU 空间，原创内容护城河。",
+      "initialPrice": 61000,
+      "volatility": 0.032
+    },
+    {
+      "symbol": "U19",
+      "code": "INTC",
+      "name": "IntelCore",
+      "industry": "半导体",
+      "market": "US",
+      "listedAt": "1971-10-13",
+      "description": "老牌芯片巨头，代工业务转型关键期，先进制程追赶与 AI 芯片放量决定未来三年。",
+      "initialPrice": 4400,
+      "volatility": 0.03
+    },
+    {
+      "symbol": "U20",
+      "code": "KO",
+      "name": "CocaRiver",
+      "industry": "食品饮料",
+      "market": "US",
+      "listedAt": "1919-09-05",
+      "description": "饮料之王，全球品牌渗透无出其右，瓶装水与咖啡矩阵扩张，股息连续 60 年上调。",
+      "initialPrice": 6100,
+      "volatility": 0.012
+    },
+    {
+      "symbol": "U12",
+      "code": "XOM",
+      "name": "EverGreen Energy",
+      "industry": "能源",
+      "market": "US",
+      "listedAt": "1920-01-01",
+      "description": "油气与化工能源巨头，上游资源储量全球领先，LNG 出口业务扩张，股息与回购回馈股东。",
+      "initialPrice": 10500,
+      "volatility": 0.02
+    }
+  ],
+  "calendar": {
+    "CN": {
+      "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "sessions": [
+        [
+          570,
+          690
+        ],
+        [
+          780,
+          900
+        ]
+      ],
+      "holidays": {
+        "2025": [
+          "2025-01-01",
+          "2025-01-28",
+          "2025-01-29",
+          "2025-01-30",
+          "2025-01-31",
+          "2025-02-03",
+          "2025-02-04",
+          "2025-04-04",
+          "2025-05-01",
+          "2025-05-02",
+          "2025-05-05",
+          "2025-06-02",
+          "2025-10-01",
+          "2025-10-02",
+          "2025-10-03",
+          "2025-10-06",
+          "2025-10-07",
+          "2025-10-08"
+        ],
+        "2026": [
+          "2026-01-01",
+          "2026-01-02",
+          "2026-02-16",
+          "2026-02-17",
+          "2026-02-18",
+          "2026-02-19",
+          "2026-02-20",
+          "2026-02-23",
+          "2026-04-06",
+          "2026-05-01",
+          "2026-05-04",
+          "2026-05-05",
+          "2026-06-19",
+          "2026-09-25",
+          "2026-10-01",
+          "2026-10-02",
+          "2026-10-05",
+          "2026-10-06",
+          "2026-10-07"
+        ],
+        "2027": [
+          "2027-01-01",
+          "2027-02-08",
+          "2027-02-09",
+          "2027-02-10",
+          "2027-02-11",
+          "2027-02-12",
+          "2027-04-05",
+          "2027-05-03",
+          "2027-05-04",
+          "2027-05-05",
+          "2027-06-09",
+          "2027-09-24",
+          "2027-10-01",
+          "2027-10-04",
+          "2027-10-05",
+          "2027-10-06",
+          "2027-10-07"
+        ]
+      }
+    },
+    "HK": {
+      "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "sessions": [
+        [
+          570,
+          720
+        ],
+        [
+          780,
+          960
+        ]
+      ],
+      "holidays": {
+        "2025": [
+          "2025-01-01",
+          "2025-01-29",
+          "2025-01-30",
+          "2025-01-31",
+          "2025-04-04",
+          "2025-04-18",
+          "2025-04-19",
+          "2025-04-21",
+          "2025-05-01",
+          "2025-05-05",
+          "2025-05-31",
+          "2025-07-01",
+          "2025-10-01",
+          "2025-10-07",
+          "2025-12-25",
+          "2025-12-26"
+        ],
+        "2026": [
+          "2026-01-01",
+          "2026-02-16",
+          "2026-02-17",
+          "2026-02-18",
+          "2026-02-19",
+          "2026-04-03",
+          "2026-04-06",
+          "2026-04-07",
+          "2026-05-01",
+          "2026-06-19",
+          "2026-07-01",
+          "2026-09-25",
+          "2026-10-01",
+          "2026-12-25",
+          "2026-12-26"
+        ],
+        "2027": [
+          "2027-01-01",
+          "2027-02-05",
+          "2027-02-08",
+          "2027-02-09",
+          "2027-03-26",
+          "2027-03-29",
+          "2027-04-05",
+          "2027-05-01",
+          "2027-05-13",
+          "2027-06-09",
+          "2027-07-01",
+          "2027-09-24",
+          "2027-10-01",
+          "2027-12-25",
+          "2027-12-27"
+        ]
+      }
+    },
+    "US": {
+      "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "sessions": [
+        [
+          1290,
+          1440
+        ],
+        [
+          0,
+          240
+        ]
+      ],
+      "holidays": {
+        "2025": [
+          "2025-01-01",
+          "2025-01-09",
+          "2025-01-20",
+          "2025-02-17",
+          "2025-04-18",
+          "2025-05-26",
+          "2025-06-19",
+          "2025-07-04",
+          "2025-09-01",
+          "2025-11-27",
+          "2025-12-25"
+        ],
+        "2026": [
+          "2026-01-01",
+          "2026-01-19",
+          "2026-02-16",
+          "2026-04-03",
+          "2026-05-25",
+          "2026-06-19",
+          "2026-07-03",
+          "2026-09-07",
+          "2026-11-26",
+          "2026-12-25"
+        ],
+        "2027": [
+          "2027-01-01",
+          "2027-01-18",
+          "2027-02-15",
+          "2027-03-26",
+          "2027-05-31",
+          "2027-06-18",
+          "2027-07-05",
+          "2027-09-06",
+          "2027-11-25",
+          "2027-12-24"
+        ]
+      }
+    }
+  }
+}

@@ -13,6 +13,7 @@ import * as market_utils_1 from '../../common/market-utils';
 import * as market_maker_1 from './market-maker';
 import * as fundamentals_1 from './fundamentals';
 import * as ai_opponents_1 from './ai-opponents';
+import { gameTradingTime, tradingMinutesFor } from '../../common/data/trading-calendar';
 
 // SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
 let klineDedupDone = false;
@@ -568,7 +569,7 @@ export class MarketDataService {
         const results = [];
         const regimes = this.marketRegime;
         const params = constants_1.STATE_PARAMS[regimes];
-        const dt = 1 / constants_1.MARKET.TICKS_PER_DAY;
+        const dt = 1 / tradingMinutesFor(this.market);
         const stocksArr: any[] = [...this.stocks.values()];
         // 行业联动：同行业股票共享一部分随机冲击（板块同涨同跌、板块间分化）
         const industryShocks = {};
@@ -616,7 +617,7 @@ export class MarketDataService {
                 }
             }
             // P3 财报后漂移（PEAD）：披露后数日同向漂移，摊到每 tick
-            const peadDrift = stock.pead && stock.pead.daysLeft > 0 ? Number(stock.pead.mag) / constants_1.MARKET.TICKS_PER_DAY : 0;
+            const peadDrift = stock.pead && stock.pead.daysLeft > 0 ? Number(stock.pead.mag) / tradingMinutesFor(this.market) : 0;
             let priceChange = drift + shock + smallJump + factorImpact * dt * 5 + ofiImpact + meanReversion + momentumBoost + burstDrift + peadDrift;
             // 收紧单 tick 波动 ±2%：保证相邻 K 线价格区间贴近（消除图表割裂）
             priceChange = this.clamp(priceChange, -0.02, 0.02);
@@ -656,14 +657,15 @@ export class MarketDataService {
             stock.dayHigh = Math.max(stock.dayHigh, stock.price);
             stock.dayLow = Math.min(stock.dayLow, stock.price);
             stock.dayVolume += stock.lastVolume;
-            stock.minuteCounter++;
             this.updateKlines(stock);
             results.push({
                 symbol: stock.symbol,
                 price: stock.price,
                 volume: stock.lastVolume,
                 timestamp: this.tickCount,
+                time: stock.current1min.time.toISOString(),
             });
+            stock.minuteCounter++;
         }
         this.tickCount++;
         return results;
@@ -1413,8 +1415,10 @@ export class MarketDataService {
     }
     // S2 交易时段时间映射：0-119 → 9:30-11:30；120-239 → 13:00-15:00（真实A股时段）
     tradingTime(day, minute) {
-        if (minute < 120) return new Date(2024, 0, 1 + day, 9, 30 + minute, 0);
-        return new Date(2024, 0, 1 + day, 13, minute - 120, 0);
+        return gameTradingTime(this.market, day, minute);
+    }
+    setTradingMinute(minute: number) {
+        for (const stock of this.stocks.values()) stock.minuteCounter = minute;
     }
     updateKlines(stock) {
         // 每 tick 即 1 分钟（TICKS_PER_DAY=240=A股真实交易分钟数），minuteCounter 每天 0 起

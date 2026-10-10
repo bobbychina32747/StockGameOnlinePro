@@ -50,6 +50,9 @@ function floorToCent(value: number): number {
 export class FundService implements OnModuleInit {
     private readonly logger = new Logger(FundService.name);
     private readonly funds: FundDefinition[];
+    private settledDays = new Map<string, number>();
+    private basketPrices: Record<string, number> = {};
+    private navQueue: Promise<unknown> = Promise.resolve();
 
     constructor(
         @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
@@ -65,17 +68,9 @@ export class FundService implements OnModuleInit {
         @Optional() @InjectRepository(FundNav) private readonly fundNavRepo?: Repository<FundNav>,
     ) {
         this.funds = [
-            // Phase C: 增加申购费率（ETF 0.15%、货基 0）；NAV 保持稳健上涨（不可跌——防重开"重置/赎回"套利窗口，teams 风控红线）
-            { id: 'fund-1', name: '沪深300 ETF', type: 'ETF', nav: 4.5, dailyReturn: 0.001, subscribeFeeRate: 0.0015 },
-            { id: 'fund-2', name: '货币基金 A', type: '货币基金', nav: 1.0, dailyReturn: 0.0001, subscribeFeeRate: 0 },
+            { id: 'fund-1', name: '模拟A股指数 ETF', type: 'ETF', nav: 4.5, dailyReturn: 0, subscribeFeeRate: 0.0015 },
+            { id: 'fund-2', name: '货币基金 A', type: '货币基金', nav: 1.0, dailyReturn: Math.pow(1.025, 1 / 252) - 1, subscribeFeeRate: 0 },
         ];
-        // FIX(M6): 定期更新基金净值（模拟净值波动）；unref 防止测试进程被定时器挂住
-        // Phase 14: updateNavs 变异步（含落库），回调补 catch 防未处理拒绝（落库失败已在内部降级为 error 日志）
-        const navTimer = setInterval(() => {
-            void this.updateNavs().catch((e) => this.logger.error(`基金净值更新异常: ${(e && e.message) ? e.message : e}`));
-        }, 60 * 1000);
-        if (navTimer && typeof navTimer.unref === 'function')
-            navTimer.unref();
     }
 
     // Phase 14 P0 修复（重启市值缩水）：启动时用库里的净值回填内存 NAV。
@@ -108,6 +103,8 @@ export class FundService implements OnModuleInit {
                 continue;
             }
             fund.nav = nav;
+            if (Number.isInteger(row.settledDay) && row.settledDay >= 0) this.settledDays.set(fund.id, row.settledDay);
+            if (fund.type === 'ETF' && row.basketPrices) this.basketPrices = this.validBasketPrices(row.basketPrices);
         }
         // 首启（fund_navs 为空）或后续新增基金：用内存初值补一次基线，保证下次重启有值可回填；
         // 已有行（含脏值行）不在此覆盖，交给下个落库周期修正
@@ -256,15 +253,50 @@ export class FundService implements OnModuleInit {
             await this.holdingRepo.save(holding);
     }
 
-    updateNavs() {
-        // 红线（teams 风控）：NAV 只涨不跌——change ≥ 0，公式与随机项分布保持不变
-        for (const fund of this.funds) {
-            const change = fund.nav * fund.dailyReturn * (Math.random() * 2);
-            fund.nav = Number((fund.nav + change).toFixed(4));
+    updateNavs(day = this.gameDay(), prices?: Record<string, number>) {
+        const run = this.navQueue.then(() => this.engine.runExclusive(() => this.settleNavs(day, prices)));
+        this.navQueue = run.then(() => undefined, () => undefined);
+        return run;
+    }
+
+    private validBasketPrices(prices: Record<string, number>) {
+        return Object.fromEntries(Object.entries(prices).filter(([symbol, price]) =>
+            !symbol.startsWith('H') && !symbol.startsWith('U') && Number.isFinite(price) && price > 0));
+    }
+
+    private async settleNavs(day: number, prices?: Record<string, number>) {
+        if (!Number.isInteger(day) || day <= 0) return;
+        const closes = this.validBasketPrices(prices || this.marketData.getPrevCloses?.() || {});
+        const reference = Object.keys(this.basketPrices).length ? this.basketPrices
+            : this.validBasketPrices(this.marketData.getPrevCloses?.() || {});
+        const dividends = this.marketData.getDividends?.(day - 1) || [];
+        const dividendsBySymbol = new Map<string, number>();
+        for (const dividend of dividends) {
+            const value = Number(dividend.perShare);
+            if (Number.isFinite(value) && value > 0) dividendsBySymbol.set(dividend.symbol, (dividendsBySymbol.get(dividend.symbol) || 0) + value);
         }
-        // Phase 14 P0 修复（重启市值缩水）：新 NAV 立即落库 upsert（fundId 主键 → save 天然幂等）。
-        // 内存 NAV 先整体推进再落库：保持既有同步可见性，且落库失败绝不阻塞行情（persistNav 内部只记 error）
-        return Promise.all(this.funds.map((fund) => this.persistNav(fund, '定时落库'))).then(() => undefined);
+        const returns = Object.entries(reference).filter(([symbol]) => closes[symbol] > 0)
+            .map(([symbol, price]) => (closes[symbol] + (dividendsBySymbol.get(symbol) || 0)) / price - 1);
+        const etfReturn = returns.length ? returns.reduce((sum, value) => sum + value, 0) / returns.length : 0;
+        const rows = this.funds.filter((fund) => day > (this.settledDays.get(fund.id) ?? this.gameDay())).map((fund) => ({
+            fundId: fund.id,
+            nav: Math.max(0.0001, Number((fund.nav * (1 + (fund.type === 'ETF' ? etfReturn : fund.dailyReturn))).toFixed(8))),
+            settledDay: day,
+            basketPrices: fund.type === 'ETF' ? closes : null,
+        }));
+        if (!rows.length) return;
+        if (this.fundNavRepo) {
+            if (this.dataSource) {
+                await this.dataSource.transaction(async (manager) => { await manager.save(FundNav, rows); });
+            } else {
+                for (const row of rows) await this.fundNavRepo.save(row);
+            }
+        }
+        for (const row of rows) {
+            this.getFund(row.fundId)!.nav = row.nav;
+            this.settledDays.set(row.fundId, day);
+        }
+        this.basketPrices = closes;
     }
 
     // Phase 14: 把某只基金的当前 NAV 落库（repo.save({ fundId, nav })，主键冲突即更新）。
@@ -274,7 +306,7 @@ export class FundService implements OnModuleInit {
         if (!repo)
             return; // 未注入 repo：跳过持久化（onModuleInit 已 warn 过一次，避免定时器周期刷日志）
         try {
-            await repo.save({ fundId: fund.id, nav: fund.nav });
+            await repo.save({ fundId: fund.id, nav: fund.nav, settledDay: this.settledDays.get(fund.id) ?? this.gameDay(), basketPrices: fund.type === 'ETF' ? this.basketPrices : null });
         }
         catch (e) {
             this.logger.error(`基金净值落库失败（${scene}）${fund.id}=${fund.nav}: ` + ((e && e.message) ? e.message : e));

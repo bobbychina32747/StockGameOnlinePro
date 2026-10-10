@@ -8,6 +8,8 @@ import { RiskManagerService } from '../../core/risk-manager/risk-manager.service
 import { runBacktest } from '../../core/backtest/backtest-engine';
 import { BotPlayerService } from '../bots/bot-player.service';
 import { TIMEOUT, withTimeout } from '../../common/with-timeout';
+import { marketDateFor, marketSessionClosed, tradingMinuteIndex, tradingMinutesFor } from '../../common/data/trading-calendar';
+import { FundService } from '../fund/fund.service';
 
 // G-4: 机器人旁路动作的硬上界（ms）——超过即放弃本 tick 的机器人动作，保证行情 tick 一定能往下走
 const BOT_TICK_TIMEOUT_MS = 20000;
@@ -64,6 +66,11 @@ export class MarketService {
     private lastAuctionDay: Record<string, number> = {};
     // Phase B: 盘后固定价格交易窗口跟踪（按 gameDay 防重入）
     private lastAfterHoursDay = -1;
+    private activeTradingDays: Record<string, string> = {};
+    private closedTradingDays: Record<string, string> = {};
+    private processedMinutes: Record<string, string> = {};
+    private initializedGameDays: Record<string, number> = {};
+    private closingDays: Record<string, { day: number; prices: Record<string, number>; advanced: boolean }> = {};
     // P4 新闻错峰队列：开盘/收盘生成的新闻按 tick 逐条播报，避免同一时刻扎堆
     private newsQueue: Record<string, any[]> = { CN: [], HK: [], US: [] };
 
@@ -80,6 +87,7 @@ export class MarketService {
         // Phase G-2: 追加在参数表末尾 + @Optional()——既不改动既有参数顺序（手工构造的测试不受影响），
         // 也让 BotModule 缺失/未注册时行情照常运行（机器人是可选增强，不是行情的前置依赖）
         @Optional() botPlayers?: BotPlayerService,
+        @Optional() private readonly funds?: FundService,
     ) {
         this.debugMode = debugMode;
         this.botPlayers = botPlayers;
@@ -135,6 +143,7 @@ export class MarketService {
         if (!marketData)
             return;
         try {
+            this.engine.setMarketGameDay?.(marketData.market || 'CN', marketData.gameDay);
             const prices = marketData.getPrices();
             if (!prices || Object.keys(prices).length === 0)
                 return;
@@ -172,16 +181,9 @@ export class MarketService {
         this.warmUpMarket(this.marketDataUS);
         // S2 启动校准：交易中启动时 tickCounter 对齐当前真实时段分钟数（避免误触发开盘/日终）
         const now = new Date();
-        const minutes = now.getHours() * 60 + now.getMinutes();
-        if (minutes >= 570 && minutes < 690) {
-            this.tickCounter = minutes - 570;
-        }
-        else if (minutes >= 780 && minutes < 900) {
-            this.tickCounter = 120 + (minutes - 780);
-        }
-        else {
-            this.tickCounter = 0;
-        }
+        this.tickCounter = tradingMinuteIndex('CN', now) ?? 0;
+        this.tickCounterHK = tradingMinuteIndex('HK', now) ?? 0;
+        this.tickCounterUS = tradingMinuteIndex('US', now) ?? 0;
         // B1 用户成交 → 行情引擎回调（价格冲击 + 成交量并入当前K线）
         this.engine.setUserFillHook((fill) => {
             try {
@@ -214,6 +216,19 @@ export class MarketService {
     async processMarket(market, marketData, counterKey) {
         let advanceCounter = false;
         try {
+            const now = new Date();
+            const realTime = this.tickIntervalMs === 60000 && !this.debugMode.isMarketActive();
+            const date = marketDateFor(market, now);
+            const tradingDay = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+            if (this.closingDays[market]) {
+                await this.finishMarketDay(market, marketData);
+                if (realTime && this.activeTradingDays[market]) this.closedTradingDays[market] = this.activeTradingDays[market];
+            }
+            if (realTime && this.activeTradingDays[market] && this.closedTradingDays[market] !== this.activeTradingDays[market]
+                && (this.activeTradingDays[market] !== tradingDay || marketSessionClosed(market, now))) {
+                await this.finishMarketDay(market, marketData);
+                this.closedTradingDays[market] = this.activeTradingDays[market];
+            }
             // Phase B P1: 盘后固定价格交易窗口（仅 A 股 15:00-15:30）——不生成行情，下单由 HTTP 路径即时撮合；
             // 跨过 15:30 后一次性撤销未成交盘后申报（每天一次，按 gameDay 防重入）
             if (market === 'CN' && !this.debugMode.isMarketActive()) {
@@ -251,6 +266,17 @@ export class MarketService {
             if (!this.debugMode.isMarketActive() && !constants_1.isTradingTimeFor(market)) {
                 return;
             }
+            if (realTime) {
+                const minute = tradingMinuteIndex(market, now);
+                if (minute === null || this.closedTradingDays[market] === tradingDay) return;
+                const key = `${tradingDay}:${minute}`;
+                if (this.processedMinutes[market] === key) return;
+                this.processedMinutes[market] = key;
+                this.activeTradingDays[market] = tradingDay;
+                this[counterKey] = minute;
+            }
+            marketData.setTradingMinute?.(this[counterKey] || 0);
+            this.engine.setMarketGameDay?.(market, marketData.gameDay);
             // G-4: 细粒度阶段标签——看门狗报「卡在哪一步」时，粗粒度的 "CN" 不足以定位，
             // 这里把 tick 内每个可能长时间阻塞的 await 都标出来（行情生成/后处理/机器人/撮合/日初日终）
             this.tickStage = `${market}:generate`;
@@ -279,9 +305,10 @@ export class MarketService {
                 this.logger.warn(`[` + market + `] 行情后处理异常: ` + (e && e.message ? e.message : e));
             }
             const counter = this[counterKey] || 0;
-            if (counter === 0) {
+            if (this.initializedGameDays[market] !== marketData.gameDay) {
+                this.initializedGameDays[market] = marketData.gameDay;
                 // SECURITY: 日初先重置 T+1 再撮合挂单，避免首 tick 触发卖单被误判 T+1 取消
-                await this.engine.resetBoughtToday();
+                if (market === 'CN') await this.engine.resetBoughtToday('CN', marketData.gameDay, counter === 0);
                 // Phase B: 清理跨夜遗留的盘后申报（重启/异常兜底），并同步昨收（涨跌停基准）
                 try {
                     await this.engine.cancelAfterHoursOrders();
@@ -300,7 +327,7 @@ export class MarketService {
                 }
                 // P1 开盘集合竞价：按最大成交量原则形成开盘价并撮合交叉挂单（早于连续竞价）
                 // P2: 当日已在盘前窗口竞价过则跳过（每天仅一次）
-                if (this.lastAuctionDay[market] !== marketData.gameDay) {
+                if (counter === 0 && this.lastAuctionDay[market] !== marketData.gameDay) {
                     this.lastAuctionDay[market] = marketData.gameDay;
                     await this.runOpeningAuctions(market, marketData);
                 }
@@ -391,65 +418,68 @@ export class MarketService {
                         this.enqueueNews(market, news.insiderNews);
                 }
             }
-            if (counter === 239) { // 分红/夜间事件
-                try {
-                    // Phase A P0#3: 先拍次日除权股票的登记日快照，再按快照发放当日 exDay 的分红（A股式口径）
-                    // Phase C: 传 market 用于红利税档位（CN 二档 / HK 20% / US 30%）
-                    await this.engine.snapshotDividendHolders(marketData.getDividends(marketData.gameDay + 1), marketData.gameDay + 1, market);
-                    await this.engine.payDividends(marketData.getDividends(marketData.gameDay), marketData.gameDay, market);
-                } catch (e) {
-                    this.logger.error(`分红发放失败: ${e.message}`);
-                }
-                const nightEvent = this.newsService.processNightEvent();
-                if (nightEvent && nightEvent.impact !== 0) {
-                    // SECURITY: 冲击必须写回行情引擎内部价格（原实现只改返回副本，下一 tick 被覆盖失效）
-                    marketData.applyMarketwideShock(nightEvent.impact);
-                    this.engine.updatePrices(marketData.getPrices());
-                    this.enqueueNews(market, {
-                        title: `🌙 ${nightEvent.name}`, description: `隔夜影响: ${(nightEvent.impact * 100).toFixed(1)}%`, type: 'night', impact: {}, duration: 1,
-                    });
-                }
-                // P4 错峰播报：每 tick 播报一条排队中的新闻（全天均匀铺开）
-                this.flushNewsQueue(market);
-            }
-            if (counter === 239) { // 日终结算
-                // G-4: 日终（分红/利息/快照/强平，最重的一段）
-                await this.timeStage(`${market}:dayEnd`, () => marketData.endOfDay());
-                const day = marketData.gameDay;
-                // FIX(H1): 全局账户日终结算只执行一次（三市场同 tick 到达日终，避免重复扣息/记快照/强平）
-                if (market === 'CN') {
-                    if (this.riskManager) {
-                        await this.riskManager.settleAllAccounts(day);
-                    }
-                    const liquidated = await this.engine.forceLiquidateMarginalAccounts();
-                    // 复盘：强平教训卡
-                    if (this.riskManager && liquidated && liquidated.length > 0) {
-                        for (const l of liquidated) {
-                            const acct = await this.engine.getAccountById(l.accountId);
-                            if (acct) {
-                                this.riskManager.addReview(acct.userId, {
-                                    type: '强平',
-                                    title: '💔 账户被强制平仓', desc: `保证金率跌破阈值（${(l.marginLevel * 100).toFixed(1)}%），所有持仓被强平`, lesson: '强平的教训：做空/融资仓位要预留充足保证金，保证金率跌破 100% 就会被强平。建议：①控制杠杆 ≤2x ②单边行情别满仓做空 ③及时补足保证金',
-                                });
-                            }
-                        }
-                        this.riskManager.addGlobalReview({
-                            type: '市场警示',
-                            title: '💔 有玩家被强制平仓', desc: '高杠杆玩家因保证金不足被强平，市场风险释放', lesson: '杠杆是把双刃剑：暴涨时放大收益，回调时直接出局。新手建议从无杠杆开始',
-                        });
-                    }
-                }
-                this.logger.log(`📅 [` + market + `] 第 ${day} 个交易日结束`);
+            if (!realTime && counter === tradingMinutesFor(market) - 1) {
+                await this.finishMarketDay(market, marketData);
+                if (realTime) this.closedTradingDays[market] = tradingDay;
             }
         } catch (e) {
             this.logger.error(`[` + market + `] Tick处理异常: ${e.message}`);
         } finally {
-            // SECURITY: tick 已生成时无论成功失败都推进计数，防止异常后重复触发日终结算/分红
             if (advanceCounter) {
                 const c = this[counterKey] || 0;
-                this[counterKey] = (c + 1) % 240;
+                this[counterKey] = (c + 1) % tradingMinutesFor(market);
             }
         }
+    }
+
+    private async finishMarketDay(market: string, marketData: MarketDataService) {
+        const closing = this.closingDays[market] ||= { day: marketData.gameDay, prices: marketData.getPrices(), advanced: false };
+        const closePrices = closing.prices;
+        if (market === 'CN' && this.funds) {
+            await this.funds.updateNavs(closing.day + 1, closePrices);
+        }
+        if (!closing.advanced) {
+        try {
+            await this.engine.snapshotDividendHolders(marketData.getDividends(marketData.gameDay + 1), marketData.gameDay + 1, market);
+            await this.engine.payDividends(marketData.getDividends(marketData.gameDay), marketData.gameDay, market);
+        } catch (e) {
+            this.logger.error(`分红发放失败: ${e.message}`);
+        }
+        const nightEvent = this.newsService.processNightEvent();
+        if (nightEvent && nightEvent.impact !== 0) {
+            marketData.applyMarketwideShock(nightEvent.impact);
+            this.enqueueNews(market, {
+                title: `🌙 ${nightEvent.name}`, description: `隔夜影响: ${(nightEvent.impact * 100).toFixed(1)}%`, type: 'night', impact: {}, duration: 1,
+            });
+        }
+        this.flushNewsQueue(market);
+        await this.timeStage(`${market}:dayEnd`, () => marketData.endOfDay());
+        closing.advanced = true;
+        }
+        // 盘后固定价委托与账户估值使用收盘价，隔夜跳空留到下次开盘。
+        this.engine.updatePrices(closePrices);
+        const day = closing.day + 1;
+        if (this.riskManager) {
+            await this.engine.runExclusive(() => this.riskManager.settleAllAccounts(day, market));
+        }
+        const liquidated = await this.engine.forceLiquidateMarginalAccounts(market);
+        if (this.riskManager && liquidated && liquidated.length > 0) {
+            for (const l of liquidated) {
+                const acct = await this.engine.getAccountById(l.accountId);
+                if (acct) {
+                    this.riskManager.addReview(acct.userId, {
+                        type: '强平',
+                        title: '💔 账户被强制平仓', desc: `保证金率跌破阈值（${(l.marginLevel * 100).toFixed(1)}%），所有持仓被强平`, lesson: '做空/融资仓位要预留充足保证金，避免满仓高杠杆，及时补足保证金。',
+                    });
+                }
+            }
+            this.riskManager.addGlobalReview({
+                type: '市场警示',
+                title: '💔 有玩家被强制平仓', desc: '高杠杆玩家因保证金不足被强平，市场风险释放', lesson: '杠杆会放大收益和损失。新手建议从无杠杆开始。',
+            });
+        }
+        this.logger.log(`📅 [${market}] 第 ${day} 个交易日结束`);
+        delete this.closingDays[market];
     }
 
     // P4 修复：tick 节奏——调试模式（无视限制）休市期走 1s/tick 高速回放，

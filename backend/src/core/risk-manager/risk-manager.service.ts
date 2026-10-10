@@ -167,8 +167,8 @@ export class RiskManagerService {
     }
 
     // F6 修复：日终批量结算所有账户（由 market.service 在每日收市时调用）
-    async settleAllAccounts(day) {
-        const accounts = await this.accountRepo.find();
+    async settleAllAccounts(day, market?: string) {
+        const accounts = await this.accountRepo.find(market ? { where: { marketMode: market } } : undefined);
         const settled = [];
         if (accounts.length === 0)
             return settled;

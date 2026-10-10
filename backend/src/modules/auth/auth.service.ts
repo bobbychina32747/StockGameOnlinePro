@@ -169,7 +169,7 @@ export class AuthService {
         this.loginFails.set(key, rec);
     }
 
-    async login(username: string, password: string, ip?: string) {
+    async login(username: string, password: string, ip?: string, allowLinked = false) {
         const name = this.normalizeUsername(username);
         const key = this.loginFailKey(name, ip);
         // 锁定检查先于一切 IO/bcrypt：锁定期内既不查库也不跑 bcrypt（省钱省 CPU，且不可被计时旁路）
@@ -189,6 +189,7 @@ export class AuthService {
         }
         // R5-④: 成功登录只清「本键」（用户名|本次 IP），该用户在其他 IP 上的失败计数不受影响
         this.loginFails.delete(key);
+        if (user.identityId && !allowLinked) throw new UnauthorizedException('此游戏账号已绑定，请使用站点账号登录');
         const token = this.jwtService.sign({ sub: user.id, username: user.username, role: user.role });
         return { user: this.toSafeUser(user), token };
     }

@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "commonjs", "moduleResolution": "node", "outDir": "dist", "rootDir": ".",
+    "strict": true, "esModuleInterop": true, "skipLibCheck": true, "resolveJsonModule": true,
+    "experimentalDecorators": true, "emitDecoratorMetadata": true, "types": ["node"],
+    "baseUrl": ".", "paths": {"*": ["node_modules/*", "../backend/node_modules/*", "../frontend/node_modules/*"]},
+    "typeRoots": ["node_modules/@types", "../backend/node_modules/@types", "../frontend/node_modules/@types"]
+  },
+  "include": ["packages/domain/**/*.ts", "packages/engine/**/*.ts", "packages/protocol/**/*.ts", "apps/game-api/**/*.ts"],
+  "exclude": ["node_modules", "dist", "apps/web"]
+}

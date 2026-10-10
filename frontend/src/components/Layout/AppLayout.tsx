@@ -8,6 +8,7 @@ import { NotificationContainer } from '../UI/Notification';
 import { MarketIndexBar } from '../Trading/MarketIndexBar';
 import { NoticeCenter } from './NoticeCenter';
 import { SettingsModal } from './SettingsModal';
+import { siteAuthApi } from '../../services/site-auth';
 // Phase C: 顶栏行情条独立 memo 子组件（原 AppLayout 订阅整个 prices 对象 → 每 tick 全树重渲染）
 const TopBarTicker = memo(function TopBarTicker() {
   // Phase G-1: 示例标的简称走字典（行情数据里的股票全名仍来自后端，不在此翻译）
@@ -71,7 +72,15 @@ export function AppLayout() {
     document.body.classList.toggle('theme-light', theme === 'light');
   }, [theme]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await siteAuthApi.logout();
+    } catch (error: any) {
+      if (error.response?.status !== 401) {
+        useUIStore.getState().addNotification(t('layout.logout.error'), 'error');
+        return;
+      }
+    }
     logout();
     navigate('/login');
   };

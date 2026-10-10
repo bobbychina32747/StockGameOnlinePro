@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
@@ -6,6 +6,7 @@ import { Server, Socket } from 'socket.io';
 import { Repository } from 'typeorm';
 
 import { User } from '../../infrastructure/database/entities/user.entity';
+import { isSiteToken, SiteGameAuthService } from '../auth/site-game-auth.service';
 
 // 行情 tick 广播载荷（market-data 生成：symbol/price/volume/timestamp）
 interface MarketTick {
@@ -41,7 +42,7 @@ interface NewsBroadcast {
 @Injectable()
 @WebSocketGateway({
     // FIX(M5): 收紧 CORS 白名单（原 origin:'*' 为无差别放行）
-    cors: { origin: ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000'], credentials: true },
+    cors: { origin: ['https://game.bobbycn.cc', 'https://staging.bobbycn.cc', 'http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000'], credentials: true },
     namespace: '/market',
 })
 export class MarketGateway {
@@ -64,6 +65,7 @@ export class MarketGateway {
     constructor(
         private readonly jwtService: JwtService,
         @InjectRepository(User) private readonly userRepo: Repository<User>,
+        @Optional() private readonly siteAuth?: SiteGameAuthService,
     ) {}
 
     async handleConnection(client: Socket) {
@@ -78,19 +80,25 @@ export class MarketGateway {
                 client.disconnect(true);
                 return;
             }
-            const payload = this.jwtService.verify(token);
-            if (!payload || !payload.sub) {
-                this.logger.warn(`WS 认证失败（token 载荷无效）: ${client.id}`);
-                client.disconnect(true);
-                return;
+            const site = this.siteAuth && isSiteToken(token);
+            const payload = site ? null : this.jwtService.verify(token);
+            if (site) {
+                const user = await this.siteAuth.authenticate(token);
+                userId = user.id;
+            } else {
+                if (!payload || !payload.sub) {
+                    this.logger.warn(`WS 认证失败（token 载荷无效）: ${client.id}`);
+                    client.disconnect(true);
+                    return;
+                }
+                const user = await this.userRepo.findOne({ where: { id: payload.sub } });
+                if (!user || !user.isActive || user.identityId) {
+                    this.logger.warn(`WS 认证失败（用户不存在或已被禁用）: ${client.id}`);
+                    client.disconnect(true);
+                    return;
+                }
+                userId = String(payload.sub);
             }
-            const user = await this.userRepo.findOne({ where: { id: payload.sub } });
-            if (!user || !user.isActive) {
-                this.logger.warn(`WS 认证失败（用户不存在或已被禁用）: ${client.id}`);
-                client.disconnect(true);
-                return;
-            }
-            userId = String(payload.sub);
         }
         catch (e) {
             this.logger.warn(`WS 认证失败: ${client.id} - ${e.message}`);

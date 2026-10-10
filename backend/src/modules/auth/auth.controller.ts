@@ -1,6 +1,15 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
+import { SiteGameAuthService } from './site-game-auth.service';
+import { CurrentSession, SessionAuthGuard } from '../identity/session-auth.guard';
+import { Session } from '../../infrastructure/database/entities/session.entity';
+
+class SiteSessionDto {
+    @IsOptional()
+    @IsBoolean()
+    create?: boolean;
+}
 
 class RegisterDto {
     @IsString()
@@ -28,7 +37,41 @@ class LoginDto {
 
 @Controller('auth')
 export class AuthController {
-    constructor(private readonly authService: AuthService) {}
+    constructor(private readonly authService: AuthService, private readonly siteAuth: SiteGameAuthService) {}
+
+    @Post('site-session')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(SessionAuthGuard)
+    async siteSession(@CurrentSession() session: Session, @Body() dto: SiteSessionDto, @Req() req: any, @Res({ passthrough: true }) res: any) {
+        this.assertGameOrigin(req);
+        res.setHeader('Cache-Control', 'no-store');
+        return this.siteAuth.session(session, dto?.create === true);
+    }
+
+    @Post('site-link')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(SessionAuthGuard)
+    async siteLink(@CurrentSession() session: Session, @Body() dto: LoginDto, @Req() req: any, @Res({ passthrough: true }) res: any) {
+        this.assertGameOrigin(req);
+        res.setHeader('Cache-Control', 'no-store');
+        return this.siteAuth.link(session, dto.username, dto.password, req.ip);
+    }
+
+    @Get(['site-return', 'identity/game-return'])
+    siteReturn(@Query('origin') origin: string, @Res() res: any) {
+        const allowed = ['https://game.bobbycn.cc', 'https://staging.bobbycn.cc', 'http://localhost:5173', 'http://localhost:3000'];
+        if (!allowed.includes(origin)) throw new BadRequestException('不支持的游戏回跳地址');
+        res.setHeader('Cache-Control', 'no-store');
+        res.redirect(302, origin + '/login');
+    }
+
+    private assertGameOrigin(req: any) {
+        const origin = req.headers?.origin;
+        if (origin && !['https://game.bobbycn.cc', 'https://staging.bobbycn.cc', 'http://localhost:5173',
+            'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000'].includes(origin)) {
+            throw new BadRequestException('不支持的游戏来源');
+        }
+    }
 
     @Post('register')
     async register(@Body() dto: RegisterDto) {

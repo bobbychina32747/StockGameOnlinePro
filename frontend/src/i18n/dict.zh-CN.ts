@@ -21,7 +21,8 @@ export const zhCN = {
     'layout.speed.title': 'TICK_INTERVAL_MS 配置',
     'layout.settings': '设置',
     'layout.theme.toggle': '切换主题',
-    'layout.logout': '退出',
+    'layout.logout': '退出站点账号',
+    'layout.logout.error': '退出失败，请稍后重试',
 
     // ─── 顶栏行情条（示例标的简称，行情数据里的全名仍由后端提供）───
     'ticker.t1': '芯澜',

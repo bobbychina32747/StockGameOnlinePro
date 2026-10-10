@@ -1,9 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
 
 // Phase A: 重置防刷钱——RESET_ENABLED 开关（大赛期间关闭）
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Account } from '../../infrastructure/database/entities/account.entity';
 import { Position } from '../../infrastructure/database/entities/position.entity';
 import { Transaction } from '../../infrastructure/database/entities/transaction.entity';
@@ -41,6 +41,7 @@ export class AccountService {
         private readonly config: ConfigService,
         @InjectRepository(Achievement) private readonly achievementRepo: Repository<Achievement>,
         private readonly seasonService: SeasonService,
+        @Optional() @InjectDataSource() private readonly dataSource?: DataSource,
     ) {}
 
     async getAccount(userId: string, mode: string = 'US') {
@@ -153,7 +154,7 @@ export class AccountService {
             const account = await this.getAccount(userId, mode);
             // SECURITY: 有持仓时禁止重置（原实现直接删持仓=免费套利棘轮：赚了保留、亏了重置）
             const positions = await this.positionRepo.find({ where: { accountId: account.id } });
-            if (positions.length > 0) {
+            if (positions.some((p) => Number(p.longQty) > 0 || Number(p.shortQty) > 0)) {
                 return { success: false, error: '存在持仓，无法重置账户（请先平仓）' };
             }
             // Phase A P0#1: 基金份额是独立资产，持有时重置=申购→重置→赎回无限刷钱，一票否决
@@ -214,6 +215,11 @@ export class AccountService {
         if (!Number.isFinite(amt) || amt <= 0) {
             return { success: false, error: '划转金额必须为大于0的数字' };
         }
+        const cents = Math.round(amt * 100);
+        if (!Number.isSafeInteger(cents) || cents <= 0 || Math.abs(amt * 100 - cents) > 1e-8) {
+            return { success: false, error: '划转金额最多保留两位小数，最低0.01' };
+        }
+        const debit = cents / 100;
         if (!fromMode || !toMode || fromMode === toMode) {
             return { success: false, error: '划转市场必须不同（CN/HK/US）' };
         }
@@ -242,17 +248,25 @@ export class AccountService {
             const from = await this.accountRepo.findOne({ where: { userId, marketMode: fromMode } });
             if (!from)
                 return { success: false, error: '转出账户不存在' };
-            if (Number(from.cash) < amt)
+            if (Number(from.cash) < debit)
                 return { success: false, error: '转出账户余额不足' };
             const to = await this.accountRepo.findOne({ where: { userId, marketMode: toMode } });
             if (!to)
                 return { success: false, error: '转入账户不存在' };
-            const cnyValue = amt * fromRate;
-            const received = (cnyValue / toRate) * (1 - FX_TRANSFER_FEE_RATE);
-            from.cash = Math.round((Number(from.cash) - amt) * 100) / 100;
+            const cnyValue = debit * fromRate;
+            const received = Math.floor(Number(((cnyValue / toRate) * (1 - FX_TRANSFER_FEE_RATE) * 100).toFixed(8))) / 100;
+            if (received <= 0) return { success: false, error: '换汇后到账金额不足0.01' };
+            from.cash = Math.round((Number(from.cash) - debit) * 100) / 100;
             to.cash = Math.round((Number(to.cash) + received) * 100) / 100;
-            await this.accountRepo.save(from);
-            await this.accountRepo.save(to);
+            if (this.dataSource) {
+                await this.dataSource.transaction(async (manager) => {
+                    await manager.save(from);
+                    await manager.save(to);
+                });
+            } else {
+                await this.accountRepo.save(from);
+                await this.accountRepo.save(to);
+            }
             this.logger.log('跨市场划转 ' + userId + ': ' + fromMode + ' -' + amt.toFixed(2) + ' → ' + toMode + ' +' + received.toFixed(2) + '（手续费 ' + (FX_TRANSFER_FEE_RATE * 100).toFixed(1) + '%）');
             return { success: true, received: Number(received.toFixed(2)) };
         });

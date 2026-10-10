@@ -7,6 +7,7 @@
 import type { I18nKey } from './dict.zh-CN';
 
 export const zhHant: Record<I18nKey, string> = {
+    'layout.logout.error': '登出失敗，請稍後重試',
     // ─── 導覽列 ───
     'nav.trading': '交易',
     'nav.ranking': '排行榜',
@@ -18,7 +19,7 @@ export const zhHant: Record<I18nKey, string> = {
     'layout.speed.title': 'TICK_INTERVAL_MS 設定',
     'layout.settings': '設定',
     'layout.theme.toggle': '切換主題',
-    'layout.logout': '登出',
+    'layout.logout': '登出站點帳號',
 
     // ─── 頂欄行情列（示例標的簡稱）───
     'ticker.t1': '芯瀾',

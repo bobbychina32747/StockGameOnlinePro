@@ -76,7 +76,8 @@ export function builtinClients(): ClientSpec[] {
     return Object.entries(paths).map(([clientId, meta]) => ({
         clientId,
         name: meta.name,
-        redirectUris: redirect(meta.dir),
+        // One callback page owns routing back to every game; retain old URIs for compatibility.
+        redirectUris: Array.from(new Set([...redirect(meta.dir), ...redirect('/games/')])),
         scopes: ['openid', 'profile', 'email', 'saves', 'arcade'],
         firstParty: true,
     }));
@@ -444,8 +445,10 @@ export class OauthService implements OnModuleInit {
         }
 
         // 先烧码再发令牌：并发双击时后到者必被拒
-        row.usedAt = new Date();
-        await this.codes.save(row);
+        const consumed = await this.codes.createQueryBuilder().update()
+            .set({ usedAt: new Date() }).where('codeHash = :hash', { hash: row.codeHash })
+            .andWhere('usedAt IS NULL').execute();
+        if (consumed.affected !== 1) throw new OAuthError('invalid_grant', '授权码已被使用');
 
         const session = await this.loadUsableSession(row.sessionId, row.identityId);
         if (!session)
@@ -484,8 +487,13 @@ export class OauthService implements OnModuleInit {
         if (!grant || grant.revokedAt)
             throw new OAuthError('invalid_grant', '授权已被撤销，请重新授权');
 
-        row.usedAt = new Date();
-        await this.refresh.save(row);
+        const consumed = await this.refresh.createQueryBuilder().update()
+            .set({ usedAt: new Date() }).where('tokenHash = :hash', { hash: row.tokenHash })
+            .andWhere('usedAt IS NULL').andWhere('revokedAt IS NULL').execute();
+        if (consumed.affected !== 1) {
+            await this.revokeGrantTokens(row.grantId);
+            throw new OAuthError('invalid_grant', '刷新令牌已被使用过，请重新授权');
+        }
 
         const session = await this.loadUsableSessionForIdentity(row.identityId);
         if (!session)
@@ -568,6 +576,9 @@ export class OauthService implements OnModuleInit {
     }
 
     private async revokeGrantTokens(grantId: string): Promise<void> {
+        // Persist revocation on the grant too: a concurrent issuer may insert after
+        // the token UPDATE, but that late token must still be unusable.
+        await this.grants.update({ id: grantId }, { revokedAt: new Date() });
         await this.refresh.createQueryBuilder()
             .update()
             .set({ revokedAt: new Date() })

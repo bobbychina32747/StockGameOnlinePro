@@ -87,3 +87,38 @@ export function isMarketHoliday(market: 'CN' | 'HK' | 'US', date: Date): boolean
   const dateStr = y + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   return list.includes(dateStr);
 }
+
+export function tradingMinutesFor(market: string): number {
+  return market === 'HK' ? 330 : market === 'US' ? 390 : 240;
+}
+
+export function tradingMinuteIndex(market: string, date: Date): number | null {
+  const sessions = market === 'US' ? usSessionsFor(date) : TRADING_CALENDAR[market === 'HK' ? 'HK' : 'CN'].sessions;
+  const minute = date.getHours() * 60 + date.getMinutes();
+  let offset = 0;
+  for (const [start, end] of sessions) {
+    if (minute >= start && minute < end) return offset + minute - start;
+    offset += end - start;
+  }
+  return null;
+}
+
+export function marketSessionClosed(market: string, date: Date): boolean {
+  const minute = date.getHours() * 60 + date.getMinutes();
+  if (market === 'US') {
+    const sessions = usSessionsFor(date);
+    return minute >= sessions[1][1] && minute < sessions[0][0];
+  }
+  return minute >= (market === 'HK' ? 960 : 900);
+}
+
+export function gameTradingTime(market: string, day: number, minute: number, date = new Date()): Date {
+  const sessions = market === 'US' ? usSessionsFor(date) : TRADING_CALENDAR[market === 'HK' ? 'HK' : 'CN'].sessions;
+  let offset = minute;
+  for (let i = 0; i < sessions.length; i++) {
+    const [start, end] = sessions[i];
+    if (offset < end - start) return new Date(2024, 0, 1 + day + (market === 'US' && i > 0 ? 1 : 0), 0, start + offset);
+    offset -= end - start;
+  }
+  throw new RangeError('交易分钟超出当日时段');
+}

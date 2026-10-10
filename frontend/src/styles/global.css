@@ -4,21 +4,21 @@
 
 /* ─── Design Tokens ─── */
 :root {
-  --color-brand: #2f6fed;
-  --color-brand-hover: #4a82f1;
-  --color-brand-light: #7ba4f5;
-  --color-brand-subtle: rgba(47, 111, 237, 0.14);
+  --color-brand: #c6d49b;
+  --color-brand-hover: #dde5b9;
+  --color-brand-light: #dae3b3;
+  --color-brand-subtle: rgba(198, 212, 155, 0.12);
 
-  --bg-primary: #0e1013;
-  --bg-secondary: #15171c;
-  --bg-elevated: #1b1d23;
-  --bg-card: #21242b;
-  --bg-hover: #282b33;
-  --bg-active: #2e313a;
+  --bg-primary: #111915;
+  --bg-secondary: #18221c;
+  --bg-elevated: #212d24;
+  --bg-card: #202a22;
+  --bg-hover: #2b372c;
+  --bg-active: #344334;
 
-  --text-primary: #e6e8eb;
-  --text-secondary: #9ba1ab;
-  --text-muted: #666d78;
+  --text-primary: #e9ecde;
+  --text-secondary: #b8c1af;
+  --text-muted: #94a18b;
   --text-disabled: #454b55;
 
   /* A股：红涨绿跌 */
@@ -36,10 +36,10 @@
   --border-color: var(--border-default); /* 兼容旧名称 */
   --border-strong: hsla(220, 12%, 60%, 0.24);
 
-  --radius-sm: 5px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 1px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 3px;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-md: 0 3px 10px rgba(0, 0, 0, 0.4);
@@ -1473,3 +1473,13 @@ body.density-compact .info-row { padding: 2px 0; }
 .tutorial-progress { flex: 1; display: flex; gap: 3px; }
 .tutorial-progress i { width: 8px; height: 4px; border-radius: 2px; background: var(--border-strong); }
 .tutorial-progress i.on { background: #2f6fed; }
+
+/* Trading desk edition. Price direction semantics are unchanged. */
+.btn-primary{color:#182218;box-shadow:none}
+.login-page{background:var(--bg-primary)}
+.login-card{background:var(--bg-secondary);border:1px solid var(--border-strong);border-top:3px solid var(--color-brand);box-shadow:none;border-radius:2px}
+.login-card h1{background:none;-webkit-text-fill-color:var(--text-primary);color:var(--text-primary);letter-spacing:-1px;font-weight:800}
+.login-card h1::before{content:'MARKET / SIMULATION';display:block;font:10px var(--font-mono);color:var(--color-brand);letter-spacing:3px;margin-bottom:12px}
+.login-card .form-group input{border-radius:1px}
+:where(button,a,input,select):focus-visible{outline:2px solid var(--color-brand);outline-offset:3px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}

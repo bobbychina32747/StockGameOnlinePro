@@ -35,16 +35,23 @@ export default function Dashboard() {
   // Q5：1min/intraday 由 WS tick 实时维护，只首次拉一次历史；其他周期 15s 低频轮询
   const realtimeTf = selectedTimeframe === '1min' || selectedTimeframe === 'intraday';
   useEffect(() => {
+    let active = true;
+    let loading = false;
     const load = async () => {
+      if (!active || loading) return;
+      loading = true;
       try {
         const [kdata, ob] = await Promise.all([
           marketApi.klines(selectedSymbol, selectedTimeframe),
           marketApi.orderBook(selectedSymbol),
         ]);
+        if (!active) return;
         setKlines(selectedSymbol, selectedTimeframe, kdata);
         setOrderBook(selectedSymbol, ob);
       } catch (e) {
         // 忽略瞬时错误，WS 会持续推送
+      } finally {
+        loading = false;
       }
     };
     load();
@@ -54,39 +61,50 @@ export default function Dashboard() {
     } else {
       // Phase C: 实时周期下 WS 只推 tick，盘口深度无人更新 → 15s 低频只刷盘口（不重复拉 K 线）
       timer = setInterval(async () => {
+        if (!active || loading) return;
+        loading = true;
         try {
           const ob = await marketApi.orderBook(selectedSymbol);
+          if (!active) return;
           setOrderBook(selectedSymbol, ob);
         } catch (e) { /* 瞬时错误忽略 */ }
+        finally { loading = false; }
       }, 15000);
     }
-    return () => { if (timer) clearInterval(timer); };
+    return () => { active = false; if (timer) clearInterval(timer); };
   }, [selectedSymbol, selectedTimeframe, realtimeTf, setKlines, setOrderBook]);
 
   // WS 断线时降级到 REST 轮询（每 5 秒）
   const [wsConnected, setWsConnected] = useState(true);
   useEffect(() => {
-    const interval = setInterval(() => {
+    let active = true;
+    let loading = false;
+    const interval = setInterval(async () => {
       const socket = (window as any).__wsSocket;
       const connected = socket?.connected ?? false;
       setWsConnected(connected);
-      if (!connected) {
+      if (!connected && !loading) {
+        loading = true;
         // 断线兜底：价格映射与 K 线一起拉，避免列表/盘口价格冻结
-        marketApi.prices().then((p) => {
-          if (p && typeof p === 'object') setPrices(p);
-        }).catch(() => {});
-        marketApi.klines(selectedSymbol, selectedTimeframe).then((k) =>
-          setKlines(selectedSymbol, selectedTimeframe, k)
-        ).catch(() => {});
+        await Promise.allSettled([
+          marketApi.prices().then((p) => {
+            if (active && p && typeof p === 'object') setPrices(p);
+          }),
+          marketApi.klines(selectedSymbol, selectedTimeframe).then((k) => {
+            if (active) setKlines(selectedSymbol, selectedTimeframe, k);
+          }),
+        ]);
+        loading = false;
       }
     }, 5000);
-    return () => clearInterval(interval);
+    return () => { active = false; clearInterval(interval); };
   }, [selectedSymbol, selectedTimeframe, setKlines, setPrices]);
 
   // ─── S5 快捷键：数字选股 / T 切周期 / 上下键换股 / Enter 详情 ───
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
+      if (e.ctrlKey || e.metaKey || e.altKey || (e.target as HTMLElement)?.isContentEditable) return;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       const sorted = [...stocks].sort((a: any, b: any) => (a.symbol < b.symbol ? -1 : 1));
       if (e.key >= '1' && e.key <= '9') {
@@ -167,6 +185,7 @@ export default function Dashboard() {
     return () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+      if (dragRef.current) onUp();
     };
   }, []);
 

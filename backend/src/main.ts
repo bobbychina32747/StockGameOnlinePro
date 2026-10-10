@@ -88,8 +88,9 @@ async function bootstrap() {
             },
         },
     }));
-    const express = require('express');
-    app.use(express.json({ limit: '1mb' }));
+    // Central transport policy; keep saves' quota reachable without relaxing other routes.
+    const { installJsonBodies } = require('./infrastructure/http/json-body');
+    installJsonBodies(app);
     // 表单体（application/x-www-form-urlencoded）由自己的解析器收：见 oauth-form.ts 的注释。
     // json 在前、表单在后，两者类型互斥，顺序不影响既有端点。
     app.use(formBodyMiddleware);
@@ -106,6 +107,8 @@ async function bootstrap() {
     app.use([
         '/api/auth/login',
         '/api/auth/register',
+        '/api/auth/site-link',
+        '/api/auth/site-session',
         '/api/auth/identity/login',
         '/api/auth/identity/register',
         '/api/auth/identity/password/reset-request',
@@ -193,5 +196,3 @@ async function bootstrap() {
     process.on('beforeExit', () => persistDatabase());
 }
 bootstrap();
-
-

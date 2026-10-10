@@ -29,6 +29,18 @@ describe('useMarketStore.addTick', () => {
     expect(useMarketStore.getState().klines.T1['1min']).toHaveLength(2);
   });
 
+  it('服务端时间优先于累计 tick，避免美股跨午夜错位', () => {
+    const time = new Date(2024, 0, 2, 0, 0).toISOString();
+    useMarketStore.getState().addTick({ symbol: 'U1', price: 10, volume: 100, timestamp: 150, time });
+    expect(useMarketStore.getState().klines.U1['1min'][0].time).toBe(time);
+  });
+
+  it('旧版本港股 tick 按港股午休映射', () => {
+    useMarketStore.getState().addTick({ symbol: 'H1', price: 10, volume: 100, timestamp: 150 });
+    const time = new Date(useMarketStore.getState().klines.H1['1min'][0].time);
+    expect([time.getHours(), time.getMinutes()]).toEqual([13, 0]);
+  });
+
   it('非法 tick（NaN/负数价格/异常 timestamp）被忽略', () => {
     const st = useMarketStore.getState();
     st.addTick({ symbol: 'T1', price: NaN, volume: 10, timestamp: 5 });

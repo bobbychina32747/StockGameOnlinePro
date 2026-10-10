@@ -18,6 +18,9 @@ export class User {
     @Column()
     password: string;
 
+    @Column({ type: 'varchar', length: 36, nullable: true, unique: true })
+    identityId: string | null;
+
     @Column({ type: 'simple-enum', enum: UserRole, default: UserRole.USER })
     role: UserRole;
 

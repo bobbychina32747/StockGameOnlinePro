@@ -39,6 +39,9 @@ export class Position {
     @Column({ default: 0 })
     boughtToday: number;
 
+    @Column('integer', { nullable: true })
+    boughtDay: number | null;
+
     @Column({ default: 0 })
     lockDay: number;
 }

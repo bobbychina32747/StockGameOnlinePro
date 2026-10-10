@@ -7,6 +7,7 @@
 import type { I18nKey } from './dict.zh-CN';
 
 export const en: Record<I18nKey, string> = {
+    'layout.logout.error': 'Sign out failed. Please try again.',
     // ─── Navigation ───
     'nav.trading': 'Trade',
     'nav.ranking': 'Ranking',
@@ -18,7 +19,7 @@ export const en: Record<I18nKey, string> = {
     'layout.speed.title': 'TICK_INTERVAL_MS setting',
     'layout.settings': 'Settings',
     'layout.theme.toggle': 'Toggle theme',
-    'layout.logout': 'Log out',
+    'layout.logout': 'Sign out of site',
 
     // ─── Top-bar ticker (short names of the demo symbols) ───
     'ticker.t1': 'Xinlan',

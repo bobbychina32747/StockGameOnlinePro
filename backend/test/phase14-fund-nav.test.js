@@ -67,7 +67,7 @@ function makeSvc({ navSeed = [], withNavRepo = true, findError = null, saveError
   const accountRepo = countingRepo([{ id: 'AC1', userId: 'U1', marketMode: 'CN', cash: 100000 }]);
   const holdingRepo = countingRepo([]);
   const engine = { runExclusive: (fn) => fn() };
-  const marketData = { gameDay };
+  const marketData = { gameDay, getPrevCloses: () => ({ T1: 10 }) };
   const seasonService = { isBlocked: async () => false };
   const nr = navRepo(navSeed, { findError, saveError });
   const svc = withNavRepo
@@ -159,13 +159,13 @@ describe('Phase 14 启动回填（onModuleInit：库值 → 内存 NAV）', () =
   });
 });
 
-describe('Phase 14 定时落库（updateNavs：新 NAV upsert，只涨不跌）', () => {
-  test('③ 每只基金的新 NAV 都落库 upsert，且内存 NAV 严格不下降（含 200 轮单调性）', async () => {
+describe('基金日终落库（价格组合上涨场景）', () => {
+  test('每个交易日 NAV upsert，持久化报价与内存一致', async () => {
     const { svc, nr } = makeSvc();
     await svc.onModuleInit();
     const before = svc.getFunds().map((f) => f.nav);
     nr.calls.save = 0;
-    await svc.updateNavs();
+    await svc.updateNavs(1, { T1: 10.01 });
     expect(nr.calls.save).toBe(2);
     expect(nr.rows.length).toBe(2); // 主键 upsert：更新既有行而非新增
     // 内存与库中严格同源、且本周期不下降
@@ -173,10 +173,10 @@ describe('Phase 14 定时落库（updateNavs：新 NAV upsert，只涨不跌）'
       expect(f.nav).toBeGreaterThanOrEqual(before[i]);
       expect(rowOf(nr, f.id).nav).toBe(f.nav);
     });
-    // 连续 200 个周期：NAV 只涨不跌（红线：跌价会重开「重置/赎回」套利窗口）
+    // 此处组合每日上涨；下跌与重复结算回归见 phase19-gameplay-safety。
     let prev = svc.getFunds().map((f) => f.nav);
     for (let i = 0; i < 200; i++) {
-      await svc.updateNavs();
+      await svc.updateNavs(i + 2, { T1: 10 * Math.pow(1.001, i + 2) });
       const now = svc.getFunds().map((f) => f.nav);
       now.forEach((v, k) => expect(v).toBeGreaterThanOrEqual(prev[k]));
       prev = now;
@@ -186,12 +186,12 @@ describe('Phase 14 定时落库（updateNavs：新 NAV upsert，只涨不跌）'
     expect(nr.rows.length).toBe(2);
   });
 
-  test('④ 落库失败不影响 NAV 内存更新：updateNavs 不 reject，仅 logger.error', async () => {
+  test('落库失败保留内存报价并抛错，禁止未持久化净值参与交易', async () => {
     const { svc, nr, errors } = makeSvc({ navSeed: [{ fundId: 'fund-1', nav: 5 }], saveError: new Error('db is locked') });
     await expect(svc.onModuleInit()).resolves.toBeUndefined(); // 初始化补基线同样只降级为日志
     const before = navOf(svc, 'fund-1');
-    await expect(svc.updateNavs()).resolves.toBeUndefined();
-    expect(navOf(svc, 'fund-1')).toBeGreaterThanOrEqual(before); // 行情照常推进
+    await expect(svc.updateNavs(1, { T1: 11 })).rejects.toThrow('db is locked');
+    expect(navOf(svc, 'fund-1')).toBe(before);
     expect(errors.some((m) => m.includes('落库失败'))).toBe(true);
     expect(errors.length).toBeGreaterThan(0);
     expect(nr.rows.find((r) => r.fundId === 'fund-1').nav).toBe(5); // 库值未被子虚乌有地改动
@@ -201,10 +201,10 @@ describe('Phase 14 定时落库（updateNavs：新 NAV upsert，只涨不跌）'
     const { svc, nr } = makeSvc();
     await svc.onModuleInit();
     nr.setSaveError(new Error('transient'));
-    await svc.updateNavs();
+    await expect(svc.updateNavs(1, { T1: 11 })).rejects.toThrow('transient');
     const afterFail = Object.fromEntries(nr.rows.map((r) => [r.fundId, r.nav]));
     nr.setSaveError(null);
-    await svc.updateNavs();
+    await svc.updateNavs(1, { T1: 11 });
     for (const f of svc.getFunds()) {
       expect(rowOf(nr, f.id).nav).toBe(navOf(svc, f.id));
       expect(rowOf(nr, f.id).nav).toBeGreaterThanOrEqual(afterFail[f.id]);
@@ -247,7 +247,7 @@ describe('Phase 14 兼容性 + 重启连续性（核心回归）', () => {
   test('⑥b 完整生命周期：演化 50 个周期落库 → 模拟重启 → 净值与市值严格连续', async () => {
     const first = makeSvc();
     await first.svc.onModuleInit();
-    for (let i = 0; i < 50; i++) await first.svc.updateNavs();
+    for (let i = 0; i < 50; i++) await first.svc.updateNavs(i + 1, { T1: 10 * Math.pow(1.001, i + 1) });
     const persisted = first.nr.rows.map((r) => ({ ...r }));
     const navBeforeRestart = navOf(first.svc, 'fund-1');
     expect(navBeforeRestart).toBeGreaterThan(4.5); // 净值确实涨过（旧实现在此复位）

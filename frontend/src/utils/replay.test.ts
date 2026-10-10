@@ -21,6 +21,12 @@ describe('replay.barsForDay', () => {
 });
 
 describe('replay.replayDaysOf', () => {
+  it('美股跨午夜行情属于同一个交易日', () => {
+    const bars = [mk(2024, 7, 27, 21, 30), mk(2024, 7, 28, 0, 0), mk(2024, 7, 28, 3, 59)];
+    const day = new Date(2024, 7, 27).toDateString();
+    expect(replayDaysOf(bars, 'US')).toEqual([day]);
+    expect(barsForDay(bars, day, 'US')).toEqual(bars);
+  });
   it('升序去重交易日', () => {
     const days = replayDaysOf([
       mk(2024, 7, 27, 9, 30), mk(2024, 7, 27, 14, 0),

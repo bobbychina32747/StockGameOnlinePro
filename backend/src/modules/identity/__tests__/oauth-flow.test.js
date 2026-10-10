@@ -30,6 +30,10 @@ describe('授权系统 · 客户端注册与参数校验', () => {
     expect(ids).toContain(GAMES_CLIENT);
     expect(ids).toContain('zombie-survival');
     expect(ids).toContain('dreamcore-walk');
+    for (const client of list) {
+      const registered = await h.oauth.findClient(client.clientId);
+      expect(registered.redirectUris).toContain(REDIRECT);
+    }
     const games = list.find((c) => c.clientId === GAMES_CLIENT);
     expect(games.firstParty).toBe(true);
     expect(games.scopes).toEqual(expect.arrayContaining(['openid', 'profile', 'email', 'saves', 'arcade']));
@@ -239,6 +243,15 @@ describe('授权系统 · /token 授权码兑换', () => {
     );
   });
 
+  test('并发兑换同一个授权码只能成功一次', async () => {
+    const { verifier, code } = await fullFlow();
+    const results = await Promise.allSettled(Array.from({ length: 6 }, () => h.oauth.exchangeCode({
+      clientId: GAMES_CLIENT, code, redirectUri: REDIRECT, codeVerifier: verifier,
+    })));
+    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
+    expect(await h.repos.refresh.count()).toBe(1);
+  });
+
   test('PKCE 校验：verifier 不对 / 缺失 → invalid_grant（校验失败不消耗授权码）', async () => {
     const { verifier, code } = await fullFlow();
     await expectOauthError(
@@ -341,6 +354,18 @@ describe('授权系统 · /token 刷新与撤销', () => {
     await expectOauthError(h.oauth.refreshTokens({ clientId: GAMES_CLIENT, refreshToken: first.refresh_token }), 'invalid_grant');
     // 正当用户手里的新令牌也被一并作废（无法区分谁是攻击者）
     await expectOauthError(h.oauth.refreshTokens({ clientId: GAMES_CLIENT, refreshToken: second.refresh_token }), 'invalid_grant');
+  });
+
+  test('并发刷新不能生成多条可用的令牌分支，重放撤销整条授权', async () => {
+    const first = await tokensFor();
+    const results = await Promise.allSettled(Array.from({ length: 6 }, () => h.oauth.refreshTokens({
+      clientId: GAMES_CLIENT, refreshToken: first.refresh_token,
+    })));
+    const succeeded = results.filter(r => r.status === 'fulfilled');
+    expect(succeeded.length).toBeLessThanOrEqual(1);
+    for (const result of succeeded) {
+      await expectOauthError(h.oauth.refreshTokens({ clientId: GAMES_CLIENT, refreshToken: result.value.refresh_token }), 'invalid_grant');
+    }
   });
 
   test('刷新令牌不能跨客户端使用', async () => {
