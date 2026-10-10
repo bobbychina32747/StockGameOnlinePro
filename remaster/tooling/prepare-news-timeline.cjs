@@ -1,0 +1,54 @@
+const fs = require('node:fs'), path = require('node:path');
+// Dates are checked against original releases. Session-level records do not pretend to have exact first-publication timestamps.
+const events = [
+  {id:'nvda-20240522',date:'2024-05-22',market:'US',session:'after-close',kind:'earnings',symbols:['NVDA','AMD'],title:'英伟达季度财报与拆股公告',
+    sources:['https://investor.nvidia.com/news/press-release-details/2024/NVIDIA-Announces-Financial-Results-for-First-Quarter-Fiscal-2025/'],confounders:['财报、指引、回购和拆股同时披露；不能分离每一项的影响'],note:'拆股公告日为5月22日，拆股后交易开始于6月10日；价格使用复权数据。'},
+  {id:'crm-20240529',date:'2024-05-29',market:'US',session:'after-close',kind:'earnings',symbols:['CRM','ORCL'],title:'Salesforce季度财报与下一季度指引',
+    sources:['https://investor.salesforce.com/news/news-details/2024/Salesforce-Announces-First-Quarter-Fiscal-2025-Results/default.aspx'],confounders:['财报和经营指引同时披露']},
+  {id:'nflx-20220419',date:'2022-04-19',market:'US',session:'after-close',kind:'earnings',symbols:['NFLX','DIS'],title:'Netflix季度财报与用户数量变化',
+    sources:['https://ir.netflix.net/investor-news-and-events/financial-releases/press-release-details/2022/Netflix-Releases-First-Quarter-2022-Financial-Results/default.aspx'],confounders:['用户数据、盈利和下一季度预期同时变化']},
+  {id:'aapl-20240502',date:'2024-05-02',market:'US',session:'after-close',kind:'earnings',symbols:['AAPL','SONY'],title:'苹果季度财报与回购计划',
+    sources:['https://www.apple.com/sg/newsroom/2024/05/apple-reports-second-quarter-results/'],confounders:['回购、分红和财报同时披露；翌日有美国就业数据']},
+  {id:'amzn-20240801',date:'2024-08-01',market:'US',session:'after-close',kind:'earnings',symbols:['AMZN','BABA'],title:'亚马逊季度财报与销售指引',
+    sources:['https://ir.aboutamazon.com/news-release/news-release-details/2024/Amazon-com-Announces-Second-Quarter-Results/default.aspx'],confounders:['翌日就业报告与市场整体抛售'],note:'17:30美东是财报电话会时间，不能当作首次发布新闻的时间。'},
+  {id:'rblx-20240509',date:'2024-05-09',market:'US',session:'before-open',kind:'earnings',symbols:['RBLX','TTWO'],title:'Roblox季度财报与全年指引',
+    sources:['https://ir.roblox.com/news/news-details/2024/Roblox-Reports-First-Quarter-2024-Financial-Results/'],confounders:['同日游戏行业其他公司披露财报'],note:'08:30美东为问答会时间；公告此前已公开，未指定首次公开分钟。'},
+  {id:'msft-20240130',date:'2024-01-30',market:'US',session:'after-close',kind:'earnings',symbols:['MSFT','PLTR'],title:'微软FY24第二季度财报',
+    sources:['https://www.microsoft.com/en-us/investor/earnings/fy-2024-q2/press-release-webcast'],confounders:['同日其他大型科技公司披露财报'],note:'FY24第二季度截止日为2023年12月31日；新闻公开日为2024年1月30日。'},
+  {id:'nke-20240627',date:'2024-06-27',market:'US',session:'after-close',kind:'earnings',symbols:['NKE','COST'],title:'耐克FY24第四季度财报与指引',
+    sources:['https://www.sec.gov/Archives/edgar/data/320187/000032018724000028/q4fy24exhibit991er.htm'],confounders:['财报与全年经营预期同时披露']},
+  {id:'lly-20230427',date:'2023-04-27',market:'US',session:'before-open',publishedAt:'2023-04-27T06:15:00-04:00',kind:'clinical',symbols:['LLY','PFE'],title:'礼来SURMOUNT-2临床结果',
+    sources:['https://investor.lilly.com/node/48776','https://www.prnewswire.com/news/eli-lilly-and-company/?page=13'],confounders:['06:45美东另有同公司季度财报，日线不能隔离临床结果影响']},
+  {id:'pep-20240711',date:'2024-07-11',market:'US',session:'before-open',kind:'earnings',symbols:['PEP','KO'],title:'百事季度财报',
+    sources:['https://www.sec.gov/Archives/edgar/data/77476/000007747624000043/q220248-kxexhibit991.htm'],confounders:['同日上午08:30美东公布美国CPI']},
+  {id:'dal-20240711',date:'2024-07-11',market:'US',session:'before-open',publishedAt:'2024-07-11T06:30:00-04:00',kind:'earnings',symbols:['DAL','UPS'],title:'达美航空季度财报与指引',
+    sources:['https://ir.delta.com/news/news-details/2024/Delta-Air-Lines-Announces-June-Quarter-2024-Financial-Results/default.aspx','https://www.prnewswire.com/news/delta-air-lines/?page=2'],confounders:['同日上午08:30美东公布美国CPI']},
+  {id:'fed-20240918',date:'2024-09-18',market:'US',session:'during-session',publishedAt:'2024-09-18T14:00:00-04:00',kind:'rates',scope:'all',title:'美联储下调政策利率50基点',
+    sources:['https://www.federalreserve.gov/newsevents/pressreleases/monetary20240918a.htm','https://www.federalreserve.gov/monetarypolicy/fomcpresconf20240918.htm'],confounders:['14:30新闻发布会追加信息；日线含14:00之前的交易']},
+  {id:'china-20240924',date:'2024-09-24',market:'CN',session:'before-open',scope:'all',kind:'policy',publicationWindow:['2024-09-24T09:00:00+08:00','2024-09-24T09:39:56+08:00'],title:'金融支持经济发展政策发布会',
+    sources:['https://www.csrc.gov.cn/csrc/c106311/c7508374/content.shtml','https://english.scio.gov.cn/m/pressroom/node_9013508.htm'],confounders:['多项货币、地产与资本市场政策同时披露；后续数日追加政策'],note:'09:00为发布会起点，具体措施的首次披露分钟未逐项核实；9月27日执行部分措施不是首次新闻日期。'},
+  {id:'opec-20230402',date:'2023-04-02',market:'US',session:'weekend',kind:'supply',symbols:['XOM','CVX','0883.HK','1088.HK','601857.SS','601088.SS','DAL','UPS'],title:'OPEC+成员公布自愿减产',
+    sources:['https://opec.org/pr-detail/63-03-apr-2023.html'],confounders:['油价、汇率、宏观需求共同影响行业'],note:'4月3日官方会议记录确认4月2日宣布；4月2日为周日，不能把4月3日网页日期当成消息起点。'},
+  {id:'svb-20230310',date:'2023-03-10',market:'US',session:'during-session',eventOccurredAt:'2023-03-10T11:15:00-05:00',kind:'credit',symbols:['JPM','BAC','GS','SCHW','AIG','CB'],title:'硅谷银行关闭及银行风险传导',
+    sources:['https://www.fdic.gov/news/press-releases/2023/pr23016.html','https://www.fdic.gov/news/speeches/2023/spmar2923.html'],confounders:['3月9日已出现银行挤兑和股价反应；3月10日另有就业数据'],note:'11:15为银行关闭时间，不是已核实的首次公开报道时间；拒绝伪造新闻时间。'},
+  {id:'svb-rescue-20230312',date:'2023-03-12',market:'US',session:'weekend',kind:'credit',symbols:['JPM','BAC','GS','SCHW','AIG','CB'],title:'美国监管机构联合银行存款措施',
+    sources:['https://www.fdic.gov/news/press-releases/2023/pr23017.html'],confounders:['此前银行事件已经被市场部分计价；同周有其他银行风险'],note:'周日公开，股票常规交易的首个反应日是下一个实际交易日。'}
+];
+events.push(
+  {id:'cat-20240425',date:'2024-04-25',market:'US',session:'before-open',kind:'earnings',symbols:['CAT','LMT'],title:'卡特彼勒季度财报与销量变化',sources:['https://www.caterpillar.com/en/news/corporate-press-releases/h/1q24-results-caterpillar-inc.html'],confounders:['同日上午美国GDP初值公布；价格、销量、回购同时变化']},
+  {id:'fcx-20240423',date:'2024-04-23',market:'US',session:'unknown',kind:'earnings',symbols:['FCX','NEM'],title:'Freeport季度财报与铜矿运营结果',sources:['https://investors.fcx.com/investors/news-releases/news-release-details/2024/Freeport-McMoRan-Reports-First-Quarter-2024-Results/default.aspx'],confounders:['铜金价格与矿山运营消息并存'],note:'仅核实公告日期；10:00电话会不能充当首次披露时间。保留当日和次日两种窗口。'},
+  {id:'t-20230726',date:'2023-07-26',market:'US',session:'before-open',kind:'earnings',symbols:['T','VZ'],title:'AT&T季度现金流与用户增长',sources:['https://about.att.com/story/2023/q2-earnings.html','https://about.att.com/story/2023/q2-earnings-reminder.html'],confounders:['当日下午有美联储决议；此前市场关注旧电缆风险']},
+  {id:'nee-20240125',date:'2024-01-25',market:'US',session:'before-open',kind:'earnings',symbols:['NEE','DUK'],title:'NextEra全年财报与电力投资前景',sources:['https://www.investor.nexteraenergy.com/news-and-events/news-releases/2024/01-25-2024-123108652'],confounders:['同日上午美国GDP数据公布']},
+  {id:'dhi-20240123',date:'2024-01-23',market:'US',session:'before-open',kind:'earnings',symbols:['DHI','PLD'],title:'D.R. Horton季度财报与住宅订单',sources:['https://investor.drhorton.com/news-and-events/press-releases/2024/01-23-2024-113041740','https://investor.drhorton.com/news-and-events/press-releases/2023/12-08-2023'],confounders:['销售订单、利润率和分红同时披露']},
+  {id:'abt-20240124',date:'2024-01-24',market:'US',session:'unknown',kind:'earnings',symbols:['ABT','MDT'],title:'雅培全年财报与器械销售预期',sources:['https://abbott.mediaroom.com/2024-01-24-Abbott-Reports-Fourth-Quarter-and-Full-Year-2023-Results-Issues-2024-Financial-Outlook'],confounders:['多个业务部门与全年指引同时更新'],note:'只确认日期，未把推测的盘前时间当作已核实时间。'},
+  {id:'fslr-20240227',date:'2024-02-27',market:'US',session:'after-close',kind:'earnings',symbols:['FSLR','ALB'],title:'First Solar全年财报与订单指引',sources:['https://www.sec.gov/Archives/edgar/data/1274494/000127449424000003/ex991pressreleaseq4-2023fi.htm'],confounders:['收入、订单、产能与税收抵免预期共同变化']},
+  {id:'tsla-20240423',date:'2024-04-23',market:'US',session:'after-close',kind:'earnings',symbols:['TSLA','GM'],title:'特斯拉季度财报与车型规划',sources:['https://ir.tesla.com/press-release/tesla-releases-first-quarter-2024-financial-results','https://ir.tesla.com/press-release/tesla-vehicle-production-deliveries-and-date-financial-results-webcast-first-quarter-2024'],confounders:['财报、成本计划、新车型展望同时变化；交付数字4月2日已公开'],note:'不把已在4月2日披露的交付数字当作4月23日首次消息。'},
+  {id:'cb-20240130',date:'2024-01-30',market:'US',session:'unknown',kind:'earnings',symbols:['CB','AIG'],title:'Chubb全年财报与承保结果',sources:['https://investors.chubb.com/files/doc_financials/2023/q4/4th-Quarter-2023-Earnings-Press-Release.pdf'],confounders:['一次性递延税收益、承保与投资结果混合'],note:'公告日期1月30日，电话会1月31日；没有用电话会日期替换新闻日期。'},
+  {id:'tencent-20240320',date:'2024-03-20',market:'HK',session:'unknown',kind:'earnings',symbols:['0700.HK','9999.HK'],title:'腾讯全年财报与回购计划',sources:['https://static.www.tencent.com/uploads/2024/03/20/fe50310bf15caaab4b05dd9e8e49d316.pdf'],confounders:['游戏、广告、回购和分红同时披露'],note:'核实香港公告日期；未核实首次公开分钟，保留两种交易日窗口。'},
+  {id:'xiaomi-20240319',date:'2024-03-19',market:'HK',session:'unknown',kind:'earnings',symbols:['1810.HK','2018.HK'],title:'小米全年财报与业务展望',sources:['https://ir.mi.com/events/event-details/xiaomi-corporation-2023-annual-results-announcement','https://ir.mi.com/system/files-encrypted/nasdaq_kms/assets/2024/03/19/5-34-07/23Q4_EN_797121_%28Xiaomi%20RA%20Eng%29_AsPrint_Fullset_1652.pdf'],confounders:['智能手机周期与新业务展望共同变化'],note:'19:30香港时间是电话会，未当作首次新闻时间。'},
+  {id:'meituan-20240322',date:'2024-03-22',market:'HK',session:'unknown',kind:'earnings',symbols:['3690.HK','9618.HK'],title:'美团全年财报与配送订单',sources:['https://www.meituan.com/news/NN240322064007784','https://www.meituan.com/en-US/investor/results'],confounders:['核心业务、新业务亏损与消费预期混合'],note:'3月22日为周五，次一交易日窗口通过实际行情日期寻找，不能直接加一天。'}
+);
+events.forEach(event => { event.timestampPrecision=event.publishedAt?'minute':event.publicationWindow?'interval':event.session==='unknown'?'day':'session'; event.firstPublicMinuteVerified=Boolean(event.publishedAt); });
+fs.writeFileSync(path.join(__dirname,'../packages/domain/news-timeline.json'),JSON.stringify({version:1,events,
+  method:'Original source dates; exact minute only where confirmed. Conference-call times, implementation dates and article updates are not substituted for first publication. Event-study results are associations, not causal estimates.'},null,2)+'\n');
+console.log(JSON.stringify({events:events.length,minuteVerified:events.filter(event=>event.publishedAt).length}));

@@ -1,6 +1,7 @@
 import { Account, Order, Position, RuleError, Side, World } from '../domain/types';
 import { fees, multiply } from '../domain/money';
 import { equity, id, longQuantity, position, postCash, sellable, system } from './world';
+import { candleTime } from './calendar';
 export function reservedCash(world: World, accountState: Account, exceptId?: string): number {
   return Object.values(world.orders).filter(order=>order.accountId===accountState.id && order.id!==exceptId && ['pending','partial'].includes(order.status)).reduce((sum,order)=>{
     const price=order.price??order.triggerPrice??world.quotes[order.symbol].price;
@@ -90,7 +91,7 @@ function settleTradeInner(world: World, buy: Order, sell: Order, price: number, 
   const quote=world.quotes[buy.symbol]; const old=quote.price; quote.price=price;quote.volume+=quantity;quote.turnover+=price*quantity;
   quote.high=Math.max(quote.high,price);quote.low=Math.min(quote.low,price);quote.momentum=quote.momentum*0.8+(price-old)/Math.max(1,old)*0.2;
   const clock=world.markets[buyer.market].clock;
-  const time=quote.history.at(-1)?.time ?? Date.parse(clock.date+'T00:00:00Z');
+  const time=candleTime(buyer.market,clock);
   world.trades.push({id:reference,symbol:buy.symbol,quantity,price,buyer:buyer.id,seller:seller.id,buySide:buy.side,sellSide:sell.side,day:clock.day,time,sequence:world.sequence});
 }
 export function marginRatio(world: World, accountState: Account): number {

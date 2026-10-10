@@ -2,17 +2,19 @@ import { MarketId, OrderInput, RuleError, World } from '../domain/types';
 import { active, checkPending, placeOrder } from './matching';
 import { longQuantity, sellable, emit } from './world';
 import { marginRatio, reservedCash } from './settlement';
-import { random } from './random';
+import { hashSeed, random } from './random';
 export function refreshLiquidity(world: World, market: MarketId): void {
   const maker=world.accounts[`maker-${market}:${market}`];
   for(const order of Object.values(world.orders).filter(item=>item.accountId===maker.id&&active(item))) order.status='cancelled';
   for(const instrument of Object.values(world.instruments).filter(item=>item.market===market)) {
     const quote=world.quotes[instrument.symbol];const limitLow=Math.ceil(quote.previousClose*0.9);const limitHigh=Math.floor(quote.previousClose*1.1);
-    const spread=Math.max(1,Math.round(quote.price*(0.0008+instrument.volatility*0.02)));
+    const stress=Math.sqrt(quote.volatilityState?.variance??1)*(1+(quote.pendingNews??[]).reduce((sum,shock)=>sum+shock.volatilityBoost,0)*.2);
+    const spread=Math.max(1,Math.round(quote.price*(0.0005+instrument.volatility*0.025)*Math.max(.7,Math.min(4,stress))));
     for(const side of ['buy','sell'] as const) for(let level=1;level<=3;level++) {
       const price=quote.price+(side==='buy'?-1:1)*spread*level;
       if(market==='CN'&&(price<limitLow||price>limitHigh)) continue;
-      const quantity=level*400;
+      const capacity=.65+(hashSeed(instrument.symbol+':depth')%25)/100;
+      const quantity=Math.max(20,Math.floor(level*400*capacity*(.85+random(world,'depth:'+instrument.symbol)*.15)/Math.max(1,stress)));
       if(side==='sell'&&sellable(world,maker,instrument.symbol)<quantity) continue;
       try {placeOrder(world,maker.owner,market,{symbol:instrument.symbol,side,type:'limit',quantity,price},`maker-${world.sequence}-${level}`,maker.id);} catch(error) {if(!(error instanceof RuleError)) throw error;}
     }

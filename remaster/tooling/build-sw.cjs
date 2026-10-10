@@ -1,0 +1,12 @@
+const fs=require('node:fs');const path=require('node:path');const {createHash}=require('node:crypto');
+const root=path.resolve(__dirname,'../apps/web/dist');
+const base=process.env.REMASTER_WEB_BASE??'/';if(!/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(base))throw new Error('Invalid web base path');
+const assets=fs.readdirSync(path.join(root,'assets')).filter(file=>/\.(js|css)$/.test(file)).map(file=>base+'assets/'+file);
+const manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.webmanifest'),'utf8'));manifest.start_url=base;manifest.scope=base;manifest.icons.forEach(icon=>{icon.src=base+'mark.svg';});fs.writeFileSync(path.join(root,'manifest.webmanifest'),JSON.stringify(manifest),'utf8');
+const version=createHash('sha256').update(fs.readFileSync(path.join(root,'index.html'))).digest('hex').slice(0,16);
+const script=`const BASE=${JSON.stringify(base)};const PREFIX='stockgame-v2-'+encodeURIComponent(BASE)+'-';const CACHE=PREFIX+'${version}';const ASSETS=${JSON.stringify([base,base+'index.html',base+'mark.svg',base+'manifest.webmanifest',...assets])};
+self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS))));
+self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith(PREFIX)&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
+self.addEventListener('fetch',event=>{const url=new URL(event.request.url);if(url.origin!==self.location.origin||event.request.method!=='GET'||!url.pathname.startsWith(BASE)||url.pathname.startsWith(BASE+'api')||url.pathname.startsWith(BASE+'socket.io'))return;if(event.request.mode==='navigate'){event.respondWith(fetch(event.request).catch(()=>caches.open(CACHE).then(cache=>cache.match(BASE+'index.html'))));return;}if(ASSETS.includes(url.pathname))event.respondWith(caches.open(CACHE).then(async cache=>(await cache.match(url.pathname))||fetch(event.request)));});
+`;
+fs.writeFileSync(path.join(root,'sw.js'),script,'utf8');console.log('Generated versioned offline shell: '+version);

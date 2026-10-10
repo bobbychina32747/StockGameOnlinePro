@@ -2,6 +2,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const root = path.resolve(__dirname, '../..');
+const shippedCatalog=path.join(root,'remaster/packages/domain/catalog.json');
+if(fs.existsSync(shippedCatalog)){const existing=JSON.parse(fs.readFileSync(shippedCatalog,'utf8'));if(existing.instruments?.length>=68){console.log(`Using packaged catalog: ${existing.instruments.length} instruments; no source or player data imported.`);process.exit(0);}throw new Error('Existing catalog is incomplete; refusing to overwrite it');}
 const ts = require(path.join(root, 'backend/node_modules/typescript'));
 function constants(relative) {
   const source = fs.readFileSync(path.join(root, relative), 'utf8');

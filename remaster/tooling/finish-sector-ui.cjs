@@ -1,0 +1,10 @@
+const fs=require('node:fs'),path=require('node:path');
+const root=path.join(__dirname,'..');
+function replace(file,oldText,newText){const destination=path.join(root,file);const source=fs.readFileSync(destination,'utf8');if(!source.includes(oldText))throw new Error('Missing expected source in '+file);fs.writeFileSync(destination,source.replace(oldText,newText),'utf8');}
+replace('apps/web/src/Trade.tsx','<div className="watch-columns">',`<label className="sector-filter"><select aria-label="筛选行业" value={workspace.industry} onChange={event=>setWorkspace({industry:event.target.value})}><option value="">全部行业 · {snapshot.instruments.filter(item=>item.market===workspace.market).length} 支</option>{[...new Set(snapshot.instruments.filter(item=>item.market===workspace.market).map(item=>item.industry))].map(industry=><option key={industry} value={industry}>{industry} · {snapshot.instruments.filter(item=>item.industry===industry&&item.market===workspace.market).length}</option>)}</select></label><div className="watch-columns">`);
+replace('apps/web/src/Trade.tsx','<dt>上市日期</dt>',`<dt>主营业务</dt><dd>{instrument.riskProfile?.business??instrument.industry}</dd></div><div><dt>消息敏感因素</dt><dd>{instrument.riskProfile?.newsKinds.join(' / ')??'经营变化'}</dd></div><div><dt>参考年股息率</dt><dd>{((instrument.riskProfile?.dividendYield??0)*100).toFixed(1)}%</dd></div><div><dt>上市日期</dt>`);
+replace('apps/web/src/Chart.tsx','let cancelled=false;setBars([]);','let cancelled=false,freshLoaded=false;setBars([]);');
+replace('apps/web/src/Chart.tsx','if(!cancelled&&values.length)setBars(values);','if(!cancelled&&!freshLoaded&&values.length)setBars(values);');
+replace('apps/web/src/Chart.tsx','setBars(result.slice(-600));','freshLoaded=true;setBars(result.slice(-600));');
+replace('tests/api.test.cjs','state.instruments.length,68','state.instruments.length,138');
+const style=path.join(root,'apps/web/src/styles.css');fs.appendFileSync(style,'\n.sector-filter{display:block;padding:0 12px 10px}.sector-filter select{width:100%;font-size:11px;padding:8px;border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--text)}\n');

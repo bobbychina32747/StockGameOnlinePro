@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "method": "Descriptive, selected event examples; no causal interpretation and no claim of representative frequency. Amplitudes are shrunk and bounded for simulation.",
+  "earnings": {
+    "sampleSize": 16,
+    "medianAbsoluteAbnormalLogReturn": 0.06815185967457807,
+    "simulationScale": 0.034075929837289035
+  },
+  "exposureAssumptions": {
+    "rateSensitive": [
+      "地产与基建",
+      "公用事业",
+      "新能源与电池",
+      "人工智能",
+      "软件与云服务"
+    ],
+    "commodityProducers": [
+      "能源与煤炭",
+      "有色与材料"
+    ],
+    "fuelConsumers": [
+      "航空航运与物流",
+      "汽车与出行"
+    ],
+    "creditSensitive": [
+      "银行",
+      "保险",
+      "券商与金融科技",
+      "地产与基建"
+    ]
+  }
+}

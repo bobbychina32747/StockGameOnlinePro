@@ -1,0 +1,28 @@
+name: Remaster
+on:
+  push:
+    branches: [main, master]
+    paths: ['remaster/**', '.github/workflows/remaster.yml']
+  pull_request:
+    paths: ['remaster/**', '.github/workflows/remaster.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: remaster
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: remaster/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: node node_modules/typescript/bin/tsc -p apps/web/tsconfig.json
+      - run: npm test
+      - name: Verify deployable subpath build
+        run: REMASTER_WEB_BASE=/remaster/ npm run build:web

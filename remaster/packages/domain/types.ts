@@ -7,18 +7,23 @@ export type Phase = 'auction-open' | 'auction-locked' | 'pre-open' | 'continuous
 export interface Instrument {
   symbol: string; code: string; name: string; industry: string; market: MarketId;
   listedAt: string; description: string; initialPrice: number; volatility: number;
+  riskProfile?: { marketWeight:number; sectorWeight:number; gapScale:number; intradayFraction:number; wickScale:number;
+    gjr:{alpha:number;beta:number;gamma:number;omega:number}; eventSensitivity:number; dividendYield:number; newsKinds:string[]; business:string };
 }
 export interface Candle { time: number; day: number; open: number; high: number; low: number; close: number; volume: number }
 export interface Quote {
   symbol: string; price: number; previousClose: number; fairValue: number; open: number; high: number; low: number;
   volume: number; turnover: number; momentum: number; bubble: number; earningsGrowth: number; pe: number;
   dividendFactor: number; history: Candle[]; daily: Candle[];
+  volatilityState?: {variance:number;shock:number};
+  pendingNews?: {kind:string;remainingReturn:number;remainingMinutes:number;halfLife:number;volatilityBoost:number}[];
 }
 export interface MarketClock { day: number; date: string; minute: number; phase: Phase; settledDay: number; lastRealMinute: string }
 export interface MarketState {
   clock: MarketClock; sentiment: number; rate: number; inflation: number; growth: number;
   sectors: Record<string, { cycle: number; trend: number; heat: number }>; lastNavDay: number;
   fundNav: { money: number; etf: number; basket: number; dividend: number };
+  volatilityState?: {variance:number;shock:number};
 }
 export interface Lot { quantity: number; cost: number; boughtDay: number; debt: number }
 export interface Position { symbol: string; lots: Lot[]; shortQuantity: number; shortProceeds: number; collateral: number }
@@ -54,6 +59,7 @@ export type GameCommand =
   | { kind: 'cancel'; owner: string; orderId: string }
   | { kind: 'transfer'; owner: string; from: MarketId; to: MarketId; amount: number }
   | { kind: 'leverage'; owner: string; market: MarketId; leverage: number }
+  | { kind: 'repay'; owner: string; market: MarketId; amount: number }
   | { kind: 'fund'; owner: string; market: MarketId; fund: 'money' | 'etf'; action: 'buy' | 'sell'; amount: number }
   | { kind: 'reset'; owner: string; market: MarketId }
   | { kind: 'season'; owner: string; market: MarketId; type: Season['type'] }

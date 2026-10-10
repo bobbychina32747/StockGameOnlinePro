@@ -9,7 +9,28 @@
       "listedAt": "2019-08-12",
       "description": "专注 AI 推理芯片与低功耗算力，为游戏主机与智能终端提供边缘计算方案，自研架构已流片三代。",
       "initialPrice": 4500,
-      "volatility": 0.028
+      "volatility": 0.023775,
+      "riskProfile": {
+        "marketWeight": 0.4479398341962556,
+        "sectorWeight": 0.2682191108862692,
+        "gapScale": 0.2458134196233164,
+        "intradayFraction": 0.913803583612139,
+        "wickScale": 0.24003976687439885,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "出口限制",
+          "库存周期",
+          "研发突破"
+        ],
+        "business": "晶圆代工"
+      }
     },
     {
       "symbol": "T2",
@@ -20,29 +41,92 @@
       "listedAt": "2016-03-25",
       "description": "大语言模型与虚拟角色对话引擎开发商，旗下「星语」平台面向情感陪伴与内容创作，月活过亿。",
       "initialPrice": 12000,
-      "volatility": 0.032
+      "volatility": 0.026844,
+      "riskProfile": {
+        "marketWeight": 0.5341092151945386,
+        "sectorWeight": 0.2536246462037644,
+        "gapScale": 0.2691402706399827,
+        "intradayFraction": 0.9247923006508939,
+        "wickScale": 0.23782539798011135,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "产品发布",
+          "算力成本",
+          "商业化进展"
+        ],
+        "business": "企业模型订阅"
+      }
     },
     {
       "symbol": "T3",
       "code": "688021",
       "name": "帧光软件",
-      "industry": "软件服务",
+      "industry": "软件与云服务",
       "market": "CN",
       "listedAt": "2018-11-05",
       "description": "实时渲染引擎与视频剪辑工具厂商，服务游戏工作室与短视频创作者，引擎授权收入高速增长。",
       "initialPrice": 3500,
-      "volatility": 0.025
+      "volatility": 0.027151,
+      "riskProfile": {
+        "marketWeight": 0.49248854062471126,
+        "sectorWeight": 0.2610956785582649,
+        "gapScale": 0.2622450977376957,
+        "intradayFraction": 0.9356437171775872,
+        "wickScale": 0.3172266655400484,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "续费率",
+          "数据安全",
+          "业绩指引"
+        ],
+        "business": "数据库订阅"
+      }
     },
     {
       "symbol": "T4",
       "code": "002189",
       "name": "微波通信",
-      "industry": "通信设备",
+      "industry": "通信与网络",
       "market": "CN",
       "listedAt": "2011-06-30",
       "description": "5G 射频前端与卫星通信终端供应商，为电竞场馆与低空经济提供高速低时延网络设备。",
       "initialPrice": 1800,
-      "volatility": 0.022
+      "volatility": 0.01554,
+      "riskProfile": {
+        "marketWeight": 0.3790998068784902,
+        "sectorWeight": 0.27760673673061725,
+        "gapScale": 0.20239156272231043,
+        "intradayFraction": 0.9756160782033791,
+        "wickScale": 0.2870477065466513,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.05,
+        "newsKinds": [
+          "资费政策",
+          "网络投资",
+          "用户增长"
+        ],
+        "business": "移动运营"
+      }
     },
     {
       "symbol": "F1",
@@ -53,18 +137,60 @@
       "listedAt": "1999-12-28",
       "description": "区域股份制商业银行，深耕长三角普惠金融与科创贷，不良率连续五年低于行业均值。",
       "initialPrice": 1100,
-      "volatility": 0.01
+      "volatility": 0.01401,
+      "riskProfile": {
+        "marketWeight": 0.605811403835347,
+        "sectorWeight": 0.23868248546651707,
+        "gapScale": 0.2644639037262936,
+        "intradayFraction": 0.8804788710084639,
+        "wickScale": 0.2405676551396148,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.05,
+        "newsKinds": [
+          "利率变化",
+          "信用损失",
+          "存款流动"
+        ],
+        "business": "零售存贷"
+      }
     },
     {
       "symbol": "F2",
       "code": "601788",
       "name": "云帆证券",
-      "industry": "券商",
+      "industry": "券商与金融科技",
       "market": "CN",
       "listedAt": "2007-09-21",
       "description": "互联网券商，自研极速交易系统毫秒级撮合，两融与量化经纪业务市占率居前。",
       "initialPrice": 2200,
-      "volatility": 0.018
+      "volatility": 0.019486,
+      "riskProfile": {
+        "marketWeight": 0.6929591421933641,
+        "sectorWeight": 0.21629305687552094,
+        "gapScale": 0.289519240284559,
+        "intradayFraction": 0.8939909184138235,
+        "wickScale": 0.19039557598934945,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "交易活跃",
+          "监管变化",
+          "资金流动"
+        ],
+        "business": "经纪交易"
+      }
     },
     {
       "symbol": "F3",
@@ -75,51 +201,156 @@
       "listedAt": "2004-06-15",
       "description": "综合金融保险集团，健康险与养老社区布局领先，投资端以长期价值股为主。",
       "initialPrice": 3800,
-      "volatility": 0.014
+      "volatility": 0.016054,
+      "riskProfile": {
+        "marketWeight": 0.6700819567446549,
+        "sectorWeight": 0.22268613655113986,
+        "gapScale": 0.29337443398388147,
+        "intradayFraction": 0.9008387910454818,
+        "wickScale": 0.2458978588170415,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.05,
+        "newsKinds": [
+          "灾害赔付",
+          "投资收益",
+          "保费增长"
+        ],
+        "business": "寿险与养老"
+      }
     },
     {
       "symbol": "M1",
       "code": "300026",
       "name": "青囊医药",
-      "industry": "创新药",
+      "industry": "医药与生物",
       "market": "CN",
       "listedAt": "2010-04-23",
       "description": "中药创新与化药仿制并重，聚焦心脑血管与代谢领域，两款创新药进入医保放量期。",
       "initialPrice": 2800,
-      "volatility": 0.024
+      "volatility": 0.021179,
+      "riskProfile": {
+        "marketWeight": 0.46855065843457155,
+        "sectorWeight": 0.26503098921304963,
+        "gapScale": 0.2133349070462341,
+        "intradayFraction": 0.9094168248793564,
+        "wickScale": 0.29158394578148855,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "临床结果",
+          "药物审批",
+          "专利变化"
+        ],
+        "business": "肿瘤新药"
+      }
     },
     {
       "symbol": "M2",
       "code": "688029",
       "name": "白泽医疗",
-      "industry": "医疗器械",
+      "industry": "医疗器械与服务",
       "market": "CN",
       "listedAt": "2017-08-18",
       "description": "手术机器人与高端影像设备厂商，微创手术机器人已获证上市，海外装机量快速爬坡。",
       "initialPrice": 6500,
-      "volatility": 0.026
+      "volatility": 0.019879,
+      "riskProfile": {
+        "marketWeight": 0.519660236545065,
+        "sectorWeight": 0.2563119027081135,
+        "gapScale": 0.2842262171346882,
+        "intradayFraction": 0.9050032348223105,
+        "wickScale": 0.2621530889376257,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.08,
+          "omega": 0.019999999999999907
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "产品认证",
+          "集采价格",
+          "设备召回"
+        ],
+        "business": "手术机器人"
+      }
     },
     {
       "symbol": "M3",
       "code": "688276",
       "name": "澜生生物",
-      "industry": "生物疫苗",
+      "industry": "医药与生物",
       "market": "CN",
       "listedAt": "2019-12-30",
       "description": "mRNA 疫苗与细胞治疗平台公司，新一代呼吸道联合疫苗进入临床三期。",
       "initialPrice": 5200,
-      "volatility": 0.03
+      "volatility": 0.027907,
+      "riskProfile": {
+        "marketWeight": 0.46855065843457155,
+        "sectorWeight": 0.26503098921304963,
+        "gapScale": 0.2133349070462341,
+        "intradayFraction": 0.9094168248793564,
+        "wickScale": 0.29158394578148855,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "临床结果",
+          "药物审批",
+          "专利变化"
+        ],
+        "business": "疫苗研发"
+      }
     },
     {
       "symbol": "C1",
       "code": "600809",
       "name": "杏花酿",
-      "industry": "白酒",
+      "industry": "食品饮料",
       "market": "CN",
       "listedAt": "1994-03-10",
       "description": "清香型白酒龙头，百年老窖陈酿，高端系列供不应求，全国化渠道持续下沉。",
       "initialPrice": 15800,
-      "volatility": 0.02
+      "volatility": 0.013246,
+      "riskProfile": {
+        "marketWeight": 0.5734769315303545,
+        "sectorWeight": 0.24576651279258455,
+        "gapScale": 0.30299644360929173,
+        "intradayFraction": 0.9010949793466296,
+        "wickScale": 0.25761750093961383,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.08,
+          "omega": 0.019999999999999907
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "原料价格",
+          "渠道库存",
+          "品牌需求"
+        ],
+        "business": "高端酒饮"
+      }
     },
     {
       "symbol": "C2",
@@ -130,227 +361,668 @@
       "listedAt": "1996-07-25",
       "description": "乳制品与休闲零食企业，冷链物流全国覆盖，联名 IP 零食深受年轻群体欢迎。",
       "initialPrice": 2400,
-      "volatility": 0.016
+      "volatility": 0.017454,
+      "riskProfile": {
+        "marketWeight": 0.5734769315303545,
+        "sectorWeight": 0.24576651279258455,
+        "gapScale": 0.30299644360929173,
+        "intradayFraction": 0.9010949793466296,
+        "wickScale": 0.25761750093961383,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.08,
+          "omega": 0.019999999999999907
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "原料价格",
+          "渠道库存",
+          "品牌需求"
+        ],
+        "business": "乳品加工"
+      }
     },
     {
       "symbol": "C3",
       "code": "000333",
       "name": "蓝湾家电",
-      "industry": "家电",
+      "industry": "硬件与家电",
       "market": "CN",
       "listedAt": "2004-03-05",
       "description": "智能家电与清洁机器人厂商，扫地机器人海外市占率第一，全屋智能生态成型。",
       "initialPrice": 3200,
-      "volatility": 0.015
+      "volatility": 0.01889,
+      "riskProfile": {
+        "marketWeight": 0.47125913533566943,
+        "sectorWeight": 0.2645984400230677,
+        "gapScale": 0.3220284585177327,
+        "intradayFraction": 0.9028734241182221,
+        "wickScale": 0.31227267973080924,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "供应链",
+          "新品发布",
+          "消费需求"
+        ],
+        "business": "智能手机"
+      }
     },
     {
       "symbol": "E1",
       "code": "300274",
       "name": "日曜能源",
-      "industry": "光伏",
+      "industry": "新能源与电池",
       "market": "CN",
       "listedAt": "2012-01-12",
       "description": "光伏逆变器与储能系统龙头，全球出货量连续八年第一，工商业储能订单饱满。",
       "initialPrice": 2600,
-      "volatility": 0.03
+      "volatility": 0.021827,
+      "riskProfile": {
+        "marketWeight": 0.5559924679224469,
+        "sectorWeight": 0.24935619865007486,
+        "gapScale": 0.34202434864326403,
+        "intradayFraction": 0.8910575668613385,
+        "wickScale": 0.24380941491214767,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "补贴政策",
+          "材料价格",
+          "产能过剩"
+        ],
+        "business": "光伏组件"
+      }
     },
     {
       "symbol": "E2",
       "code": "300450",
       "name": "电芯动力",
-      "industry": "锂电池",
+      "industry": "新能源与电池",
       "market": "CN",
       "listedAt": "2015-05-14",
       "description": "动力电池与固态电解质研发商，半固态电池已装车验证，产能规划翻倍。",
       "initialPrice": 4200,
-      "volatility": 0.034
+      "volatility": 0.02876,
+      "riskProfile": {
+        "marketWeight": 0.5559924679224469,
+        "sectorWeight": 0.24935619865007486,
+        "gapScale": 0.34202434864326403,
+        "intradayFraction": 0.8910575668613385,
+        "wickScale": 0.24380941491214767,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "补贴政策",
+          "材料价格",
+          "产能过剩"
+        ],
+        "business": "电池材料"
+      }
     },
     {
       "symbol": "E3",
       "code": "601633",
       "name": "追光汽车",
-      "industry": "新能源车",
+      "industry": "汽车与出行",
       "market": "CN",
       "listedAt": "2018-09-17",
       "description": "智能电动车新势力，主打「游戏座舱」概念，车机可运行 3A 大作，年轻用户占比高。",
       "initialPrice": 8800,
-      "volatility": 0.028
+      "volatility": 0.016704,
+      "riskProfile": {
+        "marketWeight": 0.5396273530717044,
+        "sectorWeight": 0.25257119547469054,
+        "gapScale": 0.2596687394708079,
+        "intradayFraction": 0.8884540960762122,
+        "wickScale": 0.24116439069812312,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "交付量",
+          "价格战",
+          "召回"
+        ],
+        "business": "整车制造"
+      }
     },
     {
       "symbol": "D1",
       "code": "600760",
       "name": "长空防务",
-      "industry": "军工",
+      "industry": "工业与军工",
       "market": "CN",
       "listedAt": "2003-11-20",
       "description": "军用无人机与机载雷达制造商，察打一体无人机出口多国，订单能见度高。",
       "initialPrice": 3000,
-      "volatility": 0.026
+      "volatility": 0.017236,
+      "riskProfile": {
+        "marketWeight": 0.5523160885163653,
+        "sectorWeight": 0.2500904325497847,
+        "gapScale": 0.21971894842913323,
+        "intradayFraction": 0.9512250003181562,
+        "wickScale": 0.32723449402347093,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "订单签约",
+          "资本开支",
+          "贸易限制"
+        ],
+        "business": "航空设备"
+      }
     },
     {
       "symbol": "R1",
       "code": "601899",
       "name": "金川有色",
-      "industry": "有色金属",
+      "industry": "有色与材料",
       "market": "CN",
       "listedAt": "2008-04-28",
       "description": "铜锂资源与稀有金属开采商，拥有亚洲最大铜矿之一，锂盐产能爬坡。",
       "initialPrice": 1500,
-      "volatility": 0.022
+      "volatility": 0.01673,
+      "riskProfile": {
+        "marketWeight": 0.53888288538106,
+        "sectorWeight": 0.2527142085952123,
+        "gapScale": 0.397174089470701,
+        "intradayFraction": 0.8654482325005084,
+        "wickScale": 0.274889040960019,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "金属价格",
+          "矿山供给",
+          "工业需求"
+        ],
+        "business": "铜矿开采"
+      }
     },
     {
       "symbol": "R2",
       "code": "601225",
       "name": "墨石能源",
-      "industry": "煤炭",
+      "industry": "能源与煤炭",
       "market": "CN",
       "listedAt": "2010-02-08",
       "description": "焦煤与清洁能源化工企业，长协价占比高，分红率稳定在 40% 以上。",
       "initialPrice": 900,
-      "volatility": 0.02
+      "volatility": 0.015901,
+      "riskProfile": {
+        "marketWeight": 0.3903301300351629,
+        "sectorWeight": 0.276202489240785,
+        "gapScale": 0.32338880358308325,
+        "intradayFraction": 0.9069884601956318,
+        "wickScale": 0.2690754176296052,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.05,
+        "newsKinds": [
+          "供给变化",
+          "油煤价格",
+          "长协合同"
+        ],
+        "business": "油气开采"
+      }
     },
     {
       "symbol": "P1",
       "code": "600048",
       "name": "广厦置业",
-      "industry": "房地产",
+      "industry": "地产与基建",
       "market": "CN",
       "listedAt": "2002-07-09",
       "description": "城市更新与长租公寓运营商，聚焦核心城市存量改造，轻资产输出提速。",
       "initialPrice": 600,
-      "volatility": 0.024
+      "volatility": 0.020265,
+      "riskProfile": {
+        "marketWeight": 0.4896015252506426,
+        "sectorWeight": 0.2615838893787268,
+        "gapScale": 0.283637792633606,
+        "intradayFraction": 0.9063626634328276,
+        "wickScale": 0.3009767146916158,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "融资政策",
+          "销售回款",
+          "项目开工"
+        ],
+        "business": "商业地产"
+      }
     },
     {
       "symbol": "G1",
       "code": "300999",
       "name": "星界游戏",
-      "industry": "游戏",
+      "industry": "游戏与互动娱乐",
       "market": "CN",
       "listedAt": "2017-11-16",
       "description": "手游研发发行双轮驱动，旗舰射击手游全球月流水破十亿，海外市场高歌猛进。",
       "initialPrice": 4800,
-      "volatility": 0.033
+      "volatility": 0.024758,
+      "riskProfile": {
+        "marketWeight": 0.46206639904342584,
+        "sectorWeight": 0.26605359959743774,
+        "gapScale": 0.28477053106344397,
+        "intradayFraction": 0.9173693277413504,
+        "wickScale": 0.31431521096163184,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "版号审批",
+          "新品延期",
+          "付费转化"
+        ],
+        "business": "主机发行"
+      }
     },
     {
       "symbol": "G2",
       "code": "002777",
       "name": "幻光互娱",
-      "industry": "影视传媒",
+      "industry": "传媒与文娱",
       "market": "CN",
       "listedAt": "2015-06-08",
       "description": "动画电影与短剧制作商，多部国漫票房口碑双收，虚拟偶像企划上线。",
       "initialPrice": 1400,
-      "volatility": 0.027
+      "volatility": 0.026927,
+      "riskProfile": {
+        "marketWeight": 0.484857776118172,
+        "sectorWeight": 0.2623779036511967,
+        "gapScale": 0.24444788029772835,
+        "intradayFraction": 0.9118633831093848,
+        "wickScale": 0.24985842487004875,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "内容上线",
+          "版权纠纷",
+          "广告预算"
+        ],
+        "business": "流媒体订阅"
+      }
     },
     {
       "symbol": "G3",
       "code": "300233",
       "name": "云端电竞",
-      "industry": "电竞",
+      "industry": "游戏与互动娱乐",
       "market": "CN",
       "listedAt": "2019-03-21",
       "description": "电竞赛事运营与俱乐部投资，承办多款主流游戏职业联赛，商业化全面提速。",
       "initialPrice": 2200,
-      "volatility": 0.031
+      "volatility": 0.032623,
+      "riskProfile": {
+        "marketWeight": 0.46206639904342584,
+        "sectorWeight": 0.26605359959743774,
+        "gapScale": 0.28477053106344397,
+        "intradayFraction": 0.9173693277413504,
+        "wickScale": 0.31431521096163184,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "版号审批",
+          "新品延期",
+          "付费转化"
+        ],
+        "business": "移动游戏"
+      }
     },
     {
       "symbol": "G4",
       "code": "688888",
       "name": "像素工坊",
-      "industry": "云游戏",
+      "industry": "游戏与互动娱乐",
       "market": "CN",
       "listedAt": "2016-09-09",
       "description": "云游戏与沙盒创作平台，千万玩家共建虚拟世界，UGC 内容生态繁荣。",
       "initialPrice": 3300,
-      "volatility": 0.03
+      "volatility": 0.027671,
+      "riskProfile": {
+        "marketWeight": 0.46206639904342584,
+        "sectorWeight": 0.26605359959743774,
+        "gapScale": 0.28477053106344397,
+        "intradayFraction": 0.9173693277413504,
+        "wickScale": 0.31431521096163184,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "版号审批",
+          "新品延期",
+          "付费转化"
+        ],
+        "business": "电竞赛事"
+      }
     },
     {
       "symbol": "G5",
       "code": "300031",
       "name": "天籁音乐",
-      "industry": "数字音乐",
+      "industry": "传媒与文娱",
       "market": "CN",
       "listedAt": "2014-04-17",
       "description": "数字音乐与直播平台，版权曲库超五千万，音频社交新业务快速增长。",
       "initialPrice": 1200,
-      "volatility": 0.021
+      "volatility": 0.03548,
+      "riskProfile": {
+        "marketWeight": 0.484857776118172,
+        "sectorWeight": 0.2623779036511967,
+        "gapScale": 0.24444788029772835,
+        "intradayFraction": 0.9118633831093848,
+        "wickScale": 0.24985842487004875,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "内容上线",
+          "版权纠纷",
+          "广告预算"
+        ],
+        "business": "动画制作"
+      }
     },
     {
       "symbol": "V1",
       "code": "301666",
       "name": "霓虹引擎",
-      "industry": "游戏引擎",
+      "industry": "游戏与互动娱乐",
       "market": "CN",
       "listedAt": "2021-07-30",
       "description": "自研游戏引擎与 AI NPC 技术商，向独立开发者开放订阅，助力游戏工业化。",
       "initialPrice": 5800,
-      "volatility": 0.036
+      "volatility": 0.03437,
+      "riskProfile": {
+        "marketWeight": 0.46206639904342584,
+        "sectorWeight": 0.26605359959743774,
+        "gapScale": 0.28477053106344397,
+        "intradayFraction": 0.9173693277413504,
+        "wickScale": 0.31431521096163184,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "版号审批",
+          "新品延期",
+          "付费转化"
+        ],
+        "business": "创作者平台"
+      }
     },
     {
       "symbol": "V2",
       "code": "600120",
       "name": "次元文创",
-      "industry": "动漫IP",
+      "industry": "传媒与文娱",
       "market": "CN",
       "listedAt": "2013-10-25",
       "description": "动漫 IP 运营与衍生品制造，手握多个国民级动漫形象，谷子经济浪潮受益者。",
       "initialPrice": 900,
-      "volatility": 0.026
+      "volatility": 0.030095,
+      "riskProfile": {
+        "marketWeight": 0.484857776118172,
+        "sectorWeight": 0.2623779036511967,
+        "gapScale": 0.24444788029772835,
+        "intradayFraction": 0.9118633831093848,
+        "wickScale": 0.24985842487004875,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "内容上线",
+          "版权纠纷",
+          "广告预算"
+        ],
+        "business": "数字音乐"
+      }
     },
     {
       "symbol": "V3",
       "code": "002120",
       "name": "速鹰物流",
-      "industry": "物流",
+      "industry": "航空航运与物流",
       "market": "CN",
       "listedAt": "2012-05-18",
       "description": "综合物流与供应链服务商，无人机配送试点城市超五十座，时效承诺行业领先。",
       "initialPrice": 700,
-      "volatility": 0.019
+      "volatility": 0.016743,
+      "riskProfile": {
+        "marketWeight": 0.5066238086171502,
+        "sectorWeight": 0.25865016622612635,
+        "gapScale": 0.24438159636664128,
+        "intradayFraction": 0.951110203387677,
+        "wickScale": 0.3517037668522256,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "运价变化",
+          "燃油成本",
+          "航线中断"
+        ],
+        "business": "客运航空"
+      }
     },
     {
       "symbol": "H1",
       "code": "00700",
       "name": "云顶网络",
-      "industry": "互联网",
+      "industry": "互联网与电商",
       "market": "HK",
       "listedAt": "2004-06-16",
       "description": "社交平台与游戏巨头，旗下「云讯」国民级应用覆盖超十亿用户，游戏与广告双轮驱动。",
       "initialPrice": 32000,
-      "volatility": 0.022
+      "volatility": 0.030884,
+      "riskProfile": {
+        "marketWeight": 0.8126473702050016,
+        "sectorWeight": 0.17482672179303874,
+        "gapScale": 0.6191813332247523,
+        "intradayFraction": 0.7347539979830995,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "监管变化",
+          "流量成本",
+          "交易额"
+        ],
+        "business": "本地服务"
+      }
     },
     {
       "symbol": "H2",
       "code": "00941",
       "name": "金港电信",
-      "industry": "通信",
+      "industry": "通信与网络",
       "market": "HK",
       "listedAt": "2002-10-09",
       "description": "粤港澳大湾区主导运营商，5G 基建与云计算业务稳步扩张，派息稳定著称。",
       "initialPrice": 6800,
-      "volatility": 0.018
+      "volatility": 0.01523,
+      "riskProfile": {
+        "marketWeight": 0.4779511123207737,
+        "sectorWeight": 0.2635159313605539,
+        "gapScale": 0.3658846910301822,
+        "intradayFraction": 0.9500371693837264,
+        "wickScale": 0.41467087959505655,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0.03,
+        "newsKinds": [
+          "资费政策",
+          "网络投资",
+          "用户增长"
+        ],
+        "business": "宽带网络"
+      }
     },
     {
       "symbol": "H3",
       "code": "09988",
       "name": "云帆电商",
-      "industry": "电商",
+      "industry": "互联网与电商",
       "market": "HK",
       "listedAt": "2019-11-26",
       "description": "跨境电商平台，海外仓网络覆盖 40+ 国家，新兴市场 GMV 高速增长。",
       "initialPrice": 8800,
-      "volatility": 0.026
+      "volatility": 0.040694,
+      "riskProfile": {
+        "marketWeight": 0.8126473702050016,
+        "sectorWeight": 0.17482672179303874,
+        "gapScale": 0.6191813332247523,
+        "intradayFraction": 0.7347539979830995,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "监管变化",
+          "流量成本",
+          "交易额"
+        ],
+        "business": "跨境电商"
+      }
     },
     {
       "symbol": "H4",
       "code": "03690",
       "name": "美图生活",
-      "industry": "消费",
+      "industry": "零售与消费",
       "market": "HK",
       "listedAt": "2018-09-20",
       "description": "本地生活服务龙头，外卖与到店业务双线并进，即时零售打开第二曲线。",
       "initialPrice": 12800,
-      "volatility": 0.024
+      "volatility": 0.023244,
+      "riskProfile": {
+        "marketWeight": 0.6604822180373218,
+        "sectorWeight": 0.22525250624373744,
+        "gapScale": 0.36313081013610526,
+        "intradayFraction": 0.8899559473732219,
+        "wickScale": 0.2829006774006552,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.005,
+        "newsKinds": [
+          "消费需求",
+          "折扣压力",
+          "同店销售"
+        ],
+        "business": "会员零售"
+      }
     },
     {
       "symbol": "H5",
@@ -361,7 +1033,28 @@
       "listedAt": "2005-10-27",
       "description": "大湾区跨境金融服务平台，绿色金融与数字银行转型，分红率常年领先同业。",
       "initialPrice": 520,
-      "volatility": 0.012
+      "volatility": 0.014481,
+      "riskProfile": {
+        "marketWeight": 0.6648832440606363,
+        "sectorWeight": 0.22408419056030346,
+        "gapScale": 0.5107255693554467,
+        "intradayFraction": 0.883688075756005,
+        "wickScale": 0.2886486225450445,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0.03,
+        "newsKinds": [
+          "利率变化",
+          "信用损失",
+          "存款流动"
+        ],
+        "business": "企业信贷"
+      }
     },
     {
       "symbol": "H6",
@@ -372,29 +1065,92 @@
       "listedAt": "1990-01-02",
       "description": "香港电力与燃气双牌照运营商，新能源业务占比提升，现金牛属性突出。",
       "initialPrice": 5200,
-      "volatility": 0.01
+      "volatility": 0.009161,
+      "riskProfile": {
+        "marketWeight": 0.2909227103727835,
+        "sectorWeight": 0.28702396745401215,
+        "gapScale": 0.3818672299743414,
+        "intradayFraction": 0.9574464726453811,
+        "wickScale": 0.34885716439912295,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 0.85,
+        "dividendYield": 0.05,
+        "newsKinds": [
+          "电价调整",
+          "燃料成本",
+          "来水变化"
+        ],
+        "business": "水力发电"
+      }
     },
     {
       "symbol": "H7",
       "code": "01093",
       "name": "辉腾医药",
-      "industry": "医药",
+      "industry": "医药与生物",
       "market": "HK",
       "listedAt": "2000-12-19",
       "description": "创新药出海先锋，多款药物获海外上市批准，license-out 收入持续落地。",
       "initialPrice": 4200,
-      "volatility": 0.02
+      "volatility": 0.033972,
+      "riskProfile": {
+        "marketWeight": 0.6124385178350644,
+        "sectorWeight": 0.23715546708536797,
+        "gapScale": 0.38191929992685897,
+        "intradayFraction": 0.8791355494721758,
+        "wickScale": 0.2623519095736414,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "临床结果",
+          "药物审批",
+          "专利变化"
+        ],
+        "business": "代谢治疗"
+      }
     },
     {
       "symbol": "H8",
       "code": "01113",
       "name": "长桥地产",
-      "industry": "地产",
+      "industry": "地产与基建",
       "market": "HK",
       "listedAt": "1972-11-01",
       "description": "港岛核心商业地产持有者，写字楼与零售组合穿越周期，低估值高股息。",
       "initialPrice": 3600,
-      "volatility": 0.025
+      "volatility": 0.023294,
+      "riskProfile": {
+        "marketWeight": 0.6055105221789034,
+        "sectorWeight": 0.2387511898980963,
+        "gapScale": 0.48312405154883487,
+        "intradayFraction": 0.9072354653129684,
+        "wickScale": 0.31016111889162423,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "融资政策",
+          "销售回款",
+          "项目开工"
+        ],
+        "business": "住宅开发"
+      }
     },
     {
       "symbol": "H9",
@@ -405,29 +1161,92 @@
       "listedAt": "2004-06-24",
       "description": "亚太寿险龙头，代理人渠道转型数字化，健康险与养老险双赛道扩张，内含价值持续增长。",
       "initialPrice": 5800,
-      "volatility": 0.018
+      "volatility": 0.02619,
+      "riskProfile": {
+        "marketWeight": 0.7941553273194548,
+        "sectorWeight": 0.18231444936732707,
+        "gapScale": 0.5482844468042637,
+        "intradayFraction": 0.8176244556426233,
+        "wickScale": 0.15479506962857906,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0.03,
+        "newsKinds": [
+          "灾害赔付",
+          "投资收益",
+          "保费增长"
+        ],
+        "business": "财产险"
+      }
     },
     {
       "symbol": "H10",
       "code": "01919",
       "name": "环球航运",
-      "industry": "航运",
+      "industry": "航空航运与物流",
       "market": "HK",
       "listedAt": "2005-06-30",
       "description": "全球集装箱航运巨头，运力规模前三，运价周期弹性大，长协与自有码头平滑波动。",
       "initialPrice": 1400,
-      "volatility": 0.028
+      "volatility": 0.023352,
+      "riskProfile": {
+        "marketWeight": 0.446979810015379,
+        "sectorWeight": 0.26836321366661897,
+        "gapScale": 0.27519482021077013,
+        "intradayFraction": 0.8891166683217824,
+        "wickScale": 0.26172374973438695,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "运价变化",
+          "燃油成本",
+          "航线中断"
+        ],
+        "business": "货运航空"
+      }
     },
     {
       "symbol": "H11",
       "code": "01929",
       "name": "皇冠珠宝",
-      "industry": "消费",
+      "industry": "零售与消费",
       "market": "HK",
       "listedAt": "2011-12-15",
       "description": "黄金珠宝零售龙头，门店超 7000 家，婚嫁与保值需求双驱动，金价上行周期受益。",
       "initialPrice": 960,
-      "volatility": 0.02
+      "volatility": 0.030627,
+      "riskProfile": {
+        "marketWeight": 0.6604822180373218,
+        "sectorWeight": 0.22525250624373744,
+        "gapScale": 0.36313081013610526,
+        "intradayFraction": 0.8899559473732219,
+        "wickScale": 0.2829006774006552,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "消费需求",
+          "折扣压力",
+          "同店销售"
+        ],
+        "business": "运动品牌"
+      }
     },
     {
       "symbol": "H13",
@@ -438,62 +1257,188 @@
       "listedAt": "2004-03-18",
       "description": "内地晶圆代工龙头，成熟制程产能满载，国产替代加速，先进封装布局领先。",
       "initialPrice": 2600,
-      "volatility": 0.03
+      "volatility": 0.040861,
+      "riskProfile": {
+        "marketWeight": 0.564084897276319,
+        "sectorWeight": 0.24771503906672443,
+        "gapScale": 0.3359439248701596,
+        "intradayFraction": 0.926740664935689,
+        "wickScale": 0.2427882891877169,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "出口限制",
+          "库存周期",
+          "研发突破"
+        ],
+        "business": "先进封装"
+      }
     },
     {
       "symbol": "H14",
       "code": "06808",
       "name": "百佳零售",
-      "industry": "零售",
+      "industry": "零售与消费",
       "market": "HK",
       "listedAt": "2011-07-15",
       "description": "大卖场与会员店双业态，供应链效率提升，自有品牌占比扩大，O2O 即时达覆盖全城。",
       "initialPrice": 380,
-      "volatility": 0.022
+      "volatility": 0.025979,
+      "riskProfile": {
+        "marketWeight": 0.6604822180373218,
+        "sectorWeight": 0.22525250624373744,
+        "gapScale": 0.36313081013610526,
+        "intradayFraction": 0.8899559473732219,
+        "wickScale": 0.2829006774006552,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "消费需求",
+          "折扣压力",
+          "同店销售"
+        ],
+        "business": "珠宝渠道"
+      }
     },
     {
       "symbol": "H15",
       "code": "01728",
       "name": "港汽集团",
-      "industry": "汽车",
+      "industry": "汽车与出行",
       "market": "HK",
       "listedAt": "2005-12-20",
       "description": "自主品牌乘用车出海先锋，东南亚与中东市占率攀升，混动平台降本增效显著。",
       "initialPrice": 1120,
-      "volatility": 0.026
+      "volatility": 0.052612,
+      "riskProfile": {
+        "marketWeight": 0.6435026683357546,
+        "sectorWeight": 0.2296331605540209,
+        "gapScale": 0.5839861935342008,
+        "intradayFraction": 0.6596242012430318,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "交付量",
+          "价格战",
+          "召回"
+        ],
+        "business": "汽车零件"
+      }
     },
     {
       "symbol": "H16",
       "code": "02269",
       "name": "康达医疗",
-      "industry": "医疗",
+      "industry": "医疗器械与服务",
       "market": "HK",
       "listedAt": "2017-07-18",
       "description": "高值耗材与影像设备双平台，集采压力消化后创新品种放量，海外认证持续落地。",
       "initialPrice": 3400,
-      "volatility": 0.024
+      "volatility": 0.033253,
+      "riskProfile": {
+        "marketWeight": 0.5849224252784045,
+        "sectorWeight": 0.2433267722150167,
+        "gapScale": 0.37748849507271387,
+        "intradayFraction": 0.9146055141006012,
+        "wickScale": 0.30927741535780373,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "产品认证",
+          "集采价格",
+          "设备召回"
+        ],
+        "business": "影像设备"
+      }
     },
     {
       "symbol": "H17",
       "code": "00293",
       "name": "国泰航空",
-      "industry": "航空",
+      "industry": "航空航运与物流",
       "market": "HK",
       "listedAt": "1986-05-15",
       "description": "区域枢纽航空龙头，国际航线恢复至疫情前九成，货运与飞机维修贡献稳定利润。",
       "initialPrice": 840,
-      "volatility": 0.028
+      "volatility": 0.019808,
+      "riskProfile": {
+        "marketWeight": 0.446979810015379,
+        "sectorWeight": 0.26836321366661897,
+        "gapScale": 0.27519482021077013,
+        "intradayFraction": 0.8891166683217824,
+        "wickScale": 0.26172374973438695,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "运价变化",
+          "燃油成本",
+          "航线中断"
+        ],
+        "business": "集装箱航运"
+      }
     },
     {
       "symbol": "H18",
       "code": "00388",
       "name": "港联交易所",
-      "industry": "金融",
+      "industry": "券商与金融科技",
       "market": "HK",
       "listedAt": "2000-06-27",
       "description": "亚太核心交易所集团，现货与衍生品双轮驱动，南向资金持续活跃，互联互通扩容。",
       "initialPrice": 28500,
-      "volatility": 0.02
+      "volatility": 0.02912,
+      "riskProfile": {
+        "marketWeight": 0.7668581219402829,
+        "sectorWeight": 0.1925449970092186,
+        "gapScale": 0.3724468103946596,
+        "intradayFraction": 0.8836464928444704,
+        "wickScale": 0.1666491737863173,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.07999999999999996
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "交易活跃",
+          "监管变化",
+          "资金流动"
+        ],
+        "business": "交易所服务"
+      }
     },
     {
       "symbol": "H19",
@@ -504,29 +1449,92 @@
       "listedAt": "1994-03-30",
       "description": "植物蛋白饮品龙头，内地渠道下沉叠加海外扩张，健康化转型打开估值空间。",
       "initialPrice": 720,
-      "volatility": 0.018
+      "volatility": 0.021734,
+      "riskProfile": {
+        "marketWeight": 0.5242226619674746,
+        "sectorWeight": 0.25547437065423245,
+        "gapScale": 0.43398430813349964,
+        "intradayFraction": 0.9661416295329486,
+        "wickScale": 0.339290860745138,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "原料价格",
+          "渠道库存",
+          "品牌需求"
+        ],
+        "business": "健康零食"
+      }
     },
     {
       "symbol": "H20",
       "code": "00857",
       "name": "南海能源",
-      "industry": "能源",
+      "industry": "能源与煤炭",
       "market": "HK",
       "listedAt": "2000-04-07",
       "description": "上游油气生产龙头，储量接替率高，天然气与新能源业务双轨并进，分红稳定。",
       "initialPrice": 660,
-      "volatility": 0.02
+      "volatility": 0.021502,
+      "riskProfile": {
+        "marketWeight": 0.4884760962610128,
+        "sectorWeight": 0.2617731829358083,
+        "gapScale": 0.47717560858764346,
+        "intradayFraction": 0.8512869867029143,
+        "wickScale": 0.2875218106031593,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0.03,
+        "newsKinds": [
+          "供给变化",
+          "油煤价格",
+          "长协合同"
+        ],
+        "business": "煤炭长协"
+      }
     },
     {
       "symbol": "H12",
       "code": "02333",
       "name": "湾区制造",
-      "industry": "制造业",
+      "industry": "工业与军工",
       "market": "HK",
       "listedAt": "2003-12-30",
       "description": "高端装备制造集团，工程机械出口全球前五，氢能设备与电动重卡打开第二曲线。",
       "initialPrice": 1280,
-      "volatility": 0.022
+      "volatility": 0.025745,
+      "riskProfile": {
+        "marketWeight": 0.5561877141604292,
+        "sectorWeight": 0.24931700783446303,
+        "gapScale": 0.30060191794836466,
+        "intradayFraction": 0.929809211252893,
+        "wickScale": 0.31643675904101237,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "订单签约",
+          "资本开支",
+          "贸易限制"
+        ],
+        "business": "工程机械"
+      }
     },
     {
       "symbol": "U1",
@@ -537,7 +1545,28 @@
       "listedAt": "1999-01-22",
       "description": "AI 算力芯片霸主，GPU 数据中心营收爆发式增长，先进制程代工产能紧俏。",
       "initialPrice": 48000,
-      "volatility": 0.035
+      "volatility": 0.032076,
+      "riskProfile": {
+        "marketWeight": 0.7074127340700451,
+        "sectorWeight": 0.2120402087595627,
+        "gapScale": 0.5279022534992043,
+        "intradayFraction": 0.8225631541844158,
+        "wickScale": 0.15270382592646384,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "出口限制",
+          "库存周期",
+          "研发突破"
+        ],
+        "business": "模拟芯片"
+      }
     },
     {
       "symbol": "U2",
@@ -548,62 +1577,188 @@
       "listedAt": "2012-05-18",
       "description": "社交网络与元宇宙平台，AI 推荐引擎提升广告效率，VR 生态初见规模。",
       "initialPrice": 21000,
-      "volatility": 0.03
+      "volatility": 0.033277,
+      "riskProfile": {
+        "marketWeight": 0.6692137446046797,
+        "sectorWeight": 0.2229209877129034,
+        "gapScale": 0.4438142944586492,
+        "intradayFraction": 0.8160167299930097,
+        "wickScale": 0.16407223535223717,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "产品发布",
+          "算力成本",
+          "商业化进展"
+        ],
+        "business": "智能语音"
+      }
     },
     {
       "symbol": "U3",
       "code": "TSLA",
       "name": "VoltAuto",
-      "industry": "新能源",
+      "industry": "汽车与出行",
       "market": "US",
       "listedAt": "2010-06-29",
       "description": "电动车与储能巨头，全球超级工厂产能爬坡，Robotaxi 与机器人业务点燃想象。",
       "initialPrice": 18000,
-      "volatility": 0.04
+      "volatility": 0.029845,
+      "riskProfile": {
+        "marketWeight": 0.579367730939337,
+        "sectorWeight": 0.2445198824454943,
+        "gapScale": 0.4978939463215963,
+        "intradayFraction": 0.8079973998171908,
+        "wickScale": 0.16153960881896842,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "交付量",
+          "价格战",
+          "召回"
+        ],
+        "business": "智能座舱"
+      }
     },
     {
       "symbol": "U4",
       "code": "MSFT",
       "name": "CloudPeak",
-      "industry": "软件",
+      "industry": "软件与云服务",
       "market": "US",
       "listedAt": "1986-03-13",
       "description": "云与企业软件双巨头，Copilot 全线渗透，Azure 增速领先主要对手。",
       "initialPrice": 31000,
-      "volatility": 0.02
+      "volatility": 0.026874,
+      "riskProfile": {
+        "marketWeight": 0.5844982668528993,
+        "sectorWeight": 0.24341848706319766,
+        "gapScale": 0.40239412283751586,
+        "intradayFraction": 0.7222288940511428,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "续费率",
+          "数据安全",
+          "业绩指引"
+        ],
+        "business": "企业协作"
+      }
     },
     {
       "symbol": "U5",
       "code": "VISA",
       "name": "QuantumPay",
-      "industry": "金融科技",
+      "industry": "券商与金融科技",
       "market": "US",
       "listedAt": "2008-03-19",
       "description": "全球支付网络，跨境清算壁垒深，消费复苏与数字钱包打开增量空间。",
       "initialPrice": 26000,
-      "volatility": 0.018
+      "volatility": 0.018346,
+      "riskProfile": {
+        "marketWeight": 0.6126771954463786,
+        "sectorWeight": 0.2370999765419567,
+        "gapScale": 0.45057665688423787,
+        "intradayFraction": 0.8173833020007611,
+        "wickScale": 0.17601832973790277,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.14,
+          "omega": 0.1299999999999999
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "交易活跃",
+          "监管变化",
+          "资金流动"
+        ],
+        "business": "支付网络"
+      }
     },
     {
       "symbol": "U6",
       "code": "JNJ",
       "name": "MedForge",
-      "industry": "医药",
+      "industry": "医药与生物",
       "market": "US",
       "listedAt": "1944-09-05",
       "description": "医疗健康巨头，制药+器械+消费健康三引擎，创新管线后劲充足。",
       "initialPrice": 15000,
-      "volatility": 0.015
+      "volatility": 0.021543,
+      "riskProfile": {
+        "marketWeight": 0.31055325408340173,
+        "sectorWeight": 0.2851667948307427,
+        "gapScale": 0.34449124477894394,
+        "intradayFraction": 0.8184345278204163,
+        "wickScale": 0.23098553088963372,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.08,
+          "omega": 0.07999999999999996
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "临床结果",
+          "药物审批",
+          "专利变化"
+        ],
+        "business": "罕见病药"
+      }
     },
     {
       "symbol": "U7",
       "code": "BA",
       "name": "FalconAero",
-      "industry": "军工",
+      "industry": "工业与军工",
       "market": "US",
       "listedAt": "1934-09-05",
       "description": "航空航天与防务龙头，窄体机订单积压创纪录，国防预算上行周期受益。",
       "initialPrice": 19000,
-      "volatility": 0.028
+      "volatility": 0.015694,
+      "riskProfile": {
+        "marketWeight": 0.3885141841047309,
+        "sectorWeight": 0.27643282291987176,
+        "gapScale": 0.4053077488311799,
+        "intradayFraction": 0.8010560337466281,
+        "wickScale": 0.18981251890895307,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.12
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "订单签约",
+          "资本开支",
+          "贸易限制"
+        ],
+        "business": "轨道装备"
+      }
     },
     {
       "symbol": "U8",
@@ -614,106 +1769,316 @@
       "listedAt": "1969-01-02",
       "description": "全能银行巨头，投行与财富管理双轮驱动，利率高位净息差改善明显。",
       "initialPrice": 14000,
-      "volatility": 0.016
+      "volatility": 0.015691,
+      "riskProfile": {
+        "marketWeight": 0.6454248276681711,
+        "sectorWeight": 0.22914713889694552,
+        "gapScale": 0.4934042659246617,
+        "intradayFraction": 0.804582599575042,
+        "wickScale": 0.18666674358558719,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.14,
+          "omega": 0.1299999999999999
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.045,
+        "newsKinds": [
+          "利率变化",
+          "信用损失",
+          "存款流动"
+        ],
+        "business": "跨境金融"
+      }
     },
     {
       "symbol": "U9",
       "code": "AAPL",
       "name": "PixelSoft",
-      "industry": "消费电子",
+      "industry": "硬件与家电",
       "market": "US",
       "listedAt": "1980-12-12",
       "description": "消费电子与生态服务巨头，硬件+软件+服务三位一体，高端市场护城河深厚，现金储备雄厚。",
       "initialPrice": 17500,
-      "volatility": 0.022
+      "volatility": 0.02041,
+      "riskProfile": {
+        "marketWeight": 0.6727423277854792,
+        "sectorWeight": 0.2219630564677819,
+        "gapScale": 0.6028972005625037,
+        "intradayFraction": 0.7184372599930192,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.08,
+          "omega": 0.07999999999999996
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "供应链",
+          "新品发布",
+          "消费需求"
+        ],
+        "business": "机器人家电"
+      }
     },
     {
       "symbol": "U10",
       "code": "GOOGL",
       "name": "AlphaSearch",
-      "industry": "互联网",
+      "industry": "互联网与电商",
       "market": "US",
       "listedAt": "2004-08-19",
       "description": "搜索引擎与广告之王，AI 大模型重塑搜索体验，云业务扭亏为盈，Waymo 商业化提速。",
       "initialPrice": 14200,
-      "volatility": 0.024
+      "volatility": 0.026762,
+      "riskProfile": {
+        "marketWeight": 0.5461419633041896,
+        "sectorWeight": 0.2513077914284435,
+        "gapScale": 0.5578555766983327,
+        "intradayFraction": 0.7066222040006287,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "监管变化",
+          "流量成本",
+          "交易额"
+        ],
+        "business": "搜索广告"
+      }
     },
     {
       "symbol": "U11",
       "code": "MCD",
       "name": "GoldenFry",
-      "industry": "餐饮",
+      "industry": "食品饮料",
       "market": "US",
       "listedAt": "1965-04-21",
       "description": "全球快餐连锁之王，特许经营模式轻资产扩张，门店超 4 万家，穿越周期稳健现金流。",
       "initialPrice": 25000,
-      "volatility": 0.014
+      "volatility": 0.012824,
+      "riskProfile": {
+        "marketWeight": 0.34616828805556227,
+        "sectorWeight": 0.2814517302683025,
+        "gapScale": 0.4318657199981178,
+        "intradayFraction": 0.9025972114551176,
+        "wickScale": 0.2782899789803976,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "原料价格",
+          "渠道库存",
+          "品牌需求"
+        ],
+        "business": "餐饮连锁"
+      }
     },
     {
       "symbol": "U13",
       "code": "AMZN",
       "name": "Amazonia",
-      "industry": "电商",
+      "industry": "互联网与电商",
       "market": "US",
       "listedAt": "1997-05-15",
       "description": "全球电商与云服务双龙头，Prime 会员粘性深厚，AWS 利润率修复，广告业务高增长。",
       "initialPrice": 17800,
-      "volatility": 0.03
+      "volatility": 0.033241,
+      "riskProfile": {
+        "marketWeight": 0.5461419633041896,
+        "sectorWeight": 0.2513077914284435,
+        "gapScale": 0.5578555766983327,
+        "intradayFraction": 0.7066222040006287,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "监管变化",
+          "流量成本",
+          "交易额"
+        ],
+        "business": "会员商城"
+      }
     },
     {
       "symbol": "U14",
       "code": "PYPL",
       "name": "CryptoPay",
-      "industry": "金融科技",
+      "industry": "券商与金融科技",
       "market": "US",
       "listedAt": "2015-07-20",
       "description": "数字支付与钱包巨头，跨境结算网络覆盖全球，商户收单份额领先，成本优化见效。",
       "initialPrice": 6200,
-      "volatility": 0.028
+      "volatility": 0.022788,
+      "riskProfile": {
+        "marketWeight": 0.6126771954463786,
+        "sectorWeight": 0.2370999765419567,
+        "gapScale": 0.45057665688423787,
+        "intradayFraction": 0.8173833020007611,
+        "wickScale": 0.17601832973790277,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.14,
+          "omega": 0.1299999999999999
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "交易活跃",
+          "监管变化",
+          "资金流动"
+        ],
+        "business": "资产管理"
+      }
     },
     {
       "symbol": "U15",
       "code": "DIS",
       "name": "WaltRealm",
-      "industry": "传媒",
+      "industry": "传媒与文娱",
       "market": "US",
       "listedAt": "1962-09-20",
       "description": "娱乐帝国，流媒体用户破 2 亿，主题乐园与 IP 授权全链条变现，内容库无出其右。",
       "initialPrice": 9600,
-      "volatility": 0.024
+      "volatility": 0.028815,
+      "riskProfile": {
+        "marketWeight": 0.5647520286309324,
+        "sectorWeight": 0.24757819603945774,
+        "gapScale": 0.35795806860718854,
+        "intradayFraction": 0.7340791218953047,
+        "wickScale": 0.11030865121953143,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.08,
+          "omega": 0.019999999999999907
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "内容上线",
+          "版权纠纷",
+          "广告预算"
+        ],
+        "business": "院线发行"
+      }
     },
     {
       "symbol": "U16",
       "code": "PFE",
       "name": "PfizerLab",
-      "industry": "医药",
+      "industry": "医药与生物",
       "market": "US",
       "listedAt": "1942-06-19",
       "description": "制药巨头，肿瘤与疫苗管线密集，重磅新品获批节奏加快，专利悬崖后重回增长。",
       "initialPrice": 2800,
-      "volatility": 0.018
+      "volatility": 0.016431,
+      "riskProfile": {
+        "marketWeight": 0.31055325408340173,
+        "sectorWeight": 0.2851667948307427,
+        "gapScale": 0.34449124477894394,
+        "intradayFraction": 0.8184345278204163,
+        "wickScale": 0.23098553088963372,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.08,
+          "omega": 0.07999999999999996
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "临床结果",
+          "药物审批",
+          "专利变化"
+        ],
+        "business": "仿制药"
+      }
     },
     {
       "symbol": "U17",
       "code": "HD",
       "name": "HomeCraft",
-      "industry": "零售",
+      "industry": "零售与消费",
       "market": "US",
       "listedAt": "1981-09-22",
       "description": "家装建材零售龙头，门店网络全美第一，专业客户业务高增长，股息连续 14 年上调。",
       "initialPrice": 33500,
-      "volatility": 0.016
+      "volatility": 0.022222,
+      "riskProfile": {
+        "marketWeight": 0.5799545649768945,
+        "sectorWeight": 0.24439464648519102,
+        "gapScale": 0.400632224702717,
+        "intradayFraction": 0.7744662311781043,
+        "wickScale": 0.13636015618951616,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "消费需求",
+          "折扣压力",
+          "同店销售"
+        ],
+        "business": "家居零售"
+      }
     },
     {
       "symbol": "U18",
       "code": "NFLX",
       "name": "StreamRealm",
-      "industry": "传媒",
+      "industry": "传媒与文娱",
       "market": "US",
       "listedAt": "2002-05-23",
       "description": "流媒体之王，全球订阅用户超 2.7 亿，广告分层模式打开 ARPU 空间，原创内容护城河。",
       "initialPrice": 61000,
-      "volatility": 0.032
+      "volatility": 0.021977,
+      "riskProfile": {
+        "marketWeight": 0.5647520286309324,
+        "sectorWeight": 0.24757819603945774,
+        "gapScale": 0.35795806860718854,
+        "intradayFraction": 0.7340791218953047,
+        "wickScale": 0.11030865121953143,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.08,
+          "omega": 0.019999999999999907
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "内容上线",
+          "版权纠纷",
+          "广告预算"
+        ],
+        "business": "版权授权"
+      }
     },
     {
       "symbol": "U19",
@@ -724,7 +2089,28 @@
       "listedAt": "1971-10-13",
       "description": "老牌芯片巨头，代工业务转型关键期，先进制程追赶与 AI 芯片放量决定未来三年。",
       "initialPrice": 4400,
-      "volatility": 0.03
+      "volatility": 0.039841,
+      "riskProfile": {
+        "marketWeight": 0.7074127340700451,
+        "sectorWeight": 0.2120402087595627,
+        "gapScale": 0.5279022534992043,
+        "intradayFraction": 0.8225631541844158,
+        "wickScale": 0.15270382592646384,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "出口限制",
+          "库存周期",
+          "研发突破"
+        ],
+        "business": "功率器件"
+      }
     },
     {
       "symbol": "U20",
@@ -735,18 +2121,2300 @@
       "listedAt": "1919-09-05",
       "description": "饮料之王，全球品牌渗透无出其右，瓶装水与咖啡矩阵扩张，股息连续 60 年上调。",
       "initialPrice": 6100,
-      "volatility": 0.012
+      "volatility": 0.009781,
+      "riskProfile": {
+        "marketWeight": 0.34616828805556227,
+        "sectorWeight": 0.2814517302683025,
+        "gapScale": 0.4318657199981178,
+        "intradayFraction": 0.9025972114551176,
+        "wickScale": 0.2782899789803976,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "原料价格",
+          "渠道库存",
+          "品牌需求"
+        ],
+        "business": "调味品"
+      }
     },
     {
       "symbol": "U12",
       "code": "XOM",
       "name": "EverGreen Energy",
-      "industry": "能源",
+      "industry": "能源与煤炭",
       "market": "US",
       "listedAt": "1920-01-01",
       "description": "油气与化工能源巨头，上游资源储量全球领先，LNG 出口业务扩张，股息与回购回馈股东。",
       "initialPrice": 10500,
-      "volatility": 0.02
+      "volatility": 0.01566,
+      "riskProfile": {
+        "marketWeight": 0.37430195973119507,
+        "sectorWeight": 0.2781920629074899,
+        "gapScale": 0.544416000837997,
+        "intradayFraction": 0.8247113813938551,
+        "wickScale": 0.1838908632793349,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.045,
+        "newsKinds": [
+          "供给变化",
+          "油煤价格",
+          "长协合同"
+        ],
+        "business": "炼化加工"
+      }
+    },
+    {
+      "symbol": "NX001",
+      "code": "689501",
+      "name": "青屿芯片设备",
+      "industry": "半导体",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营芯片设备；收入受库存周期影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 6240,
+      "volatility": 0.025174,
+      "riskProfile": {
+        "marketWeight": 0.4479398341962556,
+        "sectorWeight": 0.2682191108862692,
+        "gapScale": 0.2458134196233164,
+        "intradayFraction": 0.913803583612139,
+        "wickScale": 0.24003976687439885,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "出口限制",
+          "库存周期",
+          "研发突破"
+        ],
+        "business": "芯片设备"
+      }
+    },
+    {
+      "symbol": "NX002",
+      "code": "09502",
+      "name": "辰海存储设计",
+      "industry": "半导体",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营存储设计；收入受研发突破影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 10800,
+      "volatility": 0.038307,
+      "riskProfile": {
+        "marketWeight": 0.564084897276319,
+        "sectorWeight": 0.24771503906672443,
+        "gapScale": 0.3359439248701596,
+        "intradayFraction": 0.926740664935689,
+        "wickScale": 0.2427882891877169,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "出口限制",
+          "库存周期",
+          "研发突破"
+        ],
+        "business": "存储设计"
+      }
+    },
+    {
+      "symbol": "NX003",
+      "code": "09503",
+      "name": "北辰视觉检测",
+      "industry": "人工智能",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营视觉检测；收入受商业化进展影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 6480,
+      "volatility": 0.049541,
+      "riskProfile": {
+        "marketWeight": 0.39808797194158574,
+        "sectorWeight": 0.27520417328519775,
+        "gapScale": 0.2943667420958483,
+        "intradayFraction": 0.9298278962463056,
+        "wickScale": 0.21819915539469162,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "产品发布",
+          "算力成本",
+          "商业化进展"
+        ],
+        "business": "视觉检测"
+      }
+    },
+    {
+      "symbol": "NX004",
+      "code": "689504",
+      "name": "云衡算力调度",
+      "industry": "人工智能",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营算力调度；收入受产品发布影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5280,
+      "volatility": 0.037266,
+      "riskProfile": {
+        "marketWeight": 0.5341092151945386,
+        "sectorWeight": 0.2536246462037644,
+        "gapScale": 0.2691402706399827,
+        "intradayFraction": 0.9247923006508939,
+        "wickScale": 0.23782539798011135,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "产品发布",
+          "算力成本",
+          "商业化进展"
+        ],
+        "business": "算力调度"
+      }
+    },
+    {
+      "symbol": "NX005",
+      "code": "09505",
+      "name": "青屿行业智能体",
+      "industry": "人工智能",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营行业智能体；收入受算力成本影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.046933,
+      "riskProfile": {
+        "marketWeight": 0.39808797194158574,
+        "sectorWeight": 0.27520417328519775,
+        "gapScale": 0.2943667420958483,
+        "intradayFraction": 0.9298278962463056,
+        "wickScale": 0.21819915539469162,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "产品发布",
+          "算力成本",
+          "商业化进展"
+        ],
+        "business": "行业智能体"
+      }
+    },
+    {
+      "symbol": "NX006",
+      "code": "SG006",
+      "name": "辰海机器人算法 Global",
+      "industry": "人工智能",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营机器人算法；收入受商业化进展影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.031197,
+      "riskProfile": {
+        "marketWeight": 0.6692137446046797,
+        "sectorWeight": 0.2229209877129034,
+        "gapScale": 0.4438142944586492,
+        "intradayFraction": 0.8160167299930097,
+        "wickScale": 0.16407223535223717,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "产品发布",
+          "算力成本",
+          "商业化进展"
+        ],
+        "business": "机器人算法"
+      }
+    },
+    {
+      "symbol": "NX007",
+      "code": "09507",
+      "name": "北辰云安全",
+      "industry": "软件与云服务",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营云安全；收入受业绩指引影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 6480,
+      "volatility": 0.042884,
+      "riskProfile": {
+        "marketWeight": 0.6848354261689377,
+        "sectorWeight": 0.21860933080671752,
+        "gapScale": 0.32027051571096177,
+        "intradayFraction": 0.9139063339633133,
+        "wickScale": 0.2606390863131985,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "续费率",
+          "数据安全",
+          "业绩指引"
+        ],
+        "business": "云安全"
+      }
+    },
+    {
+      "symbol": "NX008",
+      "code": "689508",
+      "name": "云衡财务软件",
+      "industry": "软件与云服务",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营财务软件；收入受续费率影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5280,
+      "volatility": 0.037693,
+      "riskProfile": {
+        "marketWeight": 0.49248854062471126,
+        "sectorWeight": 0.2610956785582649,
+        "gapScale": 0.2622450977376957,
+        "intradayFraction": 0.9356437171775872,
+        "wickScale": 0.3172266655400484,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "续费率",
+          "数据安全",
+          "业绩指引"
+        ],
+        "business": "财务软件"
+      }
+    },
+    {
+      "symbol": "NX009",
+      "code": "09509",
+      "name": "青屿开发工具",
+      "industry": "软件与云服务",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营开发工具；收入受数据安全影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.040627,
+      "riskProfile": {
+        "marketWeight": 0.6848354261689377,
+        "sectorWeight": 0.21860933080671752,
+        "gapScale": 0.32027051571096177,
+        "intradayFraction": 0.9139063339633133,
+        "wickScale": 0.2606390863131985,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "续费率",
+          "数据安全",
+          "业绩指引"
+        ],
+        "business": "开发工具"
+      }
+    },
+    {
+      "symbol": "NX010",
+      "code": "SG010",
+      "name": "辰海云基础设施 Global",
+      "industry": "软件与云服务",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营云基础设施；收入受业绩指引影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.025194,
+      "riskProfile": {
+        "marketWeight": 0.5844982668528993,
+        "sectorWeight": 0.24341848706319766,
+        "gapScale": 0.40239412283751586,
+        "intradayFraction": 0.7222288940511428,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "续费率",
+          "数据安全",
+          "业绩指引"
+        ],
+        "business": "云基础设施"
+      }
+    },
+    {
+      "symbol": "NX011",
+      "code": "09511",
+      "name": "青屿引擎授权",
+      "industry": "游戏与互动娱乐",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营引擎授权；收入受新品延期影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.024618,
+      "riskProfile": {
+        "marketWeight": 0.7584502270068656,
+        "sectorWeight": 0.19551929005545993,
+        "gapScale": 0.6063540134030162,
+        "intradayFraction": 0.7677565750065845,
+        "wickScale": 0.08806480644012023,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "版号审批",
+          "新品延期",
+          "付费转化"
+        ],
+        "business": "引擎授权"
+      }
+    },
+    {
+      "symbol": "NX012",
+      "code": "SG012",
+      "name": "辰海游戏渠道 Global",
+      "industry": "游戏与互动娱乐",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营游戏渠道；收入受付费转化影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.034394,
+      "riskProfile": {
+        "marketWeight": 0.4525000606033954,
+        "sectorWeight": 0.26752931159753895,
+        "gapScale": 0.34061016313304704,
+        "intradayFraction": 0.8067874798721584,
+        "wickScale": 0.1756468762489364,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.08,
+          "omega": 0.019999999999999907
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "版号审批",
+          "新品延期",
+          "付费转化"
+        ],
+        "business": "游戏渠道"
+      }
+    },
+    {
+      "symbol": "NX013",
+      "code": "09513",
+      "name": "辰海广告分发",
+      "industry": "传媒与文娱",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营广告分发；收入受广告预算影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 10800,
+      "volatility": 0.038974,
+      "riskProfile": {
+        "marketWeight": 0.7087788068076668,
+        "sectorWeight": 0.21162923775279022,
+        "gapScale": 0.3872234783215177,
+        "intradayFraction": 0.8912887112589398,
+        "wickScale": 0.25576257761800514,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "内容上线",
+          "版权纠纷",
+          "广告预算"
+        ],
+        "business": "广告分发"
+      }
+    },
+    {
+      "symbol": "NX014",
+      "code": "09514",
+      "name": "北辰消费光学",
+      "industry": "硬件与家电",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营消费光学；收入受消费需求影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 6480,
+      "volatility": 0.029105,
+      "riskProfile": {
+        "marketWeight": 0.6308257772294485,
+        "sectorWeight": 0.23277735175583036,
+        "gapScale": 0.4053627531292359,
+        "intradayFraction": 0.9037728127697724,
+        "wickScale": 0.27474946782579684,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "供应链",
+          "新品发布",
+          "消费需求"
+        ],
+        "business": "消费光学"
+      }
+    },
+    {
+      "symbol": "NX015",
+      "code": "689515",
+      "name": "云衡家电出口",
+      "industry": "硬件与家电",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营家电出口；收入受供应链影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5280,
+      "volatility": 0.026223,
+      "riskProfile": {
+        "marketWeight": 0.47125913533566943,
+        "sectorWeight": 0.2645984400230677,
+        "gapScale": 0.3220284585177327,
+        "intradayFraction": 0.9028734241182221,
+        "wickScale": 0.31227267973080924,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "供应链",
+          "新品发布",
+          "消费需求"
+        ],
+        "business": "家电出口"
+      }
+    },
+    {
+      "symbol": "NX016",
+      "code": "09516",
+      "name": "青屿精密零件",
+      "industry": "硬件与家电",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营精密零件；收入受新品发布影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.027573,
+      "riskProfile": {
+        "marketWeight": 0.6308257772294485,
+        "sectorWeight": 0.23277735175583036,
+        "gapScale": 0.4053627531292359,
+        "intradayFraction": 0.9037728127697724,
+        "wickScale": 0.27474946782579684,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "供应链",
+          "新品发布",
+          "消费需求"
+        ],
+        "business": "精密零件"
+      }
+    },
+    {
+      "symbol": "NX017",
+      "code": "SG017",
+      "name": "辰海显示面板 Global",
+      "industry": "硬件与家电",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营显示面板；收入受消费需求影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.019135,
+      "riskProfile": {
+        "marketWeight": 0.6727423277854792,
+        "sectorWeight": 0.2219630564677819,
+        "gapScale": 0.6028972005625037,
+        "intradayFraction": 0.7184372599930192,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.08,
+          "omega": 0.07999999999999996
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "供应链",
+          "新品发布",
+          "消费需求"
+        ],
+        "business": "显示面板"
+      }
+    },
+    {
+      "symbol": "NX018",
+      "code": "689518",
+      "name": "青屿商家服务",
+      "industry": "互联网与电商",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营商家服务；收入受流量成本影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 6240,
+      "volatility": 0.027764,
+      "riskProfile": {
+        "marketWeight": 0.4435957991366406,
+        "sectorWeight": 0.2688680885284627,
+        "gapScale": 0.2578111289122106,
+        "intradayFraction": 0.9177769649593494,
+        "wickScale": 0.25973786945632366,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "监管变化",
+          "流量成本",
+          "交易额"
+        ],
+        "business": "商家服务"
+      }
+    },
+    {
+      "symbol": "NX019",
+      "code": "689519",
+      "name": "辰海数字配送",
+      "industry": "互联网与电商",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营数字配送；收入受交易额影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 7200,
+      "volatility": 0.032391,
+      "riskProfile": {
+        "marketWeight": 0.4435957991366406,
+        "sectorWeight": 0.2688680885284627,
+        "gapScale": 0.2578111289122106,
+        "intradayFraction": 0.9177769649593494,
+        "wickScale": 0.25973786945632366,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "监管变化",
+          "流量成本",
+          "交易额"
+        ],
+        "business": "数字配送"
+      }
+    },
+    {
+      "symbol": "NX020",
+      "code": "09520",
+      "name": "北辰储能系统",
+      "industry": "新能源与电池",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营储能系统；收入受产能过剩影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 6480,
+      "volatility": 0.033496,
+      "riskProfile": {
+        "marketWeight": 0.5663763343218812,
+        "sectorWeight": 0.24724402179387428,
+        "gapScale": 0.41896688319752906,
+        "intradayFraction": 0.8275277842947777,
+        "wickScale": 0.20349364111291776,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "补贴政策",
+          "材料价格",
+          "产能过剩"
+        ],
+        "business": "储能系统"
+      }
+    },
+    {
+      "symbol": "NX021",
+      "code": "SG021",
+      "name": "云衡固态电池 Global",
+      "industry": "新能源与电池",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营固态电池；收入受补贴政策影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 15400,
+      "volatility": 0.040379,
+      "riskProfile": {
+        "marketWeight": 0.4280441390669698,
+        "sectorWeight": 0.27112734895420915,
+        "gapScale": 0.4561906526719495,
+        "intradayFraction": 0.8229936273262342,
+        "wickScale": 0.20308688072231496,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.18999999999999995
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "补贴政策",
+          "材料价格",
+          "产能过剩"
+        ],
+        "business": "固态电池"
+      }
+    },
+    {
+      "symbol": "NX022",
+      "code": "09522",
+      "name": "青屿逆变器",
+      "industry": "新能源与电池",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营逆变器；收入受材料价格影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.031733,
+      "riskProfile": {
+        "marketWeight": 0.5663763343218812,
+        "sectorWeight": 0.24724402179387428,
+        "gapScale": 0.41896688319752906,
+        "intradayFraction": 0.8275277842947777,
+        "wickScale": 0.20349364111291776,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "补贴政策",
+          "材料价格",
+          "产能过剩"
+        ],
+        "business": "逆变器"
+      }
+    },
+    {
+      "symbol": "NX023",
+      "code": "SG023",
+      "name": "辰海电池回收 Global",
+      "industry": "新能源与电池",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营电池回收；收入受产能过剩影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.035931,
+      "riskProfile": {
+        "marketWeight": 0.4280441390669698,
+        "sectorWeight": 0.27112734895420915,
+        "gapScale": 0.4561906526719495,
+        "intradayFraction": 0.8229936273262342,
+        "wickScale": 0.20308688072231496,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.18999999999999995
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "补贴政策",
+          "材料价格",
+          "产能过剩"
+        ],
+        "business": "电池回收"
+      }
+    },
+    {
+      "symbol": "NX024",
+      "code": "689524",
+      "name": "云衡商用车辆",
+      "industry": "汽车与出行",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营商用车辆；收入受交付量影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5280,
+      "volatility": 0.023189,
+      "riskProfile": {
+        "marketWeight": 0.5396273530717044,
+        "sectorWeight": 0.25257119547469054,
+        "gapScale": 0.2596687394708079,
+        "intradayFraction": 0.8884540960762122,
+        "wickScale": 0.24116439069812312,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "交付量",
+          "价格战",
+          "召回"
+        ],
+        "business": "商用车辆"
+      }
+    },
+    {
+      "symbol": "NX025",
+      "code": "09525",
+      "name": "青屿出行平台",
+      "industry": "汽车与出行",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营出行平台；收入受价格战影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.042278,
+      "riskProfile": {
+        "marketWeight": 0.6435026683357546,
+        "sectorWeight": 0.2296331605540209,
+        "gapScale": 0.5839861935342008,
+        "intradayFraction": 0.6596242012430318,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "交付量",
+          "价格战",
+          "召回"
+        ],
+        "business": "出行平台"
+      }
+    },
+    {
+      "symbol": "NX026",
+      "code": "SG026",
+      "name": "辰海充电网络 Global",
+      "industry": "汽车与出行",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营充电网络；收入受召回影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.032986,
+      "riskProfile": {
+        "marketWeight": 0.579367730939337,
+        "sectorWeight": 0.2445198824454943,
+        "gapScale": 0.4978939463215963,
+        "intradayFraction": 0.8079973998171908,
+        "wickScale": 0.16153960881896842,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "交付量",
+          "价格战",
+          "召回"
+        ],
+        "business": "充电网络"
+      }
+    },
+    {
+      "symbol": "NX027",
+      "code": "689527",
+      "name": "云衡财富管理",
+      "industry": "银行",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营财富管理；收入受利率变化影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5280,
+      "volatility": 0.019449,
+      "riskProfile": {
+        "marketWeight": 0.605811403835347,
+        "sectorWeight": 0.23868248546651707,
+        "gapScale": 0.2644639037262936,
+        "intradayFraction": 0.8804788710084639,
+        "wickScale": 0.2405676551396148,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.02,
+        "newsKinds": [
+          "利率变化",
+          "信用损失",
+          "存款流动"
+        ],
+        "business": "财富管理"
+      }
+    },
+    {
+      "symbol": "NX028",
+      "code": "09528",
+      "name": "青屿区域金融",
+      "industry": "银行",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营区域金融；收入受信用损失影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.011637,
+      "riskProfile": {
+        "marketWeight": 0.6648832440606363,
+        "sectorWeight": 0.22408419056030346,
+        "gapScale": 0.5107255693554467,
+        "intradayFraction": 0.883688075756005,
+        "wickScale": 0.2886486225450445,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0.06,
+        "newsKinds": [
+          "利率变化",
+          "信用损失",
+          "存款流动"
+        ],
+        "business": "区域金融"
+      }
+    },
+    {
+      "symbol": "NX029",
+      "code": "SG029",
+      "name": "辰海支付清算 Global",
+      "industry": "银行",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营支付清算；收入受存款流动影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.017342,
+      "riskProfile": {
+        "marketWeight": 0.6454248276681711,
+        "sectorWeight": 0.22914713889694552,
+        "gapScale": 0.4934042659246617,
+        "intradayFraction": 0.804582599575042,
+        "wickScale": 0.18666674358558719,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.14,
+          "omega": 0.1299999999999999
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.035,
+        "newsKinds": [
+          "利率变化",
+          "信用损失",
+          "存款流动"
+        ],
+        "business": "支付清算"
+      }
+    },
+    {
+      "symbol": "NX030",
+      "code": "SG030",
+      "name": "北辰再保险 Global",
+      "industry": "保险",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营再保险；收入受保费增长影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 12600,
+      "volatility": 0.014091,
+      "riskProfile": {
+        "marketWeight": 0.4898347003534925,
+        "sectorWeight": 0.261544598433354,
+        "gapScale": 0.4578220944619977,
+        "intradayFraction": 0.8687908789886611,
+        "wickScale": 0.23807033563420651,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.12
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.045,
+        "newsKinds": [
+          "灾害赔付",
+          "投资收益",
+          "保费增长"
+        ],
+        "business": "再保险"
+      }
+    },
+    {
+      "symbol": "NX031",
+      "code": "689531",
+      "name": "云衡健康保险",
+      "industry": "保险",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营健康保险；收入受灾害赔付影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5280,
+      "volatility": 0.022286,
+      "riskProfile": {
+        "marketWeight": 0.6700819567446549,
+        "sectorWeight": 0.22268613655113986,
+        "gapScale": 0.29337443398388147,
+        "intradayFraction": 0.9008387910454818,
+        "wickScale": 0.2458978588170415,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.02,
+        "newsKinds": [
+          "灾害赔付",
+          "投资收益",
+          "保费增长"
+        ],
+        "business": "健康保险"
+      }
+    },
+    {
+      "symbol": "NX032",
+      "code": "09532",
+      "name": "青屿农业保险",
+      "industry": "保险",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营农业保险；收入受投资收益影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.021046,
+      "riskProfile": {
+        "marketWeight": 0.7941553273194548,
+        "sectorWeight": 0.18231444936732707,
+        "gapScale": 0.5482844468042637,
+        "intradayFraction": 0.8176244556426233,
+        "wickScale": 0.15479506962857906,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0.06,
+        "newsKinds": [
+          "灾害赔付",
+          "投资收益",
+          "保费增长"
+        ],
+        "business": "农业保险"
+      }
+    },
+    {
+      "symbol": "NX033",
+      "code": "SG033",
+      "name": "辰海保险资管 Global",
+      "industry": "保险",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营保险资管；收入受保费增长影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.015574,
+      "riskProfile": {
+        "marketWeight": 0.4898347003534925,
+        "sectorWeight": 0.261544598433354,
+        "gapScale": 0.4578220944619977,
+        "intradayFraction": 0.8687908789886611,
+        "wickScale": 0.23807033563420651,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.12
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.035,
+        "newsKinds": [
+          "灾害赔付",
+          "投资收益",
+          "保费增长"
+        ],
+        "business": "保险资管"
+      }
+    },
+    {
+      "symbol": "NX034",
+      "code": "689534",
+      "name": "青屿量化软件",
+      "industry": "券商与金融科技",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营量化软件；收入受监管变化影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 6240,
+      "volatility": 0.020632,
+      "riskProfile": {
+        "marketWeight": 0.6929591421933641,
+        "sectorWeight": 0.21629305687552094,
+        "gapScale": 0.289519240284559,
+        "intradayFraction": 0.8939909184138235,
+        "wickScale": 0.19039557598934945,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "交易活跃",
+          "监管变化",
+          "资金流动"
+        ],
+        "business": "量化软件"
+      }
+    },
+    {
+      "symbol": "NX035",
+      "code": "09535",
+      "name": "辰海投行业务",
+      "industry": "券商与金融科技",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营投行业务；收入受资金流动影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 10800,
+      "volatility": 0.0273,
+      "riskProfile": {
+        "marketWeight": 0.7668581219402829,
+        "sectorWeight": 0.1925449970092186,
+        "gapScale": 0.3724468103946596,
+        "intradayFraction": 0.8836464928444704,
+        "wickScale": 0.1666491737863173,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.07999999999999996
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "交易活跃",
+          "监管变化",
+          "资金流动"
+        ],
+        "business": "投行业务"
+      }
+    },
+    {
+      "symbol": "NX036",
+      "code": "09536",
+      "name": "辰海细胞治疗",
+      "industry": "医药与生物",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营细胞治疗；收入受专利变化影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 10800,
+      "volatility": 0.037548,
+      "riskProfile": {
+        "marketWeight": 0.6124385178350644,
+        "sectorWeight": 0.23715546708536797,
+        "gapScale": 0.38191929992685897,
+        "intradayFraction": 0.8791355494721758,
+        "wickScale": 0.2623519095736414,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "临床结果",
+          "药物审批",
+          "专利变化"
+        ],
+        "business": "细胞治疗"
+      }
+    },
+    {
+      "symbol": "NX037",
+      "code": "SG037",
+      "name": "北辰医疗耗材 Global",
+      "industry": "医疗器械与服务",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营医疗耗材；收入受设备召回影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 12600,
+      "volatility": 0.013263,
+      "riskProfile": {
+        "marketWeight": 0.45816298537879163,
+        "sectorWeight": 0.26666046031346935,
+        "gapScale": 0.4372761432139068,
+        "intradayFraction": 0.853182186731565,
+        "wickScale": 0.23915133403861039,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "产品认证",
+          "集采价格",
+          "设备召回"
+        ],
+        "business": "医疗耗材"
+      }
+    },
+    {
+      "symbol": "NX038",
+      "code": "689538",
+      "name": "云衡检测服务",
+      "industry": "医疗器械与服务",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营检测服务；收入受产品认证影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5280,
+      "volatility": 0.027597,
+      "riskProfile": {
+        "marketWeight": 0.519660236545065,
+        "sectorWeight": 0.2563119027081135,
+        "gapScale": 0.2842262171346882,
+        "intradayFraction": 0.9050032348223105,
+        "wickScale": 0.2621530889376257,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.08,
+          "omega": 0.019999999999999907
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "产品认证",
+          "集采价格",
+          "设备召回"
+        ],
+        "business": "检测服务"
+      }
+    },
+    {
+      "symbol": "NX039",
+      "code": "09539",
+      "name": "青屿医院运营",
+      "industry": "医疗器械与服务",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营医院运营；收入受集采价格影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.026721,
+      "riskProfile": {
+        "marketWeight": 0.5849224252784045,
+        "sectorWeight": 0.2433267722150167,
+        "gapScale": 0.37748849507271387,
+        "intradayFraction": 0.9146055141006012,
+        "wickScale": 0.30927741535780373,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "产品认证",
+          "集采价格",
+          "设备召回"
+        ],
+        "business": "医院运营"
+      }
+    },
+    {
+      "symbol": "NX040",
+      "code": "SG040",
+      "name": "辰海康复设备 Global",
+      "industry": "医疗器械与服务",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营康复设备；收入受设备召回影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.014659,
+      "riskProfile": {
+        "marketWeight": 0.45816298537879163,
+        "sectorWeight": 0.26666046031346935,
+        "gapScale": 0.4372761432139068,
+        "intradayFraction": 0.853182186731565,
+        "wickScale": 0.23915133403861039,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "产品认证",
+          "集采价格",
+          "设备召回"
+        ],
+        "business": "康复设备"
+      }
+    },
+    {
+      "symbol": "NX041",
+      "code": "09541",
+      "name": "辰海软饮料",
+      "industry": "食品饮料",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营软饮料；收入受品牌需求影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 10800,
+      "volatility": 0.024021,
+      "riskProfile": {
+        "marketWeight": 0.5242226619674746,
+        "sectorWeight": 0.25547437065423245,
+        "gapScale": 0.43398430813349964,
+        "intradayFraction": 0.9661416295329486,
+        "wickScale": 0.339290860745138,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "原料价格",
+          "渠道库存",
+          "品牌需求"
+        ],
+        "business": "软饮料"
+      }
+    },
+    {
+      "symbol": "NX042",
+      "code": "689542",
+      "name": "青屿服装品牌",
+      "industry": "零售与消费",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营服装品牌；收入受折扣压力影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 6240,
+      "volatility": 0.018049,
+      "riskProfile": {
+        "marketWeight": 0.4097949046805247,
+        "sectorWeight": 0.2736533066652204,
+        "gapScale": 0.3044319163479497,
+        "intradayFraction": 0.9048483433232815,
+        "wickScale": 0.2782150864104054,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "消费需求",
+          "折扣压力",
+          "同店销售"
+        ],
+        "business": "服装品牌"
+      }
+    },
+    {
+      "symbol": "NX043",
+      "code": "689543",
+      "name": "辰海美妆连锁",
+      "industry": "零售与消费",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营美妆连锁；收入受同店销售影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 7200,
+      "volatility": 0.021057,
+      "riskProfile": {
+        "marketWeight": 0.4097949046805247,
+        "sectorWeight": 0.2736533066652204,
+        "gapScale": 0.3044319163479497,
+        "intradayFraction": 0.9048483433232815,
+        "wickScale": 0.2782150864104054,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "消费需求",
+          "折扣压力",
+          "同店销售"
+        ],
+        "business": "美妆连锁"
+      }
+    },
+    {
+      "symbol": "NX044",
+      "code": "689544",
+      "name": "云衡油田服务",
+      "industry": "能源与煤炭",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营油田服务；收入受供给变化影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5280,
+      "volatility": 0.022074,
+      "riskProfile": {
+        "marketWeight": 0.3903301300351629,
+        "sectorWeight": 0.276202489240785,
+        "gapScale": 0.32338880358308325,
+        "intradayFraction": 0.9069884601956318,
+        "wickScale": 0.2690754176296052,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.02,
+        "newsKinds": [
+          "供给变化",
+          "油煤价格",
+          "长协合同"
+        ],
+        "business": "油田服务"
+      }
+    },
+    {
+      "symbol": "NX045",
+      "code": "09545",
+      "name": "青屿天然气储运",
+      "industry": "能源与煤炭",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营天然气储运；收入受油煤价格影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.017278,
+      "riskProfile": {
+        "marketWeight": 0.4884760962610128,
+        "sectorWeight": 0.2617731829358083,
+        "gapScale": 0.47717560858764346,
+        "intradayFraction": 0.8512869867029143,
+        "wickScale": 0.2875218106031593,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0.06,
+        "newsKinds": [
+          "供给变化",
+          "油煤价格",
+          "长协合同"
+        ],
+        "business": "天然气储运"
+      }
+    },
+    {
+      "symbol": "NX046",
+      "code": "SG046",
+      "name": "辰海能源贸易 Global",
+      "industry": "能源与煤炭",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营能源贸易；收入受长协合同影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.017308,
+      "riskProfile": {
+        "marketWeight": 0.37430195973119507,
+        "sectorWeight": 0.2781920629074899,
+        "gapScale": 0.544416000837997,
+        "intradayFraction": 0.8247113813938551,
+        "wickScale": 0.1838908632793349,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.035,
+        "newsKinds": [
+          "供给变化",
+          "油煤价格",
+          "长协合同"
+        ],
+        "business": "能源贸易"
+      }
+    },
+    {
+      "symbol": "NX047",
+      "code": "09547",
+      "name": "远岑黄金开采",
+      "industry": "有色与材料",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营黄金开采；收入受矿山供给影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5040,
+      "volatility": 0.030628,
+      "riskProfile": {
+        "marketWeight": 0.5998654963459339,
+        "sectorWeight": 0.24003025802266717,
+        "gapScale": 0.3811283695298959,
+        "intradayFraction": 0.8579847230269895,
+        "wickScale": 0.2665966823503897,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.15999999999999992
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0,
+        "newsKinds": [
+          "金属价格",
+          "矿山供给",
+          "工业需求"
+        ],
+        "business": "黄金开采"
+      }
+    },
+    {
+      "symbol": "NX048",
+      "code": "SG048",
+      "name": "北辰铝冶炼 Global",
+      "industry": "有色与材料",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营铝冶炼；收入受工业需求影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 12600,
+      "volatility": 0.024036,
+      "riskProfile": {
+        "marketWeight": 0.40312991849518426,
+        "sectorWeight": 0.27454282761213405,
+        "gapScale": 0.59615934341099,
+        "intradayFraction": 0.7728296398880886,
+        "wickScale": 0.1081534456167697,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "金属价格",
+          "矿山供给",
+          "工业需求"
+        ],
+        "business": "铝冶炼"
+      }
+    },
+    {
+      "symbol": "NX049",
+      "code": "689549",
+      "name": "云衡稀土材料",
+      "industry": "有色与材料",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营稀土材料；收入受金属价格影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5280,
+      "volatility": 0.023226,
+      "riskProfile": {
+        "marketWeight": 0.53888288538106,
+        "sectorWeight": 0.2527142085952123,
+        "gapScale": 0.397174089470701,
+        "intradayFraction": 0.8654482325005084,
+        "wickScale": 0.274889040960019,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "金属价格",
+          "矿山供给",
+          "工业需求"
+        ],
+        "business": "稀土材料"
+      }
+    },
+    {
+      "symbol": "NX050",
+      "code": "09550",
+      "name": "青屿特种化工",
+      "industry": "有色与材料",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营特种化工；收入受矿山供给影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.024612,
+      "riskProfile": {
+        "marketWeight": 0.5998654963459339,
+        "sectorWeight": 0.24003025802266717,
+        "gapScale": 0.3811283695298959,
+        "intradayFraction": 0.8579847230269895,
+        "wickScale": 0.2665966823503897,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.15999999999999992
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "金属价格",
+          "矿山供给",
+          "工业需求"
+        ],
+        "business": "特种化工"
+      }
+    },
+    {
+      "symbol": "NX051",
+      "code": "SG051",
+      "name": "辰海锂资源 Global",
+      "industry": "有色与材料",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营锂资源；收入受工业需求影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.026566,
+      "riskProfile": {
+        "marketWeight": 0.40312991849518426,
+        "sectorWeight": 0.27454282761213405,
+        "gapScale": 0.59615934341099,
+        "intradayFraction": 0.7728296398880886,
+        "wickScale": 0.1081534456167697,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "金属价格",
+          "矿山供给",
+          "工业需求"
+        ],
+        "business": "锂资源"
+      }
+    },
+    {
+      "symbol": "NX052",
+      "code": "689552",
+      "name": "云衡工业自动化",
+      "industry": "工业与军工",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营工业自动化；收入受订单签约影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5280,
+      "volatility": 0.023927,
+      "riskProfile": {
+        "marketWeight": 0.5523160885163653,
+        "sectorWeight": 0.2500904325497847,
+        "gapScale": 0.21971894842913323,
+        "intradayFraction": 0.9512250003181562,
+        "wickScale": 0.32723449402347093,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "订单签约",
+          "资本开支",
+          "贸易限制"
+        ],
+        "business": "工业自动化"
+      }
+    },
+    {
+      "symbol": "NX053",
+      "code": "09553",
+      "name": "青屿防务电子",
+      "industry": "工业与军工",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营防务电子；收入受资本开支影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.020688,
+      "riskProfile": {
+        "marketWeight": 0.5561877141604292,
+        "sectorWeight": 0.24931700783446303,
+        "gapScale": 0.30060191794836466,
+        "intradayFraction": 0.929809211252893,
+        "wickScale": 0.31643675904101237,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "订单签约",
+          "资本开支",
+          "贸易限制"
+        ],
+        "business": "防务电子"
+      }
+    },
+    {
+      "symbol": "NX054",
+      "code": "SG054",
+      "name": "辰海船舶制造 Global",
+      "industry": "工业与军工",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营船舶制造；收入受贸易限制影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.017346,
+      "riskProfile": {
+        "marketWeight": 0.3885141841047309,
+        "sectorWeight": 0.27643282291987176,
+        "gapScale": 0.4053077488311799,
+        "intradayFraction": 0.8010560337466281,
+        "wickScale": 0.18981251890895307,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.12
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "订单签约",
+          "资本开支",
+          "贸易限制"
+        ],
+        "business": "船舶制造"
+      }
+    },
+    {
+      "symbol": "NX055",
+      "code": "SG055",
+      "name": "北辰基础设施 Global",
+      "industry": "地产与基建",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营基础设施；收入受项目开工影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 12600,
+      "volatility": 0.019269,
+      "riskProfile": {
+        "marketWeight": 0.5603374952417471,
+        "sectorWeight": 0.24847931549398322,
+        "gapScale": 0.4769749111737352,
+        "intradayFraction": 0.8483846362680965,
+        "wickScale": 0.2022378295537421,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.008,
+        "newsKinds": [
+          "融资政策",
+          "销售回款",
+          "项目开工"
+        ],
+        "business": "基础设施"
+      }
+    },
+    {
+      "symbol": "NX056",
+      "code": "689556",
+      "name": "云衡物业服务",
+      "industry": "地产与基建",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营物业服务；收入受融资政策影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5280,
+      "volatility": 0.028133,
+      "riskProfile": {
+        "marketWeight": 0.4896015252506426,
+        "sectorWeight": 0.2615838893787268,
+        "gapScale": 0.283637792633606,
+        "intradayFraction": 0.9063626634328276,
+        "wickScale": 0.3009767146916158,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "融资政策",
+          "销售回款",
+          "项目开工"
+        ],
+        "business": "物业服务"
+      }
+    },
+    {
+      "symbol": "NX057",
+      "code": "09557",
+      "name": "青屿物流园区",
+      "industry": "地产与基建",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营物流园区；收入受销售回款影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.018718,
+      "riskProfile": {
+        "marketWeight": 0.6055105221789034,
+        "sectorWeight": 0.2387511898980963,
+        "gapScale": 0.48312405154883487,
+        "intradayFraction": 0.9072354653129684,
+        "wickScale": 0.31016111889162423,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "融资政策",
+          "销售回款",
+          "项目开工"
+        ],
+        "business": "物流园区"
+      }
+    },
+    {
+      "symbol": "NX058",
+      "code": "SG058",
+      "name": "辰海城市更新 Global",
+      "industry": "地产与基建",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营城市更新；收入受项目开工影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.021298,
+      "riskProfile": {
+        "marketWeight": 0.5603374952417471,
+        "sectorWeight": 0.24847931549398322,
+        "gapScale": 0.4769749111737352,
+        "intradayFraction": 0.8483846362680965,
+        "wickScale": 0.2022378295537421,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "融资政策",
+          "销售回款",
+          "项目开工"
+        ],
+        "business": "城市更新"
+      }
+    },
+    {
+      "symbol": "NX059",
+      "code": "689559",
+      "name": "远岑燃气分销",
+      "industry": "公用事业",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营燃气分销；收入受燃料成本影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 3360,
+      "volatility": 0.014427,
+      "riskProfile": {
+        "marketWeight": 0.30617691577334594,
+        "sectorWeight": 0.28559238901321743,
+        "gapScale": 0.2061076177579964,
+        "intradayFraction": 0.9874535276618326,
+        "wickScale": 0.39130847658732326,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1.2,
+        "dividendYield": 0.03,
+        "newsKinds": [
+          "电价调整",
+          "燃料成本",
+          "来水变化"
+        ],
+        "business": "燃气分销"
+      }
+    },
+    {
+      "symbol": "NX060",
+      "code": "SG060",
+      "name": "北辰电网运营 Global",
+      "industry": "公用事业",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营电网运营；收入受来水变化影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 12600,
+      "volatility": 0.013965,
+      "riskProfile": {
+        "marketWeight": 0.31003800380873014,
+        "sectorWeight": 0.2852172492285254,
+        "gapScale": 0.41627027987001874,
+        "intradayFraction": 0.8804398494384694,
+        "wickScale": 0.2710495834142189,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.08,
+          "omega": 0.07999999999999996
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.045,
+        "newsKinds": [
+          "电价调整",
+          "燃料成本",
+          "来水变化"
+        ],
+        "business": "电网运营"
+      }
+    },
+    {
+      "symbol": "NX061",
+      "code": "689561",
+      "name": "云衡水务处理",
+      "industry": "公用事业",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营水务处理；收入受电价调整影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5280,
+      "volatility": 0.015199,
+      "riskProfile": {
+        "marketWeight": 0.30617691577334594,
+        "sectorWeight": 0.28559238901321743,
+        "gapScale": 0.2061076177579964,
+        "intradayFraction": 0.9874535276618326,
+        "wickScale": 0.39130847658732326,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.02,
+        "newsKinds": [
+          "电价调整",
+          "燃料成本",
+          "来水变化"
+        ],
+        "business": "水务处理"
+      }
+    },
+    {
+      "symbol": "NX062",
+      "code": "09562",
+      "name": "青屿核电运营",
+      "industry": "公用事业",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营核电运营；收入受燃料成本影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.0097,
+      "riskProfile": {
+        "marketWeight": 0.2909227103727835,
+        "sectorWeight": 0.28702396745401215,
+        "gapScale": 0.3818672299743414,
+        "intradayFraction": 0.9574464726453811,
+        "wickScale": 0.34885716439912295,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0.06,
+        "newsKinds": [
+          "电价调整",
+          "燃料成本",
+          "来水变化"
+        ],
+        "business": "核电运营"
+      }
+    },
+    {
+      "symbol": "NX063",
+      "code": "SG063",
+      "name": "辰海供热服务 Global",
+      "industry": "公用事业",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营供热服务；收入受来水变化影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.015435,
+      "riskProfile": {
+        "marketWeight": 0.31003800380873014,
+        "sectorWeight": 0.2852172492285254,
+        "gapScale": 0.41627027987001874,
+        "intradayFraction": 0.8804398494384694,
+        "wickScale": 0.2710495834142189,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.08,
+          "omega": 0.07999999999999996
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.035,
+        "newsKinds": [
+          "电价调整",
+          "燃料成本",
+          "来水变化"
+        ],
+        "business": "供热服务"
+      }
+    },
+    {
+      "symbol": "NX064",
+      "code": "SG064",
+      "name": "北辰卫星通信 Global",
+      "industry": "通信与网络",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营卫星通信；收入受用户增长影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 12600,
+      "volatility": 0.013922,
+      "riskProfile": {
+        "marketWeight": 0.22816389270112292,
+        "sectorWeight": 0.2920868217261305,
+        "gapScale": 0.33437464988898774,
+        "intradayFraction": 0.828822356473923,
+        "wickScale": 0.21217576050955914,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.15999999999999992
+        },
+        "eventSensitivity": 1,
+        "dividendYield": 0.045,
+        "newsKinds": [
+          "资费政策",
+          "网络投资",
+          "用户增长"
+        ],
+        "business": "卫星通信"
+      }
+    },
+    {
+      "symbol": "NX065",
+      "code": "689565",
+      "name": "云衡光纤设备",
+      "industry": "通信与网络",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营光纤设备；收入受资费政策影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 5280,
+      "volatility": 0.021573,
+      "riskProfile": {
+        "marketWeight": 0.3790998068784902,
+        "sectorWeight": 0.27760673673061725,
+        "gapScale": 0.20239156272231043,
+        "intradayFraction": 0.9756160782033791,
+        "wickScale": 0.2870477065466513,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.02,
+        "newsKinds": [
+          "资费政策",
+          "网络投资",
+          "用户增长"
+        ],
+        "business": "光纤设备"
+      }
+    },
+    {
+      "symbol": "NX066",
+      "code": "09566",
+      "name": "青屿网络安全",
+      "industry": "通信与网络",
+      "market": "HK",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营网络安全；收入受网络投资影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 9360,
+      "volatility": 0.012238,
+      "riskProfile": {
+        "marketWeight": 0.4779511123207737,
+        "sectorWeight": 0.2635159313605539,
+        "gapScale": 0.3658846910301822,
+        "intradayFraction": 0.9500371693837264,
+        "wickScale": 0.41467087959505655,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0.06,
+        "newsKinds": [
+          "资费政策",
+          "网络投资",
+          "用户增长"
+        ],
+        "business": "网络安全"
+      }
+    },
+    {
+      "symbol": "NX067",
+      "code": "SG067",
+      "name": "辰海通信铁塔 Global",
+      "industry": "通信与网络",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营通信铁塔；收入受用户增长影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.015387,
+      "riskProfile": {
+        "marketWeight": 0.22816389270112292,
+        "sectorWeight": 0.2920868217261305,
+        "gapScale": 0.33437464988898774,
+        "intradayFraction": 0.828822356473923,
+        "wickScale": 0.21217576050955914,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.15999999999999992
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.035,
+        "newsKinds": [
+          "资费政策",
+          "网络投资",
+          "用户增长"
+        ],
+        "business": "通信铁塔"
+      }
+    },
+    {
+      "symbol": "NX068",
+      "code": "SG068",
+      "name": "云衡快递网络 Global",
+      "industry": "航空航运与物流",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营快递网络；收入受运价变化影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 15400,
+      "volatility": 0.025988,
+      "riskProfile": {
+        "marketWeight": 0.5730487540896518,
+        "sectorWeight": 0.24585638346251415,
+        "gapScale": 0.4347220784037375,
+        "intradayFraction": 0.7775583770543336,
+        "wickScale": 0.13664927525401535,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.14,
+          "omega": 0.1299999999999999
+        },
+        "eventSensitivity": 0.75,
+        "dividendYield": 0.01,
+        "newsKinds": [
+          "运价变化",
+          "燃油成本",
+          "航线中断"
+        ],
+        "business": "快递网络"
+      }
+    },
+    {
+      "symbol": "NX069",
+      "code": "689569",
+      "name": "青屿港口服务",
+      "industry": "航空航运与物流",
+      "market": "CN",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营港口服务；收入受燃油成本影响，成熟业务提供现金流，新增项目带来增长机会。",
+      "initialPrice": 6240,
+      "volatility": 0.017728,
+      "riskProfile": {
+        "marketWeight": 0.5066238086171502,
+        "sectorWeight": 0.25865016622612635,
+        "gapScale": 0.24438159636664128,
+        "intradayFraction": 0.951110203387677,
+        "wickScale": 0.3517037668522256,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993
+        },
+        "eventSensitivity": 1.3,
+        "dividendYield": 0,
+        "newsKinds": [
+          "运价变化",
+          "燃油成本",
+          "航线中断"
+        ],
+        "business": "港口服务"
+      }
+    },
+    {
+      "symbol": "NX070",
+      "code": "SG070",
+      "name": "辰海供应链仓储 Global",
+      "industry": "航空航运与物流",
+      "market": "US",
+      "listedAt": "2019-01-02",
+      "description": "虚构企业，主营供应链仓储；收入受航线中断影响，扩张投入较高，短期利润承压。",
+      "initialPrice": 21000,
+      "volatility": 0.023125,
+      "riskProfile": {
+        "marketWeight": 0.5730487540896518,
+        "sectorWeight": 0.24585638346251415,
+        "gapScale": 0.4347220784037375,
+        "intradayFraction": 0.7775583770543336,
+        "wickScale": 0.13664927525401535,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.14,
+          "omega": 0.1299999999999999
+        },
+        "eventSensitivity": 0.95,
+        "dividendYield": 0.003,
+        "newsKinds": [
+          "运价变化",
+          "燃油成本",
+          "航线中断"
+        ],
+        "business": "供应链仓储"
+      }
     }
   ],
   "calendar": {
@@ -962,5 +4630,11 @@
         ]
       }
     }
+  },
+  "remaster": {
+    "sectors": 23,
+    "perSector": 6,
+    "calibrationVersion": 1,
+    "fictional": true
   }
 }

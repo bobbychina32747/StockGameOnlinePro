@@ -1,0 +1,1780 @@
+{
+  "version": 1,
+  "collectedAt": "2026-10-10T10:22:39.644Z",
+  "trainingCutoffExclusive": "2025-10-01",
+  "holdoutFrom": "2025-10-01",
+  "method": "Adjusted daily OHLCV; market correlation and robust gap/range ratios; bounded Student-t(5) GJR likelihood grid. Two references per industry and market. Daily calibration does not identify intraday microstructure.",
+  "profiles": {
+    "半导体": {
+      "CN": {
+        "references": [
+          "688981.SS",
+          "688012.SS"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.027970873585268525,
+        "marketWeight": 0.4479398341962556,
+        "sectorWeight": 0.2682191108862692,
+        "gapScale": 0.2458134196233164,
+        "intradayFraction": 0.913803583612139,
+        "wickScale": 0.24003976687439885,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027,
+          "score": 1.076081000789944
+        },
+        "observed": {
+          "excessKurtosis": 9.408843316764894,
+          "absoluteReturnLag1": 0.20052643986655339,
+          "rangeRatio": 1.2578076528860331
+        }
+      },
+      "HK": {
+        "references": [
+          "0981.HK",
+          "1347.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.03648271708333867,
+        "marketWeight": 0.564084897276319,
+        "sectorWeight": 0.24771503906672443,
+        "gapScale": 0.3359439248701596,
+        "intradayFraction": 0.926740664935689,
+        "wickScale": 0.2427882891877169,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999,
+          "score": 1.178863935756646
+        },
+        "observed": {
+          "excessKurtosis": 6.9970253284944715,
+          "absoluteReturnLag1": 0.17523097632330759,
+          "rangeRatio": 1.289244440161395
+        }
+      },
+      "US": {
+        "references": [
+          "NVDA",
+          "AMD"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.03376370305042332,
+        "marketWeight": 0.7074127340700451,
+        "sectorWeight": 0.2120402087595627,
+        "gapScale": 0.5279022534992043,
+        "intradayFraction": 0.8225631541844158,
+        "wickScale": 0.15270382592646384,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.306356071147499
+        },
+        "observed": {
+          "excessKurtosis": 3.1516096202273087,
+          "absoluteReturnLag1": 0.044845748260257584,
+          "rangeRatio": 1.2026967975321035
+        }
+      }
+    },
+    "人工智能": {
+      "CN": {
+        "references": [
+          "002230.SZ",
+          "300033.SZ"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.0315812824205311,
+        "marketWeight": 0.5341092151945386,
+        "sectorWeight": 0.2536246462037644,
+        "gapScale": 0.2691402706399827,
+        "intradayFraction": 0.9247923006508939,
+        "wickScale": 0.23782539798011135,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027,
+          "score": 1.1203119835008275
+        },
+        "observed": {
+          "excessKurtosis": 4.7002320486591,
+          "absoluteReturnLag1": 0.1745830323817663,
+          "rangeRatio": 1.261262717960173
+        }
+      },
+      "HK": {
+        "references": [
+          "0020.HK",
+          "6682.HK"
+        ],
+        "observations": 1414,
+        "dailyVolatility": 0.05214807731189816,
+        "marketWeight": 0.39808797194158574,
+        "sectorWeight": 0.27520417328519775,
+        "gapScale": 0.2943667420958483,
+        "intradayFraction": 0.9298278962463056,
+        "wickScale": 0.21819915539469162,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999,
+          "score": 0.9465681870782949
+        },
+        "observed": {
+          "excessKurtosis": 19.842236154408063,
+          "absoluteReturnLag1": 0.17065166212003943,
+          "rangeRatio": 1.2374286712602611
+        }
+      },
+      "US": {
+        "references": [
+          "MSFT",
+          "PLTR"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.029711445876806984,
+        "marketWeight": 0.6692137446046797,
+        "sectorWeight": 0.2229209877129034,
+        "gapScale": 0.4438142944586492,
+        "intradayFraction": 0.8160167299930097,
+        "wickScale": 0.16407223535223717,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.2513893529930098
+        },
+        "observed": {
+          "excessKurtosis": 4.1955310810768935,
+          "absoluteReturnLag1": 0.1009224241964708,
+          "rangeRatio": 1.1956598649011743
+        }
+      }
+    },
+    "软件与云服务": {
+      "CN": {
+        "references": [
+          "600588.SS",
+          "688111.SS"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.03194280819766817,
+        "marketWeight": 0.49248854062471126,
+        "sectorWeight": 0.2610956785582649,
+        "gapScale": 0.2622450977376957,
+        "intradayFraction": 0.9356437171775872,
+        "wickScale": 0.3172266655400484,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002,
+          "score": 1.2800041846982613
+        },
+        "observed": {
+          "excessKurtosis": 2.8697755338669415,
+          "absoluteReturnLag1": 0.15315119370331656,
+          "rangeRatio": 1.3862361941853862
+        }
+      },
+      "HK": {
+        "references": [
+          "0268.HK",
+          "0909.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.0451408516589948,
+        "marketWeight": 0.6848354261689377,
+        "sectorWeight": 0.21860933080671752,
+        "gapScale": 0.32027051571096177,
+        "intradayFraction": 0.9139063339633133,
+        "wickScale": 0.2606390863131985,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002,
+          "score": 1.2365044229760034
+        },
+        "observed": {
+          "excessKurtosis": 5.150582024531611,
+          "absoluteReturnLag1": 0.12674116760566612,
+          "rangeRatio": 1.3131036928144062
+        }
+      },
+      "US": {
+        "references": [
+          "CRM",
+          "ORCL"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.02399456233400466,
+        "marketWeight": 0.5844982668528993,
+        "sectorWeight": 0.24341848706319766,
+        "gapScale": 0.40239412283751586,
+        "intradayFraction": 0.7222288940511428,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006,
+          "score": 1.089805910896763
+        },
+        "observed": {
+          "excessKurtosis": 20.37533895367267,
+          "absoluteReturnLag1": 0.14151750117196207,
+          "rangeRatio": 1.0427863112136655
+        }
+      }
+    },
+    "游戏与互动娱乐": {
+      "CN": {
+        "references": [
+          "002555.SZ",
+          "002602.SZ"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.029127334224931113,
+        "marketWeight": 0.46206639904342584,
+        "sectorWeight": 0.26605359959743774,
+        "gapScale": 0.28477053106344397,
+        "intradayFraction": 0.9173693277413504,
+        "wickScale": 0.31431521096163184,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006,
+          "score": 1.301934766230302
+        },
+        "observed": {
+          "excessKurtosis": 1.4934354149959863,
+          "absoluteReturnLag1": 0.16074768944702814,
+          "rangeRatio": 1.3883354968576442
+        }
+      },
+      "HK": {
+        "references": [
+          "0700.HK",
+          "9999.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.027352955387387586,
+        "marketWeight": 0.7584502270068656,
+        "sectorWeight": 0.19551929005545993,
+        "gapScale": 0.6063540134030162,
+        "intradayFraction": 0.7677565750065845,
+        "wickScale": 0.08806480644012023,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.169792096687593
+        },
+        "observed": {
+          "excessKurtosis": 10.793361948875148,
+          "absoluteReturnLag1": 0.12276846689263934,
+          "rangeRatio": 1.1228098943250973
+        }
+      },
+      "US": {
+        "references": [
+          "RBLX",
+          "TTWO"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.03275656392486706,
+        "marketWeight": 0.4525000606033954,
+        "sectorWeight": 0.26752931159753895,
+        "gapScale": 0.34061016313304704,
+        "intradayFraction": 0.8067874798721584,
+        "wickScale": 0.1756468762489364,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.08,
+          "omega": 0.019999999999999907,
+          "score": 1.0883424422891201
+        },
+        "observed": {
+          "excessKurtosis": 9.225968885068557,
+          "absoluteReturnLag1": 0.12284453697435098,
+          "rangeRatio": 1.1832180509382124
+        }
+      }
+    },
+    "传媒与文娱": {
+      "CN": {
+        "references": [
+          "300413.SZ",
+          "300251.SZ"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.031678634914094755,
+        "marketWeight": 0.484857776118172,
+        "sectorWeight": 0.2623779036511967,
+        "gapScale": 0.24444788029772835,
+        "intradayFraction": 0.9118633831093848,
+        "wickScale": 0.24985842487004875,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999,
+          "score": 1.1115540460028528
+        },
+        "observed": {
+          "excessKurtosis": 6.685153425394137,
+          "absoluteReturnLag1": 0.23304752329205963,
+          "rangeRatio": 1.2731078438813965
+        }
+      },
+      "HK": {
+        "references": [
+          "0772.HK",
+          "1024.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.03711832116794722,
+        "marketWeight": 0.7087788068076668,
+        "sectorWeight": 0.21162923775279022,
+        "gapScale": 0.3872234783215177,
+        "intradayFraction": 0.8912887112589398,
+        "wickScale": 0.25576257761800514,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999,
+          "score": 1.2314739998496989
+        },
+        "observed": {
+          "excessKurtosis": 6.095104480370266,
+          "absoluteReturnLag1": 0.14520130626510783,
+          "rangeRatio": 1.3253871676852635
+        }
+      },
+      "US": {
+        "references": [
+          "DIS",
+          "NFLX"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.024419292562661326,
+        "marketWeight": 0.5647520286309324,
+        "sectorWeight": 0.24757819603945774,
+        "gapScale": 0.35795806860718854,
+        "intradayFraction": 0.7340791218953047,
+        "wickScale": 0.11030865121953143,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.08,
+          "omega": 0.019999999999999907,
+          "score": 1.0359475629763895
+        },
+        "observed": {
+          "excessKurtosis": 29.098919214145,
+          "absoluteReturnLag1": 0.12016363264758817,
+          "rangeRatio": 1.0838812625334069
+        }
+      }
+    },
+    "硬件与家电": {
+      "CN": {
+        "references": [
+          "002475.SZ",
+          "000333.SZ"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.022223010939206658,
+        "marketWeight": 0.47125913533566943,
+        "sectorWeight": 0.2645984400230677,
+        "gapScale": 0.3220284585177327,
+        "intradayFraction": 0.9028734241182221,
+        "wickScale": 0.31227267973080924,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006,
+          "score": 1.310413457330282
+        },
+        "observed": {
+          "excessKurtosis": 1.5831356631717632,
+          "absoluteReturnLag1": 0.1285422444677778,
+          "rangeRatio": 1.3962448251246147
+        }
+      },
+      "HK": {
+        "references": [
+          "1810.HK",
+          "2018.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.030637042714887423,
+        "marketWeight": 0.6308257772294485,
+        "sectorWeight": 0.23277735175583036,
+        "gapScale": 0.4053627531292359,
+        "intradayFraction": 0.9037728127697724,
+        "wickScale": 0.27474946782579684,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999,
+          "score": 1.296365398246075
+        },
+        "observed": {
+          "excessKurtosis": 5.189951576671861,
+          "absoluteReturnLag1": 0.11678480408870995,
+          "rangeRatio": 1.3612079744600458
+        }
+      },
+      "US": {
+        "references": [
+          "AAPL",
+          "SONY"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.01822352183221433,
+        "marketWeight": 0.6727423277854792,
+        "sectorWeight": 0.2219630564677819,
+        "gapScale": 0.6028972005625037,
+        "intradayFraction": 0.7184372599930192,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.08,
+          "omega": 0.07999999999999996,
+          "score": 1.2593770504552846
+        },
+        "observed": {
+          "excessKurtosis": 4.1527993833068635,
+          "absoluteReturnLag1": 0.17364946292602224,
+          "rangeRatio": 1.0058851715976613
+        }
+      }
+    },
+    "互联网与电商": {
+      "CN": {
+        "references": [
+          "002127.SZ",
+          "002315.SZ"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.030848762168732488,
+        "marketWeight": 0.4435957991366406,
+        "sectorWeight": 0.2688680885284627,
+        "gapScale": 0.2578111289122106,
+        "intradayFraction": 0.9177769649593494,
+        "wickScale": 0.25973786945632366,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027,
+          "score": 1.1731779422403192
+        },
+        "observed": {
+          "excessKurtosis": 2.2313133955641766,
+          "absoluteReturnLag1": 0.24303523773012659,
+          "rangeRatio": 1.2929239298037811
+        }
+      },
+      "HK": {
+        "references": [
+          "3690.HK",
+          "9618.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.03633393572841234,
+        "marketWeight": 0.8126473702050016,
+        "sectorWeight": 0.17482672179303874,
+        "gapScale": 0.6191813332247523,
+        "intradayFraction": 0.7347539979830995,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.217808160875731
+        },
+        "observed": {
+          "excessKurtosis": 6.68405984267249,
+          "absoluteReturnLag1": 0.13085190660899046,
+          "rangeRatio": 1.1096529772456325
+        }
+      },
+      "US": {
+        "references": [
+          "AMZN",
+          "BABA"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.02817049346849438,
+        "marketWeight": 0.5461419633041896,
+        "sectorWeight": 0.2513077914284435,
+        "gapScale": 0.5578555766983327,
+        "intradayFraction": 0.7066222040006287,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006,
+          "score": 1.1967034171839974
+        },
+        "observed": {
+          "excessKurtosis": 7.2815485675426075,
+          "absoluteReturnLag1": 0.11873622891771846,
+          "rangeRatio": 1.0372794869601822
+        }
+      }
+    },
+    "新能源与电池": {
+      "CN": {
+        "references": [
+          "300750.SZ",
+          "601012.SS"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.02567864539100837,
+        "marketWeight": 0.5559924679224469,
+        "sectorWeight": 0.24935619865007486,
+        "gapScale": 0.34202434864326403,
+        "intradayFraction": 0.8910575668613385,
+        "wickScale": 0.24380941491214767,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.23902564900432
+        },
+        "observed": {
+          "excessKurtosis": 3.5421047755249018,
+          "absoluteReturnLag1": 0.14065411283686322,
+          "rangeRatio": 1.2927023684524155
+        }
+      },
+      "HK": {
+        "references": [
+          "1211.HK",
+          "3800.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.03525882665077866,
+        "marketWeight": 0.5663763343218812,
+        "sectorWeight": 0.24724402179387428,
+        "gapScale": 0.41896688319752906,
+        "intradayFraction": 0.8275277842947777,
+        "wickScale": 0.20349364111291776,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006,
+          "score": 1.1168041678834253
+        },
+        "observed": {
+          "excessKurtosis": 23.794775505770062,
+          "absoluteReturnLag1": 0.12312479004942717,
+          "rangeRatio": 1.2512798907399272
+        }
+      },
+      "US": {
+        "references": [
+          "FSLR",
+          "ALB"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.03421960260296923,
+        "marketWeight": 0.4280441390669698,
+        "sectorWeight": 0.27112734895420915,
+        "gapScale": 0.4561906526719495,
+        "intradayFraction": 0.8229936273262342,
+        "wickScale": 0.20308688072231496,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.18999999999999995,
+          "score": 1.2862352229046987
+        },
+        "observed": {
+          "excessKurtosis": 4.887058138344463,
+          "absoluteReturnLag1": 0.08777338321087666,
+          "rangeRatio": 1.2617962049572888
+        }
+      }
+    },
+    "汽车与出行": {
+      "CN": {
+        "references": [
+          "600104.SS",
+          "601238.SS"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.019652107961462308,
+        "marketWeight": 0.5396273530717044,
+        "sectorWeight": 0.25257119547469054,
+        "gapScale": 0.2596687394708079,
+        "intradayFraction": 0.8884540960762122,
+        "wickScale": 0.24116439069812312,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027,
+          "score": 1.030087201639486
+        },
+        "observed": {
+          "excessKurtosis": 5.394623891285947,
+          "absoluteReturnLag1": 0.255827982714419,
+          "rangeRatio": 1.2637636469582394
+        }
+      },
+      "HK": {
+        "references": [
+          "9868.HK",
+          "2015.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.04697532999930974,
+        "marketWeight": 0.6435026683357546,
+        "sectorWeight": 0.2296331605540209,
+        "gapScale": 0.5839861935342008,
+        "intradayFraction": 0.6596242012430318,
+        "wickScale": 0.08,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.2265774641180944
+        },
+        "observed": {
+          "excessKurtosis": 9.024206456549221,
+          "absoluteReturnLag1": 0.09450824688937241,
+          "rangeRatio": 1.0176120490346832
+        }
+      },
+      "US": {
+        "references": [
+          "TSLA",
+          "GM"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.03141558251632177,
+        "marketWeight": 0.579367730939337,
+        "sectorWeight": 0.2445198824454943,
+        "gapScale": 0.4978939463215963,
+        "intradayFraction": 0.8079973998171908,
+        "wickScale": 0.16153960881896842,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.3188354385534846
+        },
+        "observed": {
+          "excessKurtosis": 2.089915590458395,
+          "absoluteReturnLag1": 0.05144099822414346,
+          "rangeRatio": 1.2078315580068284
+        }
+      }
+    },
+    "银行": {
+      "CN": {
+        "references": [
+          "000001.SZ",
+          "600036.SS"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.016482506201813765,
+        "marketWeight": 0.605811403835347,
+        "sectorWeight": 0.23868248546651707,
+        "gapScale": 0.2644639037262936,
+        "intradayFraction": 0.8804788710084639,
+        "wickScale": 0.2405676551396148,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006,
+          "score": 1.1869883207973178
+        },
+        "observed": {
+          "excessKurtosis": 4.64268649515131,
+          "absoluteReturnLag1": 0.16877234125001922,
+          "rangeRatio": 1.2642474193412718
+        }
+      },
+      "HK": {
+        "references": [
+          "0939.HK",
+          "3988.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.012929824077059792,
+        "marketWeight": 0.6648832440606363,
+        "sectorWeight": 0.22408419056030346,
+        "gapScale": 0.5107255693554467,
+        "intradayFraction": 0.883688075756005,
+        "wickScale": 0.2886486225450445,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002,
+          "score": 1.3052736619000624
+        },
+        "observed": {
+          "excessKurtosis": 6.19751830381832,
+          "absoluteReturnLag1": 0.08000613162153808,
+          "rangeRatio": 1.4150554668787052
+        }
+      },
+      "US": {
+        "references": [
+          "JPM",
+          "BAC"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.01651633599913957,
+        "marketWeight": 0.6454248276681711,
+        "sectorWeight": 0.22914713889694552,
+        "gapScale": 0.4934042659246617,
+        "intradayFraction": 0.804582599575042,
+        "wickScale": 0.18666674358558719,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.14,
+          "omega": 0.1299999999999999,
+          "score": 1.2080975434094097
+        },
+        "observed": {
+          "excessKurtosis": 4.670745275351947,
+          "absoluteReturnLag1": 0.1463554340303894,
+          "rangeRatio": 1.246688069514338
+        }
+      }
+    },
+    "保险": {
+      "CN": {
+        "references": [
+          "601318.SS",
+          "601601.SS"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.018886564816887393,
+        "marketWeight": 0.6700819567446549,
+        "sectorWeight": 0.22268613655113986,
+        "gapScale": 0.29337443398388147,
+        "intradayFraction": 0.9008387910454818,
+        "wickScale": 0.2458978588170415,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002,
+          "score": 1.2314742941697774
+        },
+        "observed": {
+          "excessKurtosis": 4.268524455634244,
+          "absoluteReturnLag1": 0.1583602451424317,
+          "rangeRatio": 1.2814489043024309
+        }
+      },
+      "HK": {
+        "references": [
+          "1299.HK",
+          "2318.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.02338397732484073,
+        "marketWeight": 0.7941553273194548,
+        "sectorWeight": 0.18231444936732707,
+        "gapScale": 0.5482844468042637,
+        "intradayFraction": 0.8176244556426233,
+        "wickScale": 0.15479506962857906,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002,
+          "score": 1.2587084528573134
+        },
+        "observed": {
+          "excessKurtosis": 4.262689517408222,
+          "absoluteReturnLag1": 0.09347299330428162,
+          "rangeRatio": 1.2121574454470057
+        }
+      },
+      "US": {
+        "references": [
+          "AIG",
+          "CB"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.014832732955436388,
+        "marketWeight": 0.4898347003534925,
+        "sectorWeight": 0.261544598433354,
+        "gapScale": 0.4578220944619977,
+        "intradayFraction": 0.8687908789886611,
+        "wickScale": 0.23807033563420651,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.12,
+          "score": 1.2561980759120874
+        },
+        "observed": {
+          "excessKurtosis": 2.575551908027643,
+          "absoluteReturnLag1": 0.19368860674354849,
+          "rangeRatio": 1.3182591653533298
+        }
+      }
+    },
+    "券商与金融科技": {
+      "CN": {
+        "references": [
+          "600030.SS",
+          "300059.SZ"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.0229248298562821,
+        "marketWeight": 0.6929591421933641,
+        "sectorWeight": 0.21629305687552094,
+        "gapScale": 0.289519240284559,
+        "intradayFraction": 0.8939909184138235,
+        "wickScale": 0.19039557598934945,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006,
+          "score": 1.0825039782896049
+        },
+        "observed": {
+          "excessKurtosis": 8.807696833213518,
+          "absoluteReturnLag1": 0.20900886493745743,
+          "rangeRatio": 1.1914886936683269
+        }
+      },
+      "HK": {
+        "references": [
+          "0388.HK",
+          "6030.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.026000004598053843,
+        "marketWeight": 0.7668581219402829,
+        "sectorWeight": 0.1925449970092186,
+        "gapScale": 0.3724468103946596,
+        "intradayFraction": 0.8836464928444704,
+        "wickScale": 0.1666491737863173,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.07999999999999996,
+          "score": 1.0464336345402176
+        },
+        "observed": {
+          "excessKurtosis": 17.29091017184843,
+          "absoluteReturnLag1": 0.25778459719656044,
+          "rangeRatio": 1.1783727211765056
+        }
+      },
+      "US": {
+        "references": [
+          "GS",
+          "SCHW"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.019311890213676023,
+        "marketWeight": 0.6126771954463786,
+        "sectorWeight": 0.2370999765419567,
+        "gapScale": 0.45057665688423787,
+        "intradayFraction": 0.8173833020007611,
+        "wickScale": 0.17601832973790277,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.14,
+          "omega": 0.1299999999999999,
+          "score": 1.1789788743837535
+        },
+        "observed": {
+          "excessKurtosis": 6.329028999621209,
+          "absoluteReturnLag1": 0.20246743937169365,
+          "rangeRatio": 1.2168023246459159
+        }
+      }
+    },
+    "医药与生物": {
+      "CN": {
+        "references": [
+          "600276.SS",
+          "300122.SZ"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.024916952929519717,
+        "marketWeight": 0.46855065843457155,
+        "sectorWeight": 0.26503098921304963,
+        "gapScale": 0.2133349070462341,
+        "intradayFraction": 0.9094168248793564,
+        "wickScale": 0.29158394578148855,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002,
+          "score": 1.1995642196318532
+        },
+        "observed": {
+          "excessKurtosis": 5.956960077297791,
+          "absoluteReturnLag1": 0.15279445111044296,
+          "rangeRatio": 1.330534785364252
+        }
+      },
+      "HK": {
+        "references": [
+          "1177.HK",
+          "2269.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.035760440006794986,
+        "marketWeight": 0.6124385178350644,
+        "sectorWeight": 0.23715546708536797,
+        "gapScale": 0.38191929992685897,
+        "intradayFraction": 0.8791355494721758,
+        "wickScale": 0.2623519095736414,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002,
+          "score": 1.2322085860607561
+        },
+        "observed": {
+          "excessKurtosis": 5.789665271662372,
+          "absoluteReturnLag1": 0.09232148700300444,
+          "rangeRatio": 1.334338845295884
+        }
+      },
+      "US": {
+        "references": [
+          "PFE",
+          "LLY"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.01825681437763948,
+        "marketWeight": 0.31055325408340173,
+        "sectorWeight": 0.2851667948307427,
+        "gapScale": 0.34449124477894394,
+        "intradayFraction": 0.8184345278204163,
+        "wickScale": 0.23098553088963372,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.08,
+          "omega": 0.07999999999999996,
+          "score": 1.2375044285180072
+        },
+        "observed": {
+          "excessKurtosis": 6.132642684436094,
+          "absoluteReturnLag1": 0.09180440680909444,
+          "rangeRatio": 1.2729242228570972
+        }
+      }
+    },
+    "医疗器械与服务": {
+      "CN": {
+        "references": [
+          "300760.SZ",
+          "300015.SZ"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.023387083819328816,
+        "marketWeight": 0.519660236545065,
+        "sectorWeight": 0.2563119027081135,
+        "gapScale": 0.2842262171346882,
+        "intradayFraction": 0.9050032348223105,
+        "wickScale": 0.2621530889376257,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.08,
+          "omega": 0.019999999999999907,
+          "score": 1.0954026574670457
+        },
+        "observed": {
+          "excessKurtosis": 8.198419095817163,
+          "absoluteReturnLag1": 0.2257313997335094,
+          "rangeRatio": 1.3047128074406076
+        }
+      },
+      "HK": {
+        "references": [
+          "1099.HK",
+          "6618.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.029690367425385947,
+        "marketWeight": 0.5849224252784045,
+        "sectorWeight": 0.2433267722150167,
+        "gapScale": 0.37748849507271387,
+        "intradayFraction": 0.9146055141006012,
+        "wickScale": 0.30927741535780373,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002,
+          "score": 1.227302594996892
+        },
+        "observed": {
+          "excessKurtosis": 7.616585406398462,
+          "absoluteReturnLag1": 0.14924565314058325,
+          "rangeRatio": 1.4080904130943002
+        }
+      },
+      "US": {
+        "references": [
+          "ABT",
+          "MDT"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.013961115326990788,
+        "marketWeight": 0.45816298537879163,
+        "sectorWeight": 0.26666046031346935,
+        "gapScale": 0.4372761432139068,
+        "intradayFraction": 0.853182186731565,
+        "wickScale": 0.23915133403861039,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.2941427067770905
+        },
+        "observed": {
+          "excessKurtosis": 3.242769013346671,
+          "absoluteReturnLag1": 0.04825539599799648,
+          "rangeRatio": 1.3138249774259487
+        }
+      }
+    },
+    "食品饮料": {
+      "CN": {
+        "references": [
+          "600519.SS",
+          "600887.SS"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.01558392342899008,
+        "marketWeight": 0.5734769315303545,
+        "sectorWeight": 0.24576651279258455,
+        "gapScale": 0.30299644360929173,
+        "intradayFraction": 0.9010949793466296,
+        "wickScale": 0.25761750093961383,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.08,
+          "omega": 0.019999999999999907,
+          "score": 1.124680646001168
+        },
+        "observed": {
+          "excessKurtosis": 5.856300676107568,
+          "absoluteReturnLag1": 0.12707085565262766,
+          "rangeRatio": 1.3030869345861698
+        }
+      },
+      "HK": {
+        "references": [
+          "2319.HK",
+          "0322.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.02287760877970993,
+        "marketWeight": 0.5242226619674746,
+        "sectorWeight": 0.25547437065423245,
+        "gapScale": 0.43398430813349964,
+        "intradayFraction": 0.9661416295329486,
+        "wickScale": 0.339290860745138,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002,
+          "score": 1.281038760778672
+        },
+        "observed": {
+          "excessKurtosis": 4.928753075731519,
+          "absoluteReturnLag1": 0.1083760105517309,
+          "rangeRatio": 1.4730606696322708
+        }
+      },
+      "US": {
+        "references": [
+          "KO",
+          "PEP"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.010868204071938456,
+        "marketWeight": 0.34616828805556227,
+        "sectorWeight": 0.2814517302683025,
+        "gapScale": 0.4318657199981178,
+        "intradayFraction": 0.9025972114551176,
+        "wickScale": 0.2782899789803976,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.2819050540415382
+        },
+        "observed": {
+          "excessKurtosis": 4.052259479076612,
+          "absoluteReturnLag1": 0.10715638059995662,
+          "rangeRatio": 1.3748236823680715
+        }
+      }
+    },
+    "零售与消费": {
+      "CN": {
+        "references": [
+          "002024.SZ",
+          "600612.SS"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.020053977749647976,
+        "marketWeight": 0.4097949046805247,
+        "sectorWeight": 0.2736533066652204,
+        "gapScale": 0.3044319163479497,
+        "intradayFraction": 0.9048483433232815,
+        "wickScale": 0.2782150864104054,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027,
+          "score": 1.161206373960243
+        },
+        "observed": {
+          "excessKurtosis": 3.423954097593982,
+          "absoluteReturnLag1": 0.24160920572841824,
+          "rangeRatio": 1.3364737131610336
+        }
+      },
+      "HK": {
+        "references": [
+          "2020.HK",
+          "1929.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.027345970670351237,
+        "marketWeight": 0.6604822180373218,
+        "sectorWeight": 0.22525250624373744,
+        "gapScale": 0.36313081013610526,
+        "intradayFraction": 0.8899559473732219,
+        "wickScale": 0.2829006774006552,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.2688951096026753
+        },
+        "observed": {
+          "excessKurtosis": 4.3364039584417835,
+          "absoluteReturnLag1": 0.09157611091597095,
+          "rangeRatio": 1.36158032688188
+        }
+      },
+      "US": {
+        "references": [
+          "COST",
+          "NKE"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.018832386093247066,
+        "marketWeight": 0.5799545649768945,
+        "sectorWeight": 0.24439464648519102,
+        "gapScale": 0.400632224702717,
+        "intradayFraction": 0.7744662311781043,
+        "wickScale": 0.13636015618951616,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.1419224096119176
+        },
+        "observed": {
+          "excessKurtosis": 12.52914644936073,
+          "absoluteReturnLag1": 0.06427327746647443,
+          "rangeRatio": 1.138365917314041
+        }
+      }
+    },
+    "能源与煤炭": {
+      "CN": {
+        "references": [
+          "601857.SS",
+          "601088.SS"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.01870660261854943,
+        "marketWeight": 0.3903301300351629,
+        "sectorWeight": 0.276202489240785,
+        "gapScale": 0.32338880358308325,
+        "intradayFraction": 0.9069884601956318,
+        "wickScale": 0.2690754176296052,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006,
+          "score": 1.1690954675237988
+        },
+        "observed": {
+          "excessKurtosis": 3.4970900988185774,
+          "absoluteReturnLag1": 0.14819688807538983,
+          "rangeRatio": 1.3275373092822933
+        }
+      },
+      "HK": {
+        "references": [
+          "0883.HK",
+          "1088.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.01919794517292355,
+        "marketWeight": 0.4884760962610128,
+        "sectorWeight": 0.2617731829358083,
+        "gapScale": 0.47717560858764346,
+        "intradayFraction": 0.8512869867029143,
+        "wickScale": 0.2875218106031593,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006,
+          "score": 1.2449175097241614
+        },
+        "observed": {
+          "excessKurtosis": 4.8919922893042544,
+          "absoluteReturnLag1": 0.12222552756962193,
+          "rangeRatio": 1.403187579541348
+        }
+      },
+      "US": {
+        "references": [
+          "XOM",
+          "CVX"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.01648376784465814,
+        "marketWeight": 0.37430195973119507,
+        "sectorWeight": 0.2781920629074899,
+        "gapScale": 0.544416000837997,
+        "intradayFraction": 0.8247113813938551,
+        "wickScale": 0.1838908632793349,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.2920819359205837
+        },
+        "observed": {
+          "excessKurtosis": 2.6651052586692905,
+          "absoluteReturnLag1": 0.11655194134484276,
+          "rangeRatio": 1.257550181498335
+        }
+      }
+    },
+    "有色与材料": {
+      "CN": {
+        "references": [
+          "601899.SS",
+          "600309.SS"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.019682792972101584,
+        "marketWeight": 0.53888288538106,
+        "sectorWeight": 0.2527142085952123,
+        "gapScale": 0.397174089470701,
+        "intradayFraction": 0.8654482325005084,
+        "wickScale": 0.274889040960019,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.15000000000000002,
+          "score": 1.3124534956492029
+        },
+        "observed": {
+          "excessKurtosis": 2.655510077180552,
+          "absoluteReturnLag1": 0.060437241609980104,
+          "rangeRatio": 1.3589746923772408
+        }
+      },
+      "HK": {
+        "references": [
+          "0358.HK",
+          "2600.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.027346626873203272,
+        "marketWeight": 0.5998654963459339,
+        "sectorWeight": 0.24003025802266717,
+        "gapScale": 0.3811283695298959,
+        "intradayFraction": 0.8579847230269895,
+        "wickScale": 0.2665966823503897,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.15999999999999992,
+          "score": 1.2844185148939233
+        },
+        "observed": {
+          "excessKurtosis": 3.9469265651567365,
+          "absoluteReturnLag1": 0.08275540703355366,
+          "rangeRatio": 1.3408932026195923
+        }
+      },
+      "US": {
+        "references": [
+          "FCX",
+          "NEM"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.02530076650104443,
+        "marketWeight": 0.40312991849518426,
+        "sectorWeight": 0.27454282761213405,
+        "gapScale": 0.59615934341099,
+        "intradayFraction": 0.7728296398880886,
+        "wickScale": 0.1081534456167697,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999,
+          "score": 1.283136704733296
+        },
+        "observed": {
+          "excessKurtosis": 4.643917456929313,
+          "absoluteReturnLag1": 0.06815008642299131,
+          "rangeRatio": 1.1518933160101286
+        }
+      }
+    },
+    "工业与军工": {
+      "CN": {
+        "references": [
+          "600031.SS",
+          "600893.SS"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.020277289861069428,
+        "marketWeight": 0.5523160885163653,
+        "sectorWeight": 0.2500904325497847,
+        "gapScale": 0.21971894842913323,
+        "intradayFraction": 0.9512250003181562,
+        "wickScale": 0.32723449402347093,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.2633232613328864
+        },
+        "observed": {
+          "excessKurtosis": 2.749127246964875,
+          "absoluteReturnLag1": 0.10274898551942202,
+          "rangeRatio": 1.3894908749662935
+        }
+      },
+      "HK": {
+        "references": [
+          "1766.HK",
+          "2357.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.022986889898596836,
+        "marketWeight": 0.5561877141604292,
+        "sectorWeight": 0.24931700783446303,
+        "gapScale": 0.30060191794836466,
+        "intradayFraction": 0.929809211252893,
+        "wickScale": 0.31643675904101237,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999,
+          "score": 1.2060177334154718
+        },
+        "observed": {
+          "excessKurtosis": 7.577407954991283,
+          "absoluteReturnLag1": 0.24841877067095175,
+          "rangeRatio": 1.3964793898501293
+        }
+      },
+      "US": {
+        "references": [
+          "CAT",
+          "LMT"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.016519681730970195,
+        "marketWeight": 0.3885141841047309,
+        "sectorWeight": 0.27643282291987176,
+        "gapScale": 0.4053077488311799,
+        "intradayFraction": 0.8010560337466281,
+        "wickScale": 0.18981251890895307,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.12,
+          "score": 1.156095091606782
+        },
+        "observed": {
+          "excessKurtosis": 9.037009065190098,
+          "absoluteReturnLag1": 0.1087915035464131,
+          "rangeRatio": 1.225292354903679
+        }
+      }
+    },
+    "地产与基建": {
+      "CN": {
+        "references": [
+          "000002.SZ",
+          "600048.SS"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.02384115626522237,
+        "marketWeight": 0.4896015252506426,
+        "sectorWeight": 0.2615838893787268,
+        "gapScale": 0.283637792633606,
+        "intradayFraction": 0.9063626634328276,
+        "wickScale": 0.3009767146916158,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027,
+          "score": 1.1752625897292885
+        },
+        "observed": {
+          "excessKurtosis": 3.2064313711024504,
+          "absoluteReturnLag1": 0.1778502214016055,
+          "rangeRatio": 1.3666540812966672
+        }
+      },
+      "HK": {
+        "references": [
+          "1109.HK",
+          "0016.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.02079825019755199,
+        "marketWeight": 0.6055105221789034,
+        "sectorWeight": 0.2387511898980963,
+        "gapScale": 0.48312405154883487,
+        "intradayFraction": 0.9072354653129684,
+        "wickScale": 0.31016111889162423,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.2863992846250867
+        },
+        "observed": {
+          "excessKurtosis": 4.408317932324493,
+          "absoluteReturnLag1": 0.06774467967651691,
+          "rangeRatio": 1.4411950056912493
+        }
+      },
+      "US": {
+        "references": [
+          "DHI",
+          "PLD"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.020283597871527587,
+        "marketWeight": 0.5603374952417471,
+        "sectorWeight": 0.24847931549398322,
+        "gapScale": 0.4769749111737352,
+        "intradayFraction": 0.8483846362680965,
+        "wickScale": 0.2022378295537421,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.3061019675970957
+        },
+        "observed": {
+          "excessKurtosis": 3.3557948772622073,
+          "absoluteReturnLag1": 0.12158021060373611,
+          "rangeRatio": 1.266673000638108
+        }
+      }
+    },
+    "公用事业": {
+      "CN": {
+        "references": [
+          "600900.SS",
+          "600025.SS"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.012880887159000622,
+        "marketWeight": 0.30617691577334594,
+        "sectorWeight": 0.28559238901321743,
+        "gapScale": 0.2061076177579964,
+        "intradayFraction": 0.9874535276618326,
+        "wickScale": 0.39130847658732326,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.2072209239127103
+        },
+        "observed": {
+          "excessKurtosis": 3.7130589960944085,
+          "absoluteReturnLag1": 0.14826042336210388,
+          "rangeRatio": 1.4879258478671162
+        }
+      },
+      "HK": {
+        "references": [
+          "0002.HK",
+          "0006.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.010777328498977529,
+        "marketWeight": 0.2909227103727835,
+        "sectorWeight": 0.28702396745401215,
+        "gapScale": 0.3818672299743414,
+        "intradayFraction": 0.9574464726453811,
+        "wickScale": 0.34885716439912295,
+        "gjr": {
+          "alpha": 0.08,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.07000000000000006,
+          "score": 1.2610461271069529
+        },
+        "observed": {
+          "excessKurtosis": 4.532813367217948,
+          "absoluteReturnLag1": 0.1091084557948078,
+          "rangeRatio": 1.4727316320308992
+        }
+      },
+      "US": {
+        "references": [
+          "NEE",
+          "DUK"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.014700021414652108,
+        "marketWeight": 0.31003800380873014,
+        "sectorWeight": 0.2852172492285254,
+        "gapScale": 0.41627027987001874,
+        "intradayFraction": 0.8804398494384694,
+        "wickScale": 0.2710495834142189,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.84,
+          "gamma": 0.08,
+          "omega": 0.07999999999999996,
+          "score": 1.3168451362364682
+        },
+        "observed": {
+          "excessKurtosis": 2.473239050264509,
+          "absoluteReturnLag1": 0.09475582175922714,
+          "rangeRatio": 1.358560417423756
+        }
+      }
+    },
+    "通信与网络": {
+      "CN": {
+        "references": [
+          "600050.SS",
+          "600941.SS"
+        ],
+        "observations": 1875,
+        "dailyVolatility": 0.018282204512547057,
+        "marketWeight": 0.3790998068784902,
+        "sectorWeight": 0.27760673673061725,
+        "gapScale": 0.20239156272231043,
+        "intradayFraction": 0.9756160782033791,
+        "wickScale": 0.2870477065466513,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.84,
+          "gamma": 0.02,
+          "omega": 0.030000000000000027,
+          "score": 1.0366322091417741
+        },
+        "observed": {
+          "excessKurtosis": 5.496112029587323,
+          "absoluteReturnLag1": 0.20123526408241088,
+          "rangeRatio": 1.3199937992913353
+        }
+      },
+      "HK": {
+        "references": [
+          "0941.HK",
+          "0728.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.013597956320328525,
+        "marketWeight": 0.4779511123207737,
+        "sectorWeight": 0.2635159313605539,
+        "gapScale": 0.3658846910301822,
+        "intradayFraction": 0.9500371693837264,
+        "wickScale": 0.41467087959505655,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999,
+          "score": 1.2325543964065053
+        },
+        "observed": {
+          "excessKurtosis": 4.174755460718286,
+          "absoluteReturnLag1": 0.1784594794418456,
+          "rangeRatio": 1.5732388146611451
+        }
+      },
+      "US": {
+        "references": [
+          "VZ",
+          "T"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.014654548639462073,
+        "marketWeight": 0.22816389270112292,
+        "sectorWeight": 0.2920868217261305,
+        "gapScale": 0.33437464988898774,
+        "intradayFraction": 0.828822356473923,
+        "wickScale": 0.21217576050955914,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.08,
+          "omega": 0.15999999999999992,
+          "score": 1.2029379420216013
+        },
+        "observed": {
+          "excessKurtosis": 6.423216776007962,
+          "absoluteReturnLag1": 0.08642222177956987,
+          "rangeRatio": 1.239793611781991
+        }
+      }
+    },
+    "航空航运与物流": {
+      "CN": {
+        "references": [
+          "601111.SS",
+          "002352.SZ"
+        ],
+        "observations": 1936,
+        "dailyVolatility": 0.01969795158784101,
+        "marketWeight": 0.5066238086171502,
+        "sectorWeight": 0.25865016622612635,
+        "gapScale": 0.24438159636664128,
+        "intradayFraction": 0.951110203387677,
+        "wickScale": 0.3517037668522256,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.9,
+          "gamma": 0.02,
+          "omega": 0.04999999999999993,
+          "score": 1.250805362136842
+        },
+        "observed": {
+          "excessKurtosis": 2.757268056339152,
+          "absoluteReturnLag1": 0.0923323497410543,
+          "rangeRatio": 1.4360405058735535
+        }
+      },
+      "HK": {
+        "references": [
+          "0293.HK",
+          "1919.HK"
+        ],
+        "observations": 1952,
+        "dailyVolatility": 0.02085000693797383,
+        "marketWeight": 0.446979810015379,
+        "sectorWeight": 0.26836321366661897,
+        "gapScale": 0.27519482021077013,
+        "intradayFraction": 0.8891166683217824,
+        "wickScale": 0.26172374973438695,
+        "gjr": {
+          "alpha": 0.12,
+          "beta": 0.76,
+          "gamma": 0.02,
+          "omega": 0.10999999999999999,
+          "score": 1.1897362344515072
+        },
+        "observed": {
+          "excessKurtosis": 4.62156850149118,
+          "absoluteReturnLag1": 0.17735103886803866,
+          "rangeRatio": 1.3013164456382502
+        }
+      },
+      "US": {
+        "references": [
+          "DAL",
+          "UPS"
+        ],
+        "observations": 1992,
+        "dailyVolatility": 0.022023925946028935,
+        "marketWeight": 0.5730487540896518,
+        "sectorWeight": 0.24585638346251415,
+        "gapScale": 0.4347220784037375,
+        "intradayFraction": 0.7775583770543336,
+        "wickScale": 0.13664927525401535,
+        "gjr": {
+          "alpha": 0.04,
+          "beta": 0.76,
+          "gamma": 0.14,
+          "omega": 0.1299999999999999,
+          "score": 1.1624273869147912
+        },
+        "observed": {
+          "excessKurtosis": 10.05840114944975,
+          "absoluteReturnLag1": 0.10775787465484993,
+          "rangeRatio": 1.1490554639275459
+        }
+      }
+    }
+  }
+}

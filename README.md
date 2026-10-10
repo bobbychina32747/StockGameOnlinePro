@@ -5,7 +5,33 @@
 [![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial-10b981)](LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/bobbychina32747/StockGameOnlinePro?label=最后提交)](https://github.com/bobbychina32747/StockGameOnlinePro/commits)
 
-> **🟡 BETA 版本** — 核心功能已完成，持续迭代中。行情为模拟数据，不构成任何投资建议。
+## 2.0 重制版公开测试（2026-10-10）
+
+**测试入口：[game.bobbycn.cc/remaster/](https://game.bobbycn.cc/remaster/)**。进入后填写沙盒昵称即可体验。测试资金和股票均为游戏数据，测试账户与旧版玩家资产隔离；旧版入口仍为 [game.bobbycn.cc](https://game.bobbycn.cc/)。沙盒会话有效期为 24 小时，服务重启后需要重新进入。
+
+- 独立 TypeScript 引擎、NestJS HTTP/WebSocket API、SQLite 事务与 React/ECharts 工作台；图表占主区域，导航固定在底部。
+- **23 个行业，每行业 6 支，共 138 支虚构股票**，覆盖 A 股、港股、美股；保留原有 68 支的标识和名称。
+- 用 173,066 条真实日线、15,591 条五分钟线校准行业波动、隔夜跳空和日内形态；新闻时间线含 28 个公告事件。价格模型体现厚尾、波动聚集、行业联动、预期差和消息衰减。
+- 已通过 19 项引擎、事务、新闻时序及 API/Socket 测试，并验证桌面、手机和离线只读布局。完整重制仍有待验收项目，详见 [验收矩阵](docs/REMASTER-ACCEPTANCE-20261010.md)。历史新闻与价格的关联不等于因果证明。
+
+新开发者从 `remaster/` 启动（Node.js 22）：
+
+```bash
+cd remaster
+npm ci
+npm run verify
+npm start
+```
+
+本地访问 `http://127.0.0.1:8320`。详见 [重制版 README](remaster/README.md)、[部署与回退](remaster/deploy/README.md)、[市场真实性报告](docs/MARKET-REALISM-20261010.md)。采集的原始行情、玩家数据库及凭证不包含在仓库中。
+
+---
+
+## 1.x 旧版说明
+
+以下功能和启动方式对应旧版 `backend/`、`frontend/`，不能视为重制版的全部验收结果。
+
+> **🟡 BETA 版本** — 行情为模拟数据，不构成任何投资建议。
 
 一个纯VibeCoding的高仿真度的模拟炒股平台，目标是做出**同花顺级别的交易体验**：真实的行情引擎、宏观因子反馈、板块轮动、新闻驱动、做空/融资、量化 API 一应俱全。
 > 使用Deepseek-v4-pro构建，ReadMe也是ai写的LOL

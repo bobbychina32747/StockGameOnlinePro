@@ -1,0 +1,30 @@
+services:
+  remaster:
+    build:
+      context: ..
+      args:
+        REMASTER_WEB_BASE: /remaster/
+    image: stockgame-remaster:20261010
+    container_name: sgp-remaster-test
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8320:8320"
+    environment:
+      NODE_ENV: test
+      REMASTER_SANDBOX: "true"
+      REMASTER_HOST: 0.0.0.0
+      REMASTER_ALLOWED_ORIGINS: https://game.bobbycn.cc
+      REMASTER_COOKIE_PATH: /remaster/
+      REMASTER_COOKIE_SECURE: "true"
+      REMASTER_TICK_MS: "2000"
+      TZ: Asia/Shanghai
+    volumes:
+      - remaster-test-data:/app/data
+    mem_limit: 1100m
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+volumes:
+  remaster-test-data:

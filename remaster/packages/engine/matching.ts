@@ -23,6 +23,7 @@ export function match(world: World, incoming: Order): void {
       opposing.status='rejected';opposing.error=error.message;continue;
     }
     const buy=buySide(incoming)?incoming:opposing; const sell=buySide(incoming)?opposing:incoming;
+    try {validateFill(world,incoming,opposing.price!,quantity);}catch(error){if(!(error instanceof RuleError))throw error;incoming.status=incoming.filled?'cancelled':'rejected';incoming.error=error.message;break;}
     settleTrade(world,buy,sell,opposing.price!,quantity);
   }
 }
@@ -61,7 +62,8 @@ export function cancelOrder(world: World, owner: string, orderId: string): Order
   order.status='cancelled';return order;
 }
 export function checkPending(world: World, market: 'CN'|'HK'|'US'): void {
-  for(const order of Object.values(world.orders).filter(order=>active(order)&&world.accounts[order.accountId].market===market).sort((left,right)=>left.sequence-right.sequence)) {
+  const phase=world.markets[market].clock.phase;if(!['continuous','post-close'].includes(phase))return;
+  for(const order of Object.values(world.orders).filter(order=>active(order)&&world.accounts[order.accountId].market===market&&order.postClose===(phase==='post-close')).sort((left,right)=>left.sequence-right.sequence)) {
     if(['stop','stop-limit'].includes(order.type)&&!order.triggered) {
       const price=world.quotes[order.symbol].price;
       order.triggered=buySide(order)?price>=order.triggerPrice!:price<=order.triggerPrice!;
@@ -89,5 +91,5 @@ export function runAuction(world: World, symbol: string): number {
   world.quotes[symbol].open=opening;world.quotes[symbol].price=opening;return opening;
 }
 export function cloneWorld(world: World): World {
-  return {...world,random:{...world.random},instruments:{...world.instruments},quotes:Object.fromEntries(Object.entries(world.quotes).map(([symbol,quote])=>[symbol,{...quote,history:[...quote.history],daily:[...quote.daily]}])),markets:structuredClone(world.markets),accounts:structuredClone(world.accounts),orders:structuredClone(world.orders),trades:[...world.trades],ledger:[...world.ledger],events:[...world.events],seasons:structuredClone(world.seasons)};
+  return {...world,random:{...world.random},instruments:{...world.instruments},quotes:Object.fromEntries(Object.entries(world.quotes).map(([symbol,quote])=>[symbol,{...quote,volatilityState:quote.volatilityState?{...quote.volatilityState}:undefined,pendingNews:quote.pendingNews?.map(shock=>({...shock})),history:[...quote.history],daily:[...quote.daily]}])),markets:structuredClone(world.markets),accounts:structuredClone(world.accounts),orders:structuredClone(world.orders),trades:[...world.trades],ledger:[...world.ledger],events:[...world.events],seasons:structuredClone(world.seasons)};
 }

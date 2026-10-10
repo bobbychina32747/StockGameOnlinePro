@@ -3,6 +3,7 @@ import { Account, Instrument, MARKETS, MarketId, Position, RuleError, World } fr
 import { safeAdd } from '../domain/money';
 import { candleTime, nextTradingDate, tradingDate } from './calendar';
 import { normal } from './random';
+import { baselineHistory } from './history';
 export const INITIAL_CASH = 100_000_000;
 export function id(world: World, prefix: string): string { return `${prefix}-${++world.nextId}`; }
 export function accountId(owner: string, market: MarketId): string { return `${owner}:${market}`; }
@@ -78,17 +79,8 @@ export function basketValue(world: World, market: MarketId): number {
 }
 function initializeHistory(world: World): void {
   for(const instrument of Object.values(world.instruments)) {
-    const quote=world.quotes[instrument.symbol]; let price=instrument.initialPrice;
-    let date=instrument.listedAt || '2020-01-01';
-    if(!tradingDate(instrument.market,date)) date=nextTradingDate(instrument.market,date);
-    const end=world.markets[instrument.market].clock.date;
-    let historyDay=-10000;
-    while(date<end) {
-      const open=price;price=Math.max(100,Math.round(price*(1+normal(world,`history:${instrument.symbol}`)*0.008)));
-      const candle={time:Date.parse(date+'T12:00:00Z'),day:historyDay++,open,high:Math.max(open,price)+Math.round(price*0.003),low:Math.min(open,price)-Math.round(price*0.003),close:price,volume:10000};
-      quote.daily.push(candle);date=nextTradingDate(instrument.market,date);
-    }
-    const ratio=instrument.initialPrice/price;
-    quote.daily=quote.daily.map(candle=>({...candle,open:Math.round(candle.open*ratio),high:Math.round(candle.high*ratio),low:Math.max(1,Math.round(candle.low*ratio)),close:Math.round(candle.close*ratio)}));
+    const quote=world.quotes[instrument.symbol];
+    const recent=new Date(Date.parse(world.markets[instrument.market].clock.date+'T00:00:00Z')-300*86400000).toISOString().slice(0,10);
+    quote.daily=baselineHistory(instrument,world.seed,world.markets[instrument.market].clock.date,recent);
   }
 }
