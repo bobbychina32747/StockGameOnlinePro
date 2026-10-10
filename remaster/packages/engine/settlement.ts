@@ -2,8 +2,9 @@ import { Account, Order, Position, RuleError, Side, World } from '../domain/type
 import { fees, multiply } from '../domain/money';
 import { equity, id, longQuantity, position, postCash, sellable, system } from './world';
 import { candleTime } from './calendar';
+import { accountOrders, symbolOrders } from './order-index';
 export function reservedCash(world: World, accountState: Account, exceptId?: string): number {
-  return Object.values(world.orders).filter(order=>order.accountId===accountState.id && order.id!==exceptId && ['pending','partial'].includes(order.status)).reduce((sum,order)=>{
+  return accountOrders(world,accountState.id).filter(order=>order.id!==exceptId && ['pending','partial'].includes(order.status)).reduce((sum,order)=>{
     const price=order.price??order.triggerPrice??world.quotes[order.symbol].price;
     const turnover=price*order.remaining;
     if(order.side==='buy') return sum+Math.ceil(turnover/accountState.leverage)+fees(accountState.market,order.side,turnover);
@@ -13,7 +14,7 @@ export function reservedCash(world: World, accountState: Account, exceptId?: str
   },0);
 }
 export function reservedQuantity(world: World, accountState: Account, symbol: string, side: Side, exceptId?: string): number {
-  return Object.values(world.orders).filter(order=>order.accountId===accountState.id && order.id!==exceptId && order.symbol===symbol && order.side===side && ['pending','partial'].includes(order.status)).reduce((sum,order)=>sum+order.remaining,0);
+  return symbolOrders(world,symbol).filter(order=>order.accountId===accountState.id && order.id!==exceptId && order.side===side && ['pending','partial'].includes(order.status)).reduce((sum,order)=>sum+order.remaining,0);
 }
 export function validateFill(world: World, order: Order, price: number, quantity: number): void {
   const accountState=world.accounts[order.accountId];

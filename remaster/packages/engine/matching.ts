@@ -2,11 +2,12 @@ import { integer } from '../domain/money';
 import { Order, OrderInput, RuleError, World } from '../domain/types';
 import { account, id } from './world';
 import { settleTrade, validateFill } from './settlement';
+import { symbolOrders, registerOrder } from './order-index';
 const buySide=(order:Order)=>order.side==='buy'||order.side==='cover';
 export function active(order: Order): boolean { return order.status==='pending'||order.status==='partial'; }
 export function tradable(order: Order): boolean { return active(order) && (order.triggered || !['stop','stop-limit'].includes(order.type)); }
 export function candidates(world: World, incoming: Order): Order[] {
-  return Object.values(world.orders).filter(resting=>resting.symbol===incoming.symbol && tradable(resting) && resting.id!==incoming.id && resting.accountId!==incoming.accountId && buySide(resting)!==buySide(incoming) && resting.price!==undefined && resting.postClose===incoming.postClose).sort((left,right)=>(buySide(incoming)?left.price!-right.price!:right.price!-left.price!)||left.sequence-right.sequence);
+  return symbolOrders(world,incoming.symbol).filter(resting=>tradable(resting) && resting.id!==incoming.id && resting.accountId!==incoming.accountId && buySide(resting)!==buySide(incoming) && resting.price!==undefined && resting.postClose===incoming.postClose).sort((left,right)=>(buySide(incoming)?left.price!-right.price!:right.price!-left.price!)||left.sequence-right.sequence);
 }
 function executable(incoming: Order, resting: Order): boolean {
   if(incoming.price===undefined || (incoming.type==='stop' && incoming.triggered)) return true;
@@ -45,7 +46,7 @@ export function placeOrder(world: World, owner: string, market: 'CN'|'HK'|'US', 
   const order:Order={id:id(world,'order'),commandId,accountId:accountState.id,symbol:input.symbol,side:input.side,type:input.type,quantity:input.quantity,remaining:input.quantity,filled:0,averagePrice:0,price:input.price,triggerPrice:input.triggerPrice,displayQuantity:input.displayQuantity,visible:input.type==='iceberg'?input.displayQuantity!:input.quantity,sequence:++world.sequence,createdDay:state.clock.day,status:'pending',triggered:false,postClose};
   const estimated=quote.price;
   validateFill(world,order,needsLimit?input.price!:estimated,input.quantity);
-  world.orders[order.id]=order;
+  world.orders[order.id]=order;registerOrder(world,order);
   if(state.clock.phase.startsWith('auction') || ['stop','stop-limit'].includes(input.type)) return order;
   if(input.type==='fok') {
     const copy=cloneWorld(world);const probe=copy.orders[order.id];match(copy,probe);
@@ -74,7 +75,7 @@ export function checkPending(world: World, market: 'CN'|'HK'|'US'): void {
   }
 }
 export function runAuction(world: World, symbol: string): number {
-  const orders=Object.values(world.orders).filter(order=>order.symbol===symbol&&active(order)&&order.price!==undefined&&!order.postClose);
+  const orders=symbolOrders(world,symbol).filter(order=>active(order)&&order.price!==undefined&&!order.postClose);
   const previous=world.quotes[symbol].previousClose;let opening=previous;let bestVolume=-1;
   for(const price of [...new Set(orders.map(order=>order.price!))]) {
     const buys=orders.filter(order=>buySide(order)&&order.price!>=price).reduce((sum,order)=>sum+order.remaining,0);

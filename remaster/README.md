@@ -6,7 +6,7 @@
 
 公开测试：[https://game.bobbycn.cc/remaster/](https://game.bobbycn.cc/remaster/)。使用站点登录并选择区服，首次进入明确创建角色；重新登录恢复同一角色。测试资金与旧站玩家资产隔离。部署和回退见 [deploy/README.md](deploy/README.md)。
 
-全新检出使用 Node.js 22，在本目录执行 `npm ci`、`npm run verify`、`npm start`。依赖锁文件已纳入仓库，自动检查覆盖独立安装、构建、前端类型与 23 项测试。
+全新检出使用 Node.js 22，在本目录执行 `npm ci`、`npm run verify`、`npm start`。依赖锁文件已纳入仓库，自动检查覆盖独立安装、构建、前端类型与 24 项测试。
 
 已使用本机 Node 24 和现有项目依赖验证，无需为本次变更重新安装依赖。在本目录执行：
 
