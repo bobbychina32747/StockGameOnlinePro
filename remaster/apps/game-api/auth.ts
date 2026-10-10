@@ -1,22 +1,31 @@
 import { createPublicKey, randomBytes, verify } from 'node:crypto';
 import { UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
-export interface Principal {owner:string;name:string;token?:string;mode:'sandbox'|'site'}
+import { MarketId, MARKETS } from '../../packages/domain/types';
+export interface Principal {owner:string;name:string;market:MarketId;token?:string;mode:'sandbox'|'site'}
 export interface AuthConfig {sandbox:boolean;identityBaseUrl:string;origin:string;allowedOrigins:string[]}
 export class AuthBridge {
   private demos=new Map<string,{principal:Principal;expires:number}>();
+  private siteSessions=new Map<string,{principal:Principal;siteToken:string}>();
   constructor(readonly config:AuthConfig) {}
   assertOrigin(origin?: string): void {if(origin&&!this.config.allowedOrigins.includes(origin)) throw new UnauthorizedException('请求来源不受信任');}
-  createDemo(name: string): {token:string;principal:Principal} {
+  createDemo(name: string,market:MarketId='CN'): {token:string;principal:Principal} {
     if(!this.config.sandbox) throw new UnauthorizedException('当前环境未开放沙盒账号');
     if(typeof name!=='string'||name.length<1||name.length>40) throw new UnauthorizedException('演示名称无效');
-    const token=randomBytes(32).toString('base64url');const principal:Principal={owner:'demo:'+randomBytes(12).toString('hex'),name,mode:'sandbox'};
+    if(!MARKETS.includes(market)) throw new UnauthorizedException('请选择有效区服');
+    const token=randomBytes(32).toString('base64url');const principal:Principal={owner:'demo:'+randomBytes(12).toString('hex'),name,market,mode:'sandbox'};
     this.demos.set(token,{principal,expires:Date.now()+86400000});return {token,principal};
   }
   async authenticate(token: string): Promise<Principal> {
     if(!token||token.length>8192) throw new UnauthorizedException('请先登录');
     if(this.config.sandbox) {const demo=this.demos.get(token);if(demo&&demo.expires>Date.now()) return demo.principal;throw new UnauthorizedException('沙盒会话已失效');}
-    const claims=await this.verifySiteToken(token);
-    return {owner:'site:'+claims.sub,name:'站点玩家',token,mode:'site'};
+    const session=this.siteSessions.get(token);if(!session) throw new UnauthorizedException('请重新选择区服角色登录');
+    await this.verifySiteToken(session.siteToken);return session.principal;
+  }
+  async createSiteSession(siteToken:string,market:MarketId,name:string):Promise<{token:string;principal:Principal}> {
+    if(!MARKETS.includes(market)) throw new UnauthorizedException('请选择有效区服');
+    const claims=await this.verifySiteToken(siteToken);const token=randomBytes(32).toString('base64url');
+    const principal:Principal={owner:`site:${claims.sub}:${market}`,name,market,mode:'site'};
+    this.siteSessions.set(token,{principal,siteToken});return {token,principal};
   }
   async verifySiteToken(token: string): Promise<Record<string,any>> {
     try {
@@ -37,9 +46,10 @@ export class AuthBridge {
       return await response.json();
     } catch(error) {if(error instanceof UnauthorizedException||error instanceof ServiceUnavailableException) throw error;throw new ServiceUnavailableException('无法连接站点身份服务');}
   }
-  revoke(token: string): void {this.demos.delete(token);}
+  revoke(token: string): void {this.demos.delete(token);this.siteSessions.delete(token);}
 }
 export function tokenFrom(request: {headers:Record<string,any>}): string {
   const bearer=String(request.headers.authorization??'');if(bearer.startsWith('Bearer ')) return bearer.slice(7);
-  const cookie=String(request.headers.cookie??'').split(';').map(item=>item.trim()).find(item=>item.startsWith('rgp-demo='));return cookie?decodeURIComponent(cookie.slice(9)):'';
+  const realm=String(request.headers['x-game-realm']??'CN');const name=['CN','HK','US'].includes(realm)?'rgp-role-'+realm:'rgp-demo';
+  const cookies=String(request.headers.cookie??'').split(';').map(item=>item.trim());const cookie=cookies.find(item=>item.startsWith(name+'='))??cookies.find(item=>item.startsWith('rgp-demo='));return cookie?decodeURIComponent(cookie.slice(cookie.indexOf('=')+1)):'';
 }

@@ -53,7 +53,7 @@ export function recordCandles(world: World, market: MarketId, startVolumes: Reco
     const existing=quote.history.at(-1);
     if(existing?.time===time) quote.history[quote.history.length-1]={...existing,high:Math.max(existing.high,candle.high),low:Math.min(existing.low,candle.low),close:candle.close,volume:existing.volume+candle.volume};
     else quote.history.push(candle);
-    if(quote.history.length>10000) quote.history=quote.history.slice(-10000);
+    if(quote.history.length>120) quote.history=quote.history.slice(-120);
   }
 }
 export function settleDay(world: World, market: MarketId): void {

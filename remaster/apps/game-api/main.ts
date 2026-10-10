@@ -9,7 +9,7 @@ import { GameService } from './service';
 import { AuthBridge, tokenFrom } from './auth';
 import { GameController } from './controller';
 import { snapshot } from './read-model';
-export async function createApplication(options:{port?:number;database?:string;sandbox?:boolean;tickMs?:number;identityBaseUrl?:string;allowedOrigins?:string[]}={}) {
+export async function createApplication(options:{port?:number;database?:string;sandbox?:boolean;authSandbox?:boolean;tickMs?:number;identityBaseUrl?:string;allowedOrigins?:string[]}={}) {
   const sandbox=options.sandbox??process.env.REMASTER_SANDBOX!=='false';
   if(sandbox&&process.env.NODE_ENV==='production') throw new Error('Sandbox accounts are disabled in production');
   const root=resolve(__dirname,'../../..');const dataRoot=resolve(root,'data');mkdirSync(dataRoot,{recursive:true});
@@ -18,18 +18,19 @@ export async function createApplication(options:{port?:number;database?:string;s
   const repository=new WorldRepository(filename);const game=new GameService(repository,20261010,sandbox?'sandbox':'real');
   const port=options.port??Number(process.env.REMASTER_PORT??8320);const origins=options.allowedOrigins??(process.env.REMASTER_ALLOWED_ORIGINS?.split(',').map(value=>value.trim()).filter(Boolean)??[`http://127.0.0.1:${port}`,`http://localhost:${port}`,'http://127.0.0.1:3320','http://localhost:3320']);
   if(origins.some(origin=>new URL(origin).origin!==origin)) throw new Error('Allowed origins must be exact HTTP(S) origins');
-  const auth=new AuthBridge({sandbox,identityBaseUrl:options.identityBaseUrl??process.env.REMASTER_IDENTITY_URL??'http://127.0.0.1:8000',origin:process.env.REMASTER_SITE_ORIGIN??'https://game.bobbycn.cc',allowedOrigins:origins});
+  const authSandbox=options.authSandbox??(process.env.REMASTER_AUTH_MODE==='site'?false:sandbox);
+  const auth=new AuthBridge({sandbox:authSandbox,identityBaseUrl:options.identityBaseUrl??process.env.REMASTER_IDENTITY_URL??'http://127.0.0.1:8000',origin:process.env.REMASTER_SITE_ORIGIN??'https://game.bobbycn.cc',allowedOrigins:origins});
   @Module({controllers:[GameController],providers:[{provide:'GAME',useValue:game},{provide:'AUTH',useValue:auth}]}) class GameApiModule {}
   const app=await NestFactory.create(GameApiModule,{logger:['error','warn']});app.setGlobalPrefix('api');
-  app.enableCors({origin:origins,credentials:true,allowedHeaders:['Content-Type','Authorization','Idempotency-Key']});
+  app.enableCors({origin:origins,credentials:true,allowedHeaders:['Content-Type','Authorization','Idempotency-Key','X-Game-Realm']});
   app.use((request:any,response:any,next:()=>void)=>{response.setHeader('X-Content-Type-Options','nosniff');response.setHeader('Referrer-Policy','same-origin');response.setHeader('Cache-Control','no-store');next();});
   const express=require('express');app.use('/api',express.json({limit:'64kb'}));
   const staticDirectory=resolve(root,'apps/web/dist');app.use(express.static(staticDirectory));
   const socketServer=new Server(app.getHttpServer(),{path:'/socket.io',cors:{origin:origins,credentials:true},maxHttpBufferSize:100000});const namespace=socketServer.of('/v2');
-  namespace.use(async(socket,next)=>{try {auth.assertOrigin(socket.handshake.headers.origin);const token=socket.handshake.auth?.token||tokenFrom({headers:socket.handshake.headers});socket.data.principal=await auth.authenticate(token);socket.data.token=token;next();} catch {next(new Error('未登录或会话已失效'));}});
-  namespace.on('connection',socket=>{socket.emit('snapshot',snapshot(game.world,socket.data.principal.owner));});
+  namespace.use(async(socket,next)=>{try {auth.assertOrigin(socket.handshake.headers.origin);const token=socket.handshake.auth?.token||tokenFrom({headers:{...socket.handshake.headers,'x-game-realm':socket.handshake.auth?.market??'CN'}});socket.data.principal=await auth.authenticate(token);socket.data.token=token;next();} catch {next(new Error('未登录或会话已失效'));}});
+  namespace.on('connection',socket=>{socket.emit('snapshot',snapshot(game.world,socket.data.principal.owner,socket.data.principal.market));});
   let publishing=false;
-  game.onCommitted=()=>{if(publishing) return;publishing=true;void (async()=>{try {for(const socket of namespace.sockets.values()) {try {const principal=await auth.authenticate(socket.data.token);socket.emit('snapshot',snapshot(game.world,principal.owner));} catch {socket.emit('session-expired');socket.disconnect(true);}}repository.markDelivered(game.world.version);} finally {publishing=false;}})();};
+  game.onCommitted=()=>{if(publishing) return;publishing=true;void (async()=>{try {for(const socket of namespace.sockets.values()) {try {const principal=await auth.authenticate(socket.data.token);socket.emit('snapshot',snapshot(game.world,principal.owner,principal.market));} catch {socket.emit('session-expired');socket.disconnect(true);}}repository.markDelivered(game.world.version);} finally {publishing=false;}})();};
   let closing=false;let timer:ReturnType<typeof setTimeout>|undefined;let tickIndex=0;
   const tickMs=options.tickMs??Number(process.env.REMASTER_TICK_MS??(sandbox?2000:10000));
   if(!Number.isFinite(tickMs)||tickMs<100||tickMs>60000) throw new Error('Invalid tick interval');

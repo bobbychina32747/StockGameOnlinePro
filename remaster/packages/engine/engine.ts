@@ -21,8 +21,9 @@ function apply(world: World, command: GameCommand, commandId: string): Partial<C
   switch(command.kind) {
     case 'create-player': {
       if(!/^[\w:@.-]{1,120}$/.test(command.owner)||typeof command.name!=='string'||command.name.length<1||command.name.length>50) throw new RuleError('INVALID_IDENTITY','玩家身份无效');
-      for(const market of MARKETS) if(!world.accounts[accountId(command.owner,market)]) addAccount(world,command.owner,command.name,market,'player',INITIAL_CASH);
-      return {data:MARKETS.map(market=>account(world,command.owner,market).id)};
+      const markets=command.market?[command.market]:MARKETS;
+      for(const market of markets) if(!world.accounts[accountId(command.owner,market)]) addAccount(world,command.owner,command.name,market,'player',INITIAL_CASH);
+      return {data:markets.map(market=>account(world,command.owner,market).id)};
     }
     case 'order': return {order:placeOrder(world,command.owner,command.market,command.input,commandId)};
     case 'cancel': return {order:cancelOrder(world,command.owner,command.orderId)};

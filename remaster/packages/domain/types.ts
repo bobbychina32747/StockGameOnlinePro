@@ -54,7 +54,7 @@ export interface OrderInput {
   symbol: string; side: Side; type: OrderType; quantity: number; price?: number; triggerPrice?: number; displayQuantity?: number;
 }
 export type GameCommand =
-  | { kind: 'create-player'; owner: string; name: string }
+  | { kind: 'create-player'; owner: string; name: string; market?: MarketId }
   | { kind: 'order'; owner: string; market: MarketId; input: OrderInput }
   | { kind: 'cancel'; owner: string; orderId: string }
   | { kind: 'transfer'; owner: string; from: MarketId; to: MarketId; amount: number }

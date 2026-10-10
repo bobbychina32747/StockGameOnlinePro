@@ -10,12 +10,12 @@ const {snapshot}=require('../dist/apps/game-api/read-model');
 const {openDay}=require('../dist/packages/engine/economy');
 const {metrics,median}=require('../tooling/research-statistics.cjs');
 
-test('23 sectors contain six distinct stocks, all markets and preserved original identities',()=>{
- assert.equal(catalog.length,138);assert.equal(new Set(catalog.map(stock=>stock.symbol)).size,138);
+test('each realm contains 23 sectors of six stocks, with distinct regional names and calibrated risks',()=>{
+ assert.equal(catalog.length,414);assert.equal(new Set(catalog.map(stock=>stock.symbol)).size,414);
  const industries=[...new Set(catalog.map(stock=>stock.industry))];assert.equal(industries.length,23);
- for(const industry of industries){const stocks=catalog.filter(stock=>stock.industry===industry);assert.equal(stocks.length,6);assert.equal(new Set(stocks.map(stock=>stock.market)).size,3);assert(new Set(stocks.map(stock=>stock.volatility)).size>=3);}
+ for(const industry of industries){const stocks=catalog.filter(stock=>stock.industry===industry);assert.equal(stocks.length,18);for(const market of ['CN','HK','US'])assert.equal(stocks.filter(item=>item.market===market).length,6);assert.equal(new Set(stocks.map(stock=>stock.market)).size,3);assert(new Set(stocks.map(stock=>stock.volatility)).size>=3);}
  assert.equal(catalog.find(stock=>stock.symbol==='T1').name,'芯澜半导体');assert.equal(catalog.find(stock=>stock.symbol==='H1').name,'云顶网络');
- assert.equal(catalog.filter(stock=>/^NX/.test(stock.symbol)).length,70);
+ assert.equal(catalog.filter(stock=>/^NX/.test(stock.symbol)).length,70);for(const market of ['CN','HK','US'])assert.equal(catalog.filter(stock=>stock.market===market).length,138);assert(catalog.filter(stock=>stock.market==='US').every(stock=>/^[A-Za-z ]+$/.test(stock.name)));
  assert.equal(calibration.trainingCutoffExclusive,'2025-10-01');
  assert(calibration.profiles['半导体'].CN.dailyVolatility>calibration.profiles['银行'].CN.dailyVolatility);
 });

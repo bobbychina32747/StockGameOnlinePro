@@ -19,7 +19,7 @@ test('catalog, calendars and cross-midnight US session use authoritative timezon
 test('same seed and commands produce identical world hashes',()=>{
  const initial=fixture();const first=transition(initial,{kind:'tick',market:'US'},'tick-00001').world;
  const second=transition(cloneWorld(initial),{kind:'tick',market:'US'},'tick-00001').world;
- assert.equal(digest(first),digest(second));assert.equal(Object.keys(first.instruments).length,138);
+ assert.equal(digest(first),digest(second));assert.equal(Object.keys(first.instruments).length,414);
 });
 test('a real two-sided trade preserves cash and stock quantity and records volume once',()=>{
  const world=fixture();const symbol=Object.values(world.instruments).find(stock=>stock.market==='US').symbol;
@@ -58,7 +58,7 @@ test('market order command retry is persisted once, and different payload confli
  await assert.rejects(()=>service.execute({...command,input:{...command.input,quantity:11}},'same-market-key'),/不同请求/);repository.close();
 });
 test('fault at every transaction stage rolls back both assets and command; retry executes once',async()=>{
- for(const point of ['command','world','orders','trades','ledger','outbox']) {
+ for(const point of ['command','candles','world','orders','trades','ledger','outbox']) {
   const repository=new WorldRepository(':memory:');const service=new GameService(repository,123);await service.execute({kind:'create-player',owner:'test-player',name:'测试玩家'},'create-player');
   refreshLiquidity(service.world,'US');repository.db.prepare('UPDATE world SET state=? WHERE id=1').run(JSON.stringify(service.world));
   const snapshot=digest(service.world);repository.failAt=point;

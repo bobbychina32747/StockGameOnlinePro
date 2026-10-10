@@ -32,7 +32,7 @@ export function generateHistory(instrument:Instrument,seed:number,endDate='2026-
     const normalization=Math.log(instrument.initialPrice)-(raw.at(-1)?.close??0);
     const price=(value:number)=>Math.max(1,Math.round(Math.exp(value+normalization)));
     complete=raw.map(bar=>({time:Date.parse(bar.date+'T12:00:00Z'),day:-Math.round((Date.parse(endDate)-Date.parse(bar.date))/86400000),open:price(bar.open),high:price(bar.high),low:price(bar.low),close:price(bar.close),volume:bar.volume}));
-    memo.set(cacheKey,complete);if(memo.size>256)memo.delete(memo.keys().next().value!);
+    memo.set(cacheKey,complete);if(memo.size>1024)memo.delete(memo.keys().next().value!);
   }
   return complete.filter(bar=>bar.time>=Date.parse(startDate+'T00:00:00Z')).map(bar=>({...bar}));
 }

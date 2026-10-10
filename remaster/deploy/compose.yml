@@ -12,6 +12,8 @@ services:
     environment:
       NODE_ENV: test
       REMASTER_SANDBOX: "true"
+      REMASTER_AUTH_MODE: site
+      REMASTER_IDENTITY_URL: http://sgp-backend:8000
       REMASTER_HOST: 0.0.0.0
       REMASTER_ALLOWED_ORIGINS: https://game.bobbycn.cc
       REMASTER_COOKIE_PATH: /remaster/
@@ -20,6 +22,9 @@ services:
       TZ: Asia/Shanghai
     volumes:
       - remaster-test-data:/app/data
+    networks:
+      - default
+      - site-identity
     mem_limit: 1100m
     logging:
       driver: json-file
@@ -28,3 +33,7 @@ services:
         max-file: "2"
 volumes:
   remaster-test-data:
+networks:
+  site-identity:
+    external: true
+    name: docker_default

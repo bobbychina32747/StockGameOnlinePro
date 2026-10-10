@@ -15,3 +15,38 @@
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}:root[data-motion=reduced] *{scroll-behavior:auto!important;animation:none!important;transition:none!important}
 
 .sector-filter{display:block;padding:0 12px 10px}.sector-filter select{width:100%;font-size:11px;padding:8px;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--text)}
+
+/* The app owns the viewport. Lists and drawers own their scrolling. */
+html,body,#root{height:100%;overflow:hidden;overscroll-behavior:none}
+.app-shell{height:100dvh;min-height:0;padding-bottom:64px;overflow:hidden}
+.app-main{height:100%;overflow:auto;overscroll-behavior:contain}
+.page-trade .app-main{display:flex;flex-direction:column;overflow:hidden}
+.page-trade .topbar,.page-trade .sandbox-bar,.page-trade .market-bar,.page-trade .stale-banner{flex-shrink:0}
+.page-trade .content{flex:1;min-height:0;display:flex;flex-direction:column}
+.page-trade .account-summary{flex-shrink:0}
+.page-trade .events-strip,.page-trade .app-footer{display:none}
+.trade-content{flex:1;min-height:0;display:flex;padding-bottom:8px}
+.trade-layout{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0}
+.trading-grid{flex:1;min-height:0}
+.instrument-workspace{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.instrument-heading,.quote-strip,.instrument-meta,.chart-tools{flex-shrink:0}
+.chart-panel{flex:1;min-height:0;display:flex;flex-direction:column}
+.chart-canvas{flex:1;height:0!important;min-height:0!important;max-height:none!important}
+.watch-panel,.ticket-panel{min-height:0;overflow:hidden}
+.watch-list{max-height:none}
+.ticket-panel{overflow:auto;overscroll-behavior:contain}
+.company-details{position:absolute;inset:20% 8% 10%;z-index:35;overflow:auto;background:var(--panel);border:1px solid var(--line);box-shadow:0 12px 40px #0008}
+.company-details dl{flex-wrap:wrap}
+.blotter{height:clamp(110px,17vh,160px);flex-shrink:0;display:flex;flex-direction:column;min-height:0}
+.blotter .panel-body{flex:1;min-height:0;overflow:hidden}
+.blotter .table-scroll{height:100%;overscroll-behavior:contain}
+.login-screen{height:100dvh;min-height:0;overflow:auto}
+@media(max-width:768px){
+ .app-shell{padding-bottom:62px}.trading-grid{display:flex;flex-direction:column}.instrument-workspace{flex:1}
+ .blotter{display:none}.blotter.mobile-open{display:flex;position:fixed;inset:15% 8px 110px;height:auto;z-index:56;box-shadow:0 0 0 100vh #0009}
+ .mobile-trade-bar{position:static;flex-shrink:0;margin-top:6px;padding:6px;gap:6px}
+ .mobile-trade-bar>span{display:none}.mobile-trade-bar button{flex:1;padding:6px 10px}
+ .instrument-meta{padding:3px 12px}.company-details{inset:20% 10px 120px}
+}
+.realm-selector{margin-top:20px}.realm-selector small{line-height:1.6}.realm-badge{display:flex;align-items:center;gap:12px;font-size:11px}.realm-badge span{font-size:10px;color:var(--muted)}
+@media(max-width:768px){.realm-badge{flex:1;min-height:34px;gap:8px}.realm-badge span{font-size:9px}.page-trade .sandbox-bar{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}

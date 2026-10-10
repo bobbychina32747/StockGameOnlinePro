@@ -1,7 +1,9 @@
 import { CommandResult, GameCommand, RuleError, World } from '../../packages/domain/types';
 import { transition } from '../../packages/engine/engine';
 import { createWorld } from '../../packages/engine/world';
-import { WorldRepository } from './repository';
+import { WorldRepository, digest } from './repository';
+import catalog from '../../packages/domain/catalog.json';
+import { cloneWorld } from '../../packages/engine/matching';
 export class GameService {
   world: World;
   healthy=true;
@@ -14,6 +16,22 @@ export class GameService {
   constructor(readonly repository: WorldRepository, seed=20261010, mode: World['mode']='sandbox') {
     this.world=repository.load()??createWorld(seed,mode);repository.initialize(this.world);
     if(this.world.mode!==mode) throw new Error('Persisted world mode differs from configured mode');
+    if(catalog.instruments.some(item=>!this.world.instruments[item.symbol]||this.world.instruments[item.symbol].name!==item.name)) {
+      const previous=this.world;const next=JSON.parse(JSON.stringify(previous)) as World;const fresh=createWorld(seed,mode);
+      for(const raw of catalog.instruments) {const item=fresh.instruments[raw.symbol];
+        if(!next.instruments[item.symbol]) {
+          next.quotes[item.symbol]=fresh.quotes[item.symbol];
+          next.accounts[`maker-${item.market}:${item.market}`].positions[item.symbol]=fresh.accounts[`maker-${item.market}:${item.market}`].positions[item.symbol];
+        }
+        next.instruments[item.symbol]=fresh.instruments[item.symbol];next.markets[item.market].sectors[item.industry]??=fresh.markets[item.market].sectors[item.industry];
+      }
+      for(const market of ['CN','HK','US']as const)next.markets[market].fundNav.basket=Object.values(next.instruments).filter(i=>i.market===market).reduce((sum,i)=>sum+next.quotes[i.symbol].price/i.initialPrice,0)/Object.values(next.instruments).filter(i=>i.market===market).length;
+      next.version++;next.sequence++;this.repository.commit(previous,next,'$migration','realm-catalog-v3:'+digest(catalog.instruments),{kind:'tick'},{success:true,version:next.version});this.world=next;
+    }
+    if(Object.values(this.world.quotes).some(quote=>quote.history.length>120)) {
+      const previous=this.world;const next=cloneWorld(previous);for(const quote of Object.values(next.quotes))quote.history=quote.history.slice(-120);
+      next.version++;next.sequence++;repository.commit(previous,next,'$migration','minute-history-hot-v1:'+previous.version,{kind:'tick'},{success:true,version:next.version});this.world=next;
+    }
   }
   execute(command: GameCommand, key: string, expectedGeneration=this.generation): Promise<CommandResult> {
     this.queueLength++;

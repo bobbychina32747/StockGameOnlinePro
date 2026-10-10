@@ -18,6 +18,7 @@ export class WorldRepository {
       CREATE TABLE IF NOT EXISTS ledger(id TEXT PRIMARY KEY,account_id TEXT NOT NULL,reference TEXT NOT NULL,payload TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS ledger_account ON ledger(account_id);
       CREATE TABLE IF NOT EXISTS outbox(version INTEGER PRIMARY KEY,payload TEXT NOT NULL,delivered INTEGER NOT NULL DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS minute_candles(symbol TEXT NOT NULL,time INTEGER NOT NULL,payload TEXT NOT NULL,PRIMARY KEY(symbol,time));
     `);
     if(this.db.prepare('SELECT version FROM schema_info').get()?.version!==2) throw new Error('Unsupported remaster schema');
   }
@@ -33,6 +34,14 @@ export class WorldRepository {
       if(version!==previous.version) throw new Error('Writer fencing: world version changed');
       this.db.prepare('INSERT INTO commands(scope,key,hash,result) VALUES(?,?,?,?)').run(scope,key,digest(command),JSON.stringify(result));this.inject('command');
       if(world.version===previous.version) return;
+      const candleWrite=this.db.prepare('INSERT INTO minute_candles(symbol,time,payload) VALUES(?,?,?) ON CONFLICT(symbol,time) DO UPDATE SET payload=excluded.payload');
+      for(const [symbol,quote] of Object.entries(world.quotes)) {
+        const before=previous.quotes[symbol]?.history??[];
+        if(before.length>120)for(const bar of before)candleWrite.run(symbol,bar.time,JSON.stringify(bar));
+        const since=before.at(-1)?.time??0;
+        for(const bar of quote.history)if(bar.time>=since)candleWrite.run(symbol,bar.time,JSON.stringify(bar));
+      }
+      this.inject('candles');
       this.db.prepare('UPDATE world SET version=?,state=? WHERE id=1 AND version=?').run(world.version,JSON.stringify(world),previous.version);this.inject('world');
       const orderWrite=this.db.prepare('INSERT INTO orders(id,account_id,status,payload) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,payload=excluded.payload');
       for(const order of Object.values(world.orders)) {
@@ -49,6 +58,7 @@ export class WorldRepository {
     })();
   }
   private inject(point: string): void { if(this.failAt===point) throw new Error(`Injected storage failure: ${point}`); }
+  candles(symbol:string):import('../../packages/domain/types').Candle[] {return this.db.prepare('SELECT payload FROM minute_candles WHERE symbol=? ORDER BY time DESC LIMIT 10000').all(symbol).reverse().map((row:any)=>JSON.parse(row.payload));}
   history(table: 'orders'|'trades'|'ledger', accountId: string): unknown[] {
     const query=table==='trades'?'SELECT payload FROM trades WHERE buyer=? OR seller=? ORDER BY rowid DESC LIMIT 500':table==='orders'?'SELECT payload FROM orders WHERE account_id=? ORDER BY rowid DESC LIMIT 500':'SELECT payload FROM ledger WHERE account_id=? ORDER BY rowid DESC LIMIT 1000';
     const rows=table==='trades'?this.db.prepare(query).all(accountId,accountId):this.db.prepare(query).all(accountId);

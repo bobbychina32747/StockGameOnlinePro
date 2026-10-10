@@ -1,3 +1,4 @@
+if(require('../packages/domain/catalog.json').remaster?.catalogVersion>=3){require('./expand-realms.cjs');return;}
 const fs = require('node:fs'), path = require('node:path');
 const file = path.join(__dirname, '../packages/domain/catalog.json');
 const catalog = JSON.parse(fs.readFileSync(file, 'utf8'));
