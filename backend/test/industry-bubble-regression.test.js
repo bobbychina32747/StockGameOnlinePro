@@ -38,3 +38,20 @@ test('burst pressure has a daily time scale and cannot be cleared by one fairly 
 test('AI cannot buy substantially overpriced bubble stocks even during feature warmup',()=>{
  expect(aiEntryScore('momentum',{price:200,intrinsic:50,kline1min:[]},{ret:.03,ofi:.5},true)).toBe(-Infinity);
 });
+
+test('industry contagion cannot repeatedly multiply daily losses or poison tick-return feedback',()=>{
+ const {s,st}=service();s.market='HK';st.symbol='H_TEST';st.market='HK';st.industry='软件与云服务';
+ st.dayOpen=200;st.lastReturn=0;
+ s.stocks.set('SOURCE',{...st,symbol:'H_SOURCE',industry:'半导体',price:100,dayOpen:200});
+ for(let i=0;i<330;i++)s.updateIndustryLinks();
+ expect(st.price).toBeGreaterThan(99.49);
+ expect(Math.abs(st.lastReturn)).toBeLessThan(.006);
+});
+
+test('industry transmission respects CN daily price bands and updates candles consistently',()=>{
+ const {s,st}=service(110,100);st.prevClose=100;st.dayOpen=100;st.industry='软件与云服务';st.lastReturn=0;
+ st.current1min={open:110,high:110,low:110,close:110};
+ s.stocks.set('SOURCE',{...st,symbol:'SOURCE',industry:'半导体',price:110});
+ s.updateIndustryLinks();expect(st.price).toBe(110);expect(st.current1min.close).toBe(st.price);
+ expect(st.lastReturn).toBe(0);
+});

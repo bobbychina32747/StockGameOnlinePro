@@ -362,6 +362,7 @@ export class MarketDataService {
                 listDate: s.listDate || '',
                 description: s.description || '',
                 price,
+                intrinsic: Number(s.mu) > 0 ? Number(s.mu) : price,
                 prevTickPrice: price,
                 volatility: Number(s.sigma) * 0.5,
                 lastReturn: 0,
@@ -446,7 +447,8 @@ export class MarketDataService {
             const last = st.klineDaily[st.klineDaily.length - 1];
             if (last && st.dayOpen === st.price) {
                 st.price = last.close;
-                st.prevClose = st.klineDaily.length > 1 ? st.klineDaily[st.klineDaily.length - 2].close : last.close;
+                st.prevClose = last.close;
+                st.prevTickPrice = last.close;
                 st.dayOpen = last.close;
                 st.dayHigh = last.close;
                 st.dayLow = last.close;
@@ -840,7 +842,9 @@ export class MarketDataService {
         for (const k of Object.keys(mom)) {
             mom[k] /= counts[k] || 1;
         }
-        // 按矩阵传导：目标行业 += 来源动量 × 关联度 × 0.15（衰减系数，防自激）
+        // Daily momentum is a daily rate, not a fresh shock on every invocation.
+        // Aggregate destinations before applying one bounded, minute-scaled move.
+        const boosts: Record<string, number> = {};
         for (const [src, map] of Object.entries(links)) {
             const srcMom = mom[src];
             if (srcMom == null)
@@ -848,14 +852,25 @@ export class MarketDataService {
             for (const [dst, w] of Object.entries(map)) {
                 if (mom[dst] == null || dst === src)
                     continue;
-                // 单次传导上限 ±0.5%（防行业间正反馈滚雪球）
-                const boost = Math.max(-0.005, Math.min(0.005, srcMom * w * 0.15));
-                for (const st of this.stocks.values()) {
-                    if (st.industry === dst) {
-                        st.price = Math.max(0.5, st.price * (1 + boost));
-                        st.lastReturn = (st.price - (Number(st.dayOpen) || 1)) / (Number(st.dayOpen) || 1);
-                    }
-                }
+                boosts[dst] = (boosts[dst] || 0) + srcMom * Number(w) * 0.15;
+            }
+        }
+        const dt = 1 / tradingMinutesFor(this.market);
+        for (const st of this.stocks.values()) {
+            const boost = this.clamp(boosts[st.industry] || 0, -0.005, 0.005) * dt;
+            const before = Number(st.price);
+            if (!boost || !(before > 0)) continue;
+            let next = Math.max(0.5, before * (1 + boost));
+            const band = this.cnBandOf(st);
+            if (band) next = this.clamp(next, band.down, band.up);
+            st.price = next;
+            st.lastReturn = (1 + (Number(st.lastReturn) || 0)) * (next / before) - 1;
+            st.prevTickPrice = next;
+            st.dayHigh = Math.max(Number(st.dayHigh) || next, next);
+            st.dayLow = Math.min(Number(st.dayLow) || next, next);
+            for (const bar of [st.current1min, st.current5min, st.currentDaily]) {
+                if (!bar) continue;
+                bar.close = next; bar.high = Math.max(bar.high, next); bar.low = Math.min(bar.low, next);
             }
         }
     }
@@ -1412,7 +1427,7 @@ export class MarketDataService {
             return;
         const upRatio = arr.filter((s) => (s.lastReturn ?? 0) > 0).length / arr.length;
         const senti = (upRatio - 0.5) * 0.12;
-        const macroStocks = arr.filter((s) => ['银行', '券商', '保险', '有色金属', '煤炭', '房地产', '物流'].includes(s.industry));
+        const macroStocks = arr.filter((s) => ['银行', '券商与金融科技', '保险', '有色与材料', '能源与煤炭', '地产与基建', '航空航运与物流'].includes(s.industry));
         const macroRet = macroStocks.length
             ? macroStocks.reduce((a, s) => a + (s.lastReturn ?? 0), 0) / macroStocks.length
             : 0;
