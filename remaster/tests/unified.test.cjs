@@ -22,6 +22,15 @@ test('unified view preserves original IDs, money, debt, fractional funds, T+1, o
  assert.equal(s.formal.fundHoldings[0].shares,500.1234);assert.equal(s.accounts.HK,null);assert.equal(s.quotes.H1,undefined);
  assert.equal(JSON.stringify(raw),input);assert.equal(s.mode,'real');assert.equal(s.formal.ledger,'legacy-authoritative');
 });
+test('HK/US fund equity converts original CNY shares and NAV into realm currency without changing shares',()=>{
+ for(const [market,fx] of [['HK',.93],['US',7.2]]){
+  const input={...raw,account:{...raw.account,cash:99000,borrowed:0,shortCollateral:0},positions:[],orders:[],
+   fxRates:{HK:.93,US:7.2},funds:[{fundId:'fund-2',shares:1000*fx,totalInvested:1000*fx}]};
+  const before=JSON.stringify(input);const s=adaptLedger(input,{...principal,market},stocks,state,[{id:'fund-2',nav:1}]);
+  assert.equal(s.accounts[market].equity,10000000);assert.equal(s.markets[market].fundNav.money,Math.round(10000/fx));
+  assert.equal(s.formal.fundHoldings[0].shares,1000*fx);assert.equal(JSON.stringify(input),before);
+ }
+});
 test('persistent command journal deduplicates funds and refuses to replay interrupted writes',async()=>{
  const db=new Database(':memory:');let calls=0;const auth={forward:async()=>{calls++;return {success:true};}};const ledger=new UnifiedLedger(auth,db);
  const body={kind:'fund',market:'CN',fund:'money',action:'buy',amount:10000};

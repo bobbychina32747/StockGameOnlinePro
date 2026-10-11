@@ -87,7 +87,7 @@ export class AccountService {
             const allOrders = [...pending, ...orders.filter(row => !pending.some(item => item.id === row.id))];
             const positionValue = positions.reduce((sum, row) => sum + (Number(row.longQty) - Number(row.shortQty)) *
                 Number(this.engine.prices.get(row.symbol) ?? row.longCost ?? row.shortCost ?? 0), 0);
-            return { account, positions, positionValue, funds, orders: allOrders, transactions, achievements,
+            return { account, positions, positionValue, funds, fxRates: getFxRates(), orders: allOrders, transactions, achievements,
                 history: this.riskManager.getEquityHistory(account.id),
                 metrics: await this.riskManager.calculateMetrics(account, [...transactions].reverse()),
                 reviews: this.getReviews(userId), ledgerVersion: Date.now() };

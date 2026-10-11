@@ -40,7 +40,9 @@ export function adaptLedger(raw:any,principal:Principal,stocks:any[],state:any,f
       pnl:(price-cents(p.longCost))*quantity+(cents(p.shortCost)-price)*num(p.shortQty)};
   });
   const moneyFund=raw.funds.find((f:any)=>f.fundId==='fund-2');const etf=raw.funds.find((f:any)=>f.fundId==='fund-1');
-  const fundsValue=raw.funds.reduce((sum:number,f:any)=>sum+num(f.shares)*num(fundDefs.find(d=>d.id===f.fundId)?.nav),0);
+  // Original fund shares/NAV are CNY; account balances are in their realm currency.
+  const cnyPerUnit=(market:MarketId)=>market==='CN'?1:num(raw.fxRates?.[market])||1;
+  const fundsValue=raw.funds.reduce((sum:number,f:any)=>sum+num(f.shares)*num(fundDefs.find(d=>d.id===f.fundId)?.nav),0)/cnyPerUnit(principal.market);
   const positionValue=raw.positionValue==null?positions.reduce((sum:number,p:any)=>sum+(p.quantity-p.shortQuantity)*(quotes[p.symbol]?.price??p.cost),0):cents(raw.positionValue);
   const equity=cents(a.cash)+positionValue+cents(a.shortCollateral)-cents(a.borrowed)+cents(fundsValue);
   const orders=raw.orders.map((row:any)=>mapOrder(row,day));
@@ -58,7 +60,7 @@ export function adaptLedger(raw:any,principal:Principal,stocks:any[],state:any,f
     clock:{day:num(src.gameDay),date:new Date(Date.UTC(2024,0,1+num(src.gameDay))).toISOString().slice(0,10),minute:num(src.tickCount)%({CN:240,HK:330,US:390}[m]),
       phase:state.offHoursTrading||src.isTradingTime?'continuous':src.isPostCloseTrading?'post-close':'closed',settledDay:num(src.gameDay)-1,lastRealMinute:''},
     sentiment:num(src.factors?.['市场情绪']),rate:.025,inflation:0,growth:0,sectors:Object.fromEntries(Object.entries(src.industryCycles??{}).map(([industry,phase])=>[industry,{cycle:Math.max(0,['expansion','peak','contraction','trough'].indexOf(String(phase))),trend:0,heat:0}])),lastNavDay:day,
-    fundNav:{money:Math.round(num(fundDefs.find(d=>d.id==='fund-2')?.nav)*10000),etf:Math.round(num(fundDefs.find(d=>d.id==='fund-1')?.nav)*10000),basket:0,dividend:0},
+    fundNav:{money:Math.round(num(fundDefs.find(d=>d.id==='fund-2')?.nav)/cnyPerUnit(m)*10000),etf:Math.round(num(fundDefs.find(d=>d.id==='fund-1')?.nav)/cnyPerUnit(m)*10000),basket:0,dividend:0},
   }];})) as Snapshot['markets'];
   const events=(state.markets?.[principal.market]?.hotTopics??state.hotTopics??[]).map((item:any,index:number)=>({
     id:'topic:'+index+':'+day,sequence:index,market:principal.market,day,kind:'topic',title:typeof item==='string'?item:item.title??item.topic??item.industry+'行业热点',

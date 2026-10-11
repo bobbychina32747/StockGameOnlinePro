@@ -21,16 +21,16 @@ fi
 # Stop the independent test writer gracefully; its original volume is retained.
 docker stop sgp-remaster-test
 if [ ! -f "$release/archives/remaster-test.sqlite" ]; then
-docker run --rm --network none --entrypoint node \
+docker run --rm --network none --no-healthcheck --entrypoint node \
  -v sgp-remaster-test_remaster-test-data:/archive:ro -v "$release/archives:/backup" \
  stockgame-remaster:20261010 --require /app/tooling/runtime.cjs -e \
  'const D=require("better-sqlite3"); (async()=>{const db=new D("/archive/remaster.sqlite",{readonly:true});await db.backup("/backup/remaster-test.sqlite");db.close();})().catch(e=>{console.error(e.message);process.exitCode=1;});'
 fi
 # A file may exist after an interrupted copy. Do not treat existence as verification.
 if [ ! -f "$release/archives/remaster-test.verified" ]; then
-docker run --rm --network none --entrypoint node \
+docker run --rm --network none --no-healthcheck --memory 2g --entrypoint node \
  -v "$release/archives:/backup" stockgame-remaster:20261010 --require /app/tooling/runtime.cjs -e \
- 'const D=require("better-sqlite3"),fs=require("fs");const copy=new D("/backup/remaster-test.sqlite",{readonly:true});if(copy.pragma("integrity_check",{simple:true})!=="ok")throw Error("Test archive integrity check failed");copy.close();fs.writeFileSync("/backup/remaster-test.verified",new Date().toISOString());console.log("2.0 test ledger archived independently and verified");'
+ 'const D=require("better-sqlite3"),fs=require("fs");const copy=new D("/backup/remaster-test.sqlite",{readonly:true});copy.pragma("cache_size=-262144");copy.pragma("mmap_size=536870912");if(copy.pragma("integrity_check",{simple:true})!=="ok")throw Error("Test archive integrity check failed");copy.close();fs.writeFileSync("/backup/remaster-test.verified",new Date().toISOString());console.log("2.0 test ledger archived independently and verified");'
 fi
 chmod 600 "$release/archives/"*
 sudo cp /etc/nginx/conf.d/game.conf "$release/previous-game.conf"
