@@ -1,4 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { siteAuthApi, GameSession } from './site-auth';
+import { tokenAlgorithm } from './token-kind';
 
 const API_BASE = '/api';
 
@@ -22,11 +24,15 @@ let unauthorizedHandler: (() => void) | null = null;
 export function setUnauthorizedHandler(fn: () => void) {
   unauthorizedHandler = fn;
 }
+let renewedHandler: ((session: GameSession) => void) | null = null;
+export function setSessionRenewedHandler(fn: (session: GameSession) => void) {
+  renewedHandler = fn;
+}
 
 // 401 时清除token并统一登出（Phase C：不再整页硬跳转，store 残留由 logout 清理）
 api.interceptors.response.use(
   (res) => res,
-  (err: AxiosError) => {
+  async (err: AxiosError) => {
     // 登录/注册接口的 401 由业务层处理（展示错误信息），不触发登出
     const url = err.config?.url || '';
     const isAuthRequest = url.includes('/auth/login') || url.includes('/auth/register');
@@ -35,6 +41,23 @@ api.interceptors.response.use(
     // 旧账号请求迟到时，不能清掉已切换的新账号会话。
     const belongsToCurrentSession = !!currentToken && requestAuthorization === `Bearer ${currentToken}`;
     if (err.response?.status === 401 && !isAuthRequest && belongsToCurrentSession) {
+      const config = err.config as InternalAxiosRequestConfig & { siteAuthRetried?: boolean };
+      if (tokenAlgorithm(currentToken) === 'EdDSA' && !config.siteAuthRetried && renewedHandler) {
+        try {
+          // A sleeping tab may miss the timer. Renew once before discarding its session.
+          const session = await siteAuthApi.session();
+          if (localStorage.getItem('token') !== currentToken) return Promise.reject(err);
+          if ('token' in session) {
+            renewedHandler(session);
+            config.siteAuthRetried = true;
+            return api.request(config);
+          }
+        } catch (renewError: any) {
+          if (localStorage.getItem('token') !== currentToken || renewError.response?.status !== 401) {
+            return Promise.reject(err);
+          }
+        }
+      }
       if (unauthorizedHandler) unauthorizedHandler();
     }
     return Promise.reject(err);

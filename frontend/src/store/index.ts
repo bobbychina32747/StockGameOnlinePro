@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import api, { setUnauthorizedHandler } from '../services/api.client';
+import api, { setUnauthorizedHandler, setSessionRenewedHandler } from '../services/api.client';
 import { gameTradingTime, tradingMinutesFor } from '../data/trading-calendar';
 
 // localStorage 安全解析：数据损坏时回退默认值，避免整站崩溃
@@ -307,4 +307,7 @@ export const useUIStore = create<UIState>((set) => ({
 // Phase C: 401 统一走 logout（清 store 残留 + ProtectedRoute 自动跳登录，不再整页硬刷新）
 setUnauthorizedHandler(() => {
   useAuthStore.getState().logout();
+});
+setSessionRenewedHandler(session => {
+  useAuthStore.getState().setAuth(session.token, session.user);
 });

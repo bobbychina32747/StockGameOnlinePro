@@ -32,3 +32,22 @@ it('clears previous-player assets when the site account changes', async () => {
   const hook = renderHook(() => useSiteSession()); await waitFor(() => expect(hook.result.current).toBe(true));
   expect(useAccountStore.getState().account).toBeNull(); expect(useAccountStore.getState().positions).toEqual([]);
 });
+it('keeps password authentication on reload and window focus without a site cookie', async () => {
+  const token = btoa(JSON.stringify({ alg: 'HS256' })) + '.payload.signature';
+  useAuthStore.getState().setAuth(token, session.user);
+  (siteAuthApi.session as jest.Mock).mockRejectedValue({ response: { status: 401 } });
+  const hook = renderHook(() => useSiteSession());
+  await waitFor(() => expect(hook.result.current).toBe(true));
+  await act(async () => { window.dispatchEvent(new Event('focus')); });
+  expect(useAuthStore.getState().token).toBe(token);
+  expect(siteAuthApi.session).not.toHaveBeenCalled();
+});
+it('does not replace a password login with an already signed-in site account', async () => {
+  const token = btoa(JSON.stringify({ alg: 'HS256' })) + '.payload.signature';
+  useAuthStore.getState().setAuth(token, session.user);
+  (siteAuthApi.session as jest.Mock).mockResolvedValue(session);
+  const hook = renderHook(() => useSiteSession());
+  await waitFor(() => expect(hook.result.current).toBe(true));
+  expect(useAuthStore.getState().token).toBe(token);
+  expect(siteAuthApi.session).not.toHaveBeenCalled();
+});

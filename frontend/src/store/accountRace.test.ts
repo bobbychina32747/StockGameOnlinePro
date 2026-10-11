@@ -5,6 +5,7 @@ jest.mock('../services/api.client', () => ({
   __esModule: true,
   default: { get: jest.fn() },
   setUnauthorizedHandler: jest.fn(),
+  setSessionRenewedHandler: jest.fn(),
 }));
 
 function pendingAccount() {

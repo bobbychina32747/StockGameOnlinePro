@@ -1,5 +1,26 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const {io}=require('socket.io-client');
 const {createApplication}=require('../dist/apps/game-api/main');
+const {ServiceUnavailableException,UnauthorizedException}=require('@nestjs/common');
+test('socket keeps authentication during an identity outage, resumes, and disconnects on confirmed revocation',async()=>{
+ const server=await createApplication({port:0,database:':memory:',sandbox:true,tickMs:60000});let socket;
+ try{
+  const session=await fetch(server.url+'/api/v2/auth/demo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'会话恢复测试',market:'CN'})}).then(r=>r.json());
+  await new Promise(resolve=>setTimeout(resolve,250));
+  socket=io(server.url+'/v2',{auth:{token:session.token},transports:['websocket'],reconnection:false});
+  await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('initial snapshot timeout')),3000);socket.once('snapshot',()=>{clearTimeout(timer);resolve();});socket.once('connect_error',reject);});
+  let snapshots=0,expired=0;socket.on('snapshot',()=>snapshots++);socket.on('session-expired',()=>expired++);
+  const authenticate=server.auth.authenticate.bind(server.auth);
+  server.auth.authenticate=async()=>{throw new ServiceUnavailableException('fixture outage');};
+  await server.game.execute({kind:'tick'},'outage-tick-0001');await new Promise(resolve=>setTimeout(resolve,100));
+  assert.equal(socket.connected,true);assert.equal(expired,0);assert.equal(snapshots,0);
+  server.auth.authenticate=authenticate;
+  const resumed=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('resumed snapshot timeout')),3000);socket.once('snapshot',()=>{clearTimeout(timer);resolve();});});
+  await server.game.execute({kind:'tick'},'recovered-tick-0001');await resumed;
+  server.auth.authenticate=async()=>{throw new UnauthorizedException('fixture revoked');};
+  const revoked=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('revocation timeout')),3000);socket.once('session-expired',()=>{clearTimeout(timer);resolve();});});
+  await server.game.execute({kind:'tick'},'revoked-tick-0001');await revoked;assert.equal(expired,1);
+ }finally{socket?.disconnect();await server.close();}
+});
 test('local API + real socket: isolated auth, all markets, idempotent order, logout revokes',async()=>{
  const server=await createApplication({port:0,database:':memory:',sandbox:true,tickMs:60000});let socket;
  try {

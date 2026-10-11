@@ -4,7 +4,7 @@ import Login from './Login';
 import { siteAuthApi } from '../../services/site-auth';
 import { useAuthStore } from '../../store';
 import { authApi } from '../../services/api.client';
-jest.mock('../../services/api.client', () => ({ authApi: { login: jest.fn(), register: jest.fn() }, setUnauthorizedHandler: jest.fn() }));
+jest.mock('../../services/api.client', () => ({ authApi: { login: jest.fn(), register: jest.fn() }, setUnauthorizedHandler: jest.fn(), setSessionRenewedHandler: jest.fn() }));
 
 jest.mock('../../services/site-auth', () => ({
   siteAuthApi: { session: jest.fn(), link: jest.fn() },

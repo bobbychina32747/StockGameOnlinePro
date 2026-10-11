@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, HttpException } from '@nestjs/common';
 import { Server } from 'socket.io';
 import { mkdirSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
@@ -44,7 +44,11 @@ export async function createApplication(options:{port?:number;database?:string;s
   namespace.use(async(socket,next)=>{try {auth.assertOrigin(socket.handshake.headers.origin);const token=socket.handshake.auth?.token||tokenFrom({headers:{...socket.handshake.headers,'x-game-realm':socket.handshake.auth?.market??'CN'}});socket.data.principal=await auth.authenticate(token);socket.data.token=token;next();} catch {next(new Error('未登录或会话已失效'));}});
   namespace.on('connection',socket=>{socket.emit('snapshot',snapshot(game.world,socket.data.principal.owner,socket.data.principal.market));});
   let publishing=false;
-  game.onCommitted=()=>{if(publishing) return;publishing=true;void (async()=>{try {for(const socket of namespace.sockets.values()) {try {const principal=await auth.authenticate(socket.data.token);socket.emit('snapshot',snapshot(game.world,principal.owner,principal.market));} catch {socket.emit('session-expired');socket.disconnect(true);}}repository.markDelivered(game.world.version);} finally {publishing=false;}})();};
+  game.onCommitted=()=>{if(publishing) return;publishing=true;void (async()=>{try {for(const socket of namespace.sockets.values()) {try {const principal=await auth.authenticate(socket.data.token);socket.emit('snapshot',snapshot(game.world,principal.owner,principal.market));} catch(error) {
+    // Do not turn an identity-service timeout/rate limit into a player logout.
+    // Skip this snapshot and validate again on the next commit; never emit unverified data.
+    if(error instanceof HttpException&&error.getStatus()===401){socket.emit('session-expired');socket.disconnect(true);}
+  }}repository.markDelivered(game.world.version);} finally {publishing=false;}})();};
   let closing=false;let timer:ReturnType<typeof setTimeout>|undefined;let tickIndex=0;
   const tickMs=options.tickMs??Number(process.env.REMASTER_TICK_MS??(sandbox?2000:10000));
   if(!Number.isFinite(tickMs)||tickMs<100||tickMs>60000) throw new Error('Invalid tick interval');

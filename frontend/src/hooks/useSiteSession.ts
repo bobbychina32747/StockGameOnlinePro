@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { siteAuthApi } from '../services/site-auth';
 import { useAuthStore } from '../store';
+import { tokenAlgorithm } from '../services/token-kind';
 
 export function useSiteSession() {
   const [ready, setReady] = useState(false);
@@ -12,6 +13,8 @@ export function useSiteSession() {
       pending = true;
       const tokenBefore = useAuthStore.getState().token;
       try {
+        // Password sessions do not depend on a site cookie, even for linked users.
+        if (tokenAlgorithm(tokenBefore) === 'HS256') return;
         const session = await siteAuthApi.session();
         if (!active || useAuthStore.getState().token !== tokenBefore) return;
         if ('token' in session) useAuthStore.getState().setAuth(session.token, session.user);
