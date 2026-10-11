@@ -1,7 +1,7 @@
 require('reflect-metadata');
 const {DataSource}=require('typeorm');
 const {Kline}=require('../dist/src/infrastructure/database/entities/kline.entity');
-const {restoreHistoryCache,HISTORY_CACHE_LIMITS}=require('../dist/src/core/market-data/history-cache');
+const {restoreHistoryCache,HISTORY_CACHE_LIMITS,persistCandleBatches}=require('../dist/src/core/market-data/history-cache');
 const {MarketDataService}=require('../dist/src/core/market-data/market-data.service');
 
 test('large persisted history restores a bounded cache instrument by instrument without deleting archive or resetting other instruments',async()=>{
@@ -41,3 +41,15 @@ test('thirty simulated trading days keep minute caches bounded with continuous l
  expect(stock.current5min.volume).toBe(50);
  expect(stock.kline1min.at(-1).time.getTime()).toBe(base+7198*60000);
 });
+
+test('day-end writes yield to event-loop work before all candles finish and retry keeps stored UUIDs',async()=>{
+ const source=new DataSource({type:'better-sqlite3',database:':memory:',entities:[Kline],synchronize:true});await source.initialize();
+ try{
+  const repository=source.getRepository(Kline);const rows=Array.from({length:1600},(_,i)=>repository.create({symbol:'T1',timeframe:'1min',time:new Date(Date.UTC(2024,0,1)+i*60000),open:10,high:12,low:9,close:11,volume:100}));
+  let observed;const heartbeat=new Promise(resolve=>setImmediate(async()=>{observed=await repository.count();resolve();}));
+  await persistCandleBatches(repository,rows);await heartbeat;
+  expect(observed).toBeGreaterThan(0);expect(observed).toBeLessThan(rows.length);
+  expect(await repository.count()).toBe(rows.length);expect(rows.every(row=>typeof row.id==='string')).toBe(true);
+  await persistCandleBatches(repository,rows);expect(await repository.count()).toBe(rows.length);
+ }finally{await source.destroy();}
+},20000);

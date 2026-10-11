@@ -15,7 +15,7 @@ import * as fundamentals_1 from './fundamentals';
 import * as ai_opponents_1 from './ai-opponents';
 import { gameTradingTime, tradingMinutesFor } from '../../common/data/trading-calendar';
 import { calibratedShock, heavyTail, unifiedInstruments } from '../../common/unified-market';
-import { HISTORY_CACHE_LIMITS, restoreHistoryCache } from './history-cache';
+import { HISTORY_CACHE_LIMITS, restoreHistoryCache, persistCandleBatches } from './history-cache';
 
 // SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
 let klineDedupDone = false;
@@ -1762,11 +1762,11 @@ export class MarketDataService {
         // 批量写入（daily + 当天完整 1min/5min）
         if (batchKlines.length > 0) {
             try {
-                await this.klineRepo.save(batchKlines);
+                await persistCandleBatches(this.klineRepo, batchKlines);
             } catch (e) {
                 this.logger.error('K线落库失败（第1次）: ' + (e && e.message ? e.message : e));
                 try {
-                    await this.klineRepo.save(batchKlines);
+                    await persistCandleBatches(this.klineRepo, batchKlines);
                 } catch (e2) {
                     this.logger.error('K线落库失败（重试仍失败，今日K线可能丢失）: ' + (e2 && e2.message ? e2.message : e2));
                 }
