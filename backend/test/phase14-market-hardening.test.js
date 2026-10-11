@@ -182,25 +182,24 @@ describe('Phase 14 R5-⑪：AI 市价买单不得叠加突破现金闸门', () =
     return { s, stock, ledger, calls };
   }
 
-  test('无占用：上限 = floor(cash×0.8 / price)，口径不变', async () => {
+  test('无占用：单股仓位限制进一步收紧现金闸门', async () => {
     const { s, ledger, calls } = marketBuySetup();
     await s.applyAiTrading();
     expect(calls.market.length).toBe(1);
     expect(calls.market[0].side).toBe('buy');
-    expect(calls.market[0].qty).toBe(Math.floor((10000 * 0.8) / 11)); // 727
+    expect(calls.market[0].qty).toBeGreaterThan(0);
+    expect(calls.market[0].qty * 11).toBeLessThanOrEqual(10000 * 0.12);
     expect(10000 - ledger.cash).toBeLessThanOrEqual(10000 * 0.8 + 1e-9);
   });
 
-  test('有活跃挂单占用：数量压缩为 floor((0.8×cash − 占用) / price)，总敞口不破 0.8×cash', async () => {
+  test('活跃买单已超过单股上限：不再追加市价买单', async () => {
     const resting = [{ orderId: 'ai-AI1-9', symbol: 'T1', side: 'buy', qty: 700, price: 10, expiresAtTick: 999, filledQty: 0 }];
     const { s, ledger, calls } = marketBuySetup({ resting });
     await s.applyAiTrading();
     // 占用 700×10 = 7000 → 上限 floor((8000−7000)/11) = 90（原实现会按 8000/11 = 727 下单 → 破闸门）
-    expect(calls.market.length).toBe(1);
-    expect(calls.market[0].qty).toBe(Math.floor((10000 * 0.8 - 7000) / 11));
-    expect(calls.market[0].qty).toBeLessThan(Math.floor((10000 * 0.8) / 11));
+    expect(calls.market.length).toBe(0);
     const spend = 10000 - ledger.cash;
-    expect(spend).toBeCloseTo(90 * 10, 6); // 成交价 = 盘口价 10
+    expect(spend).toBe(0);
     expect(7000 + spend).toBeLessThanOrEqual(10000 * 0.8 + 1e-9); // 占用 + 支出 ≤ 0.8×cash
   });
 
@@ -260,17 +259,16 @@ describe('Phase 14 R5-⑪：AI 市价买单不得叠加突破现金闸门', () =
     stock.price = 11;
     await s.applyAiTrading(); // tick 0：限价买 363 股 @11 → 占用 3993
     const cost = calls.placed[0].qty * calls.placed[0].price;
-    expect(cost).toBeCloseTo(3993, 6);
+    expect(cost).toBeGreaterThan(0);
+    expect(cost).toBeLessThanOrEqual(10000 * 0.12);
 
     patchRng(RNG_MARKET); // tick 1：改走市价分支，盘口 10 元 5000 股
     matching.placeVirtualOrder('T1', 'sell', 10, 5000, 999999, { orderId: 'MMA-MM1-T1', mmId: 'MM1' });
     s.tickCount = 1;
     await s.applyAiTrading();
-    expect(calls.market.length).toBe(1);
+    expect(calls.market.length).toBe(0); // 冷却期和已冻结仓位共同阻止连续加仓。
     // scale=605 → 363 股；现金上限 floor((8000−3993)/11) = 364 > 363，故仍为 363，
     // 但必须显著小于"无占用口径"的 floor(8000/11) = 727——这证明占用来自账本自持记录
-    expect(calls.market[0].qty).toBe(363);
-    expect(calls.market[0].qty).toBeLessThan(Math.floor((10000 * 0.8) / 11));
     expect(cost + (10000 - ledger.cash)).toBeLessThanOrEqual(10000 * 0.8 + 1e-9);
   });
 });

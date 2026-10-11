@@ -16,6 +16,7 @@ import * as ai_opponents_1 from './ai-opponents';
 import { gameTradingTime, tradingMinutesFor } from '../../common/data/trading-calendar';
 import { calibratedShock, heavyTail, unifiedInstruments } from '../../common/unified-market';
 import { HISTORY_CACHE_LIMITS, restoreHistoryCache, persistCandleBatches } from './history-cache';
+import { aiEntryScore, aiPolicyDirection, aiPortfolioRisk } from './ai-risk-policy';
 
 // SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
 let klineDedupDone = false;
@@ -1018,17 +1019,58 @@ export class MarketDataService {
         for (let ai = 0; ai < this.aiAgents.length; ai++) {
             const agent = this.aiAgents[ai];
             const ledger = this.aiLedger[ai];
+            // Score a previous prediction against a later observable price, not the AI's own vote.
+            const prediction = ledger.treePrediction;
+            if (this.aiAdaptiveEnabled && prediction && this.tickCount >= prediction.tick + 12) {
+                const observed = Number(this.stocks.get(prediction.symbol)?.price);
+                const outcome = Math.sign(observed - prediction.price);
+                if (Number.isFinite(observed) && outcome !== 0) {
+                    prediction.votes.forEach((vote, k) => {
+                        if (Math.sign(vote) === outcome) ledger.treeHit[k]++;
+                        else if (Math.sign(vote) === -outcome) ledger.treeMiss[k]++;
+                    });
+                }
+                ledger.treePrediction = null;
+            }
             // Phase F 在线自适应（团队 C1-C16）：参数由绩效 + regime 驱动，出口恒在钳制带内；
             // 关闭开关（AI_ADAPTIVE_ENABLED=false）时回落到默认参数与全 1 系数（零回归）
             const eff = this.aiAdaptiveEnabled
                 ? ai_opponents_1.effectiveParams(agent, ledger.params, coef)
                 : ai_opponents_1.effectiveParams(agent, ai_opponents_1.defaultAiParams(), ai_opponents_1.AI_COEF_BASE);
             // 确定性随机：salt 隔离用途 → 同一 (gameDay, tick, agent) 必然重放同一决策序列
-            if (ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'act')() > eff.activity)
-                continue;
             // P0-3: 原「未平挂单市值 ×0.97 指数衰减近似」删除，改为按活跃挂单精确占用
             // （见下方 pendingBuyCash / pendingSellQty，以及成交回调里的 filledQty 更新）
             const resting = this.activeAiResting(ledger);
+            const risk = aiPortfolioRisk(ledger, this.stocks, resting, this.marketRegime);
+            ledger.riskPeakEquity = risk.peak;
+            // Inspect every held stock before the activity lottery or entry selection.
+            let riskTarget;
+            let worstLoss = 0;
+            for (const [symbol, pos] of ledger.positions) {
+                const st = this.stocks.get(symbol);
+                if (!st || !(Number(pos.cost) > 0)) continue;
+                const loss = Number(st.price) / Number(pos.cost) - 1;
+                if (loss <= eff.stopLoss && (!riskTarget || loss < worstLoss)) {
+                    riskTarget = st; worstLoss = loss;
+                }
+            }
+            if (!riskTarget && risk.holdings > risk.exposureLimit * 1.05) {
+                let largest = 0;
+                for (const [symbol, pos] of ledger.positions) {
+                    const st = this.stocks.get(symbol);
+                    const value = Number(pos.qty) * Number(st?.price || 0);
+                    if (st && value > largest) { largest = value; riskTarget = st; }
+                }
+            }
+            if (!riskTarget && agent.type !== '机构') {
+                for (const [symbol, pos] of ledger.positions) {
+                    const st = this.stocks.get(symbol);
+                    if (st && Number(pos.cost) > 0 && Number(st.price) / Number(pos.cost) - 1 >= eff.takeProfit) {
+                        riskTarget = st; break;
+                    }
+                }
+            }
+            if (!riskTarget && ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'act')() > eff.activity) continue;
             // 选股：羊群/动量策略追热点行业（概率随 hotBias/regime 缩放）；均值回归选超跌；其余随机
             const pickRng = ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'pick');
             let target;
@@ -1046,12 +1088,20 @@ export class MarketDataService {
             else {
                 target = arr[Math.floor(pickRng() * arr.length)];
             }
+            if (riskTarget) target = riskTarget;
+            else {
+                const candidates = arr.map(st => ({ st, score: aiEntryScore(agent.strategy, st, features.get(st.symbol), this.hotTopics.some(t => t.industry === st.industry)) }))
+                    .filter(row => row.score !== null && Number.isFinite(row.score))
+                    .sort((a, b) => b.score - a.score).slice(0, 5);
+                if (candidates.length) target = candidates[Math.floor(pickRng() * candidates.length)].st;
+            }
             const feats = features.get(target.symbol);
             // 羊群效应：热点行业 → 追涨正反馈（策略信号 + RF 融合）
             const hotFlag = this.hotTopics.length > 0 && this.hotTopics[0].industry === target.industry;
             let dir = ai_opponents_1.decideDirection(agent.strategy, feats, hotFlag,
                 ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'dir'),
                 { gain: eff.gain, treeWeights: ledger.treeWeights, herdBias: eff.herdWeight });
+            dir = aiPolicyDirection(agent.strategy, target, feats, hotFlag, dir);
             // P3 行为树：游资/散户持仓止盈/止损；机构持仓过重(>现金60%)再平衡卖出
             // Phase F: 止盈/止损阈值改为绝对值参数（默认 5%/-3% 与现状一致），随绩效与 regime 平滑移动
             const priceNow = Number(target.price);
@@ -1065,17 +1115,20 @@ export class MarketDataService {
             }
             if (agent.type === '机构' && heldQty * priceNow > ledger.cash * 0.6)
                 dir = -1;
+            if (riskTarget) dir = -1;
+            if (dir > 0) {
+                if (risk.drawdown >= 0.08) continue; // Recovery mode: no new risk until existing assets recover.
+                const entryScore = aiEntryScore(agent.strategy, target, feats, hotFlag);
+                if (entryScore === -Infinity) continue;
+                const lastEntry = ledger.entryTicks?.[target.symbol];
+                if (lastEntry !== undefined && this.tickCount - lastEntry < 36) continue;
+            }
             if (dir === 0)
                 continue;
-            // Phase F 在线学习样本：决策产生即计数（R8 钉死"决策即计"口径，非成交后计数）
-            if (this.aiAdaptiveEnabled) {
+            // One outstanding prediction per agent; label it with the price observed 12 ticks later.
+            if (this.aiAdaptiveEnabled && !ledger.treePrediction) {
                 const votes = ai_opponents_1.treeVotes(feats);
-                for (let k = 0; k < votes.length; k++) {
-                    if (Math.sign(votes[k]) === dir)
-                        ledger.treeHit[k]++;
-                    else if (Math.sign(votes[k]) === -dir)
-                        ledger.treeMiss[k]++;
-                }
+                ledger.treePrediction = { tick: this.tickCount, symbol: target.symbol, price: priceNow, votes };
             }
             const side = dir > 0 ? 'buy' : 'sell';
             // P0-3: 该 AI 在同一标的上的活跃挂单占用（卖单冻结持仓、买单占用现金）
@@ -1102,6 +1155,9 @@ export class MarketDataService {
                 // 余额 ≤ 0 时 qty ≤ 0 → 下方 continue 跳过该笔（只收紧，不放宽任何既有闸门）。
                 const restingCash = this.aiRestingCash(ledger);
                 qty = Math.min(qty, Math.floor((ledger.cash * 0.8 - restingCash) / Math.max(priceNow, 0.01)));
+                const singleRoom = risk.singleLimit - heldQty * priceNow - (risk.bySymbol.get(target.symbol) || 0);
+                const totalRoom = risk.exposureLimit - risk.holdings - risk.pendingBuys;
+                qty = Math.min(qty, Math.floor(Math.max(0, Math.min(singleRoom, totalRoom)) / Math.max(priceNow * 1.005, 0.01)));
             }
             else {
                 // P0-3: 可卖量 = 持仓 − 活跃卖单剩余量（卖单冻结）。市价分支也走这条口径，
@@ -1115,7 +1171,7 @@ export class MarketDataService {
             // P1-13: 报价区间改用与撮合引擎/委托校验同基准的涨跌停工具（昨收 + 新股首日 ±44%/-36%）——
             // 原实现用 dayOpen ±10% 硬编码，与引擎封板/委托校验口径不一致
             const band = this.cnBandOf(target);
-            if (ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'route')() < 0.67) {
+            if (!riskTarget && ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'route')() < 0.67) {
                 // 限价挂单进入盘口排队：机构贴价大单、游资中等、散户偏远小单；TTL 8~30 tick
                 // Phase F: 挂单预算上限 = eff.restBudget（默认 0.6 = 现状；硬闸门 0.8×cash 在市价单侧不变）
                 const offsetRng = ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'offset');
@@ -1129,7 +1185,7 @@ export class MarketDataService {
                 const ttlTicks = 8 + Math.floor(ai_opponents_1.agentRng(this.gameDay, this.tickCount, agent.id, 'ttl')() * 22);
                 // P0-3: 买单现金占用用精确值校验（Σ活跃买单占用 + 本单金额 ≤ cash × restBudget），
                 // 卖单只受持仓冻结约束（不额外占用现金）
-                if (side === 'buy' && pendingBuyCash + qty * price > ledger.cash * eff.restBudget)
+                if (side === 'buy' && this.aiRestingCash(ledger) + qty * price > ledger.cash * eff.restBudget)
                     continue; // 挂单预算约束
                 // P0-3: 确定性 orderId（ai-<agentId>-<seq>）+ tag=agent.id —— 成交回调据此定位账本与挂单
                 const seq = Number(ledger.restingSeq || 0) + 1;
@@ -1143,6 +1199,7 @@ export class MarketDataService {
                         expiresAtTick: this.tickCount + ttlTicks, filledQty: 0,
                     });
                     this.refreshAiRestingValue(ledger);
+                    if (side === 'buy') { ledger.entryTicks ||= {}; ledger.entryTicks[target.symbol] = this.tickCount; }
                 }
                 catch (e) { }
             }
@@ -1177,9 +1234,11 @@ export class MarketDataService {
                         pos.cost = pos.qty > 0 ? (pos.cost * pos.qty + fill.avgPrice * fill.filledQuantity) / newQty : fill.avgPrice;
                         pos.qty = newQty;
                         ledger.positions.set(target.symbol, pos);
+                        ledger.entryTicks ||= {}; ledger.entryTicks[target.symbol] = this.tickCount;
                     }
                     else {
                         ledger.cash += fill.filledQuantity * fill.avgPrice;
+                        ledger.entryTicks ||= {}; ledger.entryTicks[target.symbol] = this.tickCount;
                         const pos = ledger.positions.get(target.symbol);
                         if (pos) {
                             // 平仓盈亏入账（平均成本法）
