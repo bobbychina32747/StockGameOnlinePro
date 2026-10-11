@@ -73,6 +73,16 @@ it('real site Cookie → Ed25519 token → game HTTP auth → global logout revo
     expect((await post('/api/auth/identity/logout', {})).status).toBe(200);
     expect((await fetch(base + '/api/test-game', { headers: authHeaders })).status).toBe(401);
     expect((await post('/api/auth/site-session', {})).status).toBe(401);
+    const native = await post('/api/auth/register', { username: 'http-game-player', password: 'synthetic-password-123' }, false);
+    expect(native.status).toBe(201);const registered=await native.json();expect(registered.user.password).toBeUndefined();
+    const nativeHeaders={Authorization:'Bearer '+registered.token};
+    const profile=await fetch(base+'/api/auth/game-profile',{headers:nativeHeaders});expect(profile.status).toBe(200);
+    expect(profile.headers.get('cache-control')).toBe('no-store');expect(await profile.json()).toMatchObject({subject:'game:'+registered.user.id,user:{id:registered.user.id}});
+    expect((await fetch(base+'/api/auth/game-profile',{headers:{Authorization:'Bearer forged'}})).status).toBe(401);
+    expect((await post('/api/auth/login',{username:'http-game-player',password:'incorrect-password'},false)).status).toBe(401);
+    const signedIn=await post('/api/auth/login',{username:'http-game-player',password:'synthetic-password-123'},false);
+    expect(signedIn.status).toBe(200);expect((await signedIn.json()).user.id).toBe(registered.user.id);
+    expect(await ds.getRepository(Account).count()).toBe(6);
   } finally {
     if (app) await app.close();
     seed.mockRestore();

@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { base } from './base';
 import { useSyncExternalStore } from 'react';
 import { Snapshot } from '../../../packages/protocol/snapshot';
-export interface Principal {owner:string;name:string;market:MarketId;mode:'sandbox'|'site';token?:string}
+export interface Principal {owner:string;name:string;market:MarketId;mode:'sandbox'|'site'|'game';token?:string}
 export interface Session {phase:'loading'|'login'|'ready'|'offline';principal:Principal|null;snapshot:Snapshot|null;connection:'connecting'|'live'|'stale'|'offline';error:string|null;lastReceived:number;config:{sandbox:boolean}|null}
 class ApiError extends Error {constructor(message:string,readonly status:number){super(message);}}
 class RuleRejected extends Error {}
@@ -27,6 +27,7 @@ function connect(principal:Principal){
 }
 export function boot():Promise<void>{if(booting)return booting;booting=(async()=>{try {const config=await request('/config');update({config});const principal=await request<Principal>('/auth/session');connect(principal);}catch(error){if(error instanceof ApiError&&error.status===401)update({phase:'login',connection:'offline'});else{const cached=await readPublicCache();update({phase:cached?'offline':'login',snapshot:cached,connection:'offline',error:'连接暂不可用，恢复后重试'});}}})();return booting;}
 export async function loginDemo(name:string,market:MarketId){const principal=await request<Principal>('/auth/demo',{name,market});connect(principal);}
+export async function gameCredentials(username:string,password:string,market:MarketId,register=false){bearer='';const principal=await request<Principal>('/auth/'+(register?'register':'login'),{username,password,market});connect(principal);}
 export async function siteSession(create=false,createRemaster=false,market:MarketId='CN'){bearer='';const result=await request('/auth/site-session',{create,createRemaster,market});if(result.needsAccountSetup||result.needsRemasterAccount)return result;connect(result);return result;}
 export async function siteLink(username:string,password:string){return request('/auth/site-link',{username,password});}
 export async function logout(remote=true){const owner=state.principal?.owner;if(remote)await request('/auth/logout',{});generation++;socket?.disconnect();socket=null;if(poll)clearInterval(poll);if(renew)clearInterval(renew);poll=null;renew=null;bearer='';pending.clear();if(owner)sessionStorage.removeItem('rgp.pending:'+owner);update({phase:'login',principal:null,snapshot:null,connection:'offline',error:null});}

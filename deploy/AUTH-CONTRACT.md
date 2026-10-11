@@ -29,7 +29,7 @@
 |---|---|
 | 会话 Cookie 名 | `sid` |
 | Cookie 域 | `.bobbycn.cc`（`Domain=.bobbycn.cc`），`Path=/`，`HttpOnly`，`Secure`，`SameSite=Lax` |
-| 唯一登录入口 | `https://bobbycn.cc/login/`（**任何服务不得自渲染登录表单**；未认证一律 302 回主域并带 `return_to`） |
+| 站点账号登录入口 | `https://bobbycn.cc/login/`（站点账号仍在主域登录；2026-10-11 起，按用户要求，两版股票游戏同时提供独立游戏账密表单，复用 `/api/auth/register`、`/api/auth/login`，不把游戏账密当作站点身份） |
 | 注册 | `https://bobbycn.cc/register/` → 邮件验证落地页 `https://bobbycn.cc/verify-email?token=…` |
 | 口令重置 | `https://bobbycn.cc/reset-password?token=…` |
 | **exchange 端点** | `POST https://bobbycn.cc/api/auth/identity/token`（带 Cookie 或 Bearer）→ `{ token, tokenType:"Bearer", expiresIn, kid }` |

@@ -25,11 +25,29 @@ export class GameController {
     response.setHeader('Set-Cookie',this.demoCookie(session.token,86400));response.setHeader('Cache-Control','no-store');return {...session.principal,token:session.token};
   }
   @Get('auth/session') async session(@Req() request:any) {return this.auth.authenticate(tokenFrom(request));}
+  @Post('auth/login') async gameLogin(@Body() body:any,@Req() request:any,@Res({passthrough:true}) response:any) {
+    return this.gameCredentials(false,body,request,response);
+  }
+  @Post('auth/register') async gameRegister(@Body() body:any,@Req() request:any,@Res({passthrough:true}) response:any) {
+    return this.gameCredentials(true,body,request,response);
+  }
+  private async gameCredentials(register:boolean,body:any,request:any,response:any) {
+    this.auth.assertOrigin(request.headers.origin);const market=this.realm(body?.market);
+    if(this.auth.config.sandbox)throw new BadRequestException('沙盒与正式游戏账号隔离');
+    if(typeof body?.username!=='string'||body.username.trim().length<2||body.username.length>50||typeof body?.password!=='string'||body.password.length<1||body.password.length>200)throw new BadRequestException('请输入有效的用户名和密码');
+    if(register&&(body.password.length<8||Buffer.byteLength(body.password,'utf8')>72))throw new BadRequestException('密码至少8位且不超过72个UTF-8字节');
+    const result=await this.auth.request('/api/auth/'+(register?'register':'login'),{username:body.username.trim(),password:body.password},undefined,undefined,request.ip);
+    if(!result.token)throw new BadRequestException(result.error??'注册失败，请更换用户名');
+    const session=await this.auth.createGameSession(result.token,market);const principal=session.principal;
+    if(!this.game.world.accounts[accountId(principal.owner,market)])await this.game.execute({kind:'create-player',owner:principal.owner,name:principal.name,market},'create:'+principal.owner);
+    response.setHeader('Set-Cookie',this.demoCookie(session.token,86400,'rgp-role-'+market));response.setHeader('Cache-Control','no-store');return {...principal,token:session.token};
+  }
   @Post('auth/site-session') async siteSession(@Body() body:any,@Req() request:any,@Res({passthrough:true}) response:any) {
     const market=this.realm(body?.market);
     this.auth.assertOrigin(request.headers.origin);if(this.auth.config.sandbox) throw new BadRequestException('沙盒与站点账户隔离，请使用沙盒账户');
     const cookie=String(request.headers.cookie??'');const result=await this.auth.request('/api/auth/identity/token',{},cookie);const user=await this.auth.request('/api/auth/identity/me',undefined,cookie);response.setHeader('Cache-Control','no-store');
-    const session=await this.auth.createSiteSession(result.token,market,user.username??'站点玩家');const principal=session.principal;const existing=this.game.world.accounts[accountId(principal.owner,market)];
+    const linked=await this.auth.request('/api/auth/site-session',{create:false},cookie);
+    const session=await this.auth.createSiteSession(result.token,market,user.username??'站点玩家',linked.user?.id?'game:'+linked.user.id:undefined);const principal=session.principal;const existing=this.game.world.accounts[accountId(principal.owner,market)];
     if(!existing&&!body?.createRemaster) return {...result,needsRemasterAccount:true,owner:principal.owner};
     if(!existing) await this.game.execute({kind:'create-player',owner:principal.owner,name:principal.name,market},'create:'+principal.owner);
     response.setHeader('Set-Cookie',this.demoCookie(session.token,600,'rgp-role-'+market));

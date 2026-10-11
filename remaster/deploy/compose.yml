@@ -18,6 +18,7 @@ services:
       REMASTER_ALLOWED_ORIGINS: https://game.bobbycn.cc
       REMASTER_COOKIE_PATH: /remaster/
       REMASTER_COOKIE_SECURE: "true"
+      REMASTER_TRUST_PROXY: "1"
       REMASTER_TICK_MS: "2000"
       TZ: Asia/Shanghai
     volumes:

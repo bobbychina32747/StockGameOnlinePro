@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { ConflictException } from '@nestjs/common';
 import { Server } from 'socket.io';
 import { mkdirSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
@@ -20,8 +21,21 @@ export async function createApplication(options:{port?:number;database?:string;s
   if(origins.some(origin=>new URL(origin).origin!==origin)) throw new Error('Allowed origins must be exact HTTP(S) origins');
   const authSandbox=options.authSandbox??(process.env.REMASTER_AUTH_MODE==='site'?false:sandbox);
   const auth=new AuthBridge({sandbox:authSandbox,identityBaseUrl:options.identityBaseUrl??process.env.REMASTER_IDENTITY_URL??'http://127.0.0.1:8000',origin:process.env.REMASTER_SITE_ORIGIN??'https://game.bobbycn.cc',allowedOrigins:origins});
+  auth.resolveOwner=(subject,market,gameSubject)=>{
+    const subjects=[...new Set([subject,...(gameSubject?[gameSubject]:[])])];
+    return repository.db.transaction(()=>{
+      const rows=subjects.map(key=>repository.db.prepare('SELECT owner FROM role_owners WHERE subject=? AND market=?').get(key,market));
+      const existingOwners=[...rows.filter(Boolean).map(row=>row.owner),...subjects.map(key=>key+':'+market).filter(owner=>game.world.accounts[owner+':'+market])];
+      if(new Set(existingOwners).size>1)throw new ConflictException('两种身份在该区服已有不同角色，不能自动合并资产');
+      const existing=rows.find(Boolean)?.owner??subjects.map(key=>key+':'+market).find(owner=>game.world.accounts[owner+':'+market]);
+      const owner=existing??subject+':'+market;
+      for(const key of subjects)repository.db.prepare('INSERT OR IGNORE INTO role_owners(subject,market,owner) VALUES(?,?,?)').run(key,market,owner);
+      return owner;
+    })();
+  };
   @Module({controllers:[GameController],providers:[{provide:'GAME',useValue:game},{provide:'AUTH',useValue:auth}]}) class GameApiModule {}
   const app=await NestFactory.create(GameApiModule,{logger:['error','warn']});app.setGlobalPrefix('api');
+  app.getHttpAdapter().getInstance().set('trust proxy',process.env.REMASTER_TRUST_PROXY==='1'?1:0);
   app.enableCors({origin:origins,credentials:true,allowedHeaders:['Content-Type','Authorization','Idempotency-Key','X-Game-Realm']});
   app.use((request:any,response:any,next:()=>void)=>{response.setHeader('X-Content-Type-Options','nosniff');response.setHeader('Referrer-Policy','same-origin');response.setHeader('Cache-Control','no-store');next();});
   const express=require('express');app.use('/api',express.json({limit:'64kb'}));

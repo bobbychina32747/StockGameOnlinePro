@@ -100,9 +100,9 @@ describe('site identity to game account', () => {
     await service.link(session(), 'alice', 'old-password');
     expect((await service.link(session(), 'alice', 'old-password')).user.id).toBe(old.id);
   });
-  it('legacy passwords no longer grant independent login after binding', async () => {
+  it('bound game accounts retain the optional password login', async () => {
     await oldUser(users, { identityId: 'site-1' });
-    await expect(legacy.login('alice', 'old-password')).rejects.toThrow('站点账号');
+    expect((await legacy.login('alice', 'old-password')).token).toBe('old-token');
   });
   it.each([{ revokedAt: new Date() }, { expiresAt: new Date(0) }, { identity: { id: 'site-1', status: 'disabled' } }])
     ('rejects an unusable site session before creating accounts (%j)', async overrides => {
@@ -123,10 +123,10 @@ describe('site identity to game account', () => {
     await oldUser(users, { identityId: 'site-1', isActive: false });
     await expect(service.authenticate('site-token')).rejects.toThrow();
   });
-  it('legacy JWTs stop authorizing a linked user', async () => {
+  it('legacy JWTs continue authorizing active linked users', async () => {
     const old = await oldUser(users, { identityId: 'site-1' });
     const strategy = new JwtStrategy({ get: () => 'test-secret-with-enough-length' }, users);
-    await expect(strategy.validate({ sub: old.id })).rejects.toThrow();
+    expect((await strategy.validate({ sub: old.id })).id).toBe(old.id);
   });
   it('HTTP guard attaches the game user rather than the site identity id', async () => {
     const old = await oldUser(users, { identityId: 'site-1' });

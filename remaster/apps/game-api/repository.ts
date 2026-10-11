@@ -19,6 +19,7 @@ export class WorldRepository {
       CREATE INDEX IF NOT EXISTS ledger_account ON ledger(account_id);
       CREATE TABLE IF NOT EXISTS outbox(version INTEGER PRIMARY KEY,payload TEXT NOT NULL,delivered INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS minute_candles(symbol TEXT NOT NULL,time INTEGER NOT NULL,payload TEXT NOT NULL,PRIMARY KEY(symbol,time));
+      CREATE TABLE IF NOT EXISTS role_owners(subject TEXT NOT NULL,market TEXT NOT NULL,owner TEXT NOT NULL,PRIMARY KEY(subject,market));
     `);
     if(this.db.prepare('SELECT version FROM schema_info').get()?.version!==2) throw new Error('Unsupported remaster schema');
   }

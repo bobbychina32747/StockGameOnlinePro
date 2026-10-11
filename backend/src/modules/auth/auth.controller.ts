@@ -4,6 +4,8 @@ import { AuthService } from './auth.service';
 import { SiteGameAuthService } from './site-game-auth.service';
 import { CurrentSession, SessionAuthGuard } from '../identity/session-auth.guard';
 import { Session } from '../../infrastructure/database/entities/session.entity';
+import { JwtAuthGuard, CurrentUser } from '../../common/guards/jwt-auth.guard';
+import { User } from '../../infrastructure/database/entities/user.entity';
 
 class SiteSessionDto {
     @IsOptional()
@@ -38,6 +40,13 @@ class LoginDto {
 @Controller('auth')
 export class AuthController {
     constructor(private readonly authService: AuthService, private readonly siteAuth: SiteGameAuthService) {}
+
+    @Get('game-profile')
+    @UseGuards(JwtAuthGuard)
+    gameProfile(@CurrentUser() user: User, @Res({ passthrough: true }) res: any) {
+        res.setHeader('Cache-Control', 'no-store');
+        return { user: this.authService.toSafeUser(user), subject: user.identityId ? `site:${user.identityId}` : `game:${user.id}` };
+    }
 
     @Post('site-session')
     @HttpCode(HttpStatus.OK)

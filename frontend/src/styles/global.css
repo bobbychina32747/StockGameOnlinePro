@@ -1483,3 +1483,4 @@ body.density-compact .info-row { padding: 2px 0; }
 .login-card .form-group input{border-radius:1px}
 :where(button,a,input,select):focus-visible{outline:2px solid var(--color-brand);outline-offset:3px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+.login-methods{display:flex;gap:8px;margin:20px 0}.login-methods .btn{flex:1;width:auto}.login-methods .btn[aria-pressed="true"]{border-color:var(--color-brand);color:var(--color-brand)}.login-card{max-width:calc(100vw - 32px)}

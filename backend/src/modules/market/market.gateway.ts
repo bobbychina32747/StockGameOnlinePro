@@ -92,7 +92,7 @@ export class MarketGateway {
                     return;
                 }
                 const user = await this.userRepo.findOne({ where: { id: payload.sub } });
-                if (!user || !user.isActive || user.identityId) {
+                if (!user || !user.isActive) {
                     this.logger.warn(`WS 认证失败（用户不存在或已被禁用）: ${client.id}`);
                     client.disconnect(true);
                     return;

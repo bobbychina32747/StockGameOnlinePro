@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -96,6 +96,10 @@ export class AuthService {
     }
 
     async register(username: string, password: string) {
+        username = this.normalizeUsername(username);
+        if (username.length < 2 || username.length > 50 || typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) {
+            throw new BadRequestException('用户名需为2–50个字符；密码至少8位且不超过72个UTF-8字节');
+        }
         const existing = await this.userRepo.findOne({ where: { username } });
         if (existing)
             // Phase E: 枚举面收口（teams 方案 B）——重名不再 409，统一 200+{success:false}，
@@ -189,7 +193,7 @@ export class AuthService {
         }
         // R5-④: 成功登录只清「本键」（用户名|本次 IP），该用户在其他 IP 上的失败计数不受影响
         this.loginFails.delete(key);
-        if (user.identityId && !allowLinked) throw new UnauthorizedException('此游戏账号已绑定，请使用站点账号登录');
+        if (!user.isActive) throw new UnauthorizedException('游戏账号不可用');
         const token = this.jwtService.sign({ sub: user.id, username: user.username, role: user.role });
         return { user: this.toSafeUser(user), token };
     }
