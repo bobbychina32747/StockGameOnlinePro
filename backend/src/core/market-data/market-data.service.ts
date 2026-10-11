@@ -15,6 +15,7 @@ import * as fundamentals_1 from './fundamentals';
 import * as ai_opponents_1 from './ai-opponents';
 import { gameTradingTime, tradingMinutesFor } from '../../common/data/trading-calendar';
 import { calibratedShock, heavyTail, unifiedInstruments } from '../../common/unified-market';
+import { HISTORY_CACHE_LIMITS, restoreHistoryCache } from './history-cache';
 
 // SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
 let klineDedupDone = false;
@@ -413,12 +414,9 @@ export class MarketDataService {
         }
         // 三服务器：仅加载本市场的 K 线（原实现全表加载×3，277MB 库会产生数 GB 级瞬时内存峰值）
         const ownSymbols = [...this.stocks.keys()];
-        const allHistory = ownSymbols.length > 0
-            ? await this.klineRepo.find({ where: { symbol: In(ownSymbols) }, order: { time: 'ASC' } })
-            : [];
-        const historyRows = allHistory.filter((r) => this.stocks.has(r.symbol));
-        if (historyRows.length > 0) {
-            this.restoreFromHistory(historyRows);
+        const historyCount = await restoreHistoryCache(this.klineRepo, ownSymbols,
+            (symbol, rows) => this.restoreFromHistory(rows, symbol));
+        if (historyCount > 0) {
             // S1 补齐：恢复的天数不足 30 天则补生成（内存，不落库）
             const missingDays = Math.max(0, 30 - this.gameDay);
             for (let d = 0; d < missingDays; d++) {
@@ -427,7 +425,7 @@ export class MarketDataService {
                 }
                 await this.endOfDay(true);
             }
-            this.logger.log(`[S1] 已恢复历史K线 ${historyRows.length} 条, 从第 ${this.gameDay} 个交易日继续（补齐 ${missingDays} 天）`);
+            this.logger.log(`[S1] 已恢复行情缓存 ${historyCount} 条, 从第 ${this.gameDay} 个交易日继续（补齐 ${missingDays} 天；完整历史留在数据库）`);
         } else {
             for (let d = 0; d < 30; d++) {
                 for (let t = 0; t < constants_1.MARKET.TICKS_PER_DAY; t++) {
@@ -1436,7 +1434,7 @@ export class MarketDataService {
         if (!stock.current1min || stock.current1min.startMinute !== minute) {
             if (stock.current1min) {
                 stock.kline1min.push(stock.current1min);
-                if (stock.kline1min.length > 50000)
+                if (stock.kline1min.length > HISTORY_CACHE_LIMITS['1min'])
                     stock.kline1min.shift();
             }
             // 价格连续性：新 bar 的 open = 上一条 close（相邻 bar 区间自然交叠，消除图表割裂）
@@ -1457,7 +1455,7 @@ export class MarketDataService {
         if (!stock.current5min || stock.current5min.startFiveIdx !== fiveIdx) {
             if (stock.current5min) {
                 stock.kline5min.push(stock.current5min);
-                if (stock.kline5min.length > 20000)
+                if (stock.kline5min.length > HISTORY_CACHE_LIMITS['5min'])
                     stock.kline5min.shift();
             }
             const prevClose5 = stock.kline5min.length > 0 ? Number(stock.kline5min[stock.kline5min.length - 1].close) : price;
@@ -1621,7 +1619,7 @@ export class MarketDataService {
         }
         this.logger.log('全生命周期历史补齐完成，共 ' + total + ' 根日线');
     }
-    restoreFromHistory(rows) {
+    restoreFromHistory(rows, symbol?: string) {
         const BASE = new Date(2024, 0, 1).getTime();
         const DAY_MS = 86400000;
         const byStock = {};
@@ -1648,6 +1646,7 @@ export class MarketDataService {
         };
         let maxDay = -1;
         for (const st of this.stocks.values()) {
+            if (symbol && st.symbol !== symbol) continue;
             const h = byStock[st.symbol] || { '1min': [], '5min': [], daily: [] };
             st.kline1min = dedupe(h['1min']);
             st.kline5min = dedupe(h['5min']);
@@ -1658,7 +1657,7 @@ export class MarketDataService {
                     maxDay = day;
             }
         }
-        this.gameDay = maxDay + 1;
+        this.gameDay = symbol ? Math.max(this.gameDay, maxDay + 1) : maxDay + 1;
     }
     async endOfDay(skipPersist = false) {
         // 内在价值每日微增（基本面缓慢向好，泡沫度相对下降）
@@ -1695,10 +1694,13 @@ export class MarketDataService {
             }
             if (stock.currentDaily) {
                 stock.klineDaily.push(stock.currentDaily);
+                if (stock.klineDaily.length > HISTORY_CACHE_LIMITS.daily) stock.klineDaily.shift();
                 if (!skipPersist)
                     persistBar('daily', stock.currentDaily);
                 stock.currentDaily = null;
             }
+            if (stock.kline1min.length > HISTORY_CACHE_LIMITS['1min']) stock.kline1min.splice(0, stock.kline1min.length - HISTORY_CACHE_LIMITS['1min']);
+            if (stock.kline5min.length > HISTORY_CACHE_LIMITS['5min']) stock.kline5min.splice(0, stock.kline5min.length - HISTORY_CACHE_LIMITS['5min']);
             // P1 隔夜跳空模型：昨收=今日收盘，开盘=昨收×(1+缺口)；缺口写入 lastReturn 让 GARCH 感知隔夜冲击
             // 市场级冲击×个股β + 个股级厚尾冲击；CN 受 ±10% 涨跌停约束（涨停/跌停开盘标记）
             const lastClose = stock.price;
