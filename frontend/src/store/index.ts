@@ -116,7 +116,11 @@ export const useMarketStore = create<MarketState>((set) => ({
             volume: last.volume + tick.volume,
           };
         } else {
-          arr.push({ time, open: tick.price, high: tick.price, low: tick.price, close: tick.price, volume: tick.volume });
+          // Match the backend's minute bars: previous close opens the next candle.
+          // Using the incoming close for all four prices makes every live candle flat.
+          const open = Number.isFinite(last?.close) ? last.close
+            : Number.isFinite(state.prices[tick.symbol]) ? state.prices[tick.symbol] : tick.price;
+          arr.push({ time, open, high: Math.max(open, tick.price), low: Math.min(open, tick.price), close: tick.price, volume: tick.volume });
           // 大 cap：session 内头部不滚动（防 LoD 头部桶重排 = 历史只读）
           if (arr.length > 50000) arr.shift();
         }

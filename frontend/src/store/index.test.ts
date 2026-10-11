@@ -27,6 +27,34 @@ describe('useMarketStore.addTick', () => {
     st.addTick({ symbol: 'T1', price: 10, volume: 10, timestamp: 5 });
     st.addTick({ symbol: 'T1', price: 11, volume: 10, timestamp: 6 });
     expect(useMarketStore.getState().klines.T1['1min']).toHaveLength(2);
+    expect(useMarketStore.getState().klines.T1['1min'][1]).toMatchObject({ open: 10, close: 11, high: 11, low: 10 });
+  });
+
+  it('历史接实时：上涨和下跌分钟都有实体，历史蜡烛保持原样', () => {
+    const history = { time: '2024-02-03T01:30:00Z', open: 40, high: 42, low: 39, close: 41, volume: 100 };
+    const st = useMarketStore.getState();
+    st.setKlines('T1', '1min', [history]);
+    st.addTicks([
+      { symbol: 'T1', price: 43, volume: 20, timestamp: 1, time: '2024-02-03T01:31:00Z' },
+      { symbol: 'T1', price: 42, volume: 30, timestamp: 2, time: '2024-02-03T01:32:00Z' },
+      { symbol: 'T1', price: 42, volume: 40, timestamp: 3, time: '2024-02-03T01:33:00Z' },
+    ]);
+    const bars = useMarketStore.getState().klines.T1['1min'];
+    expect(bars[0]).toEqual(history);
+    expect(bars[1]).toMatchObject({ open: 41, close: 43, high: 43, low: 41, volume: 20 });
+    expect(bars[2]).toMatchObject({ open: 43, close: 42, high: 43, low: 42, volume: 30 });
+    // A genuinely unchanged price should still display a flat candle.
+    expect(bars[3]).toMatchObject({ open: 42, close: 42, high: 42, low: 42, volume: 40 });
+  });
+
+  it('没有历史时用已有报价开线，并独立维护每只股票', () => {
+    useMarketStore.setState({ prices: { T1: 10, H1: 20 } });
+    useMarketStore.getState().addTicks([
+      { symbol: 'T1', price: 11, volume: 10, timestamp: 5 },
+      { symbol: 'H1', price: 19, volume: 20, timestamp: 5 },
+    ]);
+    expect(useMarketStore.getState().klines.T1['1min'][0]).toMatchObject({ open: 10, close: 11, high: 11, low: 10 });
+    expect(useMarketStore.getState().klines.H1['1min'][0]).toMatchObject({ open: 20, close: 19, high: 20, low: 19 });
   });
 
   it('服务端时间优先于累计 tick，避免美股跨午夜错位', () => {
