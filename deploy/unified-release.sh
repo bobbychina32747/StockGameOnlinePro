@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 release=/opt/stockgame/releases/unified-formal-20261011
+# Source data is code: packaging must exclude backend/data, never src/common/data.
+test -f "$release/backend/src/common/data/trading-calendar.ts"
 mkdir -p "$release/archives"
 chmod 700 "$release/archives"
 if [ -f "$release/deployed" ]; then echo 'Release already deployed; refusing replay'; exit 1; fi
@@ -22,7 +24,13 @@ if [ ! -f "$release/archives/remaster-test.sqlite" ]; then
 docker run --rm --network none --entrypoint node \
  -v sgp-remaster-test_remaster-test-data:/archive:ro -v "$release/archives:/backup" \
  stockgame-remaster:20261010 --require /app/tooling/runtime.cjs -e \
- 'const D=require("better-sqlite3"); (async()=>{const db=new D("/archive/remaster.sqlite",{readonly:true});await db.backup("/backup/remaster-test.sqlite");db.close();const copy=new D("/backup/remaster-test.sqlite",{readonly:true});if(copy.pragma("integrity_check",{simple:true})!=="ok")throw Error("Test archive integrity check failed");copy.close();console.log("2.0 test ledger archived independently and verified");})().catch(e=>{console.error(e.message);process.exitCode=1;});'
+ 'const D=require("better-sqlite3"); (async()=>{const db=new D("/archive/remaster.sqlite",{readonly:true});await db.backup("/backup/remaster-test.sqlite");db.close();})().catch(e=>{console.error(e.message);process.exitCode=1;});'
+fi
+# A file may exist after an interrupted copy. Do not treat existence as verification.
+if [ ! -f "$release/archives/remaster-test.verified" ]; then
+docker run --rm --network none --entrypoint node \
+ -v "$release/archives:/backup" stockgame-remaster:20261010 --require /app/tooling/runtime.cjs -e \
+ 'const D=require("better-sqlite3"),fs=require("fs");const copy=new D("/backup/remaster-test.sqlite",{readonly:true});if(copy.pragma("integrity_check",{simple:true})!=="ok")throw Error("Test archive integrity check failed");copy.close();fs.writeFileSync("/backup/remaster-test.verified",new Date().toISOString());console.log("2.0 test ledger archived independently and verified");'
 fi
 chmod 600 "$release/archives/"*
 sudo cp /etc/nginx/conf.d/game.conf "$release/previous-game.conf"
