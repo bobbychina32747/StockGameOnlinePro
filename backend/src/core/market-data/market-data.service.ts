@@ -127,6 +127,7 @@ export class MarketDataService {
     private burstingIndustries: Set<string>;
     private burstEvents: any[];
     private industryBubbleMap: Record<string, number>;
+    private burstLastDay = new Map<string, number>();
     // AI 对手盘：机构/游资/散户市场参与者（每服务器独立，完全本地：规则策略 + 本地随机森林，零 API）
     // P4 具名对手盘 + 策略 + 绩效记账（净值/胜率/段位）
     private aiLedger: any[];
@@ -572,6 +573,10 @@ export class MarketDataService {
         const regimes = this.marketRegime;
         const params = constants_1.STATE_PARAMS[regimes];
         const dt = 1 / tradingMinutesFor(this.market);
+        this.computeIndustryBubble();
+        for (const industry of this.burstingIndustries) {
+            if ((this.industryBubbleMap[industry] || 1) <= 1.1) this.burstingIndustries.delete(industry);
+        }
         const stocksArr: any[] = [...this.stocks.values()];
         // 行业联动：同行业股票共享一部分随机冲击（板块同涨同跌、板块间分化）
         const industryShocks = {};
@@ -596,17 +601,17 @@ export class MarketDataService {
             const { small: smallJump, big: bigJump } = this.calcJump(dt, stock);
             const factorImpact = this.calcFactorImpact(stock);
             const ofiImpact = this.calcOFIImpact(stock);
-            const drift = params.driftBase;
+            const drift = params.driftBase * dt;
             let meanReversion = 0;
             let momentumBoost = 0;
             if (!stock.isTrending) {
                 meanReversion = Number(cfg.theta ?? 0.15) * (effMu - stock.price) / Math.max(.5, stock.price) * dt;
             } else {
-                momentumBoost = 0.2 * dt * 1.5;
+                momentumBoost = Number(stock.trendDirection || 0) * 0.01 * dt;
                 // 经济泡沫积累：行业泡沫度越高追涨越强（受控）
                 const ib = this.industryBubbleMap[stock.industry] || 1;
                 if (ib > 1.3) {
-                    momentumBoost += Math.min(0.3, (ib - 1) * 0.12) * dt * 4;
+                    momentumBoost += Number(stock.trendDirection || 0) * Math.min(0.03, (ib - 1) * 0.01) * dt;
                 }
             }
             // 经济泡沫：破灭期向内在价值快速回归
@@ -615,11 +620,7 @@ export class MarketDataService {
                 const intrinsic = Number(stock.intrinsic) || 1;
                 const target = intrinsic * 1.05;
                 if (stock.price > target) {
-                    burstDrift = -0.008; // 每 tick 回归 0.8%（泡沫破灭暴跌）
-                }
-                else if (stock.price >= intrinsic * 0.9) {
-                    this.burstingIndustries.delete(stock.industry); // 回归完成
-                    this.logger.log('🧊 泡沫出清: ' + stock.industry + ' 回归内在价值');
+                    burstDrift = -Math.min(0.08, Math.log(stock.price / target) * 0.25) * dt;
                 }
             }
             // P3 财报后漂移（PEAD）：披露后数日同向漂移，摊到每 tick
@@ -736,8 +737,11 @@ export class MarketDataService {
     triggerBurst(industry, reason) {
         if (this.burstingIndustries.has(industry))
             return;
+        const lastDay = this.burstLastDay.get(industry);
+        if (lastDay !== undefined && this.gameDay - lastDay < 3) return;
+        this.burstLastDay.set(industry, this.gameDay);
         this.burstingIndustries.add(industry);
-        this.burstEvents.push({ industry, reason });
+        this.burstEvents.push({ industry, reason, day: this.gameDay, market: this.market, ratio: this.industryBubbleMap[industry] });
         this.factors['市场情绪'] = Math.max(-0.15, (this.factors['市场情绪'] ?? 0) - 0.04);
         this.logger.warn('💥 泡沫破灭: ' + industry + '（' + reason + '）');
     }
@@ -1043,6 +1047,11 @@ export class MarketDataService {
             const resting = this.activeAiResting(ledger);
             const risk = aiPortfolioRisk(ledger, this.stocks, resting, this.marketRegime);
             ledger.riskPeakEquity = risk.peak;
+            if (risk.drawdown >= 0.08) {
+                if (!ledger.riskRecovery || risk.equity < ledger.riskRecovery.anchor * 0.98) {
+                    ledger.riskRecovery = { resumeDay: this.gameDay + 2, anchor: risk.equity };
+                }
+            } else if (risk.drawdown < 0.04) ledger.riskRecovery = null;
             // Inspect every held stock before the activity lottery or entry selection.
             let riskTarget;
             let worstLoss = 0;
@@ -1117,7 +1126,7 @@ export class MarketDataService {
                 dir = -1;
             if (riskTarget) dir = -1;
             if (dir > 0) {
-                if (risk.drawdown >= 0.08) continue; // Recovery mode: no new risk until existing assets recover.
+                if (ledger.riskRecovery && this.gameDay < ledger.riskRecovery.resumeDay) continue;
                 const entryScore = aiEntryScore(agent.strategy, target, feats, hotFlag);
                 if (entryScore === -Infinity) continue;
                 const lastEntry = ledger.entryTicks?.[target.symbol];
@@ -2106,6 +2115,8 @@ export class MarketDataService {
                 dayVolume: state.dayVolume,
                 fundamentals: state.fund ? { ...state.fund } : null,
                 intrinsic: Number(state.intrinsic) || null,
+                previousClose: prevClose,
+                priceLimits: this.cnBandOf(state),
             });
         }
         return list;

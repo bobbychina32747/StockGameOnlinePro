@@ -15,6 +15,7 @@ export function recentAiReturns(stock) {
 }
 
 export function aiEntryScore(strategy, stock, features, hot) {
+    if (Number(stock.intrinsic) > 0 && Number(stock.price) > Number(stock.intrinsic) * 1.35) return -Infinity;
     const recent = recentAiReturns(stock);
     if (!recent.ready) return null; // Retain the existing signal until enough completed candles are available.
     const ret = Number(features.ret) || 0;
@@ -42,7 +43,7 @@ export function aiPortfolioRisk(ledger, stocks, resting, regime) {
     const equity = Math.max(0, Number(ledger.cash) + holdings);
     const peak = Math.max(equity, Number(ledger.riskPeakEquity) || Number(ledger.initialCash) || equity);
     const drawdown = peak > 0 ? (peak - equity) / peak : 0;
-    const exposureLimit = equity * (drawdown >= 0.1 ? 0.25 : regime === 'bear' ? 0.35 : 0.6);
+    const exposureLimit = equity * (drawdown >= 0.08 ? 0.1 : regime === 'bear' ? 0.35 : 0.6);
     let pendingBuys = 0;
     const bySymbol = new Map<string, number>();
     for (const order of resting) {
@@ -51,5 +52,5 @@ export function aiPortfolioRisk(ledger, stocks, resting, regime) {
         pendingBuys += value;
         bySymbol.set(order.symbol, (bySymbol.get(order.symbol) || 0) + value);
     }
-    return { equity, peak, drawdown, holdings, pendingBuys, bySymbol, exposureLimit, singleLimit: equity * 0.12 };
+    return { equity, peak, drawdown, holdings, pendingBuys, bySymbol, exposureLimit, singleLimit: equity * (drawdown >= 0.08 ? 0.03 : 0.12) };
 }

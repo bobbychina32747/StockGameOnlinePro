@@ -17,10 +17,10 @@ test('组合和单股额度包含跨标的挂买单，回撤后收缩总敞口',
     {symbol:'A',side:'sell',qty:100,price:10},
   ], 'bull');
   expect(risk.equity).toBe(8000);
-  expect(risk.exposureLimit).toBe(2000);
+  expect(risk.exposureLimit).toBe(800);
   expect(risk.pendingBuys).toBe(1200);
   expect(risk.bySymbol.get('B')).toBe(800);
-  expect(risk.singleLimit).toBe(960);
+  expect(risk.singleLimit).toBe(240);
 });
 
 test('大股票池中止损先于参与率抽签，不依赖随机选到亏损持仓', async () => {

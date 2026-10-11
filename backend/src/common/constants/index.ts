@@ -1,6 +1,6 @@
 
 
-import { extendStockPool } from '../unified-market';
+import { extendStockPool, canonicalIndustry } from '../unified-market';
 export const MARKET = {
     OPEN_HOUR: 9,
     OPEN_MINUTE: 30,
@@ -442,3 +442,17 @@ export const INDUSTRY_LINKS: Record<string, Record<string, number>> = {
 extendStockPool(STOCK_POOL, 'CN');
 extendStockPool(HK_POOL, 'HK');
 extendStockPool(US_POOL, 'US');
+extendStockPool(IPO_POOL, '__ipo_aliases_only__');
+// Retain factor exposure and sector transmission after consolidating old labels.
+for (const [industry, weights] of Object.entries({...INDUSTRY_SENSITIVITY})) {
+    const canonical = canonicalIndustry(industry);
+    INDUSTRY_SENSITIVITY[canonical] = { ...weights, ...INDUSTRY_SENSITIVITY[canonical] };
+}
+for (const [industry, links] of Object.entries({...INDUSTRY_LINKS})) {
+    const canonical = canonicalIndustry(industry);
+    const target = INDUSTRY_LINKS[canonical] ||= {};
+    for (const [linked, weight] of Object.entries(links)) {
+        const destination = canonicalIndustry(linked);
+        if (destination !== canonical) target[destination] = Math.max(target[destination] || 0, weight);
+    }
+}

@@ -26,9 +26,10 @@ export function adaptLedger(raw:any,principal:Principal,stocks:any[],state:any,f
     initialPrice:catalogBySymbol.get(row.symbol)?.initialPrice??cents(row.price),volatility:catalogBySymbol.get(row.symbol)?.volatility??.02,
   }));
   const quotes=Object.fromEntries(stocks.filter(row=>row.market===principal.market).map(row=>{
-    const price=cents(row.price),change=num(row.changePct)/100,previousClose=Math.round(price/(1+change));
+    const price=cents(row.price),change=num(row.changePct)/100,previousClose=cents(row.previousClose)||Math.round(price/(1+change));
     return [row.symbol,{symbol:row.symbol,price,previousClose,fairValue:cents(row.intrinsic)||price,open:cents(row.dayOpen)||price,
       high:cents(row.dayHigh)||price,low:cents(row.dayLow)||price,volume:num(row.dayVolume),turnover:0,
+      priceLimits:row.priceLimits?{up:cents(row.priceLimits.up),down:cents(row.priceLimits.down)}:null,
       momentum:0,bubble:0,earningsGrowth:num(row.fundamentals?.consensusGrowth),pe:0,dividendFactor:num(row.adjFactor)||1,change}];
   }));
   const positions=raw.positions.filter((p:any)=>p.longQty||p.shortQty).map((p:any)=>{
@@ -72,7 +73,7 @@ export function adaptLedger(raw:any,principal:Principal,stocks:any[],state:any,f
     instruments,quotes,markets,indices:[{market:principal.market,value:instruments.length?instruments.reduce((s,row)=>s+quotes[row.symbol].price/Math.max(1,row.initialPrice),0)/instruments.length*1000:1000,
       change:instruments.length?instruments.reduce((s,row)=>s+quotes[row.symbol].change,0)/instruments.length:0,advancing:instruments.filter(row=>quotes[row.symbol].change>0).length,count:instruments.length}],
     accounts:{CN:null,HK:null,US:null,[principal.market]:held},orders,trades:[],events,seasons:[],rankings:[]};
-  return Object.assign(snapshot,{formal:{ledger:'legacy-authoritative',tier:a.tier,metrics:raw.metrics,reviews:raw.reviews,achievements:raw.achievements,
+  return Object.assign(snapshot,{formal:{ledger:'legacy-authoritative',tier:a.tier,metrics:raw.metrics,reviews:(raw.reviews??[]).filter((row:any)=>!row.market||row.market===principal.market),achievements:raw.achievements,
     fundHoldings:raw.funds,funds:fundDefs,tickIntervalMs:state.tickIntervalMs,offHoursTrading:state.offHoursTrading}});
 }
 

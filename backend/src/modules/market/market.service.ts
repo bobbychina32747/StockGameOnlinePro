@@ -366,6 +366,7 @@ export class MarketService {
                 if (this.riskManager) {
                     this.riskManager.addGlobalReview({
                         type: '泡沫破灭',
+                        market, day: b.day, industry: b.industry, reason: b.reason, ratio: b.ratio,
                         title: `💥 ${b.industry} 板块泡沫破灭`, desc: `${b.reason}。板块股价正在向内在价值剧烈回归`, lesson: '泡沫破灭的教训：板块连续暴涨（涨幅远超基本面）时，任何细小抛售都可能引发连锁崩盘。识别泡沫：关注涨幅是否离谱、回调时是否放量下跌。破灭期不要抄底，等价格回归价值企稳后再介入',
                     });
                 }

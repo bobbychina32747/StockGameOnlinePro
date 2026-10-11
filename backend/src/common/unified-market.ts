@@ -2,7 +2,23 @@ import catalog from './unified-catalog.json';
 import intraday from './unified-intraday.json';
 
 export const unifiedInstruments = new Map(catalog.instruments.map(row => [row.symbol, row]));
+const industryAliases = {
+    航天科技:'工业与军工', 军工:'工业与军工', 制造业:'工业与军工', 券商:'券商与金融科技', 金融科技:'券商与金融科技', 金融:'券商与金融科技',
+    创新药:'医药与生物', 生物疫苗:'医药与生物', 医药:'医药与生物', 医疗:'医疗器械与服务', 医疗器械:'医疗器械与服务',
+    新能源车:'汽车与出行', 汽车:'汽车与出行', 锂电池:'新能源与电池', 光伏:'新能源与电池', 新能源:'新能源与电池',
+    游戏:'游戏与互动娱乐', 电竞:'游戏与互动娱乐', 云游戏:'游戏与互动娱乐', 游戏引擎:'游戏与互动娱乐',
+    动漫IP:'传媒与文娱', 影视传媒:'传媒与文娱', 数字音乐:'传媒与文娱', 传媒:'传媒与文娱',
+    房地产:'地产与基建', 地产:'地产与基建', 家电:'硬件与家电', 消费电子:'硬件与家电', 有色金属:'有色与材料',
+    煤炭:'能源与煤炭', 能源:'能源与煤炭', 物流:'航空航运与物流', 航空:'航空航运与物流', 航运:'航空航运与物流',
+    软件服务:'软件与云服务', 软件:'软件与云服务', 数据要素:'软件与云服务', 通信设备:'通信与网络', 通信:'通信与网络',
+    白酒:'食品饮料', 餐饮:'食品饮料', 农业:'食品饮料', 在线教育:'互联网与电商', 消费:'零售与消费', 零售:'零售与消费',
+    互联网:'互联网与电商', 电商:'互联网与电商',
+};
+export function canonicalIndustry(industry: string, symbol?: string) {
+    return unifiedInstruments.get(symbol)?.industry || industryAliases[industry] || industry;
+}
 export function extendStockPool(pool: any[], market: string) {
+    for (const row of pool) row.industry = canonicalIndustry(row.industry, row.symbol);
     const existing = new Set(pool.map(row => row.symbol));
     for (const row of catalog.instruments.filter(row => row.market === market)) {
         if (!existing.has(row.symbol)) pool.push({ symbol: row.symbol, name: row.name, code: row.code,

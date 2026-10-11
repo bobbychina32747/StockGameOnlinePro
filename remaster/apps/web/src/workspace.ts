@@ -7,6 +7,7 @@ function stored<T>(key:string,fallback:T):T{try{return JSON.parse(localStorage.g
 let workspace:Workspace={market:'CN',symbol:'T1',page:'trade',ticketOpen:false,search:'',industry:'',watchOnly:false,watch:[],theme:stored('rgp.theme','dark'),language:stored('rgp.language','zh-CN'),upIsRed:stored('rgp.up-red',true),reducedMotion:stored('rgp.motion',false),drafts:{}};
 const listeners=new Set<()=>void>();let owner='';
 export function useWorkspace(){return useSyncExternalStore(listener=>{listeners.add(listener);return()=>{listeners.delete(listener);};},()=>workspace);}
+export function currentLanguage(){return workspace.language;}
 export function setWorkspace(patch:Partial<Workspace>){workspace={...workspace,...patch};for(const listener of listeners)listener();}
 export function changeOwner(identity:string){if(owner===identity)return;owner=identity;setWorkspace({watch:stored('rgp.watch:'+owner,[]),drafts:stored('rgp.drafts:'+owner,{})});}
 export function chooseMarket(market:MarketId,symbol:string){setWorkspace({market,symbol,search:'',industry:'',watchOnly:false});}
