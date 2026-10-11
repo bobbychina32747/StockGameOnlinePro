@@ -1,5 +1,6 @@
 
 
+import { extendStockPool } from '../unified-market';
 export const MARKET = {
     OPEN_HOUR: 9,
     OPEN_MINUTE: 30,
@@ -437,3 +438,7 @@ export const INDUSTRY_LINKS: Record<string, Record<string, number>> = {
     动漫: { 游戏: 0.5, 传媒: 0.4, 消费: 0.2 },
     旅游: { 消费: 0.3, 航空: 0.3, 零售: 0.2 },
 };
+
+extendStockPool(STOCK_POOL, 'CN');
+extendStockPool(HK_POOL, 'HK');
+extendStockPool(US_POOL, 'US');

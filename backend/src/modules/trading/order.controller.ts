@@ -63,6 +63,11 @@ class PlaceOrderDto {
 export class OrderController {
     constructor(private readonly orderService: OrderService) {}
 
+    @Post('estimate')
+    estimate(@CurrentUser() user: User, @Body() dto: PlaceOrderDto, @Query('mode') mode: string) {
+        return this.orderService.estimateOrder(user.id, mode || 'CN', dto);
+    }
+
     @Post('order')
     placeOrder(
         @CurrentUser() user: User,

@@ -1,0 +1,39 @@
+services:
+  formal:
+    build:
+      context: ..
+      args:
+        REMASTER_WEB_BASE: /
+    image: stockgame-unified:20261011
+    container_name: sgp-unified-formal
+    command: [node, --require, ./tooling/runtime.cjs, dist/apps/game-api/unified-main.js]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8321:8320"
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=192
+      REMASTER_HOST: 0.0.0.0
+      REMASTER_PORT: "8320"
+      REMASTER_IDENTITY_URL: http://sgp-backend:8000
+      REMASTER_ALLOWED_ORIGINS: https://game.bobbycn.cc
+      REMASTER_SITE_ORIGIN: https://game.bobbycn.cc
+      REMASTER_COOKIE_SECURE: "true"
+      REMASTER_TRUST_PROXY: "1"
+      TZ: Asia/Shanghai
+    volumes:
+      - formal-command-data:/app/data
+    networks:
+      - site-identity
+    mem_limit: 300m
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+volumes:
+  formal-command-data:
+networks:
+  site-identity:
+    external: true
+    name: docker_default

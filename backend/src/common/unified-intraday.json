@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "method": "One month of continuous five-minute returns; exclude overnight and lunch gaps. Opening/closing 45-minute variance relative to middle session; robust cross-stock medians. Recent samples do not establish long-run stability.",
+  "profiles": {
+    "CN": {
+      "openBoost": 5,
+      "closeBoost": 0,
+      "normalization": 0.736842266501449,
+      "stocks": 4
+    },
+    "HK": {
+      "openBoost": 5,
+      "closeBoost": 0,
+      "normalization": 0.736842266501449,
+      "stocks": 4
+    },
+    "US": {
+      "openBoost": 5,
+      "closeBoost": 0.30109216467974265,
+      "normalization": 0.7253477201129449,
+      "stocks": 4
+    }
+  }
+}

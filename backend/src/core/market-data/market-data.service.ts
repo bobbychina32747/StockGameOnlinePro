@@ -14,6 +14,7 @@ import * as market_maker_1 from './market-maker';
 import * as fundamentals_1 from './fundamentals';
 import * as ai_opponents_1 from './ai-opponents';
 import { gameTradingTime, tradingMinutesFor } from '../../common/data/trading-calendar';
+import { calibratedShock, heavyTail, unifiedInstruments } from '../../common/unified-market';
 
 // SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
 let klineDedupDone = false;
@@ -59,6 +60,7 @@ function dispatchVirtualFill(f: any) {
 
 // 单市场状态快照（getState 返回值）；后三个可选字段由 MarketService 聚合三市场状态时附加
 export interface MarketStateSnapshot {
+    news?: Array<{ title: string; description: string; type: string; [key: string]: any }>;
     gameDay: number;
     tickCount: number;
     marketRegime: string;
@@ -437,6 +439,7 @@ export class MarketDataService {
             this.logger.log(`市场数据已初始化(首次): ${dbStocks.length} 只股票, 30天历史已生成并落库`);
         }
         // P1 全生命周期历史：补齐上市日至 30 天窗口前的日线历史（周/月线由日线聚合，只落库一次）
+        await this.seedUnifiedHistory();
         await this.generatePreHistoryForAll();
         // 恢复/生成后：确保最新价格作为开盘基准
         for (const st of this.stocks.values()) {
@@ -573,10 +576,11 @@ export class MarketDataService {
         const stocksArr: any[] = [...this.stocks.values()];
         // 行业联动：同行业股票共享一部分随机冲击（板块同涨同跌、板块间分化）
         const industryShocks = {};
+        const marketShock = heavyTail(this.randn.bind(this));
         const cfgBySymbol = this.poolBySymbol;
         for (const stock of stocksArr) {
             if (industryShocks[stock.industry] === undefined) {
-                industryShocks[stock.industry] = this.randn() * 0.004;
+                industryShocks[stock.industry] = heavyTail(this.randn.bind(this));
             }
         }
         for (const stock of stocksArr) {
@@ -585,8 +589,11 @@ export class MarketDataService {
             // P3 行业景气周期：估值中枢随阶段上下移，波动率随阶段放大（收缩期最动荡）
             const cycle = fundamentals_1.cycleEffects(this.industryCycles.get(stock.industry) || 'expansion');
             const effMu = mu * (1 + cycle.valuationBias);
-            this.updateVolatility(stock);
-            const shock = stock.volatility * params.volMult * cycle.volMul * this.randn() * Math.sqrt(dt) * 1.5 + industryShocks[stock.industry];
+            const calibrated = calibratedShock(stock, this.randn.bind(this), tradingMinutesFor(this.market), this.market, industryShocks[stock.industry], marketShock);
+            if (calibrated === null) this.updateVolatility(stock);
+            const shock = calibrated === null
+                ? stock.volatility * params.volMult * cycle.volMul * this.randn() * Math.sqrt(dt) * 1.5 + industryShocks[stock.industry] * .004
+                : calibrated * params.volMult * cycle.volMul;
             const { small: smallJump, big: bigJump } = this.calcJump(dt, stock);
             const factorImpact = this.calcFactorImpact(stock);
             const ofiImpact = this.calcOFIImpact(stock);
@@ -594,7 +601,7 @@ export class MarketDataService {
             let meanReversion = 0;
             let momentumBoost = 0;
             if (!stock.isTrending) {
-                meanReversion = Number(cfg.theta ?? 0.15) * (effMu - stock.price) * dt;
+                meanReversion = Number(cfg.theta ?? 0.15) * (effMu - stock.price) / Math.max(.5, stock.price) * dt;
             } else {
                 momentumBoost = 0.2 * dt * 1.5;
                 // 经济泡沫积累：行业泡沫度越高追涨越强（受控）
@@ -1481,11 +1488,47 @@ export class MarketDataService {
     // S1 从 klines 表恢复历史（1min/5min/daily + gameDay + 价格）
     // P1 全生命周期历史：按上市日补齐 2024-01-01（游戏纪元）之前的日线历史
     // 随机游走 + 漂移校准到既有首根日线开盘价，保证与游戏内历史无缝衔接；只落库一次（存在即跳过）
+    async seedUnifiedHistory() {
+        const batch = [];
+        for (const stock of this.stocks.values()) {
+            const instrument = unifiedInstruments.get(stock.symbol);
+            if (!instrument || stock.klineDaily.length || !/^(R|NX)/.test(stock.symbol)) continue;
+            // New listings receive bounded synthetic history. Existing prices and history are untouched.
+            const daily = []; let close = stock.price;
+            for (let day = this.gameDay - 1; day >= this.gameDay - 120; day--) {
+                const move = Math.max(-.08, Math.min(.08, heavyTail(this.randn.bind(this)) * instrument.volatility));
+                const open = close / (1 + move), wick = Math.abs(this.randn()) * instrument.volatility * .15;
+                daily.unshift({ time: this.tradingTime(day, 0), open, close,
+                    high: Math.max(open, close) * (1 + wick), low: Math.min(open, close) * (1 - wick),
+                    volume: Math.floor(stock.baseVolume * tradingMinutesFor(this.market)) }); close = open;
+            }
+            stock.klineDaily = daily;
+            const minutes = []; close = stock.price; const length = tradingMinutesFor(this.market);
+            for (let minute = length - 1; minute >= 0; minute--) {
+                const move = heavyTail(this.randn.bind(this)) * instrument.volatility / Math.sqrt(length);
+                const open = close / (1 + move);
+                minutes.unshift({ time: this.tradingTime(this.gameDay - 1, minute), open, close,
+                    high: Math.max(open, close), low: Math.min(open, close), volume: stock.baseVolume }); close = open;
+            }
+            stock.kline1min = minutes;
+            for (const bar of daily) batch.push({ symbol: stock.symbol, timeframe: 'daily', ...bar });
+            for (const bar of minutes) batch.push({ symbol: stock.symbol, timeframe: '1min', ...bar });
+            for (let i = 0; i < minutes.length; i += 5) {
+                const group = minutes.slice(i, i + 5);
+                const bar = { time: group[0].time, open: group[0].open, close: group[group.length - 1].close,
+                    high: Math.max(...group.map(b => b.high)), low: Math.min(...group.map(b => b.low)), volume: group.reduce((sum, b) => sum + b.volume, 0) };
+                stock.kline5min.push(bar); batch.push({ symbol: stock.symbol, timeframe: '5min', ...bar });
+            }
+        }
+        for (let offset = 0; offset < batch.length; offset += 500) await this.klineRepo.save(batch.slice(offset, offset + 500));
+        if (batch.length) this.logger.log(`统一股票池已补齐 ${batch.length} 根合成历史K线；旧行情未改写`);
+    }
     async generatePreHistoryForAll() {
         const BASE = new Date(2024, 0, 1).getTime();
         const batch = [];
         let total = 0;
         for (const stock of this.stocks.values()) {
+            if (/^(R|NX)/.test(stock.symbol) && unifiedInstruments.has(stock.symbol)) continue;
             if (!stock.klineDaily || stock.klineDaily.length === 0)
                 continue;
             const oldest = new Date(stock.klineDaily[0].time).getTime();
@@ -2000,6 +2043,8 @@ export class MarketDataService {
                 dayHigh: Number(state.dayHigh.toFixed(2)),
                 dayLow: Number(state.dayLow.toFixed(2)),
                 dayVolume: state.dayVolume,
+                fundamentals: state.fund ? { ...state.fund } : null,
+                intrinsic: Number(state.intrinsic) || null,
             });
         }
         return list;

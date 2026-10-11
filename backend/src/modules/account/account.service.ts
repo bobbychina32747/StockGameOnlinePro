@@ -3,7 +3,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException, Optional, S
 // Phase A: 重置防刷钱——RESET_ENABLED 开关（大赛期间关闭）
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { Account } from '../../infrastructure/database/entities/account.entity';
 import { Position } from '../../infrastructure/database/entities/position.entity';
 import { Transaction } from '../../infrastructure/database/entities/transaction.entity';
@@ -69,6 +69,29 @@ export class AccountService {
 
     async getPositions(accountId: string) {
         return this.positionRepo.find({ where: { accountId } });
+    }
+
+    // Read the existing ledger; the unified client never creates replacement balances.
+    async getUnifiedLedger(userId: string, mode: string) {
+        if (!['CN', 'HK', 'US'].includes(mode)) throw new BadRequestException('区服无效');
+        return this.engine.runExclusive(async () => {
+            const account = await this.getAccount(userId, mode);
+            const [positions, funds, orders, transactions, achievements] = await Promise.all([
+                this.getPositions(account.id),
+                this.fundHoldingRepo.find({ where: { userId, marketMode: mode } }),
+                this.orderRepo.find({ where: { accountId: account.id }, order: { createdAt: 'DESC' }, take: 300 }),
+                this.getTransactions(userId, mode, 300),
+                this.getAchievements(userId),
+            ]);
+            const pending = await this.orderRepo.find({ where: { accountId: account.id, status: In([OrderStatus.PENDING, OrderStatus.PARTIAL]) } });
+            const allOrders = [...pending, ...orders.filter(row => !pending.some(item => item.id === row.id))];
+            const positionValue = positions.reduce((sum, row) => sum + (Number(row.longQty) - Number(row.shortQty)) *
+                Number(this.engine.prices.get(row.symbol) ?? row.longCost ?? row.shortCost ?? 0), 0);
+            return { account, positions, positionValue, funds, orders: allOrders, transactions, achievements,
+                history: this.riskManager.getEquityHistory(account.id),
+                metrics: await this.riskManager.calculateMetrics(account, [...transactions].reverse()),
+                reviews: this.getReviews(userId), ledgerVersion: Date.now() };
+        });
     }
 
     // Q7：交易流水（资金明细/交割单）

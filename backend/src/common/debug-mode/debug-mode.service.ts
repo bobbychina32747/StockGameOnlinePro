@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * 全局调试模式：管理员开启后，休市期间也可生成行情/下单（用于 debug）。
@@ -12,6 +13,13 @@ export class DebugModeService {
   private bypassUserIds = new Set<string>();
   /** P6 全服休市交易：开启后所有用户均可休市下单（行情也全时生成） */
   private globalBypass = false;
+
+  constructor(@Optional() config?: ConfigService) {
+    if (config?.get('FORMAL_CONTINUOUS_SIMULATION') === 'true') {
+      this.debug = true;
+      this.globalBypass = true;
+    }
+  }
 
   set(on: boolean) {
     this.debug = !!on;

@@ -52,7 +52,7 @@ export class AuthBridge {
       if(!key||!verify(null,Buffer.from(parts[0]+'.'+parts[1]),createPublicKey({key,format:'jwk'}),Buffer.from(parts[2],'base64url'))) throw new Error();
       const active=await this.request('/api/auth/identity/introspect',{token});
       if(active.active!==true||active.sub!==claims.sub||active.sid!==claims.sid) throw new Error();return claims;
-    } catch(error) {if(error instanceof ServiceUnavailableException) throw error;throw new UnauthorizedException('站点会话已失效');}
+    } catch(error) {if(error instanceof HttpException&&(error.getStatus()===429||error.getStatus()>=500)) throw error;throw new UnauthorizedException('站点会话已失效');}
   }
   async request(path: string, body?: unknown, cookie?: string, authorization?:string,clientIp?:string): Promise<any> {
     const headers:Record<string,string>={'Content-Type':'application/json',Origin:this.config.origin};if(cookie) headers.Cookie=cookie;
@@ -66,6 +66,22 @@ export class AuthBridge {
     } catch(error) {if(error instanceof HttpException) throw error;throw new ServiceUnavailableException('无法连接账号服务');}
   }
   revoke(token: string): void {this.demos.delete(token);this.siteSessions.delete(token);this.gameSessions.delete(token);}
+
+  // Backend credentials stay on the server; the browser receives only an opaque role session.
+  backendToken(token:string):string {
+    const value=this.gameSessions.get(token)?.gameToken??this.siteSessions.get(token)?.siteToken;
+    if(!value)throw new UnauthorizedException('正式角色会话已失效');return value;
+  }
+  async forward(token:string,path:string,method='GET',body?:unknown):Promise<any> {
+    try {
+      const response=await fetch(new URL(path,this.config.identityBaseUrl),{method,
+        headers:{'Content-Type':'application/json',Origin:this.config.origin,Authorization:'Bearer '+this.backendToken(token)},
+        body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(15000),redirect:'error'});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw new HttpException({message:typeof result.message==='string'?result.message:Array.isArray(result.message)?result.message.join('；'):'交易服务暂不可用'},response.status);
+      return result;
+    }catch(error){if(error instanceof HttpException)throw error;throw new ServiceUnavailableException('交易服务暂不可用，请核对原操作结果后重试');}
+  }
 }
 export function tokenFrom(request: {headers:Record<string,any>}): string {
   const bearer=String(request.headers.authorization??'');if(bearer.startsWith('Bearer ')) return bearer.slice(7);

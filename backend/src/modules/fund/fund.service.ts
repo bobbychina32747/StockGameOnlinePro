@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
+import { symbolMarket } from '../../common/market-utils';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
@@ -261,7 +262,7 @@ export class FundService implements OnModuleInit {
 
     private validBasketPrices(prices: Record<string, number>) {
         return Object.fromEntries(Object.entries(prices).filter(([symbol, price]) =>
-            !symbol.startsWith('H') && !symbol.startsWith('U') && Number.isFinite(price) && price > 0));
+            symbolMarket(symbol) === 'CN' && Number.isFinite(price) && price > 0));
     }
 
     private async settleNavs(day: number, prices?: Record<string, number>) {

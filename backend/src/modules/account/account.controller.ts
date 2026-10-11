@@ -8,6 +8,11 @@ import { AccountService } from './account.service';
 export class AccountController {
     constructor(private readonly accountService: AccountService) {}
 
+    @Get('unified')
+    getUnifiedLedger(@CurrentUser() user: User, @Query('mode') mode: string = 'CN') {
+        return this.accountService.getUnifiedLedger(user.id, mode);
+    }
+
     @Get()
     async getAccount(@CurrentUser() user: User, @Query('mode') mode: string = 'US') {
         const account = await this.accountService.getAccount(user.id, mode);

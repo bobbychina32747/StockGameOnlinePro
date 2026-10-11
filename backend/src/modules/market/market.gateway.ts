@@ -52,6 +52,7 @@ export class MarketGateway {
     private readonly logger = new Logger(MarketGateway.name);
 
     clients = 0;
+    recentNews: NewsBroadcast[] = [];
 
     // R5-⑦: 单用户并发 WS 连接上限——5 个足够覆盖多标签页/多设备正常使用，同时限制
     // 单账号连接放大（每次连接都要跑一次 JWT verify + User 查询，无上限时可被单账号刷爆 DB/句柄）。
@@ -159,6 +160,8 @@ export class MarketGateway {
     }
 
     broadcastNews(news: NewsBroadcast) {
+        this.recentNews.unshift({ ...news, publishedAt: new Date().toISOString() });
+        this.recentNews = this.recentNews.slice(0, 120);
         this.server.emit('news', news);
     }
 }

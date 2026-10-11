@@ -9,6 +9,7 @@
     "build": "npm run build:api && npm run build:web",
     "test": "node --require ./tooling/runtime.cjs --test tests/*.test.cjs",
     "start": "node --require ./tooling/runtime.cjs dist/apps/game-api/main.js",
+    "start:formal": "node --require ./tooling/runtime.cjs dist/apps/game-api/unified-main.js",
     "dev:web": "node tooling/runner.cjs dev-web",
     "typecheck:web": "node tooling/runner.cjs typecheck-web",
     "verify": "npm run build && npm run typecheck:web && npm test"

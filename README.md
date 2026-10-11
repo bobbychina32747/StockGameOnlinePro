@@ -5,33 +5,39 @@
 [![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial-10b981)](LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/bobbychina32747/StockGameOnlinePro?label=最后提交)](https://github.com/bobbychina32747/StockGameOnlinePro/commits)
 
-## 2.0 重制版公开测试（2026-10-10）
+## 统一正式版 2.0（2026-10-11）
 
-**测试入口：[game.bobbycn.cc/remaster/](https://game.bobbycn.cc/remaster/)**。可使用站点账号或游戏账密登录后选择区服，首次进入明确创建角色；角色创建后不能切换区服。测试资金仍为加速模拟。测试资金和股票均为游戏数据，测试账户与旧版玩家资产隔离；旧版入口仍为 [game.bobbycn.cc](https://game.bobbycn.cc/)。游戏账密与旧版共用，资金、持仓分别保存。角色长期保存在独立测试数据库；服务重启后重新登录可恢复同一角色。
+**唯一游戏入口：[game.bobbycn.cc](https://game.bobbycn.cc/)**。2.0 工作台与原正式版已合并：保留原账户 UUID、现金、持仓、债务、基金、挂单、成交与赛季；测试资产单独备份，不追加到正式本金。原 `/remaster/` 入口转向统一版。
 
-登录会话：游戏账密登录不依赖站点 Cookie，刷新或切回窗口会保留登录；旧版站点令牌过期后先续期并重试一次。重制版身份服务暂时超时或限流时暂停推送、恢复后重试，确认会话失效才退出。
+- 原正式账本和撮合作为唯一正式核心，接入 2.0 图表工作台、底部导航、固定区服会话、回放、缩放保留和两位价格。
+- 414 支基础虚构股票：三个区服各 23 行业 × 6 支，另保留旧股票和已上市 IPO。一个账号每区一个角色，区服不可修改，不能跨区交易或划转。
+- 原市场接入 2.0 行业校准、厚尾、条件波动率与日内活跃度；原宏观、财报、消息漂移、AI/做市商和交易限制继续运行。校准来源包含 173,066 条真实日线、15,591 条五分钟线及 28 个公告事件；历史关联不是因果证明。
+- 站点登录或原游戏账密登录，指向同一原游戏用户。站点身份尚未绑定时可绑定原账户，原资产继续使用。
+- 保留基金、融资、融券信息、财报与预期差、订单流、原赛季、绩效、成就和复盘；正式预检使用原引擎费用与校验。研究回测是独立模拟，不能视为正式账户业绩。
 
-旧版分钟 K 线：实时推送使用上一根收盘价作为下一根开盘价，与后端历史线保持一致；只有价格确实没有变化时才显示平线。
+架构、资产策略与回退边界见 [合并说明](docs/UNIFIED-FORMAL-20261011.md)，校准方法见 [真实性报告](docs/MARKET-REALISM-20261010.md)。玩家数据库、凭证及原始采集行情不进入仓库。
 
-- 独立 TypeScript 引擎、NestJS HTTP/WebSocket API、SQLite 事务与 React/ECharts 工作台；图表占主区域，导航固定在底部。
-- **中国、香港、美国三个区服，每区 23 行业 × 6 支 = 138 支，总计 414 支基础虚构股票（游戏推进后可额外发行 IPO）**。一个站点账号可绑定三个区服角色，每区一个；角色与资产独立，不能跨区交易或划转。原有股票标识保留，名称按区服文化调整。
-- 用 173,066 条真实日线、15,591 条五分钟线校准行业波动、隔夜跳空和日内形态；新闻时间线含 28 个公告事件。价格模型体现厚尾、波动聚集、行业联动、预期差和消息衰减。
-- 已通过 25 项引擎、事务、新闻时序及 API/Socket 测试，并验证桌面、手机和离线只读布局。交易页固定在视口内，行情刷新保留缩放，价格与指标显示两位小数。完整重制仍有待验收项目，详见 [验收矩阵](docs/REMASTER-ACCEPTANCE-20261010.md)。历史新闻与价格的关联不等于因果证明。
-
-新开发者从 `remaster/` 启动（Node.js 22）：
+本地开发需同时启动原后端与统一工作台适配服务（Node.js 22）：
 
 ```bash
+cd backend
+npm ci
+npm run build
+npm start
+# 在另一个终端：
 cd remaster
 npm ci
-npm run verify
-npm start
+REMASTER_WEB_BASE=/ npm run build
+npm run typecheck:web
+npm test
+npm run start:formal
 ```
 
-本地访问 `http://127.0.0.1:8320`。详见 [重制版 README](remaster/README.md)、[部署与回退](remaster/deploy/README.md)、[市场真实性报告](docs/MARKET-REALISM-20261010.md)。采集的原始行情、玩家数据库及凭证不包含在仓库中。
+统一服务默认 `http://127.0.0.1:8321`，原后端 `http://127.0.0.1:8000`。Windows PowerShell 用 `$env:REMASTER_WEB_BASE='/'` 设置构建路径。原后端身份服务的配置沿用部署契约，不从生产复制密钥。生产容器定义见 [unified-compose.yml](remaster/deploy/unified-compose.yml)。
 
 ---
 
-## 1.x 旧版说明
+## 正式账本后端与历史实现
 
 以下功能和启动方式对应旧版 `backend/`、`frontend/`，不能视为重制版的全部验收结果。
 

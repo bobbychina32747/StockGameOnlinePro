@@ -30,6 +30,16 @@ export class OrderService {
         private readonly debugMode: DebugModeService,
     ) {}
 
+    async estimateOrder(userId: string, mode: string, dto: any) {
+        const account = await this.accountRepo.findOne({ where: { userId, marketMode: mode } });
+        if (!account) throw new NotFoundException('账户不存在');
+        const order = { ...dto, filledQty: 0, accountId: account.id } as Order;
+        if (mode === 'CN' && ['short', 'cover'].includes(dto.side)) return { valid: false, error: 'A股不支持做空' };
+        const validation = await this.engine.validateOrder(order, account);
+        const price = dto.price || this.engine.prices.get(dto.symbol) || 0;
+        return { ...validation, price, fees: this.engine.calcFees(dto.side, price * dto.quantity, dto.quantity, mode) };
+    }
+
     async placeOrder(userId: string, mode: string, symbol: string, type: OrderType, side: OrderSide, quantity: number, price: number, triggerPrice: number, displayQty: number, clientOrderId?: string) {
         // S2 休市校验：非交易时段拒绝下单
         // 调试模式仅对开启它的管理员（canBypassHours 白名单）跳过休市检查

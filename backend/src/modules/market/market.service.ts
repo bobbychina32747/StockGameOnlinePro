@@ -639,7 +639,7 @@ export class MarketService {
         if (!item)
             return;
         const q = this.newsQueue[market] || (this.newsQueue[market] = []);
-        q.push(item);
+        q.push({ ...item, market });
     }
 
     flushNewsQueue(market) {
@@ -756,6 +756,7 @@ export class MarketService {
         // G-4: 暴露 tick 健康度（当前阶段/是否卡住/自愈次数）——"行情不动了"这类问题一眼可判：
         // processing=true 且 sinceMs 很大 = 某个阶段卡住；hungRecoveries 增长 = 看门狗已自愈过
         cn.tickHealth = this.getTickHealth();
+        cn.news = this.gateway.recentNews || [];
         // 浅拷贝避免循环引用（markets.CN 不能引用 cn 自身）
         cn.markets = {
             CN: { ...cn },
@@ -772,9 +773,9 @@ export class MarketService {
     // P4 AI 对手盘：三服务器合并排名（完全本地策略，零外部 API）
     getAiOpponents() {
         const all = [];
-        for (const md of [this.marketData, this.marketDataHK, this.marketDataUS]) {
+        for (const [index, md] of [this.marketData, this.marketDataHK, this.marketDataUS].entries()) {
             if (md)
-                all.push(...(md.getAiOpponents() || []));
+                all.push(...(md.getAiOpponents() || []).map(row => ({ ...row, market: ['CN', 'HK', 'US'][index] })));
         }
         return all.sort((a, b) => b.pnlPct - a.pnlPct);
     }

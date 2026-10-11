@@ -5,6 +5,7 @@ export interface AccountView extends Omit<Account,'positions'> {
 }
 export interface Rank {id:string;name:string;market:MarketId;actor:string;strategy?:string;equity:number;return:number;seasonPoints:number}
 export interface Snapshot {
+  formal?:{ledger:string;tier?:string;metrics:any;reviews:any[];achievements:any[];fundHoldings:any[];funds:any[];tickIntervalMs:number;offHoursTrading:boolean};
   protocolVersion:2;kind:'snapshot';worldVersion:number;sequence:number;mode:'sandbox'|'real';
   simulatedAt:Record<MarketId,MarketState['clock']>;instruments:Instrument[];markets:Record<MarketId,MarketState>;
   quotes:Record<string,Omit<Quote,'history'|'daily'|'pendingNews'|'volatilityState'>&{candle?:Candle;change:number}>;
