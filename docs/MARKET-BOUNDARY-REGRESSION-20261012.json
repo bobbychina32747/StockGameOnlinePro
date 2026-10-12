@@ -1,0 +1,1188 @@
+{
+  "method": "30 complete game days, full stock pools, real generateTick/postTickProcessing/virtual matching; no real-player accounts, orders or network. Seeded randomness. Not a profitability guarantee.",
+  "drift": {
+    "hotSignal": 0.5,
+    "oldDailyDrift": 2.25,
+    "newDailyDrift": 0.002655341614781328,
+    "oldGlobalEmotionDrift": 0.78,
+    "newGlobalEmotionDrift": 0.000934106400131169
+  },
+  "scenarios": [
+    {
+      "market": "CN",
+      "regime": "bull",
+      "premium": 1,
+      "seed": 17,
+      "stocks": 138,
+      "days": [
+        {
+          "day": 1,
+          "meanReturnPct": 1.85,
+          "upFraction": 0.667,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 2,
+          "meanReturnPct": 0.9,
+          "upFraction": 0.58,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 3,
+          "meanReturnPct": 2.88,
+          "upFraction": 0.761,
+          "limitUpFraction": 0.065,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 4,
+          "meanReturnPct": -0.4,
+          "upFraction": 0.507,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 5,
+          "meanReturnPct": -3.37,
+          "upFraction": 0.246,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 6,
+          "meanReturnPct": 0.9,
+          "upFraction": 0.551,
+          "limitUpFraction": 0.014,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 7,
+          "meanReturnPct": -0.3,
+          "upFraction": 0.507,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 8,
+          "meanReturnPct": 0.98,
+          "upFraction": 0.558,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 9,
+          "meanReturnPct": 0.33,
+          "upFraction": 0.529,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.014
+        },
+        {
+          "day": 10,
+          "meanReturnPct": -0.35,
+          "upFraction": 0.464,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 11,
+          "meanReturnPct": 0.75,
+          "upFraction": 0.543,
+          "limitUpFraction": 0.022,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 12,
+          "meanReturnPct": -1.29,
+          "upFraction": 0.355,
+          "limitUpFraction": 0.022,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 13,
+          "meanReturnPct": -0.68,
+          "upFraction": 0.457,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.014
+        },
+        {
+          "day": 14,
+          "meanReturnPct": 0.05,
+          "upFraction": 0.529,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 15,
+          "meanReturnPct": -3.84,
+          "upFraction": 0.21,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 16,
+          "meanReturnPct": 0.37,
+          "upFraction": 0.529,
+          "limitUpFraction": 0.014,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 17,
+          "meanReturnPct": 1.76,
+          "upFraction": 0.616,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 18,
+          "meanReturnPct": 0.29,
+          "upFraction": 0.536,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 19,
+          "meanReturnPct": -0.69,
+          "upFraction": 0.457,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.014
+        },
+        {
+          "day": 20,
+          "meanReturnPct": 1.22,
+          "upFraction": 0.601,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 21,
+          "meanReturnPct": -1.01,
+          "upFraction": 0.391,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 22,
+          "meanReturnPct": -0.38,
+          "upFraction": 0.457,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 23,
+          "meanReturnPct": -1.8,
+          "upFraction": 0.362,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.014
+        },
+        {
+          "day": 24,
+          "meanReturnPct": 0.28,
+          "upFraction": 0.522,
+          "limitUpFraction": 0.022,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 25,
+          "meanReturnPct": -4.66,
+          "upFraction": 0.188,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.051
+        },
+        {
+          "day": 26,
+          "meanReturnPct": 0.64,
+          "upFraction": 0.522,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 27,
+          "meanReturnPct": -0.06,
+          "upFraction": 0.493,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 28,
+          "meanReturnPct": -0.26,
+          "upFraction": 0.464,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.022
+        },
+        {
+          "day": 29,
+          "meanReturnPct": 1.32,
+          "upFraction": 0.652,
+          "limitUpFraction": 0.022,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 30,
+          "meanReturnPct": 0.14,
+          "upFraction": 0.478,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0.007
+        }
+      ],
+      "ai": [
+        {
+          "id": "AI9",
+          "pnlPct": 14.46,
+          "fills": 1066,
+          "closedTrades": 614,
+          "positions": 11
+        },
+        {
+          "id": "AI10",
+          "pnlPct": 6.91,
+          "fills": 1063,
+          "closedTrades": 609,
+          "positions": 12
+        },
+        {
+          "id": "AI5",
+          "pnlPct": 4.52,
+          "fills": 1074,
+          "closedTrades": 650,
+          "positions": 11
+        },
+        {
+          "id": "AI6",
+          "pnlPct": 3.87,
+          "fills": 1337,
+          "closedTrades": 768,
+          "positions": 10
+        },
+        {
+          "id": "AI7",
+          "pnlPct": 1.89,
+          "fills": 1215,
+          "closedTrades": 685,
+          "positions": 15
+        },
+        {
+          "id": "AI4",
+          "pnlPct": 1.41,
+          "fills": 1155,
+          "closedTrades": 690,
+          "positions": 11
+        },
+        {
+          "id": "AI3",
+          "pnlPct": -0.61,
+          "fills": 1317,
+          "closedTrades": 783,
+          "positions": 14
+        },
+        {
+          "id": "AI2",
+          "pnlPct": -0.88,
+          "fills": 606,
+          "closedTrades": 346,
+          "positions": 31
+        },
+        {
+          "id": "AI1",
+          "pnlPct": -1.71,
+          "fills": 843,
+          "closedTrades": 480,
+          "positions": 28
+        },
+        {
+          "id": "AI8",
+          "pnlPct": -2.99,
+          "fills": 979,
+          "closedTrades": 552,
+          "positions": 9
+        }
+      ],
+      "meanAiPnl": 2.69,
+      "worstDrawdownPct": 8.78,
+      "fills": 10655
+    },
+    {
+      "market": "CN",
+      "regime": "sideways",
+      "premium": 5,
+      "seed": 29,
+      "stocks": 138,
+      "days": [
+        {
+          "day": 1,
+          "meanReturnPct": 0.07,
+          "upFraction": 0.478,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 2,
+          "meanReturnPct": -1.9,
+          "upFraction": 0.341,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.036
+        },
+        {
+          "day": 3,
+          "meanReturnPct": -3.16,
+          "upFraction": 0.275,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.036
+        },
+        {
+          "day": 4,
+          "meanReturnPct": -3.81,
+          "upFraction": 0.217,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.043
+        },
+        {
+          "day": 5,
+          "meanReturnPct": -3.73,
+          "upFraction": 0.21,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.065
+        },
+        {
+          "day": 6,
+          "meanReturnPct": -4.48,
+          "upFraction": 0.167,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.109
+        },
+        {
+          "day": 7,
+          "meanReturnPct": -4.27,
+          "upFraction": 0.21,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 8,
+          "meanReturnPct": -3.31,
+          "upFraction": 0.174,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 9,
+          "meanReturnPct": -4.53,
+          "upFraction": 0.181,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0.08
+        },
+        {
+          "day": 10,
+          "meanReturnPct": -3.45,
+          "upFraction": 0.225,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.043
+        },
+        {
+          "day": 11,
+          "meanReturnPct": -3,
+          "upFraction": 0.275,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.014
+        },
+        {
+          "day": 12,
+          "meanReturnPct": -1.7,
+          "upFraction": 0.362,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 13,
+          "meanReturnPct": -1.99,
+          "upFraction": 0.362,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.036
+        },
+        {
+          "day": 14,
+          "meanReturnPct": -4.43,
+          "upFraction": 0.225,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.087
+        },
+        {
+          "day": 15,
+          "meanReturnPct": -0.64,
+          "upFraction": 0.442,
+          "limitUpFraction": 0.014,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 16,
+          "meanReturnPct": -5.73,
+          "upFraction": 0.087,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 17,
+          "meanReturnPct": -2.25,
+          "upFraction": 0.312,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 18,
+          "meanReturnPct": -2.17,
+          "upFraction": 0.304,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 19,
+          "meanReturnPct": -3.61,
+          "upFraction": 0.254,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.029
+        },
+        {
+          "day": 20,
+          "meanReturnPct": -5.25,
+          "upFraction": 0.138,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.072
+        },
+        {
+          "day": 21,
+          "meanReturnPct": -4.74,
+          "upFraction": 0.152,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.051
+        },
+        {
+          "day": 22,
+          "meanReturnPct": -1.68,
+          "upFraction": 0.362,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 23,
+          "meanReturnPct": -4.01,
+          "upFraction": 0.188,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0.072
+        },
+        {
+          "day": 24,
+          "meanReturnPct": -1.9,
+          "upFraction": 0.362,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 25,
+          "meanReturnPct": -2.18,
+          "upFraction": 0.377,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.029
+        },
+        {
+          "day": 26,
+          "meanReturnPct": -2.86,
+          "upFraction": 0.275,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.051
+        },
+        {
+          "day": 27,
+          "meanReturnPct": -2.58,
+          "upFraction": 0.319,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 28,
+          "meanReturnPct": -3.21,
+          "upFraction": 0.297,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 29,
+          "meanReturnPct": -2.33,
+          "upFraction": 0.297,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 30,
+          "meanReturnPct": -3.49,
+          "upFraction": 0.225,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.065
+        }
+      ],
+      "ai": [
+        {
+          "id": "AI10",
+          "pnlPct": 0.81,
+          "fills": 39,
+          "closedTrades": 16,
+          "positions": 7
+        },
+        {
+          "id": "AI9",
+          "pnlPct": 0.27,
+          "fills": 35,
+          "closedTrades": 14,
+          "positions": 5
+        },
+        {
+          "id": "AI2",
+          "pnlPct": -0.36,
+          "fills": 71,
+          "closedTrades": 38,
+          "positions": 5
+        },
+        {
+          "id": "AI5",
+          "pnlPct": -0.66,
+          "fills": 45,
+          "closedTrades": 23,
+          "positions": 2
+        },
+        {
+          "id": "AI3",
+          "pnlPct": -1.43,
+          "fills": 847,
+          "closedTrades": 428,
+          "positions": 7
+        },
+        {
+          "id": "AI4",
+          "pnlPct": -2.56,
+          "fills": 722,
+          "closedTrades": 370,
+          "positions": 9
+        },
+        {
+          "id": "AI8",
+          "pnlPct": -3.42,
+          "fills": 780,
+          "closedTrades": 389,
+          "positions": 4
+        },
+        {
+          "id": "AI7",
+          "pnlPct": -4.68,
+          "fills": 895,
+          "closedTrades": 444,
+          "positions": 4
+        },
+        {
+          "id": "AI6",
+          "pnlPct": -4.82,
+          "fills": 888,
+          "closedTrades": 442,
+          "positions": 4
+        },
+        {
+          "id": "AI1",
+          "pnlPct": -5.34,
+          "fills": 641,
+          "closedTrades": 363,
+          "positions": 9
+        }
+      ],
+      "meanAiPnl": -2.22,
+      "worstDrawdownPct": 5.6,
+      "fills": 4963
+    },
+    {
+      "market": "HK",
+      "regime": "bear",
+      "premium": 1,
+      "seed": 31,
+      "stocks": 138,
+      "days": [
+        {
+          "day": 1,
+          "meanReturnPct": -1.85,
+          "upFraction": 0.442,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 2,
+          "meanReturnPct": 4.15,
+          "upFraction": 0.775,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 3,
+          "meanReturnPct": 1.59,
+          "upFraction": 0.645,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 4,
+          "meanReturnPct": -1,
+          "upFraction": 0.399,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 5,
+          "meanReturnPct": -3.06,
+          "upFraction": 0.297,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 6,
+          "meanReturnPct": -5.85,
+          "upFraction": 0.145,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 7,
+          "meanReturnPct": 3.85,
+          "upFraction": 0.739,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 8,
+          "meanReturnPct": -1.44,
+          "upFraction": 0.428,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 9,
+          "meanReturnPct": -0.76,
+          "upFraction": 0.493,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 10,
+          "meanReturnPct": -2.23,
+          "upFraction": 0.384,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 11,
+          "meanReturnPct": -1.38,
+          "upFraction": 0.442,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 12,
+          "meanReturnPct": -0.05,
+          "upFraction": 0.514,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 13,
+          "meanReturnPct": -0.64,
+          "upFraction": 0.478,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 14,
+          "meanReturnPct": 3.25,
+          "upFraction": 0.717,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 15,
+          "meanReturnPct": 4.06,
+          "upFraction": 0.732,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 16,
+          "meanReturnPct": 0.88,
+          "upFraction": 0.529,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 17,
+          "meanReturnPct": -0.59,
+          "upFraction": 0.471,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 18,
+          "meanReturnPct": -0.91,
+          "upFraction": 0.442,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 19,
+          "meanReturnPct": 1.06,
+          "upFraction": 0.551,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 20,
+          "meanReturnPct": -0.84,
+          "upFraction": 0.442,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 21,
+          "meanReturnPct": -2.08,
+          "upFraction": 0.37,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 22,
+          "meanReturnPct": -2.78,
+          "upFraction": 0.29,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 23,
+          "meanReturnPct": -0.03,
+          "upFraction": 0.522,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 24,
+          "meanReturnPct": -7.65,
+          "upFraction": 0.167,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 25,
+          "meanReturnPct": -0.26,
+          "upFraction": 0.442,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 26,
+          "meanReturnPct": -1.39,
+          "upFraction": 0.384,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 27,
+          "meanReturnPct": -0.17,
+          "upFraction": 0.529,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 28,
+          "meanReturnPct": 1.28,
+          "upFraction": 0.587,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 29,
+          "meanReturnPct": 0.05,
+          "upFraction": 0.536,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 30,
+          "meanReturnPct": -3.69,
+          "upFraction": 0.29,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        }
+      ],
+      "ai": [
+        {
+          "id": "AI10",
+          "pnlPct": 6.45,
+          "fills": 1145,
+          "closedTrades": 627,
+          "positions": 6
+        },
+        {
+          "id": "AI6",
+          "pnlPct": 3.06,
+          "fills": 1487,
+          "closedTrades": 816,
+          "positions": 11
+        },
+        {
+          "id": "AI9",
+          "pnlPct": 2.69,
+          "fills": 1186,
+          "closedTrades": 642,
+          "positions": 7
+        },
+        {
+          "id": "AI4",
+          "pnlPct": 2.28,
+          "fills": 1472,
+          "closedTrades": 878,
+          "positions": 11
+        },
+        {
+          "id": "AI5",
+          "pnlPct": 1.3,
+          "fills": 1263,
+          "closedTrades": 780,
+          "positions": 7
+        },
+        {
+          "id": "AI3",
+          "pnlPct": 1.17,
+          "fills": 1633,
+          "closedTrades": 966,
+          "positions": 17
+        },
+        {
+          "id": "AI8",
+          "pnlPct": 1.16,
+          "fills": 1232,
+          "closedTrades": 675,
+          "positions": 8
+        },
+        {
+          "id": "AI7",
+          "pnlPct": -1.18,
+          "fills": 1347,
+          "closedTrades": 721,
+          "positions": 12
+        },
+        {
+          "id": "AI2",
+          "pnlPct": -2.16,
+          "fills": 744,
+          "closedTrades": 426,
+          "positions": 32
+        },
+        {
+          "id": "AI1",
+          "pnlPct": -4.97,
+          "fills": 931,
+          "closedTrades": 516,
+          "positions": 31
+        }
+      ],
+      "meanAiPnl": 0.98,
+      "worstDrawdownPct": 6.02,
+      "fills": 12440
+    },
+    {
+      "market": "US",
+      "regime": "sideways",
+      "premium": 5,
+      "seed": 43,
+      "stocks": 138,
+      "days": [
+        {
+          "day": 1,
+          "meanReturnPct": -2.5,
+          "upFraction": 0.304,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 2,
+          "meanReturnPct": -3.73,
+          "upFraction": 0.246,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 3,
+          "meanReturnPct": -2.15,
+          "upFraction": 0.348,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 4,
+          "meanReturnPct": -2.19,
+          "upFraction": 0.37,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 5,
+          "meanReturnPct": -0.73,
+          "upFraction": 0.413,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 6,
+          "meanReturnPct": -2.01,
+          "upFraction": 0.37,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 7,
+          "meanReturnPct": -6.05,
+          "upFraction": 0.109,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 8,
+          "meanReturnPct": -2.35,
+          "upFraction": 0.326,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 9,
+          "meanReturnPct": -3.83,
+          "upFraction": 0.232,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 10,
+          "meanReturnPct": -3.34,
+          "upFraction": 0.246,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 11,
+          "meanReturnPct": -3.12,
+          "upFraction": 0.283,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 12,
+          "meanReturnPct": -4.82,
+          "upFraction": 0.188,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 13,
+          "meanReturnPct": -2.27,
+          "upFraction": 0.333,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 14,
+          "meanReturnPct": -1.6,
+          "upFraction": 0.326,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 15,
+          "meanReturnPct": -5.22,
+          "upFraction": 0.196,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 16,
+          "meanReturnPct": -4.15,
+          "upFraction": 0.21,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 17,
+          "meanReturnPct": -5.07,
+          "upFraction": 0.196,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 18,
+          "meanReturnPct": -5.23,
+          "upFraction": 0.138,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 19,
+          "meanReturnPct": -4.09,
+          "upFraction": 0.232,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 20,
+          "meanReturnPct": -3.19,
+          "upFraction": 0.254,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 21,
+          "meanReturnPct": -3.31,
+          "upFraction": 0.246,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 22,
+          "meanReturnPct": -1.68,
+          "upFraction": 0.435,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 23,
+          "meanReturnPct": -1.94,
+          "upFraction": 0.399,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 24,
+          "meanReturnPct": -5.7,
+          "upFraction": 0.167,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 25,
+          "meanReturnPct": -5.05,
+          "upFraction": 0.181,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 26,
+          "meanReturnPct": -4.09,
+          "upFraction": 0.232,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 27,
+          "meanReturnPct": -3.32,
+          "upFraction": 0.29,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 28,
+          "meanReturnPct": -3.12,
+          "upFraction": 0.283,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 29,
+          "meanReturnPct": -4.56,
+          "upFraction": 0.188,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 30,
+          "meanReturnPct": -3.15,
+          "upFraction": 0.297,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        }
+      ],
+      "ai": [
+        {
+          "id": "AI9",
+          "pnlPct": -0.68,
+          "fills": 178,
+          "closedTrades": 89,
+          "positions": 7
+        },
+        {
+          "id": "AI2",
+          "pnlPct": -2.8,
+          "fills": 184,
+          "closedTrades": 101,
+          "positions": 11
+        },
+        {
+          "id": "AI3",
+          "pnlPct": -2.84,
+          "fills": 859,
+          "closedTrades": 428,
+          "positions": 5
+        },
+        {
+          "id": "AI5",
+          "pnlPct": -3.45,
+          "fills": 192,
+          "closedTrades": 111,
+          "positions": 5
+        },
+        {
+          "id": "AI4",
+          "pnlPct": -4.39,
+          "fills": 924,
+          "closedTrades": 457,
+          "positions": 8
+        },
+        {
+          "id": "AI6",
+          "pnlPct": -5.59,
+          "fills": 1087,
+          "closedTrades": 535,
+          "positions": 5
+        },
+        {
+          "id": "AI1",
+          "pnlPct": -5.83,
+          "fills": 653,
+          "closedTrades": 327,
+          "positions": 9
+        },
+        {
+          "id": "AI7",
+          "pnlPct": -6.68,
+          "fills": 885,
+          "closedTrades": 439,
+          "positions": 5
+        },
+        {
+          "id": "AI10",
+          "pnlPct": -6.72,
+          "fills": 137,
+          "closedTrades": 71,
+          "positions": 0
+        },
+        {
+          "id": "AI8",
+          "pnlPct": -8.43,
+          "fills": 833,
+          "closedTrades": 411,
+          "positions": 5
+        }
+      ],
+      "meanAiPnl": -4.74,
+      "worstDrawdownPct": 8.6,
+      "fills": 5932
+    }
+  ]
+}

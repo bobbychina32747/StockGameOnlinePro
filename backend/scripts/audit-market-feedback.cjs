@@ -25,7 +25,8 @@ async function run(market,regime,premium,seed){
    trendCounter:0,trendDirection:0,trendAccumulated:0,isTrending:false});
  }
  const days=[],length=tradingMinutesFor(market),peaks=s.aiLedger.map(l=>l.initialCash),drawdowns=peaks.map(()=>0);
- for(let d=0;d<6;d++){
+ const auditDays=Math.max(6,Math.min(120,Number(process.env.AUDIT_DAYS)||6));
+ for(let d=0;d<auditDays;d++){
   engine.setPrevCloses(s.getPrevCloses());engine.updatePrices(s.getPrices());engine.setDayOpen(s.getPrices());
   for(let tick=0;tick<length;tick++){
    await s.generateTick();engine.updatePrices(s.getPrices());engine.setVolatilities(s.getVolatilities());engine.refreshOrderBooks(s.getPrices());
@@ -42,7 +43,7 @@ async function run(market,regime,premium,seed){
  return {market,regime,premium,seed,stocks:pool.length,days,ai,meanAiPnl:+(ai.reduce((a,r)=>a+r.pnlPct,0)/ai.length).toFixed(2),worstDrawdownPct:+(Math.max(...drawdowns)*100).toFixed(2),fills:ai.reduce((a,r)=>a+r.fills,0)};
 }
 (async()=>{
- const report={method:'6 complete game days, full stock pools, real generateTick/postTickProcessing/virtual matching; no real-player accounts, orders or network. Seeded randomness. Not a profitability guarantee.',drift:{hotSignal:.5,oldDailyDrift:.5*.9*5,newDailyDrift:dailyFactorDrift(.5*.9),oldGlobalEmotionDrift:.12*1.3*5,newGlobalEmotionDrift:dailyFactorDrift(.12*1.3)},scenarios:[]};
+ const report={method:(Math.max(6,Math.min(120,Number(process.env.AUDIT_DAYS)||6)))+' complete game days, full stock pools, real generateTick/postTickProcessing/virtual matching; no real-player accounts, orders or network. Seeded randomness. Not a profitability guarantee.',drift:{hotSignal:.5,oldDailyDrift:.5*.9*5,newDailyDrift:dailyFactorDrift(.5*.9),oldGlobalEmotionDrift:.12*1.3*5,newGlobalEmotionDrift:dailyFactorDrift(.12*1.3)},scenarios:[]};
  for(const args of [['CN','bull',1,17],['CN','sideways',5,29],['HK','bear',1,31],['US','sideways',5,43]]){
   const row=await run(...args);report.scenarios.push(row);fs.writeFileSync(process.argv[2],JSON.stringify(report,null,2));console.log(JSON.stringify({market:row.market,regime:row.regime,premium:row.premium,days:row.days,fills:row.fills,meanAiPnl:row.meanAiPnl,worstDrawdownPct:row.worstDrawdownPct}));
   if(row.market==='CN'&&row.days.some(d=>d.limitUpFraction>.35||d.limitDownFraction>.35))throw Error('Broad daily sealing regression');

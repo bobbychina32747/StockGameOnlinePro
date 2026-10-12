@@ -460,6 +460,8 @@ export class MarketService {
         } catch (e) {
             this.logger.error(`分红发放失败: ${e.message}`);
         }
+        await this.timeStage(`${market}:dayEnd`, () => marketData.endOfDay());
+        closing.advanced = true;
         const nightEvent = this.newsService.processNightEvent();
         if (nightEvent && nightEvent.impact !== 0) {
             marketData.applyMarketwideShock(nightEvent.impact);
@@ -468,8 +470,6 @@ export class MarketService {
             });
         }
         this.flushNewsQueue(market);
-        await this.timeStage(`${market}:dayEnd`, () => marketData.endOfDay());
-        closing.advanced = true;
         }
         // 盘后固定价委托与账户估值使用收盘价，隔夜跳空留到下次开盘。
         this.engine.updatePrices(closePrices);

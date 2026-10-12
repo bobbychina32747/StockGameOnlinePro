@@ -641,6 +641,7 @@ export class MarketDataService {
         }
         for (const stock of stocksArr) {
             const cfg = cfgBySymbol.get(stock.symbol) || {};
+            const previousPrice = Number(stock.price);
             const mu = Number(cfg.mu ?? 100);
             // P3 行业景气周期：估值中枢随阶段上下移，波动率随阶段放大（收缩期最动荡）
             const cycle = fundamentals_1.cycleEffects(this.industryCycles.get(stock.industry) || 'expansion');
@@ -689,7 +690,6 @@ export class MarketDataService {
                 newPrice = stock.price;
             newPrice = Math.max(0.5, newPrice);
             stock.price = newPrice;
-            this.updateTrend(stock, priceChange);
             // B1 波动检测：记录本 tick 前价（用于事件驱动传导判断）
             // 价格安全网：单 tick 涨跌 ±10%（prevTickPrice 为本 tick 前价）
             if (stock.prevTickPrice && stock.prevTickPrice > 0) {
@@ -711,7 +711,8 @@ export class MarketDataService {
                 }
             }
             stock.prevTickPrice = stock.price;
-            stock.lastReturn = priceChange;
+            stock.lastReturn = stock.price / previousPrice - 1;
+            this.updateTrend(stock, stock.lastReturn);
             // prevClose 保持"昨收"不变（涨跌幅基准），仅由 endOfDay 更新
             stock.lastVolume = this.calcVolume(stock, regimes);
             stock.avgVolume = stock.avgVolume * 0.92 + stock.lastVolume * 0.08;
@@ -1981,8 +1982,7 @@ export class MarketDataService {
                 const sens = ev.industries[st.industry];
                 if (!sens)
                     continue;
-                st.price = Math.max(0.5, st.price * (1 + surprise * 0.004 * sens));
-                st.lastReturn = surprise * 0.004 * sens;
+                this.applyEventPrice(st, st.price * (1 + surprise * 0.004 * sens));
                 touched++;
             }
             this.newsImpacts.push({
@@ -2011,13 +2011,13 @@ export class MarketDataService {
                     const sens = imp.mode === 'macro-industries' ? (imp.industries[st.industry] || 0) : (st.industry === imp.industry ? 1 : 0);
                     if (!sens)
                         continue;
-                    st.price = Math.max(0.5, st.price * (1 + factor * sens));
+                    this.applyEventPrice(st, st.price * (1 + factor * sens));
                 }
             }
             else if (imp.mode === 'symbol' && imp.symbol) {
                 const st = this.stocks.get(imp.symbol);
                 if (st)
-                    st.price = Math.max(0.5, st.price * (1 + factor));
+                    this.applyEventPrice(st, st.price * (1 + factor));
             }
             imp.daysLeft--;
             if (imp.daysLeft > 0)
@@ -2153,9 +2153,8 @@ export class MarketDataService {
     applyMarketwideShock(pct) {
         const factor = 1 + Number(pct);
         for (const st of this.stocks.values()) {
-            st.price = Math.max(0.5, Number(st.price) * factor);
-            st.dayOpen = Math.max(0.5, Number(st.dayOpen) * factor);
-            st.prevClose = Math.max(0.5, Number(st.prevClose) * factor);
+            this.applyEventPrice(st, Number(st.price) * factor);
+            st.dayOpen = st.price;
         }
         this.logger.log('🌙 隔夜事件冲击全市场 ' + (Number(pct) * 100).toFixed(2) + '%（已写回内部价格）');
     }
@@ -2288,6 +2287,25 @@ export class MarketDataService {
             this.factors[factor] = this.clamp(this.factors[factor], -0.2, 0.2);
         }
     }
+    // Every news/report shock uses the same daily band and observable candle state.
+    applyEventPrice(stock: any, proposedPrice: number) {
+        const before = Number(stock.price);
+        if (!(before > 0) || !Number.isFinite(proposedPrice)) return;
+        const band = this.cnBandOf(stock);
+        let next = Math.max(0.5, proposedPrice);
+        if (band) next = this.clamp(next, band.down, band.up);
+        stock.price = next;
+        stock.lastReturn = next / before - 1;
+        stock.prevTickPrice = next;
+        stock.dayHigh = Math.max(Number(stock.dayHigh) || next, next);
+        stock.dayLow = Math.min(Number(stock.dayLow) || next, next);
+        for (const bar of [stock.current1min, stock.current5min, stock.currentDaily]) {
+            if (!bar) continue;
+            bar.close = next;
+            bar.high = Math.max(Number(bar.high) || next, next);
+            bar.low = Math.min(Number(bar.low) || next, next);
+        }
+    }
     // ─── P3 财报基本面模型：按个股披露日历触发；surprise = 披露增速 vs 分析师一致预期 ───
     // 五档分级（大超/略超/符合/略低/大低）→ 披露日跳空 + 财报后漂移(PEAD 5日) + 一致预期修正
     generateReports() {
@@ -2305,8 +2323,7 @@ export class MarketDataService {
             const cls = report.surpriseClass;
             // 披露日跳空（分级）+ 财报后漂移 + 一致预期修正
             const shock = fundamentals_1.earningsShock(cls);
-            st.price = Math.max(0.5, st.price * (1 + shock));
-            st.lastReturn = shock;
+            this.applyEventPrice(st, st.price * (1 + shock));
             st.pead = { mag: fundamentals_1.peadDaily(cls), daysLeft: 5 };
             fundamentals_1.reviseConsensus(st.fund, cls);
             // 分红与盈利能力挂钩：高净利率公司更大概率派现，派现额随利润放大
@@ -2417,8 +2434,7 @@ export class MarketDataService {
             // 市场级：±2~4%
             const impact = good ? 2 + Math.random() * 2 : -(2 + Math.random() * 2);
             for (const st of arr) {
-                st.price = Math.max(0.5, st.price * (1 + impact / 100));
-                st.lastReturn = impact / 100;
+                this.applyEventPrice(st, st.price * (1 + impact / 100));
             }
             this.factors['市场情绪'] = this.clamp((this.factors['市场情绪'] ?? 0) + (good ? 0.08 : -0.08), -0.2, 0.2);
             return { type: 'market', impact, direction, desc: good ? '政策红包：央行降准降息，市场全面利好' : '系统性风险：市场恐慌性抛售' };
@@ -2430,8 +2446,7 @@ export class MarketDataService {
             const impact = good ? 5 + Math.random() * 3 : -(5 + Math.random() * 3);
             for (const st of arr) {
                 if (st.industry === industry) {
-                    st.price = Math.max(0.5, st.price * (1 + impact / 100));
-                    st.lastReturn = impact / 100;
+                    this.applyEventPrice(st, st.price * (1 + impact / 100));
                 }
             }
             this.factors['行业景气'] = this.clamp((this.factors['行业景气'] ?? 0) + (good ? 0.05 : -0.05), -0.2, 0.2);
@@ -2441,8 +2456,7 @@ export class MarketDataService {
             // 个股级：±10~15%
             const st = arr[Math.floor(Math.random() * arr.length)];
             const impact = good ? 10 + Math.random() * 5 : -(10 + Math.random() * 5);
-            st.price = Math.max(0.5, st.price * (1 + impact / 100));
-            st.lastReturn = impact / 100;
+            this.applyEventPrice(st, st.price * (1 + impact / 100));
             return { type: 'stock', impact, direction, symbol: st.symbol, name: st.name, desc: good ? st.name + '重大利好：拿下超级订单或新品发布' : st.name + '突发利空：造假指控或重大事故' };
         }
     }
@@ -2656,8 +2670,7 @@ export class MarketDataService {
             const immediate = direction * strength * 0.01 * 0.4;
             const st = this.stocks.get(news.targetedSymbol);
             if (st) {
-                st.price = Math.max(0.5, st.price * (1 + immediate));
-                st.lastReturn = immediate;
+                this.applyEventPrice(st, st.price * (1 + immediate));
             }
             this.registerNewsImpact(news, 'symbol', news.targetedSymbol, direction * strength * 0.01);
         }
@@ -2665,8 +2678,7 @@ export class MarketDataService {
             const immediate = direction * strength * 0.004 * 0.4;
             for (const st of this.stocks.values()) {
                 if (st.industry === news.targetedIndustry) {
-                    st.price = Math.max(0.5, st.price * (1 + immediate));
-                    st.lastReturn = immediate;
+                    this.applyEventPrice(st, st.price * (1 + immediate));
                 }
             }
             this.registerNewsImpact(news, 'industry', news.targetedIndustry, direction * strength * 0.004);

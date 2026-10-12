@@ -55,3 +55,43 @@ test('industry transmission respects CN daily price bands and updates candles co
  s.updateIndustryLinks();expect(st.price).toBe(110);expect(st.current1min.close).toBe(st.price);
  expect(st.lastReturn).toBe(0);
 });
+
+test('blocked limit moves are zero observable returns and an opposite move can reopen the stock',async()=>{
+ const {s,st}=service(110,110);st.prevClose=100;st.dayOpen=100;
+ s.calcJump=()=>({small:0,big:.1});await s.generateTick();
+ expect(st.price).toBe(110);expect(st.lastReturn).toBe(0);expect(st.trendCounter).toBe(0);
+ s.calcJump=()=>({small:0,big:-.01});await s.generateTick();
+ expect(st.price).toBeLessThan(110);expect(st.lastReturn).toBeCloseTo(-.01,5);
+});
+
+test('immediate and decaying news obey daily limits and keep candle extrema and actual returns consistent',()=>{
+ const {s,st}=service(109.99,110);st.prevClose=100;st.dayOpen=100;
+ st.current1min={open:109.99,high:109.99,low:109.99,close:109.99};
+ st.current5min={...st.current1min};st.currentDaily={...st.current1min};
+ s.applyNewsImpact({type:'bullish',targetedSymbol:'TEST',duration:3,title:'fixture'});
+ expect(st.price).toBe(110);expect(st.lastReturn).toBeCloseTo(110/109.99-1,10);
+ for(const bar of [st.current1min,st.current5min,st.currentDaily]){
+  expect(bar.close).toBe(110);expect(bar.high).toBe(110);expect(bar.low).toBe(109.99);
+ }
+ s.newsImpacts=[{mode:'symbol',symbol:'TEST',initial:2,daysLeft:1,totalDays:1,decay:.7}];
+ s.applyPersistentNewsImpacts();expect(st.price).toBe(110);expect(st.lastReturn).toBe(0);
+ s.newsImpacts=[{mode:'industry',industry:'银行',initial:-2,daysLeft:1,totalDays:1,decay:.7}];
+ s.applyPersistentNewsImpacts();expect(st.price).toBe(90);expect(st.dayLow).toBe(90);
+});
+
+test('overnight event preserves the actual previous close and HK has no CN daily band',()=>{
+ const {s,st}=service();s.applyMarketwideShock(-.5);
+ expect(st.price).toBe(90);expect(st.prevClose).toBe(100);expect(st.dayOpen).toBe(90);
+ st.market='HK';s.applyEventPrice(st,50);expect(st.price).toBe(50);
+});
+
+test('night events follow the closing candle and cannot rewrite the previous close',async()=>{
+ const {MarketService}=require('../dist/src/modules/market/market.service');
+ const {s,st}=service();let ended=false;
+ s.getDividends=()=>[];s.endOfDay=async()=>{ended=true;st.prevClose=st.price;s.gameDay++;};
+ const context={closingDays:{},engine:{snapshotDividendHolders:async()=>{},payDividends:async()=>{},updatePrices:()=>{},forceLiquidateMarginalAccounts:async()=>[]},
+  newsService:{processNightEvent:()=>{expect(ended).toBe(true);return {impact:-.5,name:'fixture'};}},
+  enqueueNews:()=>{},flushNewsQueue:()=>{},timeStage:(_,work)=>work(),logger:{log:()=>{},error:message=>{throw Error(message);}}};
+ await MarketService.prototype.finishMarketDay.call(context,'CN',s);
+ expect(st.prevClose).toBe(100);expect(st.price).toBe(90);
+});
