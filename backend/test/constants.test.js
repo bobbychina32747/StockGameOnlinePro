@@ -70,8 +70,8 @@ describe('isTradingTimeNow 交易时段判断', () => {
 });
 
 describe('P4 tickDelayMs 调试模式休市节奏', () => {
-  test('调试开启且全市场休市 → 1s 高速回放', () => {
-    expect(tickDelayMs(true, false, 60000)).toBe(1000);
+  test('调试开启且全市场休市仍使用配置间隔，不自动进入高速回放', () => {
+    expect(tickDelayMs(true, false, 60000)).toBe(60000);
     expect(tickDelayMs(true, false, 1000)).toBe(1000);
   });
 

@@ -4,7 +4,17 @@ export const HISTORY_CACHE_LIMITS = { '1min': 1440, '5min': 1200, daily: 10000 }
 export async function persistCandleBatches(repository, rows: any[]) {
     for (let offset = 0; offset < rows.length; offset += 500) {
         // Keep each ORM working set small and retain generated UUIDs for safe retries.
-        await repository.save(rows.slice(offset, offset + 500));
+        const batch = rows.slice(offset, offset + 500);
+        if (repository.find) {
+            const existing = await repository.find({
+                where: batch.map(({symbol, timeframe, time}) => ({symbol, timeframe, time})),
+                select: ['id', 'symbol', 'timeframe', 'time'], order: { id: 'ASC' },
+            });
+            const key = row => `${row.symbol}:${row.timeframe}:${new Date(row.time).getTime()}`;
+            const identities = new Map(existing.map(row => [key(row), row.id]));
+            for (const row of batch) if (identities.has(key(row))) row.id = identities.get(key(row));
+        }
+        await repository.save(batch);
         // Let HTTP, WebSocket and timers run between synchronous SQLite batches.
         await new Promise<void>(resolve => setImmediate(resolve));
     }
@@ -17,7 +27,7 @@ export async function restoreHistoryCache(repository, symbols: string[], restore
     for (const symbol of symbols) {
         const rows = [];
         for (const [timeframe, take] of Object.entries(HISTORY_CACHE_LIMITS)) {
-            const recent = await repository.find({ where: { symbol, timeframe }, order: { time: 'DESC' }, take });
+            const recent = await repository.find({ where: { symbol, timeframe }, order: { time: 'DESC', id: 'DESC' }, take });
             rows.push(...recent.reverse());
         }
         if (rows.length) {

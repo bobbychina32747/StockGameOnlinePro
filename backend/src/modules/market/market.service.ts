@@ -184,9 +184,9 @@ export class MarketService {
         this.tickCounter = tradingMinuteIndex('CN', now) ?? 0;
         this.tickCounterHK = tradingMinuteIndex('HK', now) ?? 0;
         this.tickCounterUS = tradingMinuteIndex('US', now) ?? 0;
-        if (this.tickIntervalMs < 60000) {
+        if (this.tickIntervalMs < 60000 || this.debugMode.isMarketActive()) {
             for (const [market, md, key] of [['CN',this.marketData,'tickCounter'],['HK',this.marketDataHK,'tickCounterHK'],['US',this.marketDataUS,'tickCounterUS']] as const) {
-                const counter = md?.getResumeCounter?.();
+                const counter = md?.getResumeCounter?.() ?? 0;
                 if (counter != null) {
                     this[key] = counter;
                     if (counter > 0) { this.initializedGameDays[market] = md.gameDay; this.lastAuctionDay[market] = md.gameDay; }

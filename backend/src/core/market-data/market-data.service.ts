@@ -20,9 +20,6 @@ import { aiEntryScore, aiPolicyDirection, aiPortfolioRisk } from './ai-risk-poli
 import { dailyFactorDrift, dailyValueDrift } from './price-drift';
 import { MarketRuntimeStore, encodeAiLedger, decodeAiLedger } from './runtime-state';
 
-// SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
-let klineDedupDone = false;
-
 // R5-⑧ 做市商库存风控阈值（每个做市商 / 每只标的的净库存上下限，单位：股）：
 // 取 ±60,000 股 ≈ 单次报价量的几十倍（MM_PARAMS.quoteSize=800；任务书原按 500 股估的"百倍量级"，
 // 实际报价量已调为 800，故本值为约 75 倍）——足以覆盖连续多轮报价撤换的正常做市吞吐，
@@ -406,21 +403,7 @@ export class MarketDataService {
             this.macroEvents.push({ ...def, dueDay: def.offset + Math.floor(Math.random() * 5) });
         }
         // S1 历史持久化：若 klines 表已有历史则恢复，否则生成 30 天初始历史并落库
-        // SECURITY: 启动一次性去重（保留每个 symbol/timeframe/time 中 id 最大的一行），防止旧库重复行继续膨胀
-        if (!klineDedupDone) {
-            klineDedupDone = true;
-            try {
-                const dupCheck = await this.klineRepo.manager.query('SELECT COUNT(*) AS c FROM (SELECT 1 FROM klines GROUP BY symbol, timeframe, time HAVING COUNT(*) > 1)');
-                const dupCount = Number(dupCheck && dupCheck[0] && dupCheck[0].c) || 0;
-                if (dupCount > 0) {
-                    this.logger.warn('检测到 ' + dupCount + ' 组重复 K 线，开始去重（保留每组 id 最大行）...');
-                    await this.klineRepo.manager.query('DELETE FROM klines WHERE id NOT IN (SELECT MAX(id) FROM klines GROUP BY symbol, timeframe, time)');
-                    this.logger.log('K 线历史去重完成');
-                }
-            } catch (e) {
-                this.logger.warn('K 线去重跳过: ' + (e && e.message ? e.message : e));
-            }
-        }
+        // Historical repair must run offline; startup only reads the bounded cache.
         // 三服务器：仅加载本市场的 K 线（原实现全表加载×3，277MB 库会产生数 GB 级瞬时内存峰值）
         const ownSymbols = [...this.stocks.keys()];
         const historyCount = await restoreHistoryCache(this.klineRepo, ownSymbols,
@@ -1798,14 +1781,7 @@ export class MarketDataService {
             else byStock[r.symbol].daily.push(bar);
         }
         const dedupe = (arr) => {
-            const seen = new Set();
-            return arr.filter((b) => {
-                const k = new Date(b.time).getTime();
-                if (seen.has(k))
-                    return false;
-                seen.add(k);
-                return true;
-            });
+            return [...new Map(arr.map(b => [new Date(b.time).getTime(), b])).values()];
         };
         let maxDay = -1;
         for (const st of this.stocks.values()) {

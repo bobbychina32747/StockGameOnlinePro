@@ -51,5 +51,10 @@ test('day-end writes yield to event-loop work before all candles finish and retr
   expect(observed).toBeGreaterThan(0);expect(observed).toBeLessThan(rows.length);
   expect(await repository.count()).toBe(rows.length);expect(rows.every(row=>typeof row.id==='string')).toBe(true);
   await persistCandleBatches(repository,rows);expect(await repository.count()).toBe(rows.length);
+  const regenerated=rows.slice(0,3).map(({id,...row})=>repository.create({...row,close:12}));
+  await persistCandleBatches(repository,regenerated);
+  expect(await repository.count()).toBe(rows.length);
+  expect(regenerated.map(row=>row.id)).toEqual(rows.slice(0,3).map(row=>row.id));
+  expect((await repository.findOneBy({id:rows[0].id})).close).toBe(12);
  }finally{await source.destroy();}
 },20000);
