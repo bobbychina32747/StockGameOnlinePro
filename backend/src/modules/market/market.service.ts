@@ -159,6 +159,9 @@ export class MarketService {
             }
             catch (e) { }
             this.engine.refreshOrderBooks(prices);
+            // Synthetic display depth cannot fill virtual AI orders. Seed actual
+            // maker quotes immediately rather than waiting ten real minutes.
+            marketData.refreshMarketMakers?.();
         }
         catch (e) {
             this.logger.warn('行情引擎预热失败: ' + (e && e.message ? e.message : e));
