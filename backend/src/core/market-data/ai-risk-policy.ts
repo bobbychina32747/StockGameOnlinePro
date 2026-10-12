@@ -11,12 +11,13 @@ export function recentAiReturns(stock) {
     const latest = mean(Math.max(0, bars.length - 30), bars.length);
     const previous = mean(Math.max(0, bars.length - 60), Math.max(1, bars.length - 30));
     const older = mean(Math.max(0, bars.length - 90), Math.max(1, bars.length - 60));
-    return { ready: bars.length >= 90, short: price / back(6) - 1, trend: latest / previous - 1, priorTrend: previous / older - 1 };
+    return { ready: bars.length >= 90, reference: latest, short: price / back(6) - 1, trend: latest / previous - 1, priorTrend: previous / older - 1 };
 }
 
 export function aiEntryScore(strategy, stock, features, hot) {
-    if (Number(stock.intrinsic) > 0 && Number(stock.price) > Number(stock.intrinsic) * 1.35) return -Infinity;
+    const expensive = Number(stock.intrinsic) > 0 && Number(stock.price) > Number(stock.intrinsic) * 1.35;
     const recent = recentAiReturns(stock);
+    if (expensive && (!recent.ready || strategy === 'meanrev' || strategy === 'reversal' || Number(stock.price) > recent.reference * 1.035)) return -Infinity;
     if (!recent.ready) return null; // Retain the existing signal until enough completed candles are available.
     const ret = Number(features.ret) || 0;
     const flow = Number(features.ofi) || 0;

@@ -17,6 +17,8 @@ import { gameTradingTime, tradingMinutesFor } from '../../common/data/trading-ca
 import { calibratedShock, heavyTail, unifiedInstruments } from '../../common/unified-market';
 import { HISTORY_CACHE_LIMITS, restoreHistoryCache, persistCandleBatches } from './history-cache';
 import { aiEntryScore, aiPolicyDirection, aiPortfolioRisk } from './ai-risk-policy';
+import { dailyFactorDrift, dailyValueDrift } from './price-drift';
+import { MarketRuntimeStore, encodeAiLedger, decodeAiLedger } from './runtime-state';
 
 // SECURITY: K线启动去重只执行一次（三市场实例共享模块状态）
 let klineDedupDone = false;
@@ -134,6 +136,9 @@ export class MarketDataService {
     private aiAgents: any[];
     private aiAdaptiveEnabled: boolean;
     private aiVolBucket: string;
+    private runtimeStore: MarketRuntimeStore | null = null;
+    private lastRuntimeSave = 0;
+    private resumeCounter: number | null = null;
     // P4 订单流信号：机构/游资大单净流入（股数，逐日清零）
     private bigOrderFlow: Map<string, number>;
     private intervalHandle: any;
@@ -198,6 +203,7 @@ export class MarketDataService {
                 cash: def.cash, initialCash: def.cash,
                 positions: new Map<string, { qty: number, cost: number }>(),
                 restingValue: 0, trades: 0, wins: 0, losses: 0, realizedPnl: 0,
+                fills: 0,
                 // P0-3: AI 限价挂单账本（orderId 追踪 + 冻结依据：活跃挂单剩余量/占用现金）
                 restingOrders: [], restingSeq: 0,
                 equityHistory: [],
@@ -454,6 +460,67 @@ export class MarketDataService {
                 st.dayLow = last.close;
             }
         }
+        const dbType = this.klineRepo?.manager?.connection?.options?.type;
+        if (dbType === 'sqlite' || dbType === 'better-sqlite3') {
+            this.runtimeStore = new MarketRuntimeStore(this.klineRepo.manager);
+            const saved = await this.runtimeStore.load(this.market);
+            if (saved) this.restoreRuntimeState(saved);
+        }
+    }
+    getResumeCounter() { return this.resumeCounter; }
+
+    restoreRuntimeState(saved: any) {
+        if (saved.version !== 1 || saved.market !== this.market || !Number.isInteger(saved.gameDay)
+            || saved.gameDay < this.gameDay || !Number.isInteger(saved.tickCount)
+            || !Number.isInteger(saved.counter) || saved.counter < 0 || saved.counter >= tradingMinutesFor(this.market)) {
+            throw new Error('Invalid or stale market runtime snapshot');
+        }
+        const ledger = decodeAiLedger(saved.aiLedger, this.market, new Set(this.stocks.keys()));
+        // Validate the entire snapshot before changing any live state.
+        for (const [symbol, row] of Object.entries(saved.stocks) as [string, any][]) {
+            if (!this.stocks.has(symbol)) throw new Error('Unknown snapshot symbol');
+            for (const key of ['price','prevClose','dayOpen','dayHigh','dayLow','intrinsic']) {
+                if (!(row[key] > 0) || !Number.isFinite(row[key])) throw new Error('Invalid runtime price');
+            }
+        }
+        this.aiLedger = ledger; this.gameDay = saved.gameDay; this.tickCount = saved.tickCount;
+        this.resumeCounter = saved.counter;
+        for (const [symbol, row] of Object.entries(saved.stocks) as [string, any][]) {
+            const st = this.stocks.get(symbol);
+            const { recent1min, current1min, current5min, currentDaily, ...state } = row;
+            Object.assign(st, state);
+            const decodeBar = bar => bar ? { ...bar, time: new Date(bar.time) } : null;
+            const byTime = new Map(st.kline1min.map(bar => [new Date(bar.time).getTime(), bar]));
+            for (const bar of recent1min || []) byTime.set(new Date(bar.time).getTime(), decodeBar(bar));
+            st.kline1min = [...byTime.values()].sort((a: any,b: any) => a.time - b.time).slice(-HISTORY_CACHE_LIMITS['1min']);
+            st.current1min = decodeBar(current1min); st.current5min = decodeBar(current5min); st.currentDaily = decodeBar(currentDaily);
+        }
+        this.factors = saved.factors; this.hotTopics = saved.hotTopics;
+        this.marketRegime = saved.marketRegime; this.industryCycles = new Map(saved.industryCycles);
+        this.burstingIndustries = new Set(saved.burstingIndustries); this.burstLastDay = new Map(saved.burstLastDay);
+        this.newsImpacts = saved.newsImpacts; this.macroEvents = saved.macroEvents;
+        this.indexDivisors = saved.indexDivisors;
+        this.logger.log('已恢复行情与 AI 账本，交易日 ' + this.gameDay + '，分钟 ' + saved.counter);
+    }
+
+    async persistRuntimeState(counter: number, force = false) {
+        if (!this.runtimeStore || (!force && Date.now() - this.lastRuntimeSave < 30000)) return;
+        const stocks = {};
+        for (const [symbol, st] of this.stocks) {
+            const row = {};
+            for (const key of ['price','prevClose','prevTickPrice','dayOpen','dayHigh','dayLow','dayVolume','minuteCounter',
+                'intrinsic','lastReturn','volatility','lastVolume','avgVolume','fund','calibratedVariance','pead','nextReportDay','listedDay']) {
+                if (st[key] !== undefined) row[key] = st[key];
+            }
+            row['recent1min'] = st.kline1min.slice(-90);
+            for (const key of ['current1min','current5min','currentDaily']) row[key] = st[key];
+            stocks[symbol] = row;
+        }
+        await this.runtimeStore.save(this.market, { version: 1, market: this.market, gameDay: this.gameDay, tickCount: this.tickCount,
+            counter, stocks, aiLedger: encodeAiLedger(this.aiLedger), factors: this.factors, hotTopics: this.hotTopics,
+            marketRegime: this.marketRegime, industryCycles: [...this.industryCycles], burstingIndustries: [...this.burstingIndustries],
+            burstLastDay: [...this.burstLastDay], newsImpacts: this.newsImpacts, macroEvents: this.macroEvents, indexDivisors: this.indexDivisors });
+        this.lastRuntimeSave = Date.now();
     }
     start() {
         if (this.isRunning)
@@ -530,7 +597,7 @@ export class MarketDataService {
                 const total = book.bids[0].size + book.asks[0].size;
                 if (total > 0) {
                     const ofi = (book.bids[0].size - book.asks[0].size) / total;
-                    return ofi * 0.002;
+                    return ofi * 0.0001;
                 }
             }
         } catch (e) { }
@@ -607,7 +674,7 @@ export class MarketDataService {
             let meanReversion = 0;
             let momentumBoost = 0;
             if (!stock.isTrending) {
-                meanReversion = Number(cfg.theta ?? 0.15) * (effMu - stock.price) / Math.max(.5, stock.price) * dt;
+                meanReversion = dailyValueDrift(stock.price, effMu, Number(cfg.theta ?? 0.15)) * dt;
             } else {
                 momentumBoost = Number(stock.trendDirection || 0) * 0.01 * dt;
                 // 经济泡沫积累：行业泡沫度越高追涨越强（受控）
@@ -627,7 +694,9 @@ export class MarketDataService {
             }
             // P3 财报后漂移（PEAD）：披露后数日同向漂移，摊到每 tick
             const peadDrift = stock.pead && stock.pead.daysLeft > 0 ? Number(stock.pead.mag) / tradingMinutesFor(this.market) : 0;
-            let priceChange = drift + shock + smallJump + factorImpact * dt * 5 + ofiImpact + meanReversion + momentumBoost + burstDrift + peadDrift;
+            const continuousDrift = this.clamp(drift + dailyFactorDrift(factorImpact) * dt + meanReversion + momentumBoost + burstDrift + peadDrift,
+                -0.03 * dt, 0.03 * dt);
+            let priceChange = continuousDrift + shock + smallJump + ofiImpact;
             // 收紧单 tick 波动 ±2%：保证相邻 K 线价格区间贴近（消除图表割裂）
             priceChange = this.clamp(priceChange, -0.02, 0.02);
             // P1 厚尾：低频大跳（崩盘/脉冲）不受 ±2% 连续项限幅，在限幅后叠加（真实极端行情形态）
@@ -963,6 +1032,7 @@ export class MarketDataService {
         }
         const symbol = f.symbol;
         const side = String(f.side || '').toLowerCase();
+        ledger.fills = Number(ledger.fills || 0) + 1;
         if (side === 'buy' || side === 'cover') {
             ledger.cash = Number(ledger.cash) - qty * price;
             const pos = ledger.positions.get(symbol) || { qty: 0, cost: 0 };
@@ -1024,7 +1094,7 @@ export class MarketDataService {
         // 每 tick 特征缓存（所有对手盘共用）：日内涨幅/波动率/OFI/行业周期/市场情绪
         const features = new Map<string, any>();
         for (const st of arr) {
-            const rawOfi = this.engine ? this.calcOFIImpact(st) / 0.002 : 0;
+            const rawOfi = this.engine ? this.calcOFIImpact(st) / 0.0001 : 0;
             features.set(st.symbol, ai_opponents_1.aiFeatures(
                 st, rawOfi,
                 this.industryCycles.get(st.industry) || 'expansion',
@@ -1182,6 +1252,12 @@ export class MarketDataService {
                 const singleRoom = risk.singleLimit - heldQty * priceNow - (risk.bySymbol.get(target.symbol) || 0);
                 const totalRoom = risk.exposureLimit - risk.holdings - risk.pendingBuys;
                 qty = Math.min(qty, Math.floor(Math.max(0, Math.min(singleRoom, totalRoom)) / Math.max(priceNow * 1.005, 0.01)));
+                // Technical strategies may participate in expensive but confirmed trends only at small size.
+                if (Number(target.intrinsic) > 0 && priceNow > Number(target.intrinsic) * 1.35) {
+                    const premiumRoom = Math.min(risk.equity * 0.02 - heldQty * priceNow - (risk.bySymbol.get(target.symbol) || 0),
+                        risk.equity * 0.15 - risk.holdings - risk.pendingBuys);
+                    qty = Math.min(qty, Math.floor(Math.max(0, premiumRoom) / Math.max(priceNow * 1.005, 0.01)));
+                }
             }
             else {
                 // P0-3: 可卖量 = 持仓 − 活跃卖单剩余量（卖单冻结）。市价分支也走这条口径，
@@ -1250,6 +1326,7 @@ export class MarketDataService {
                     }
                     // 价格冲击 + 成交量并入 K 线（与用户成交同一路径，AI 抛售可戳破泡沫）
                     this.applyUserFill({ symbol: target.symbol, side, filledQuantity: fill.filledQuantity, avgPrice: fill.avgPrice });
+                    ledger.fills = Number(ledger.fills || 0) + 1;
                     // P3 更新资金/持仓账本；P4 平仓记入绩效（已实现盈亏/胜率）
                     if (side === 'buy') {
                         ledger.cash -= fill.filledQuantity * fill.avgPrice;
@@ -1349,6 +1426,8 @@ export class MarketDataService {
                 pnlPct: Number((equityReturn * 100).toFixed(2)),
                 winRate: Number((winRate * 100).toFixed(1)),
                 trades: Number(ledger.trades) || 0,
+                fills: Number(ledger.fills) || 0,
+                status: ledger.positions.size ? '持仓中' : ledger.riskRecovery && this.gameDay < ledger.riskRecovery.resumeDay ? '风控冷却' : '等待信号',
                 tier: perf.tier,
                 score: Number(perf.score.toFixed(1)),
                 positions: ledger.positions.size,
@@ -1418,7 +1497,8 @@ export class MarketDataService {
         }
         const avg = sum / idx.length; // 平均指数涨跌幅（%）
         // 削弱系数：% 转小数 + 极弱反馈（一天最多 ~0.003，防正反馈自激爆炸）
-        this.factors['市场情绪'] = this.clamp((this.factors['市场情绪'] ?? 0) + avg * 0.00002, -0.1, 0.1);
+        const target = this.clamp(avg * 0.0025, -0.05, 0.05);
+        this.factors['市场情绪'] = (this.factors['市场情绪'] ?? 0) * 0.98 + target * 0.02;
     }
     // ─── 宏观反馈：股票表现反向影响宏观因子（双向联动，缓慢平滑防自激震荡） ───
     updateMacroFeedback() {

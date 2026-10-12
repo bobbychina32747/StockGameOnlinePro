@@ -148,7 +148,7 @@ export class MarketService {
             if (!prices || Object.keys(prices).length === 0)
                 return;
             this.engine.updatePrices(prices);
-            this.engine.setDayOpen(prices);
+            this.engine.setDayOpen(Object.fromEntries(Object.keys(prices).map(symbol => [symbol, marketData.getDayOpen?.(symbol) || prices[symbol]])));
             // Phase B: 昨收同步（涨跌停/委托价校验基准）
             try {
                 this.engine.setPrevCloses(marketData.getPrevCloses());
@@ -184,6 +184,15 @@ export class MarketService {
         this.tickCounter = tradingMinuteIndex('CN', now) ?? 0;
         this.tickCounterHK = tradingMinuteIndex('HK', now) ?? 0;
         this.tickCounterUS = tradingMinuteIndex('US', now) ?? 0;
+        if (this.tickIntervalMs < 60000) {
+            for (const [market, md, key] of [['CN',this.marketData,'tickCounter'],['HK',this.marketDataHK,'tickCounterHK'],['US',this.marketDataUS,'tickCounterUS']] as const) {
+                const counter = md?.getResumeCounter?.();
+                if (counter != null) {
+                    this[key] = counter;
+                    if (counter > 0) { this.initializedGameDays[market] = md.gameDay; this.lastAuctionDay[market] = md.gameDay; }
+                }
+            }
+        }
         // B1 用户成交 → 行情引擎回调（价格冲击 + 成交量并入当前K线）
         this.engine.setUserFillHook((fill) => {
             try {
@@ -429,6 +438,8 @@ export class MarketService {
             if (advanceCounter) {
                 const c = this[counterKey] || 0;
                 this[counterKey] = (c + 1) % tradingMinutesFor(market);
+                try { await marketData.persistRuntimeState?.(this[counterKey], this[counterKey] === 0); }
+                catch (e) { this.logger.error('行情与 AI 账本保存失败: ' + e.message); }
             }
         }
     }

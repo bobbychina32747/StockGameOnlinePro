@@ -164,6 +164,13 @@ describe('P2 OFI 动态滑点', () => {
 });
 
 describe('P2 做市商模型', () => {
+  test('日波动率与库存股数不能制造两位数价差或跨过中间价', () => {
+    for (const inventory of [-60000, 0, 60000]) {
+      const q = mmQuote(100, 0.02, inventory);
+      expect((q.ask-q.bid)/100).toBeLessThan(.005);
+      expect(q.bid).toBeLessThan(100); expect(q.ask).toBeGreaterThan(100);
+    }
+  });
   test('mmQuote：价差随波动率扩大，报价围绕中间价', () => {
     const calm = mmQuote(100, 0.02, 0);
     const wild = mmQuote(100, 0.08, 0);
