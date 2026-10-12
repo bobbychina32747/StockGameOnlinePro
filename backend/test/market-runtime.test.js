@@ -10,6 +10,7 @@ test('SQLite restart retains actual AI cash, cost, loss, risk cooldown and marke
  a.runtimeStore=new MarketRuntimeStore(manager);a.gameDay=40;a.tickCount=999;
  a.stocks.set('TEST',{symbol:'TEST',price:90,prevClose:100,dayOpen:100,dayHigh:100,dayLow:90,intrinsic:100,
  minuteCounter:123,kline1min:[{time:new Date(2024,1,10),open:91,high:91,low:90,close:90,volume:12}],current1min:null,current5min:null,currentDaily:null});
+ Object.assign(a.stocks.get('TEST'),{volumeState:{shock:.25},eventVolumeState:{boost:1.84,remaining:12},lastAmount:1234,dayAmount:5678});
  const l=a.aiLedger[0];l.cash-=10000;l.positions.set('TEST',{qty:100,cost:100});l.fills=3;
  l.riskRecovery={resumeDay:42,anchor:l.cash+900};l.entryTicks={TEST:995};
  l.restingOrders=[{side:'buy',qty:4,price:90}];
@@ -22,6 +23,9 @@ test('SQLite restart retains actual AI cash, cost, loss, risk cooldown and marke
  expect(b.aiLedger[0].riskRecovery).toEqual(l.riskRecovery);expect(b.aiLedger[0].entryTicks).toEqual(l.entryTicks);
  expect(b.aiLedger[0].restingOrders).toEqual([]);expect(b.aiLedger[0].fills).toBe(3);
  expect(b.getResumeCounter()).toBe(123);expect(b.tickCount).toBe(999);
+ expect(b.stocks.get('TEST').volumeState).toEqual({shock:.25});
+ expect(b.stocks.get('TEST').eventVolumeState).toEqual({boost:1.84,remaining:12});
+ expect(b.stocks.get('TEST').dayAmount).toBe(5678);
  expect(b.stocks.get('TEST').price).toBe(90);expect(b.stocks.get('TEST').kline1min[0].time).toBeInstanceOf(Date);
  expect(b.getAiOpponents().find(row=>row.id==='AI1').pnlPct).toBeLessThan(0);
  const invalid={...saved,market:'HK'};expect(()=>b.restoreRuntimeState(invalid)).toThrow();

@@ -12,6 +12,7 @@ export interface Instrument {
 }
 export interface Candle { time: number; day: number; open: number; high: number; low: number; close: number; volume: number }
 export interface Quote {
+  volumeSource?: string; modeledTurnoverPct?: number|null; relativeVolume?: number;
   priceLimits?: {up:number;down:number}|null;
   symbol: string; price: number; previousClose: number; fairValue: number; open: number; high: number; low: number;
   volume: number; turnover: number; momentum: number; bubble: number; earningsGrowth: number; pe: number;

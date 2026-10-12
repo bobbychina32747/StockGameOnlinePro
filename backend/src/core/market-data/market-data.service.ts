@@ -19,6 +19,7 @@ import { HISTORY_CACHE_LIMITS, restoreHistoryCache, persistCandleBatches } from 
 import { aiEntryScore, aiPolicyDirection, aiPortfolioRisk } from './ai-risk-policy';
 import { dailyFactorDrift, dailyValueDrift } from './price-drift';
 import { MarketRuntimeStore, encodeAiLedger, decodeAiLedger } from './runtime-state';
+import { calibratedVolume, modeledFloatShares } from '../../common/volume-model';
 
 // R5-⑧ 做市商库存风控阈值（每个做市商 / 每只标的的净库存上下限，单位：股）：
 // 取 ±60,000 股 ≈ 单次报价量的几十倍（MM_PARAMS.quoteSize=800；任务书原按 500 股估的"百倍量级"，
@@ -492,7 +493,7 @@ export class MarketDataService {
         for (const [symbol, st] of this.stocks) {
             const row = {};
             for (const key of ['price','prevClose','prevTickPrice','dayOpen','dayHigh','dayLow','dayVolume','minuteCounter',
-                'intrinsic','lastReturn','volatility','lastVolume','avgVolume','fund','calibratedVariance','pead','nextReportDay','listedDay']) {
+                'intrinsic','lastReturn','volatility','lastVolume','avgVolume','fund','calibratedVariance','volumeState','eventVolumeState','lastAmount','dayAmount','pead','nextReportDay','listedDay']) {
                 if (st[key] !== undefined) row[key] = st[key];
             }
             row['recent1min'] = st.kline1min.slice(-90);
@@ -610,6 +611,8 @@ export class MarketDataService {
     }
     // ─── 私有辅助函数：成交量 ───
     calcVolume(stock, regimes) {
+        const calibrated = calibratedVolume(stock, this.market, tradingMinutesFor(this.market), this.randn.bind(this));
+        if (calibrated !== null) return calibrated;
         const baseVol = stock.baseVolume || 10000;
         const volFactor = 1 + stock.volatility * 5;
         const regimeMul = regimes === 'bull' ? 1.4 : regimes === 'bear' ? 1.2 : 0.9;
@@ -715,6 +718,8 @@ export class MarketDataService {
             this.updateTrend(stock, stock.lastReturn);
             // prevClose 保持"昨收"不变（涨跌幅基准），仅由 endOfDay 更新
             stock.lastVolume = this.calcVolume(stock, regimes);
+            stock.lastAmount = stock.lastVolume * (previousPrice + stock.price) / 2;
+            stock.dayAmount = (Number(stock.dayAmount) || Number(stock.dayVolume) * previousPrice || 0) + stock.lastAmount;
             stock.avgVolume = stock.avgVolume * 0.92 + stock.lastVolume * 0.08;
             stock.dayHigh = Math.max(stock.dayHigh, stock.price);
             stock.dayLow = Math.min(stock.dayLow, stock.price);
@@ -863,6 +868,9 @@ export class MarketDataService {
         const qty = Number(fill.filledQuantity) || 0;
         stock.lastVolume += qty;
         stock.dayVolume += qty;
+        const amount = qty * Number(fill.avgPrice || stock.price);
+        stock.lastAmount = (Number(stock.lastAmount) || 0) + amount;
+        stock.dayAmount = (Number(stock.dayAmount) || 0) + amount;
         const k1 = stock.current1min;
         if (k1) {
             k1.volume += qty;
@@ -1867,6 +1875,8 @@ export class MarketDataService {
             stock.dayHigh = stock.price;
             stock.dayLow = stock.price;
             stock.dayVolume = 0;
+            stock.dayAmount = 0;
+            stock.lastAmount = 0;
             stock.minuteCounter = 0;
             stock.isTrending = false;
             stock.trendCounter = 0;
@@ -2071,7 +2081,9 @@ export class MarketDataService {
         for (const mm of this.marketMakers) {
             for (const stock of this.stocks.values()) {
                 const inv = Number(mm.inventory.get(stock.symbol)) || 0;
-                const q = market_maker_1.mmQuote(stock.price, stock.volatility, inv, p);
+                const liquidity = this.clamp(Math.sqrt((Number(stock.avgVolume) || Number(stock.baseVolume) || 10000)
+                    / Math.max(1, Number(stock.baseVolume) || 10000)), .5, 2);
+                const q = market_maker_1.mmQuote(stock.price, stock.volatility, inv, { ...p, quoteSize: Math.round(p.quoteSize * liquidity) });
                 const bidId = `MMB-${mm.id}-${stock.symbol}`;
                 const askId = `MMA-${mm.id}-${stock.symbol}`;
                 // 撤旧报价 → 挂新报价（TTL 到期由引擎 prune 兜底）
@@ -2163,6 +2175,7 @@ export class MarketDataService {
         this.computeIndustryBubble();
         const list = [];
         for (const state of this.stocks.values()) {
+            const floatShares = modeledFloatShares(state, this.market, tradingMinutesFor(this.market));
             const prevClose = Number(state.prevClose) || Number(state.dayOpen) || 1;
             const adj = this.adjFactors.get(state.symbol) || { factor: 1, series: [] };
             list.push({
@@ -2183,6 +2196,12 @@ export class MarketDataService {
                 dayHigh: Number(state.dayHigh.toFixed(2)),
                 dayLow: Number(state.dayLow.toFixed(2)),
                 dayVolume: state.dayVolume,
+                dayAmount: Number(state.dayAmount) || 0,
+                amountSource: 'simulated activity plus matched fills; background amount estimated from minute midpoint',
+                volumeSource: 'simulated-plus-matched',
+                relativeVolume: (Number(state.lastVolume) || 0) / Math.max(1, Number(state.avgVolume) || 1),
+                modeledFloatShares: floatShares,
+                modeledTurnoverPct: floatShares ? Number(state.dayVolume || 0) / floatShares * 100 : null,
                 fundamentals: state.fund ? { ...state.fund } : null,
                 intrinsic: Number(state.intrinsic) || null,
                 previousClose: prevClose,
@@ -2324,6 +2343,9 @@ export class MarketDataService {
             // 披露日跳空（分级）+ 财报后漂移 + 一致预期修正
             const shock = fundamentals_1.earningsShock(cls);
             this.applyEventPrice(st, st.price * (1 + shock));
+            // Selected earnings events had median volume 3.37x; shrink its square
+            // root to a bounded pulse instead of treating all news as that extreme.
+            st.eventVolumeState = { boost: 1.84, remaining: 30 };
             st.pead = { mag: fundamentals_1.peadDaily(cls), daysLeft: 5 };
             fundamentals_1.reviseConsensus(st.fund, cls);
             // 分红与盈利能力挂钩：高净利率公司更大概率派现，派现额随利润放大

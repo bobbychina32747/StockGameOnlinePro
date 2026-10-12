@@ -1,0 +1,14 @@
+const fs=require('node:fs'),path=require('node:path');
+const universe=require('../packages/domain/research-universe.json'),out=process.argv[2];fs.mkdirSync(out,{recursive:true});
+const labels=new Map();for(const [industry,symbols]of Object.entries(universe))for(const s of symbols.filter(s=>/\.(SS|SZ)$/.test(s)))labels.set(s,industry);
+const filename=path.join(out,'cn-turnover.ndjson'),completed=new Set(fs.existsSync(filename)?fs.readFileSync(filename,'utf8').trim().split('\n').filter(Boolean).map(l=>JSON.parse(l).symbol):[]),failures=[];
+(async()=>{for(const [symbol,industry]of labels){if(completed.has(symbol))continue;
+ const secid=(symbol.endsWith('.SS')?'1.':'0.')+symbol.split('.')[0];
+ const url=`https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&klt=101&fqt=0&beg=20161001&end=20261009&lmt=10000&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61`;
+ try{const r=await fetch(url,{signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('HTTP '+r.status);const b=await r.json();if(!b.data?.klines?.length)throw Error('Empty kline response');
+  const rows=b.data.klines.map(line=>{const [date,...values]=line.split(',');return {date,values:values.map(Number)};}).filter(row=>row.date<'2026-10-10'&&row.values.every(Number.isFinite));
+  fs.appendFileSync(filename,JSON.stringify({symbol,industry,market:'CN',source:url,retrievedAt:new Date().toISOString(),currency:'CNY',adjusted:false,columns:['date','open','close','high','low','volumeLots','amountCny','amplitudePct','changePct','change','turnoverPct'],volumeLotShares:100,rows:rows.map(r=>[r.date,...r.values])})+'\n');
+  completed.add(symbol);console.log(symbol+' '+rows.length+' OHLC/amount/turnover rows');
+ }catch(e){failures.push({symbol,error:e.message});}await new Promise(resolve=>setTimeout(resolve,500));
+ }fs.writeFileSync(path.join(out,'cn-turnover-status.json'),JSON.stringify({completed:completed.size,requested:labels.size,failures},null,2));
+})().catch(e=>{console.error(e);process.exitCode=1;});

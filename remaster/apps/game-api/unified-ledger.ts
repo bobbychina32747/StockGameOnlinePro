@@ -28,7 +28,8 @@ export function adaptLedger(raw:any,principal:Principal,stocks:any[],state:any,f
   const quotes=Object.fromEntries(stocks.filter(row=>row.market===principal.market).map(row=>{
     const price=cents(row.price),change=num(row.changePct)/100,previousClose=cents(row.previousClose)||Math.round(price/(1+change));
     return [row.symbol,{symbol:row.symbol,price,previousClose,fairValue:cents(row.intrinsic)||price,open:cents(row.dayOpen)||price,
-      high:cents(row.dayHigh)||price,low:cents(row.dayLow)||price,volume:num(row.dayVolume),turnover:0,
+      high:cents(row.dayHigh)||price,low:cents(row.dayLow)||price,volume:num(row.dayVolume),turnover:cents(row.dayAmount),
+      volumeSource:row.volumeSource,modeledTurnoverPct:row.modeledTurnoverPct??null,relativeVolume:num(row.relativeVolume),
       priceLimits:row.priceLimits?{up:cents(row.priceLimits.up),down:cents(row.priceLimits.down)}:null,
       momentum:0,bubble:0,earningsGrowth:num(row.fundamentals?.consensusGrowth),pe:0,dividendFactor:num(row.adjFactor)||1,change}];
   }));
