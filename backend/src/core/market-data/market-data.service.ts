@@ -20,6 +20,7 @@ import { aiEntryScore, aiPolicyDirection, aiPortfolioRisk } from './ai-risk-poli
 import { dailyFactorDrift, dailyValueDrift } from './price-drift';
 import { MarketRuntimeStore, encodeAiLedger, decodeAiLedger } from './runtime-state';
 import { calibratedVolume, modeledFloatShares } from '../../common/volume-model';
+import { fiveMinuteHistory } from './candle-aggregation';
 
 // R5-⑧ 做市商库存风控阈值（每个做市商 / 每只标的的净库存上下限，单位：股）：
 // 取 ±60,000 股 ≈ 单次报价量的几十倍（MM_PARAMS.quoteSize=800；任务书原按 500 股估的"百倍量级"，
@@ -1593,7 +1594,8 @@ export class MarketDataService {
                     stock.kline1min.shift();
             }
             // 价格连续性：新 bar 的 open = 上一条 close（相邻 bar 区间自然交叠，消除图表割裂）
-            const prevClose1 = stock.kline1min.length > 0 ? Number(stock.kline1min[stock.kline1min.length - 1].close) : price;
+            const prevClose1 = minute === 0 && Number(stock.dayOpen) > 0 ? Number(stock.dayOpen)
+                : stock.kline1min.length > 0 ? Number(stock.kline1min[stock.kline1min.length - 1].close) : price;
             stock.current1min = {
                 startMinute: minute,
                 time: this.tradingTime(this.gameDay, minute),
@@ -1613,16 +1615,15 @@ export class MarketDataService {
                 if (stock.kline5min.length > HISTORY_CACHE_LIMITS['5min'])
                     stock.kline5min.shift();
             }
-            const prevClose5 = stock.kline5min.length > 0 ? Number(stock.kline5min[stock.kline5min.length - 1].close) : price;
             stock.current5min = {
                 startFiveIdx: fiveIdx,
                 time: this.tradingTime(this.gameDay, fiveIdx * 5),
-                open: prevClose5, high: Math.max(prevClose5, price), low: Math.min(prevClose5, price), close: price, volume: 0,
+                open: k1.open, high: k1.high, low: k1.low, close: price, volume: 0,
             };
         }
         const k5 = stock.current5min;
-        k5.high = Math.max(k5.high, price);
-        k5.low = Math.min(k5.low, price);
+        k5.high = Math.max(k5.high, k1.high);
+        k5.low = Math.min(k5.low, k1.low);
         k5.close = price;
         k5.volume += volume;
         if (!stock.currentDaily) {
@@ -2243,9 +2244,8 @@ export class MarketDataService {
                 current = stock.current1min;
                 break;
             case '5min':
-                klines = [...stock.kline5min];
-                current = stock.current5min;
-                break;
+                return fiveMinuteHistory([...stock.kline5min, ...(stock.current5min ? [stock.current5min] : [])],
+                    [...stock.kline1min, ...(stock.current1min ? [stock.current1min] : [])]);
             case '60min':
                 // 60 分钟：按小时聚合（09:30 起始，跨午休按自然小时）
                 {
