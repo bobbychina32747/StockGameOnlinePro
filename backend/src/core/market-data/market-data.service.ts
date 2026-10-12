@@ -410,7 +410,17 @@ export class MarketDataService {
         const ownSymbols = [...this.stocks.keys()];
         const historyCount = await restoreHistoryCache(this.klineRepo, ownSymbols,
             (symbol, rows) => this.restoreFromHistory(rows, symbol));
-        if (historyCount > 0) {
+        const dbType = this.klineRepo?.manager?.connection?.options?.type;
+        let savedRuntime: any = null;
+        if (dbType === 'sqlite' || dbType === 'better-sqlite3') {
+            this.runtimeStore = new MarketRuntimeStore(this.klineRepo.manager);
+            savedRuntime = await this.runtimeStore.load(this.market);
+        }
+        if (savedRuntime) {
+            // Restore before warm-up: generating another random past would splice
+            // incompatible OHLC into the real minute path captured by the snapshot.
+            this.restoreRuntimeState(savedRuntime);
+        } else if (historyCount > 0) {
             // S1 补齐：恢复的天数不足 30 天则补生成（内存，不落库）
             const missingDays = Math.max(0, 30 - this.gameDay);
             for (let d = 0; d < missingDays; d++) {
@@ -436,7 +446,7 @@ export class MarketDataService {
         // 恢复/生成后：确保最新价格作为开盘基准
         for (const st of this.stocks.values()) {
             const last = st.klineDaily[st.klineDaily.length - 1];
-            if (last && st.dayOpen === st.price) {
+            if (!savedRuntime && last && st.dayOpen === st.price) {
                 st.price = last.close;
                 st.prevClose = last.close;
                 st.prevTickPrice = last.close;
@@ -444,12 +454,6 @@ export class MarketDataService {
                 st.dayHigh = last.close;
                 st.dayLow = last.close;
             }
-        }
-        const dbType = this.klineRepo?.manager?.connection?.options?.type;
-        if (dbType === 'sqlite' || dbType === 'better-sqlite3') {
-            this.runtimeStore = new MarketRuntimeStore(this.klineRepo.manager);
-            const saved = await this.runtimeStore.load(this.market);
-            if (saved) this.restoreRuntimeState(saved);
         }
     }
     getResumeCounter() { return this.resumeCounter; }
@@ -490,6 +494,16 @@ export class MarketDataService {
 
     async persistRuntimeState(counter: number, force = false) {
         if (!this.runtimeStore || (!force && Date.now() - this.lastRuntimeSave < 30000)) return;
+        if (this.klineRepo?.save) {
+            const rows = [];
+            for (const [symbol, st] of this.stocks) {
+                for (const [timeframe, current, history] of [['1min',st.current1min,st.kline1min],['5min',st.current5min,st.kline5min]] as const) {
+                    const bar = current || history?.[history.length - 1];
+                    if (bar) rows.push(this.klineRepo.create({symbol,timeframe,time:bar.time,open:bar.open,high:bar.high,low:bar.low,close:bar.close,volume:bar.volume}));
+                }
+            }
+            await persistCandleBatches(this.klineRepo, rows);
+        }
         const stocks = {};
         for (const [symbol, st] of this.stocks) {
             const row = {};
