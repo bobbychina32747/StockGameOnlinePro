@@ -12,6 +12,9 @@ services:
       - NODE_OPTIONS=--max-old-space-size=900
       # 容器默认 UTC，A 股开盘/收盘/交易日判断会整体偏 8 小时 → 必须钉死北京时区
       - TZ=Asia/Shanghai
+      # Production advances one simulated trading minute per real minute.
+      - TICK_INTERVAL_MS=60000
+      - SANDBOX_FAST=false
       # 站内写作台：内容源目录（含 build.mjs 与 content/）与静态产物目录
       # 用 !override 显式列出全部挂载，避免与基础 compose 的 sgp-data 合并歧义
       - BLOG_DIR=/blog

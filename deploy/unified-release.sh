@@ -45,6 +45,8 @@ services:
     image: sgp-unified-ledger:20261011
     environment:
       - FORMAL_CONTINUOUS_SIMULATION=true
+      - TICK_INTERVAL_MS=60000
+      - SANDBOX_FAST=false
 YAML
 docker compose -p docker -f /opt/stockgame/backend/docker/docker-compose.yml \
  -f /opt/stockgame/deploy/docker-compose.override.yml \
