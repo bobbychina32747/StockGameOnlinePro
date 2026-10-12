@@ -66,5 +66,7 @@ function activateReset(original, backupDirectory) {
 module.exports={prepareReset,activateReset};
 if(require.main===module) {
   if(process.env.CONFIRMED_PUBLIC_BETA_RESET!=='keep-accounts-reset-assets') throw new Error('Explicit reset scope is required');
-  activateReset('/app/data/stockgame.db','/app/data/public-beta-before-reset-20261012');
+  const label=process.env.PUBLIC_BETA_RESET_LABEL || new Date().toISOString().replace(/[^0-9]/g,'');
+  if(!/^[a-zA-Z0-9_-]+$/.test(label)) throw new Error('Invalid reset backup label');
+  activateReset('/app/data/stockgame.db',path.join('/app/data','public-beta-before-reset-'+label));
 }

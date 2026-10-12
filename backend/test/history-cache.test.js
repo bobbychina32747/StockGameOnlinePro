@@ -4,6 +4,24 @@ const {Kline}=require('../dist/src/infrastructure/database/entities/kline.entity
 const {restoreHistoryCache,HISTORY_CACHE_LIMITS,persistCandleBatches}=require('../dist/src/core/market-data/history-cache');
 const {MarketDataService}=require('../dist/src/core/market-data/market-data.service');
 
+test('fresh generated minute and five-minute windows survive database reload and repeated seed writes',async()=>{
+ const source=new DataSource({type:'better-sqlite3',database:':memory:',entities:[Kline],synchronize:true});await source.initialize();
+ try{
+  const repository=source.getRepository(Kline),service=new MarketDataService(null,repository,null,null,'HK');
+  const base=Date.UTC(2024,0,1),bars=(n,step)=>Array.from({length:n},(_,i)=>({time:new Date(base+i*step),open:10+i*.01,high:11+i*.01,low:9+i*.01,close:10.5+i*.01,volume:100+i}));
+  const stock={kline1min:bars(1100,60000),kline5min:bars(220,300000),klineDaily:bars(30,86400000)};
+  service.stocks.set('T1',stock);service.klineRepo=repository;
+  await service.persistInitialHistory();await service.persistInitialHistory();
+  expect(await repository.count()).toBe(1350);
+  const restored={stocks:new Map([['T1',{symbol:'T1',kline1min:[],kline5min:[],klineDaily:[]}]]),gameDay:0};
+  await restoreHistoryCache(repository,['T1'],(symbol,rows)=>MarketDataService.prototype.restoreFromHistory.call(restored,rows,symbol));
+  for(const key of ['kline1min','kline5min','klineDaily']){
+   const result=restored.stocks.get('T1')[key];expect(result.length).toBe(stock[key].length);
+   expect(result.map(({time,open,high,low,close,volume})=>({time,open,high,low,close,volume}))).toEqual(stock[key]);
+  }
+ }finally{await source.destroy();}
+},20000);
+
 test('large persisted history restores a bounded cache instrument by instrument without deleting archive or resetting other instruments',async()=>{
  const source=new DataSource({type:'better-sqlite3',database:':memory:',entities:[Kline],synchronize:true});await source.initialize();
  try{

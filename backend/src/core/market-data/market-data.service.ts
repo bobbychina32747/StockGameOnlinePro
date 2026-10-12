@@ -421,10 +421,10 @@ export class MarketDataService {
             // incompatible OHLC into the real minute path captured by the snapshot.
             this.restoreRuntimeState(savedRuntime);
         } else if (historyCount > 0) {
-            // S1 补齐：恢复的天数不足 30 天则补生成（内存，不落库）
+            // 恢复的天数不足 30 天则补生成，完成后持久化运行窗口。
             const missingDays = Math.max(0, 30 - this.gameDay);
             for (let d = 0; d < missingDays; d++) {
-                for (let t = 0; t < constants_1.MARKET.TICKS_PER_DAY; t++) {
+                for (let t = 0; t < tradingMinutesFor(this.market); t++) {
                     await this.generateTick();
                 }
                 await this.endOfDay(true);
@@ -432,13 +432,17 @@ export class MarketDataService {
             this.logger.log(`[S1] 已恢复行情缓存 ${historyCount} 条, 从第 ${this.gameDay} 个交易日继续（补齐 ${missingDays} 天；完整历史留在数据库）`);
         } else {
             for (let d = 0; d < 30; d++) {
-                for (let t = 0; t < constants_1.MARKET.TICKS_PER_DAY; t++) {
+                for (let t = 0; t < tradingMinutesFor(this.market); t++) {
                     await this.generateTick();
                 }
-                await this.endOfDay(true); // skipPersist：初始30天仅内存生成(快速)
+                await this.endOfDay(true); // 预热结束后按标的分批持久化。
             }
             // 注意：不重置 gameDay，历史 30 天用 0..29，实时从 30 开始，避免 K 线时间戳重叠
-            this.logger.log(`市场数据已初始化(首次): ${dbStocks.length} 只股票, 30天历史已生成并落库`);
+            this.logger.log(`市场数据已初始化(首次): ${dbStocks.length} 只股票, 30天历史已生成`);
+        }
+        if (!savedRuntime && this.klineRepo?.save) {
+            await this.persistInitialHistory();
+            this.logger.log('初始行情窗口已持久化');
         }
         // P1 全生命周期历史：补齐上市日至 30 天窗口前的日线历史（周/月线由日线聚合，只落库一次）
         await this.seedUnifiedHistory();
@@ -455,8 +459,21 @@ export class MarketDataService {
                 st.dayLow = last.close;
             }
         }
+        if (!savedRuntime) await this.persistRuntimeState(0, true);
     }
     getResumeCounter() { return this.resumeCounter; }
+
+    async persistInitialHistory() {
+        // Persist bounded windows instrument by instrument before taking the
+        // first snapshot, so restart can recover the generated minute path.
+        for (const [symbol, st] of this.stocks) {
+            for (const [timeframe, history] of [['1min',st.kline1min],['5min',st.kline5min],['daily',st.klineDaily]] as const) {
+                const rows = history.map(bar => this.klineRepo.create({symbol,timeframe,time:bar.time,
+                    open:bar.open,high:bar.high,low:bar.low,close:bar.close,volume:bar.volume}));
+                await persistCandleBatches(this.klineRepo, rows);
+            }
+        }
+    }
 
     restoreRuntimeState(saved: any) {
         if (saved.version !== 1 || saved.market !== this.market || !Number.isInteger(saved.gameDay)
