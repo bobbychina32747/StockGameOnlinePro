@@ -481,7 +481,9 @@ export class MarketDataService {
             const decodeBar = bar => bar ? { ...bar, time: new Date(bar.time) } : null;
             const byTime = new Map(st.kline1min.map(bar => [new Date(bar.time).getTime(), bar]));
             for (const bar of recent1min || []) byTime.set(new Date(bar.time).getTime(), decodeBar(bar));
+            if (current1min) byTime.delete(new Date(current1min.time).getTime());
             st.kline1min = [...byTime.values()].sort((a: any,b: any) => a.time - b.time).slice(-HISTORY_CACHE_LIMITS['1min']);
+            if (current5min) st.kline5min = (st.kline5min || []).filter(bar => new Date(bar.time).getTime() !== new Date(current5min.time).getTime());
             st.current1min = decodeBar(current1min); st.current5min = decodeBar(current5min); st.currentDaily = decodeBar(currentDaily);
         }
         this.factors = saved.factors; this.hotTopics = saved.hotTopics;

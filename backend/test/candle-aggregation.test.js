@@ -39,5 +39,7 @@ test('minute snapshots persist live candles idempotently and resume without gene
   restored.generateTick=jest.fn(()=>{throw Error('Restart regenerated historical prices');});
   await restored.init();expect(restored.generateTick).not.toHaveBeenCalled();
   expect(restored.gameDay).toBe(42);expect(restored.getResumeCounter()).toBe(123);expect(restored.stocks.get('T1').price).toBe(101);
+  expect(restored.getKlines('T1','1min')).toHaveLength(1);
+  expect(restored.getKlines('T1','5min')).toHaveLength(1);
  }finally{await db.destroy();}
 });
