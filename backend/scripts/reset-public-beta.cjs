@@ -39,8 +39,10 @@ function prepareReset(original, replacement) {
       }
       for(const row of source.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL").all()) target.exec(row.sql);
     })();
-    if (target.pragma('foreign_key_check').length) throw new Error('Reset has broken foreign keys');
-    if (target.pragma('quick_check',{simple:true})!=='ok') throw new Error('Reset database integrity check failed');
+    // An unqualified integrity pragma also visits attached databases. Validate
+    // only the new database, never rescan the multi-GB historical archive here.
+    if (target.pragma('main.foreign_key_check').length) throw new Error('Reset has broken foreign keys');
+    if (target.pragma('main.quick_check',{simple:true})!=='ok') throw new Error('Reset database integrity check failed');
     for(const {name} of tables.filter(row=>cleared.has(row.name))) {
       if(target.prepare(`SELECT COUNT(*) AS n FROM main.${quote(name)}`).get().n!==0) throw new Error('Game table was not cleared');
     }
