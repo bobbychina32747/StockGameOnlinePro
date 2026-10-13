@@ -1,58 +1,63 @@
-# StockSim Pro — 模拟炒股游戏
+**English** | [中文](README.zh.md)
+
+# StockSim Pro — Stock Trading Simulation
 
 [![Release](https://img.shields.io/github/v/release/bobbychina32747/StockGameOnlinePro?label=Release&color=2f6fed)](https://github.com/bobbychina32747/StockGameOnlinePro/releases)
-[![更新日志](https://img.shields.io/badge/Changelog-Keep%20a%20Changelog-8251EE)](CHANGELOG.md)
+[![Changelog](https://img.shields.io/badge/Changelog-Keep%20a%20Changelog-8251EE)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial-10b981)](LICENSE)
-[![Last Commit](https://img.shields.io/github/last-commit/bobbychina32747/StockGameOnlinePro?label=最后提交)](https://github.com/bobbychina32747/StockGameOnlinePro/commits)
+[![Last Commit](https://img.shields.io/github/last-commit/bobbychina32747/StockGameOnlinePro?label=Last%20Commit)](https://github.com/bobbychina32747/StockGameOnlinePro/commits)
 
-## 统一正式版 2.0（2026-10-11）
+## Unified Production Version 2.0 (2026-10-11)
 
-工作台已清理迁移说明、开发接口介绍、重复事件区、页面口号和通用说教；保留交易数据、错误提示与必要的操作规则。A 股隐藏不支持的做空/平空操作，未提供的 PE 数据不再占位显示。
+The workbench removes migration notes, developer API explanations, duplicate event panels, slogans, and generic advice. Trading data, errors, and essential trading rules remain. Unsupported short/cover actions are hidden in the China realm, and missing P/E values no longer occupy a placeholder.
 
-盘中波动按真实五分钟数据重新拟合，使用实际分钟收益响应新闻和撮合冲击；新闻成交量、成交额与各周期同步，普通蜡烛加入受限影线。更新保留现有资产与历史，从后续分钟生效。核对结论、留出验证及仍未解决的问题见 [真实性核对](docs/REALISM-AUDIT-20261013.md)。
+Intraday volatility is fitted to real five-minute data and responds to actual minute returns, including news and execution shocks. News activity updates volume, traded value, and all candle intervals together. Ordinary candles include bounded simulated shadows. Existing assets and history remain intact; the changes affect subsequent minutes. See the [realism audit](docs/REALISM-AUDIT-20261013.md) for findings, holdout validation, and remaining limitations.
 
-2026-10-12 公测重置：保留账号、密码、站点绑定及固定区服角色 ID，清空公测持仓、订单、基金、负债、赛季、行情和 AI，账户恢复每区服 100,000 初始资金。旧数据库在服务器保留回退副本；博客和其他游戏云存档保留。此次重置取代此前合并时的资产保留状态。
+**Public beta reset, 2026-10-12:** accounts, passwords, site-account links, and fixed realm character IDs were retained. Beta positions, orders, funds, debt, seasons, market history, and AI state were cleared. Each realm character received 100,000 in initial funds. The server retains the previous databases for rollback; blog data and cloud saves for other games were preserved. This reset supersedes the asset-preservation policy used during the earlier merge.
 
-生产行情使用 `TICK_INTERVAL_MS=60000`、`SANDBOX_FAST=false`：一个真实分钟推进一个交易分钟，连续模拟模式允许全天运行，但休市不再自动切换到秒级高速回放。A 股一个模拟交易日需要 240 分钟。启动不再全表扫描或删除历史 K 线；按标的读取有限缓存，重复写入沿用同一 K 线 ID。重置操作及回退步骤见 [公测重置说明](docs/PUBLIC-BETA-RESET-20261012.md)。
+Production uses `TICK_INTERVAL_MS=60000` and `SANDBOX_FAST=false`: one real minute advances one trading minute. Continuous simulation can run throughout the day, but closed sessions no longer trigger automatic second-by-second playback. One simulated China trading day takes 240 minutes. Startup loads bounded caches per instrument instead of scanning or deleting the full candle archive. Repeated writes retain the same candle ID. See the [beta reset and rollback guide](docs/PUBLIC-BETA-RESET-20261012.md).
 
-新闻、宏观和财报冲击统一检查每日涨跌停，并同步分钟、五分钟、日线和日高低。波动率与趋势只使用限幅后的实际收益，触板后不能凭空累计趋势；隔夜事件在收盘完成后应用，昨收保持真实收盘价。四个场景各 30 个交易日的完整市场撮合结果见 [价格边界回归](docs/MARKET-BOUNDARY-REGRESSION-20261012.md)。
+News, macroeconomic releases, and earnings shocks share the daily price-limit checks. They update minute, five-minute, and daily candles, plus daily highs and lows. Volatility and trend signals use actual returns after price limits; blocked moves do not accumulate fictitious momentum. Overnight events apply after the close, while the previous close remains the actual closing price. See the [price-boundary regression](docs/MARKET-BOUNDARY-REGRESSION-20261012.md), which covers four scenarios of 30 trading days each.
 
-新增量价联合校准：350,111 条日线、173,865 条五分钟线、95,314 条 A 股成交额/换手率记录及 24,546 条利率、汇率、油价和信用利差观测。覆盖 69 个行业/市场组合。成交量随绝对收益、持续活跃度及各市场盘中时段变化，财报后出现受限放量脉冲；做市深度随模拟活跃度调整。成交额和模拟换手估计通过正式 API 提供，不把放量当成上涨信号。69 支股票的留出成交量季节性检验中，68 支优于旧模型，误差中位数降低约 57%。方法、数据缺口和完整检验见 [量价与流动性报告](docs/MARKET-MICROSTRUCTURE-20261012.md)。
+Joint price-volume calibration uses 350,111 daily bars, 173,865 five-minute bars, 95,314 China traded-value/turnover records, and 24,546 observations of interest rates, exchange rates, oil prices, and credit spreads. It covers 69 sector/market combinations. Volume responds to absolute returns, persistent activity, and each market's intraday pattern. Earnings can cause bounded volume pulses, and market-maker depth responds to simulated activity. The production API exposes traded value and estimated simulated turnover. Higher volume is not treated as a bullish signal. In the volume-seasonality holdout test, 68 of 69 stocks improved over the previous model, with a median error reduction of about 57%. See the [price-volume and liquidity report](docs/MARKET-MICROSTRUCTURE-20261012.md) for methods, data gaps, and full results.
 
-分时周期绘制一分钟蜡烛；五分钟最新行情从同一份一分钟数据聚合，开高低收和成交量保持一致。较早完整五分钟历史保留，有限缓存最早端的半根蜡烛不会覆盖完整历史；缩放和复盘继续沿用原工作台。
+The intraday chart displays one-minute candles. Recent five-minute candles aggregate the same minute data, keeping open, high, low, close, and volume consistent. Earlier complete five-minute history remains available; a partial bucket at the beginning of the bounded minute cache does not overwrite a complete historical candle. Zoom and replay remain available in the workbench.
 
-已有运行快照时，重启直接恢复市场状态，不再生成另一条随机历史价格路径。运行中的一分钟和五分钟蜡烛随快照持续落库，重复保存沿用相同记录，避免仅等日结导致重启丢失盘中历史。
+When a runtime snapshot exists, restart restores the market state directly instead of generating another random historical path. Active one-minute and five-minute candles persist with the snapshot. Repeated saves reuse their records, so intraday history does not depend solely on end-of-day settlement.
 
-首次重建使用量价联合模型生成 30 个交易日，按 A 股 240、港股 330、美股 390 分钟预热；一分钟和五分钟运行窗口及日线分批入库，并保存初始运行快照。公测资产重置可重复执行，每次使用独立备份目录，保留账号、区服绑定和其他应用数据。
+An initial rebuild generates 30 trading days with the joint price-volume model. Warm-up uses 240 minutes for China, 330 for Hong Kong, and 390 for the US. Minute and five-minute runtime windows, daily bars, and the initial snapshot persist in batches. Repeated beta resets use separate backup directories and preserve accounts, realm bindings, and other application data.
 
-行情反馈修复：行业联动按分钟折算，每日累计传导幅度上限 0.5%，传导后检查 A 股涨跌停并同步 K 线；重启采用最近收盘作为昨收基准，普通股票初始化内在价值，使 AI 估值保护生效。
+Sector feedback is scaled per minute, with cumulative daily transmission capped at 0.5%. It respects China price limits and synchronizes candles. Restart uses the latest close as the previous-close baseline. Ordinary stocks receive an intrinsic value so AI valuation guards can operate.
 
-后续修正将因子信号转换为有上限的日漂移，限制估值回归速度；做市商常态双边总价差约 0.28%，库存偏移按限额归一化。价值策略保留估值保护，趋势策略在确认信号后可用小仓位参与高估标的。行情及 AI 账本每 30 秒、每个日结保存到原 SQLite 卷，恢复现金、成本、亏损和市场时钟；排行榜新增状态与实际成交笔数。完整市场多日验证见 [回归报告](docs/AI-MARKET-REGRESSION-20261011.md)。
+Factor signals become bounded daily drift, and valuation reversion has a limited rate. The market maker's normal total bid-ask spread is about 0.28%; inventory skew is normalized against inventory limits. Value strategies keep their valuation guards, while confirmed trend strategies can take small positions in expensive stocks. Market and AI ledgers persist to the original SQLite volume every 30 seconds and at each day-end. Restart restores cash, cost basis, losses, and the market clock. Rankings show status and actual execution counts. See the [multi-day market regression](docs/AI-MARKET-REGRESSION-20261011.md).
 
-**唯一游戏入口：[game.bobbycn.cc](https://game.bobbycn.cc/)**。2.0 工作台与原正式版已合并：保留原账户 UUID、现金、持仓、债务、基金、挂单、成交与赛季；测试资产单独备份，不追加到正式本金。原 `/remaster/` 入口转向统一版。
+**Game entry point: [game.bobbycn.cc](https://game.bobbycn.cc/).** The 2.0 workbench and original production game share one production system. The merge initially retained original account UUIDs, cash, positions, debt, funds, open orders, executions, and seasons; the beta reset described above later replaced the financial state. Test assets were archived separately and never added to production principal. `/remaster/` redirects to the unified version.
 
-- 原正式账本和撮合作为唯一正式核心，接入 2.0 图表工作台、底部导航、固定区服会话、回放、缩放保留和两位价格。
-- 414 支基础虚构股票：三个区服各 23 行业 × 6 支，另保留旧股票和已上市 IPO。一个账号每区一个角色，区服不可修改，不能跨区交易或划转。
-- 原市场接入 2.0 行业校准、厚尾、条件波动率与日内活跃度；原宏观、财报、消息漂移、AI/做市商和交易限制继续运行。校准来源包含 173,066 条真实日线、15,591 条五分钟线及 28 个公告事件；历史关联不是因果证明。
-- 站点登录或原游戏账密登录，指向同一原游戏用户。站点身份尚未绑定时可绑定原账户，原资产继续使用。
-- 保留基金、融资、融券信息、财报与预期差、订单流、原赛季、绩效、成就和复盘；正式预检使用原引擎费用与校验。研究回测是独立模拟，不能视为正式账户业绩。
+- The original production ledger and matching engine remain the authoritative core. The 2.0 workbench provides charts, bottom navigation, fixed realm sessions, replay, persistent zoom, and two-decimal prices.
+- The base catalog contains 414 fictional stocks: three realms, each with 23 sectors and six stocks per sector. Existing legacy stocks and listed IPOs are also supported. Each account can have one character in each realm. Characters cannot change realm, trade across realms, or transfer assets between them.
+- The original market integrates sector calibration, heavy tails, conditional volatility, and intraday activity from 2.0. Macroeconomics, earnings, news drift, AI, market makers, and trading restrictions continue to operate. The initial calibration used 173,066 real daily bars, 15,591 five-minute bars, and 28 announcement events. Historical association does not establish causation.
+- Site-account login and game username/password login resolve to the same original game user. An unlinked site identity can bind an existing game account.
+- Funds, margin borrowing, stock-borrow information, earnings surprises, order flow, seasons, performance, achievements, and reviews remain available. Production preflight uses the original engine's fees and validation. Research backtests are separate simulations and do not count as production account performance.
 
-架构、资产策略与回退边界见 [合并说明](docs/UNIFIED-FORMAL-20261011.md)，校准方法见 [真实性报告](docs/MARKET-REALISM-20261010.md)。玩家数据库、凭证及原始采集行情不进入仓库。
+See the [merge design](docs/UNIFIED-FORMAL-20261011.md) for architecture, asset policies, and rollback boundaries, and the [initial realism report](docs/MARKET-REALISM-20261010.md) for calibration methods. Player databases, credentials, and raw collected market data are not stored in the repository.
 
-AI 对手盘逐 tick 管理全部持仓，采用单股/组合仓位限制、加仓冷却及回撤暂停机制；收益按实际模拟资产计算。策略变化和受控对比见 [AI 风控说明](docs/AI-RISK-20261011.md)，不保证所有 AI 盈利。AI 账本和市场时钟定期持久化，重启恢复真实现金、成本和收益，不把亏损重置成零。
+AI opponents manage all positions on each tick, with per-stock and portfolio exposure limits, entry cooldowns, and drawdown pauses. Returns are calculated from their actual simulated assets. See the [AI risk controls](docs/AI-RISK-20261011.md) for strategy changes and controlled comparisons. Profit is not guaranteed for every opponent. Restart restores real simulated cash, costs, and returns rather than resetting losses to zero.
 
-旧行业别名已归入 23 个标准行业，各区每行业至少 6 支，IPO 在对应行业追加。工作台支持简体中文、繁体中文和英文界面；公司名称、玩家内容等原始数据保留。A 股展示后端计算的涨跌停价及触及状态，港美股展示不设日涨跌停。市场风险事件与个人交易复盘分别展示。
+Legacy sector aliases map to 23 standard sectors. Each realm has at least six stocks per sector, and IPOs join their corresponding sector. The workbench supports Simplified Chinese, Traditional Chinese, and English. Company names and player content retain their original text. China quotes show backend-calculated upper/lower price limits and limit status; Hong Kong and US quotes state that there is no daily price limit. Market-risk events and personal trade reviews appear separately.
 
-行情历史按股票加载有限运行缓存，避免扩充股票池后全量读取造成内存耗尽；完整历史与资产继续保存在 SQLite，分钟缓存随运行保持上限。
+Market history loads through bounded per-stock caches to avoid loading the entire expanded archive into memory. Complete persisted history and assets remain in SQLite, while minute caches stay within their configured limits.
 
-本地开发需同时启动原后端与统一工作台适配服务（Node.js 22）：
+### Local development
+
+Run both the original backend and the unified workbench adapter with Node.js 22:
 
 ```bash
 cd backend
 npm ci
 npm run build
 npm start
-# 在另一个终端：
+
+# In a second terminal, from the repository root:
 cd remaster
 npm ci
 REMASTER_WEB_BASE=/ npm run build
@@ -61,271 +66,278 @@ npm test
 npm run start:formal
 ```
 
-统一服务默认 `http://127.0.0.1:8321`，原后端 `http://127.0.0.1:8000`。Windows PowerShell 用 `$env:REMASTER_WEB_BASE='/'` 设置构建路径。原后端身份服务的配置沿用部署契约，不从生产复制密钥。生产容器定义见 [unified-compose.yml](remaster/deploy/unified-compose.yml)。
+The unified service defaults to `http://127.0.0.1:8321`; the original backend defaults to `http://127.0.0.1:8000`. In Windows PowerShell, set the build base with `$env:REMASTER_WEB_BASE='/'`. Configure the original identity service according to the deployment contract; do not copy production secrets. See [unified-compose.yml](remaster/deploy/unified-compose.yml) for the production containers.
 
 ---
 
-## 正式账本后端与历史实现
+## Original Ledger Backend and Legacy Implementation
 
-以下功能和启动方式对应旧版 `backend/`、`frontend/`，不能视为重制版的全部验收结果。
+The following sections describe the legacy `backend/` and `frontend/`. Their features, counts, and launch instructions are historical and do not constitute acceptance results for the unified workbench.
 
-> **🟡 BETA 版本** — 行情为模拟数据，不构成任何投资建议。
+> **BETA:** prices and funds are simulated. They are not investment advice.
 
-一个纯VibeCoding的高仿真度的模拟炒股平台，目标是做出**同花顺级别的交易体验**：真实的行情引擎、宏观因子反馈、板块轮动、新闻驱动、做空/融资、量化 API 一应俱全。
-> 使用Deepseek-v4-pro构建，ReadMe也是ai写的LOL
+An AI-assisted stock-trading simulation built through vibe coding. The legacy goal was a terminal experience comparable to major Chinese retail trading platforms, with a simulated market engine, macroeconomic feedback, sector rotation, news, short selling, margin, and a quantitative API.
 
-> 唯一的Contributor是AI操控的账户，没错我给他开了一个账户嘻嘻（总算成功了）
+The original project notes credit DeepSeek-v4-pro for implementation and AI for the README. They also note that the contributor account was operated by AI.
+
+## Features of the Legacy Implementation
+
+### Market engine: a simulated world
+
+- **Historical 68-stock catalog:** 28 China stocks, 20 Hong Kong stocks, and 20 US stocks. Each market reflects local company themes, such as Hong Kong finance/property/shipping and US technology/blue chips. Instruments include a code, listing date, and company description. The unified catalog is larger, as described above.
+- **Charts and history:** intraday, one-minute, five-minute, 60-minute, daily, weekly, and monthly candles; MA/BOLL/RSI indicators; daily history backfilled to each listing date, exceeding 30 years for some legacy stocks; weekly/monthly aggregation; forward-adjusted and unadjusted views for dividend adjustments.
+- **Opening call auction:** maximum executable volume determines the opening price within the China price band. Crossing orders execute at that price. China pre-open phases are 09:15–09:20 submission/cancellation, 09:20–09:25 submission without cancellation, and matching at 09:25.
+- **Exchange calendars and US daylight saving:** shared CN/HK/US holiday data for 2025–2027. US opening is 21:30 China time during daylight saving and 22:30 during standard time. Sessions crossing midnight use the US Eastern trading date.
+- **Overnight gaps:** a shared market shock, including crash nights, scales by stock beta and combines with a stock-specific heavy-tailed shock. China opening gaps respect the ±10% band and can be tagged as limit-up/down openings.
+- **Configurable tick rate:** `TICK_INTERVAL_MS=60000` is the default minute pace. A 1,000 ms fast replay requires explicit `SANDBOX_FAST=true`. The legacy status bar labels fast sandbox playback.
+- **Macroeconomic factors:** economic conditions, sector conditions, sentiment, and policy risk affect prices through sector sensitivities. Collective stock behavior feeds back into macroeconomic state.
+- **Indices:** Shanghai Composite, Shenzhen Component, ChiNext, STAR 50, an entertainment index, Hang Seng, Nasdaq, and Dow Jones. Values use constituent stocks, and index moves affect global sentiment.
+- **Sector transmission:** the legacy 32-sector relationship matrix transmits every five minutes in calm periods and immediately after volatile events. A shock in renewable energy can propagate into automotive stocks.
+- **Player price impact:** each execution affects price, current-candle volume, and traded value. Large orders can move the market.
+- **Hot-sector rotation:** one or two daily themes add momentum over several days; the legacy UI includes a hot-sector strip.
+- **Two-sided event shocks:** the legacy event model uses an approximately 3% trigger probability, with 60% negative shocks and 40% positive policy/order/technology events. Shocks can affect the market, a sector, or one stock.
+- **Bubble cycles:** sector prices can diverge from intrinsic value. A small sale in an expensive sector can trigger contagion and a return toward intrinsic value. The legacy design exposes no explicit bubble warning.
+- **IPOs:** one or two new stocks can list every ten trading days, with elevated first-day volatility.
+- **Earnings and dividends:** staggered disclosures occur roughly every 45 game days. Revenue growth, net margin, ROE, and consensus estimates evolve. Five surprise categories affect disclosure-day price changes, five-day post-earnings drift, and consensus revisions. Dividends depend on profitability and include price adjustment and position cash payments.
+- **Macro release calendar:** CPI, PMI, central-bank decisions, and employment reports publish on scheduled game days. Consensus surprises transmit through sector sensitivities and can persist for several days.
+- **Sector business cycles:** expansion, peak, contraction, and trough evolve as a Markov process and affect revenue, valuations, and volatility.
+- **News:** more than 190 templates span early, growth, and mature market phases. Dynamic placeholders extend variety across more than 100 game days. Opening/closing news broadcasts across successive ticks instead of arriving all at once.
+
+### Trading
+
+- **Order-book matching:** resting limit orders use price-time priority. Crossing orders execute at the counterparty price. Market orders consume depth and can fill partially; remaining limit quantity stays queued. Self-trade prevention and cancellations update the visible book.
+- **Order types:** market, limit, stop, stop-limit, FOK (fill or kill), IOC (immediate or cancel), and iceberg orders with hidden quantity and replenished display size.
+- **Market makers:** two per market quote both sides, using volatility-dependent spreads, inventory skew, and scheduled order replacement.
+- **Dynamic slippage:** order-flow imbalance and volatility affect market-order impact. Adverse conditions increase slippage; favorable conditions reduce it. Total slippage is capped at 2%.
+- **Short selling and margin in Hong Kong/US:** opening shorts locks collateral with stock-specific factors of 0.50–0.65; covering releases it proportionally. Maintenance ratios trigger warning below 140%, partial liquidation below 130%, and full liquidation below 120%. Interest settles daily.
+- **China rules:** T+1 selling and ±10% daily limits. Orders can queue at sealed limits and execute when the market opens away from the limit.
+- **Fees:** market-specific simulated commission, stamp duty, levies, and regulatory fees.
+- **Independent sessions:** China 09:30–11:30/13:00–15:00, Hong Kong 09:30–12:00/13:00–16:00, and US 21:30–04:00 the next day in China time during daylight saving. Market generation, order validation, and closed-session overlays follow each market's calendar.
+- **Legacy cross-market transfers:** currency conversion used CN=1, HK≈0.92, US≈7.12, with a 0.1% fee. The unified game uses fixed realms and does not permit these transfers.
+
+### Legacy interface
+
+- Three columns for stocks, charts, and order book/order entry/account data, with persistent draggable widths.
+- Intraday/candle view switching, wheel zoom, and a bottom range slider.
+- Historical intraday replay at 1×/4×/16×, with pause/resume and progress controls.
+- Optional animated numbers and price flashes, with China-style red-up/green-down colors.
+- Stock search, watchlists, sector rankings, and advance/decline counts.
+- Company details: code, listing date, reports, dividends, fund flow, and announcements.
+- Notifications for executions, news, insider events, and major shocks; activity records, equity curves, achievements, and simulated competitions.
+- An AI assistant with MA/RSI signals and spoken price alerts; keyboard shortcuts for stock selection, periods, and navigation.
+- Dark/light themes covering chart axes, tooltips, and range sliders; density and animation settings.
+- Performance measures: return, Sharpe ratio, maximum drawdown, annualized volatility, Calmar ratio, profitable-day fraction, trade count, equity history, and tiers.
+- Mobile layout at widths of 768 px or less, with bottom tabs and touch controls.
+
+### AI opponents
+
+The legacy presentation challenges players to compete with ten named algorithmic opponents that quote, trade, follow themes, and realize losses. Its original interface also includes playful opponent remarks.
+
+- **Ten named opponents:** trend following, mean reversion, momentum, herding, reversal, and noise strategies, including five retail-style characters.
+- **Local execution:** rule strategies and eight decision stumps run without external APIs or training dependencies. The legacy README calls this ensemble a local random forest; it is not a trained market-prediction guarantee.
+- **Cash and position constraints:** buys require cash and sells require positions. The legacy strategy description includes +5% take-profit and −3% stop-loss rules; the unified risk changes are documented above.
+- **Herding:** themes attract AI orders, price feedback can build bubbles, and selling can trigger reversals. Opponents can also suffer losses.
+- **Visible performance:** returns, win rates, tiers, and opponent remarks appear in the legacy assistant panel.
+- **Order-flow signals:** buying/selling pressure and large institutional/speculative flows provide market activity information.
+- **Actual matching participation:** AI executions affect depth, price, and volume, and can fill player orders.
+- **Three market instances:** China, Hong Kong, and US have independent engines, sessions, holidays, factors, themes, and events. Accounts and rankings are separate; the legacy UI offers a cross-market board. IPOs originate in China only.
+- **Closed-session and debug modes:** the legacy chart shows a closed-market overlay and next opening time. Administrators can enable personal or global off-hours trading.
+
+### Quantitative integration
+
+- REST API and WebSocket streams: [API documentation](docs/API.md).
+- Backtests with trading fees, configurable slippage, MA crossover/RSI reversal/momentum strategies, a buy-and-hold benchmark, annualized return, drawdown, Sharpe ratio, and profit factor. The legacy CLI is `node backend/scripts/backtest.js`.
+- `backend/scripts/quant-bot.js` provides an executable bot example tested with automated orders.
 
 ---
 
-## ✨ 功能特性
+## Legacy Quick Start
 
-### 📈 行情引擎（自研模拟世界）
-- **68 只虚构股票（三市场，数量持平）**：A股 28 只 + 港股 20 只 + 美股 20 只，各市场体现本土大企业特色（港股金融/地产/航运，美股 FAANG/蓝筹），每只带股票代码、上市日期、公司简介
-- **真实市场结构**：分时 / 1分 / 5分 / 60分 / 日线 / 周线 / 月线 K 线，MA/BOLL/RSI 指标；**全生命周期日线历史**（按上市日补齐，老股可回溯 30 年以上，周/月线自动聚合）；**前复权/不复权**一键切换（分红除权消除跳空）
-- **开盘集合竞价**：按最大成交量原则形成开盘价（A 股限涨跌停区间），交叉挂单以开盘价撮合；A 股 9:15-9:25 盘前申报窗口，**三阶段规则**（9:15-9:20 可申报可撤单 / 9:20-9:25 可申报不可撤 / 9:25 撮合）
-- **真实交易日历与美股夏令时**：CN/HK/US 节假日清单统一数据源（2025-2027），美股北京时间 21:30（夏令时）/ 22:30（冬令时）开盘，跨午夜交易日按美东日期判定
-- **隔夜跳空模型**：市场级冲击（含崩盘夜）×个股 β + 个股级厚尾冲击；A 股开盘缺口受 ±10% 涨跌停约束（涨停/跌停开盘打标）
-- **行情档位可调**：TICK_INTERVAL_MS 配置（60000=真实分钟级行情，默认，全天约 4 小时；1000=高速回放 1 秒 1 分钟，需 `SANDBOX_FAST=true` 显式确认，顶部状态栏自动标注「⏩ 高速回放·沙盒演示」）
-- **宏观因子体系**：宏观经济 / 行业景气 / 市场情绪 / 政策风险… 因子 → 行业敏感度 → 个股价格，**双向反馈回路**（个股集体行为反向影响宏观）
-- **指数体系**：上证/深成/创业板/科创50/中证文娱 + 恒生指数 + 纳斯达克 + 道琼斯（按成分股实时计算，随市场切换；**指数涨跌影响全局市场情绪**）
-- **行业复合传导（事件驱动 LoD）**：32 行业关联矩阵——平稳期每 5 分钟传导，剧烈波动（黑天鹅/跳空）**立即传导**（新能源暴跌 → 汽车瞬间跟跌）
-- **用户交易计入行情**：每笔成交产生价格冲击 + 成交量并入当前 tick K 线（大单影响盘面，图表/成交额实时反映）
-- **热点板块轮动**：每日 1-2 个热点行业（动量加成、持续数日），顶部 🔥 热点条
-- **事件冲击（双向）**：约 3% 概率触发——60% 利空黑天鹅（恐慌/事故/造假）、40% **利好政策红包**（降准/订单/突破），市场级 / 板块级 / 个股级
-- **经济泡沫周期（隐形）**：行业价格偏离内在价值 → 泡沫积累（**无任何提示**）→ **细小抛售戳破**（卖出高泡沫板块可能引发连锁恐慌）→ 股价向内在价值剧烈回归（崩盘）。靠经验识别泡沫，吃一堑长一智
-- **IPO 新股**：每 10 个交易日上市 1-2 只新股（首日高波动）
-- **财报季 + 分红**：按个股披露日历错峰披露（约 45 游戏日/季），营收增速/净利率/ROE 连续演化 + 分析师一致预期 + 五档预期差（大超~大低）→ 披露日跳空 + 财报后 5 日漂移（PEAD）+ 一致预期修正；分红与盈利能力挂钩、除权、持仓现金到账
-- **宏观数据日历**：CPI / PMI / 央行议息 / 非农就业定时披露，市场一致预期与 surprise 按行业敏感度传导（议息→银行/地产，PMI→制造业/半导体），影响持续数日
-- **行业景气周期**：每个行业在扩张/顶峰/收缩/谷底四阶段间马尔可夫演化，驱动营收增长中枢、估值中枢与波动率
-- **新闻系统**：190+ 条模板分三阶段（元年俏皮 → 成长 → 成熟专业），占位符动态生成，100+ 游戏日零重复；**错峰播报**（开盘/收盘生成的新闻按 tick 逐条播出，不再同一时刻扎堆）
+Use the unified development instructions above for the production workbench. These commands launch the legacy frontend.
 
-### 💹 交易体验
-- **真实订单簿撮合**：限价单常驻盘口队列（**价格-时间优先**），新单即时交叉撮合（对手价成交）、市价单逐档吃单+滑点模型（吃穿盘口后逐级恶化价格），部分成交剩余继续排队，自成交防护，撤单/成交即时反映盘口
-- **多类型订单**：市价 / 限价 / 止损 / 止损限价 / **FOK（全成或撤）/ IOC（即成余撤）/ 冰山单（隐藏大单逐档补量）**，部分成交
-- **做市商模型**：每市场 2 个做市商持续双边报价（波动率自适应价差 + 库存偏斜 + 定时撤换单），盘口始终有对手方
-- **动态滑点**：市价冲击成本由订单流不平衡（OFI）×波动率驱动，逆风放大/顺风收窄，总滑点上限 2%
-- **做空与保证金**（港股/美股 T+0）：SHORT 冻结保证金（**按个股折算 0.50~0.65**）、COVER 按比例释放；**维持担保比例三级强平**（<140% 预警 / <130% 追保部分平仓 / <120% 爆仓全平），日终计息
-- **A 股规则**：T+1 当日买入次日可卖、涨跌停 ±10% **封板排队**（涨停买不进、跌停卖不出，限价单按优先级排队开板释放）
-- **手续费模型**：三市场差异化费率（A股佣金+印花税 / 港股佣金+印花税+征费 / 美股零佣金+SEC费）
-- **各市场独立时段与节假日**：A股 9:30-11:30/13:00-15:00、港股 9:30-12:00/13:00-16:00、美股 21:30-次日 04:00（中国时间）+ 各自节假日历；行情生成、下单校验、休市遮罩均按市场判断
-- **跨市场资金划转**：CN/HK/US 账户按汇率折算划转（CN=1 / HK≈0.92 / US≈7.12，0.1% 手续费）
+### Option 1: Windows launcher
 
-### 🖥️ 界面（同花顺式）
-- 三栏布局（股票列表 / 图表 / 盘口+下单+账户），拖拽调宽并持久化
-- 分时 / K 线分层切换，图表滚轮缩放 + 底部滑条
-- **盘后回放**：分时图按历史交易日 1x/4x/16x 倍速回放（暂停/续播/进度）
-- 数字滚动动画 + 涨跌闪烁（可关闭）、A 股红涨绿跌
-- 股票搜索 / 自选股 / 行业板块榜 / 涨跌家数
-- 公司资料弹窗（F10：代码 / 上市日期 / 财报 / 分红 / 资金流 / 公告）
-- 通知中心（成交 / 新闻 / 内幕 / 黑天鹅）、交易流水、历史净值曲线、成就系统、模拟大赛
-- AI 助手（MA/RSI 信号 + 语音涨跌提醒）、快捷键（数字选股 / T 切周期 / 方向键）
-- 深色 / 浅色主题（图表轴/提示框/滑条全量适配）、字体密度、动画开关
-- **绩效归因**：总收益/夏普/最大回撤/年化波动率/卡玛/盈利日占比/成交笔数 + 历史净值曲线 + 段位系统
-- **移动端适配**：≤768px 自动切换底部 Tab（行情/图表/交易），触控友好
+Double-click `start.bat`. It starts the backend on port 8000, waits for readiness, starts the frontend on port 3000, and opens a browser.
 
-### 🎮 多空博弈：AI 对手盘
+### Option 2: Manual launch
 
-> 🤖 **AI 都打不过还想炒股赚钱？** 你的对手不是别的玩家，是 10 个不吃不喝、不睡觉、不 emo 的算法。它们每天在盘口挂单、扫单、追热点、割肉，顺便嘲讽你两句。
-
-- **10 个具名 AI 对手盘**：算法一号（趋势跟随）、低波猎手（均值回归）、动量刺客、龙虎老哥（羊群）、反向大师、散户老王/小张/阿珍/老李/小美——每人一句杀人诛心的台词
-- **完全本地运行，零外部 API**：规则策略（趋势/均值回归/动量/羊群/反转/噪声）+ **本地随机森林（8 棵决策树桩）**，无训练依赖、无网络调用——你在练习，它们也在"思考"
-- **资金约束真实**：每个 AI 都有现金/持仓账本，买单受现金约束、卖单受持仓约束，止盈 +5%/止损 -3% 照做不误
-- **羊群效应**：热点板块吸引 AI 追涨 → 资金涌入 → 价格正反馈 → 泡沫积累 → 被细小抛售戳破崩盘（AI 自己也会被套在山顶）
-- **绩效公开**：AI 助手面板实时显示每个对手盘的收益/胜率/段位/嘲讽——跑赢 AI 中位数才配说话；跑不赢？"🤖 AI 都打不过还想炒股赚钱？"
-- **订单流信号**：盘口显示 OFI 买压/卖压 + 机构/游资大单净流入，AI 的资金动向就是你的博弈信号
-- AI 对手盘成交计入盘口、价格冲击与成交量（用户挂单可被 AI 触发真实成交）
-- **三服务器**：A股/港股/美股独立行情引擎（**各自交易时段/节假日**/宏观因子/热点/黑天鹅），账户与排行隔离，跨服总榜一键切换；IPO 仅 A 股服务器发行
-- **休市遮罩 + 调试模式**：图表超大已休市提示（下次开盘时间）；管理员可在个人中心开启调试模式（本人休市可下单）或**全服休市交易**（所有用户休市可下单、行情全时生成）
-
-### 🤖 量化接入
-- 完整 REST API + WebSocket 流（见 [docs/API.md](docs/API.md)）
-- 回测平台（**与实盘同口径的手续费 + 可调滑点 + 三策略**：MA交叉/RSI反转/动量，买入持有基准对比 + 年化/回撤/夏普/盈亏因子）+ 策略回测页面 + CLI（`node backend/scripts/backtest.js`）
-- `backend/scripts/quant-bot.js`：可运行的量化机器人示例（已实测自动下单）
-
----
-
-## 🚀 快速开始
-
-### 方式一：一键启动（推荐）
-```bat
-双击 start.bat
-```
-自动启动后端（8000）→ 等待就绪 → 启动前端（3000）→ 打开浏览器。
-
-### 方式二：手动启动
 ```bash
-# 终端 1：后端
+# Terminal 1: backend
 cd backend
 npm install
 npm run build
 npm start
 
-# 终端 2：前端
+# Terminal 2, from the repository root: legacy frontend
 cd frontend
 npm install
 npm run dev
 ```
 
-浏览器访问 http://localhost:3000 ，随便注册一个账户
+Open `http://localhost:3000` and register a game account.
 
-### 开发与质量门禁
+### Development and quality gates
 
 ```bash
-# 后端：类型构建 + 单元测试（368 例）+ 数据库迁移校验（sql.js → better-sqlite3，已完成）
+# Backend: build, unit tests, and optional sql.js -> better-sqlite3 migration
 cd backend
 npm run build && npm test -- --runInBand
-npm run db:migrate          # 备份 + integrity_check + 逐表行数核对 + 切换 WAL
+npm run db:migrate
 
-# 前端：lint + 类型检查 + 单元测试（Jest + Testing Library，59 例）+ 生产构建（含 PWA 预缓存清单门禁）
+# Legacy frontend: lint, types, unit tests, and production/PWA build
 cd frontend
 npm run lint && npx tsc -b && npm test -- --runInBand && npm run build
 ```
 
-- **CI**：push/PR 自动触发 `.github/workflows/ci.yml`（后端构建/测试/启动冒烟 + 前端 lint/tsc/jest/vite build）
-- **pre-commit 门禁**：`git config core.hooksPath .githooks` 后，提交时自动跑后端 build+tests、前端 lint+tsc
-- **数据库驱动**：默认 `DB_TYPE=sqlite` 走 better-sqlite3（WAL 增量写盘）；旧 `sqljs` 内存驱动仍可用（`DB_TYPE=sqljs`）；两种驱动数据文件格式兼容，切换前建议先跑 `npm run db:migrate` 校验
+The migration command performs a backup, an integrity check, per-table count verification, and a switch to WAL. The legacy documentation originally listed 368 backend tests and 59 frontend tests; these are historical counts, not the current suite totals.
 
-> 首次启动会生成全生命周期日线历史（约 25 万根，视机器需要 1~2 分钟），此后启动秒开。行情档位由 `backend/.env` 的 `TICK_INTERVAL_MS` 控制（60000=真实分钟级，默认；1000=高速回放，**演示/调试请双击 `start-fast.bat`**——它自动设置快档所需的 `SANDBOX_FAST=true`，日息/IPO/分红按游戏日加速，仅供沙盒体验）。
+- **CI:** `.github/workflows/ci.yml` runs on pushes and pull requests, covering backend build/tests/startup smoke checks and legacy frontend lint/types/tests/build.
+- **Pre-commit:** `git config core.hooksPath .githooks` enables backend build/tests and legacy frontend lint/type checks on commits.
+- **Database driver:** `DB_TYPE=sqlite` uses better-sqlite3 with incremental WAL writes. The legacy `DB_TYPE=sqljs` driver remains available. Both use compatible SQLite file formats; validate migration before switching.
 
-### 默认账号（演示）
+First startup generates listing-date daily history. The legacy description estimates about 250,000 bars and one to two minutes, but generation time depends on the machine and catalog. Later startup restores persisted history. `backend/.env` controls `TICK_INTERVAL_MS`; 60,000 ms is the minute default. `start-fast.bat` explicitly sets `SANDBOX_FAST=true` for fast sandbox replay. Game-day interest, IPOs, and dividends accelerate with that clock.
 
-| 角色 | 用户名 | 密码 |
-|---|---|---|
-| 管理员 | `admin` | 由 `ADMIN_PASSWORD` 环境变量决定（开发环境未设置时默认 `admin123`） |
+### Default development account
 
-> 首次启动自动创建。**生产环境必须设置强 `ADMIN_PASSWORD`（≥8 位）与强 `JWT_SECRET`，否则后端拒绝创建默认管理员 / 拒绝启动。**
+| Role | Username | Password |
+| --- | --- | --- |
+| Administrator | `admin` | Set by `ADMIN_PASSWORD`; development fallback is `admin123` when unset. |
 
-### 市场与规则
+The account is created on first startup. Production requires a strong `ADMIN_PASSWORD` of at least eight characters and a strong `JWT_SECRET`; otherwise the backend rejects default administrator creation or startup.
 
-| 市场 | 交易 | 做空 | 涨跌停 | 费率特色 |
-|---|---|---|---|---|
-| 🇨🇳 A股（28只）| T+1（当日买入次日可卖）| ❌ | ±10% | 佣金万2.5 + 印花税0.1%（卖）|
-| 🇭🇰 港股（20只）| T+0 | ✅ | 无 | 佣金0.03%最低50 + 印花税0.13%（卖）|
-| 🇺🇸 美股（20只）| T+0 | ✅ | 无 | SEC/TAF 费，零佣金 |
+### Legacy markets and rules
 
-> 三市场账户独立（资金/持仓互不影响），右上角一键切换；跨市场划转按汇率折算（0.1% 手续费）。
->
-> **交易时段（中国时间）**：A股 9:30-11:30 / 13:00-15:00 · 港股 9:30-12:00 / 13:00-16:00 · 美股 21:30-次日 04:00；各市场独立节假日历。
+The stock counts in this table describe the original catalog, not the unified 414-stock base catalog. Fees are game parameters.
 
----
+| Market | Settlement | Short selling | Daily limits | Simulated fees |
+| --- | --- | --- | --- | --- |
+| China (28 legacy stocks) | T+1; next-day selling | No | ±10% | 0.025% commission; 0.1% stamp duty on sells |
+| Hong Kong (20 legacy stocks) | T+0 | Yes | None | 0.03% commission, minimum 50; 0.13% stamp duty on sells |
+| US (20 legacy stocks) | T+0 | Yes | None | SEC/TAF fees; zero commission |
 
-## 🛠️ 技术栈
+Legacy accounts have separate cash and positions, with a market selector and currency-converted transfers subject to a 0.1% fee. Unified realm characters cannot change realm or transfer assets across realms.
 
-| 层 | 技术 |
-|---|---|
-| 后端 | NestJS + TypeORM + better-sqlite3（SQLite 原生驱动，WAL 增量写盘）|
-| 前端 | React + Vite + ECharts + Zustand + Socket.IO |
-| 行情生成 | 自研 GARCH 波动率 + 厚尾跳跃扩散 + 隔夜跳空模型 + 宏观因子 + 行业联动 + 趋势状态机 |
-| 交易撮合 | 真实订单簿（价格-时间优先）+ 开盘集合竞价（最大成交量定价）+ 滑点模型 |
-| 实时 | WebSocket（tick 推送 / 新闻错峰 / 成交），JWT 握手认证 |
+China-time sessions: China 09:30–11:30/13:00–15:00; Hong Kong 09:30–12:00/13:00–16:00; US 21:30–04:00 the next day during daylight saving, with separate holiday calendars and standard-time adjustment.
 
 ---
 
-## 📁 项目结构
+## Technology
 
-```
+| Layer | Technology |
+| --- | --- |
+| Backend | NestJS, TypeORM, better-sqlite3, SQLite with incremental WAL writes |
+| Frontend | React, Vite, ECharts, Zustand, Socket.IO; unified workbench under `remaster/` |
+| Market simulation | Conditional volatility, heavy-tailed jumps, overnight gaps, macro factors, sector feedback, and trend state |
+| Matching | Price-time-priority order book, maximum-volume opening auction, and slippage model |
+| Real-time transport | WebSocket price/news/execution streams with JWT handshake authentication |
+
+## Repository Layout
+
+```text
 backend/
-  src/core/          # 行情引擎 / 交易引擎 / 风控
-  src/modules/       # auth / trading / market / ranking / account / fund
-  src/common/        # 股票池 / 因子配置 / 新闻模板
-  scripts/           # quant-bot 量化机器人 / backtest 回测
+  src/core/          # Market engine, matching engine, risk controls
+  src/modules/       # Auth, trading, market, ranking, account, funds
+  src/common/        # Stock catalog, factor settings, calibration, news templates
+  scripts/           # Quant bot, backtests, migration, calibration checks
 frontend/
-  src/components/    # 图表 / 盘口 / 下单 / 列表 / 通知 / 设置
-  src/pages/         # 交易 / 排行 / 流水 / 回测 / 个人中心
-  src/store/         # Zustand 状态
+  src/components/    # Legacy charts, book, order entry, notifications, settings
+  src/pages/         # Legacy trading, rankings, activity, backtests, profile
+  src/store/         # Zustand state
+remaster/
+  apps/web/          # Unified production workbench
+  apps/game-api/     # Unified ledger adapter and standalone simulation API
+  packages/domain/   # Shared simulation types and catalog
+  deploy/            # Unified container definitions
 docs/
-  API.md             # 量化接入文档
-  REALISM.md         # 模拟真实性差距清单与路线图
+  API.md             # Quantitative integration
+  REALISM.md         # Legacy realism gaps and roadmap
 ```
 
 ---
 
-## 🟡 Beta 状态说明
+## Beta Status and Historical Roadmap
 
-**当前为 Beta 版本**：核心功能完整可用，但仍在迭代打磨。已知/计划事项：
+The project is in beta and continues to evolve. The following checklist records legacy milestones; deployment modes and the unified workbench can differ from these historical defaults.
 
-- [x] 行情引擎、交易撮合、宏观反馈、指数、新闻、热点、黑天鹅、IPO、分红
-- [x] 同花顺式前端、量化 API、回测、通知中心
-- [x] 交易时段与本地时钟完全同步（真实A股时段 9:30-11:30 / 13:00-15:00，周末休市，休市禁交易）
-- [x] 历史数据可持久化跨重启（K线落库，重启恢复玩家历史并补齐）
-- [x] 移动端完整适配（底部Tab切换 行情/图表/交易，弹窗底部弹出，指数条横滑）
-- [x] 三服务器架构（A股 / 港股 / 美股）：每市场独立行情引擎（独立 gameDay/因子/热点/黑天鹅），账户独立，**跨服总榜 + 服内排行**
-- [x] AI 对手盘：机构/游资/散户市场参与者（多空博弈：追热点、低吸高抛、追涨杀跌，成交量计入盘面）
-- [x] 真实订单簿撮合（价格-时间优先/部分成交排队/自成交防护/FOK·IOC）
-- [x] 开盘集合竞价 + A 股盘前申报窗口 + 涨跌停封板排队
-- [x] 前复权因子 + 全生命周期日线历史（上市日至今）
-- [x] 各市场独立交易时段与节假日历（CN/HK/US）
-- [x] 两融三级强平（预警/追保/爆仓）+ 个股折算率
-- [x] 跨市场资金划转（汇率折算 + 手续费）
-- [x] 行情档位可调（高速回放 / 真实分钟级）+ 市价滑点模型
-- [x] 新闻错峰播报 + AI 行为树资金账户
-- [x] 绩效归因（夏普/回撤/胜率/波动率）+ 管理员全服休市交易开关
-- [x] 回测平台升级（实盘同口径手续费 + 滑点模型 + MA/RSI/动量三策略 + 买入持有基准 + 年化/回撤/夏普/盈亏因子）
+- [x] Market simulation, matching, macro feedback, indices, news, themes, events, IPOs, and dividends.
+- [x] Legacy trading terminal, quantitative API, backtests, and notifications.
+- [x] Exchange sessions aligned with local time; weekends and closed-session trading restrictions in normal calendar mode.
+- [x] Persistent candles and restored player/market history across restarts.
+- [x] Mobile bottom tabs, overlays, and horizontally scrolling index strips.
+- [x] Three market instances with independent clocks, factors, events, accounts, and legacy cross-market rankings.
+- [x] Institutional/speculative/retail AI participants whose executions affect volume.
+- [x] Price-time-priority matching, partial fills, self-trade prevention, FOK, and IOC.
+- [x] Opening auctions, China pre-open phases, and limit-price queues.
+- [x] Forward adjustment and listing-date daily history.
+- [x] CN/HK/US sessions and holiday calendars.
+- [x] Margin warning, partial liquidation, full liquidation, and stock-specific collateral factors.
+- [x] Legacy currency-converted cross-market transfers.
+- [x] Configurable market pace and market-order slippage.
+- [x] Staggered news broadcasts and AI cash/position ledgers.
+- [x] Performance measures and administrator off-hours trading controls.
+- [x] Backtests with fees, slippage, three strategies, buy-and-hold comparison, and risk/performance measures.
 
-**✅ 0.2.0 计划事项全部完成。**
+The legacy README marked all v0.2.0 planned items complete.
 
-### 🎯 v0.3.0 计划（规则补全 + 移动端生态）
+### Historical v0.3.0 plan: trading rules and mobile support
 
-> Phase 6 回测平台已合入 main（尚未打 tag），将随 v0.3.0 一并发布。
+The legacy plan recorded Phase 6 backtesting as merged into `main`, pending the v0.3.0 release.
 
-**已完成（待随 v0.3.0 发布）**
-- [x] 回测平台升级：实盘同口径手续费 + 滑点模型 + MA/RSI/动量三策略 + 买入持有基准 + 年化/回撤/夏普/盈亏因子（REALISM #24）
+**Trading-rule milestones:**
 
-**交易规则补全（REALISM 剩余项，按体验影响排序）**
-- [x] 盘后固定价格交易：A股 15:00-15:30 以收盘价申报撮合（REALISM #3 最后一环）
-- [x] 指数权重动态化：自由流通市值加权 + 新股纳入指数（REALISM #12）
-- [x] 基金/ETF 费率模型：申购/赎回费、ETF 免印花税、分级佣金（REALISM #17）
-- [~] 融券展期（REALISM #15）：**明确裁剪不做**——已隐式展期（无固定期限）+ 日终利息含券息，见 [docs/PHASE-ROADMAP.md](docs/PHASE-ROADMAP.md) 不做清单
-- [x] 红利税按持有期分档：CN 二档 / HK / US 分市场税率（REALISM #19 除权日细节）
-- [x] 复盘系统数据驱动：教训卡/成就/段位基于真实绩效与交易行为（REALISM #25）
-- [x] AI 对手盘在线自适应：按自身战绩 + 市场状态调参（REALISM #20 收官，Phase F）
+- [x] Backtest upgrades: trading fee conventions, slippage, three strategies, benchmark, and performance measures (REALISM #24).
+- [x] China closing-price orders during 15:00–15:30 (REALISM #3).
+- [x] Float-weighted indices and progressive IPO inclusion (REALISM #12).
+- [x] Fund subscription/redemption fees, ETF stamp-duty exemption, and tiered commission (REALISM #17).
+- [ ] Explicit stock-borrow renewal (REALISM #15): intentionally out of scope. Borrowing has no fixed expiry, and daily interest includes stock-borrow fees. See [the scope decisions](docs/PHASE-ROADMAP.md).
+- [x] Market-specific dividend taxes, including China holding-period bands (REALISM #19).
+- [x] Data-driven trade reviews, achievements, and tiers (REALISM #25).
+- [x] AI parameter adaptation based on performance and market state (REALISM #20, Phase F).
 
-**体验与生态**
-- [x] 移动端 PWA 打包（离线可用、添加到主屏）
-- [x] PWA 构建期预缓存清单（发版后半白屏窗口收口 + 体积红线门禁，Phase F）
-- [x] 模拟大赛深化：周赛/月赛/双周赛、赛季积分榜、战绩档案（Phase E）
-- [x] 浏览器级 E2E 冒烟脚本（登录→下单→撤单→排行→断线壳，可选门禁，Phase F）
-- [ ] 多语言（EN / 繁中）
+**Experience and ecosystem milestones:**
 
-### 🎯 真实性差距与路线图
+- [x] Mobile PWA packaging, offline support, and home-screen installation.
+- [x] Build-time PWA precache manifest and bundle-size gates (Phase F).
+- [x] Weekly, fortnightly, and monthly competitions, points, and season archives (Phase E).
+- [x] Optional browser smoke checks for login, order, cancellation, rankings, and disconnected UI (Phase F).
+- [x] English and Traditional Chinese in the unified workbench; this was unfinished in the historical legacy plan.
 
-对照真实交易终端（同花顺级别）的差距清单与优先级路线，详见 **[docs/REALISM.md](docs/REALISM.md)**。
+### Realism gaps
 
-### 🚀 远期方向
+See [REALISM.md](docs/REALISM.md) for the legacy gap list and priorities, and [the 2026-10-13 audit](docs/REALISM-AUDIT-20261013.md) for the latest implementation checks and measured limitations.
 
-- [ ] 接入真实行情源（模拟 → 真实数据可选）
-- [ ] 用户社区 / 交易对战
-- [ ] 移动端原生 App
-- [ ] 真实财报数据与宏观日历联动
+### Longer-term directions
 
-> ⚠️ 模拟数据仅供娱乐与学习，不构成投资建议。
+- [ ] Optional real market-data sources.
+- [ ] Player community and trading competitions.
+- [ ] Native mobile app.
+- [ ] Real company reports linked with macro release calendars.
 
-### 🔐 部署安全提示
+Simulated data is for entertainment and learning, not investment advice.
 
-- **JWT_SECRET**：必须在 `backend/.env` 配置强密钥（弱密钥会被启动校验拒绝，见 `jwt.strategy.ts`）
-- **默认账号**：管理员密码由 `ADMIN_PASSWORD` 环境变量决定；仅开发环境（NODE_ENV=development）未设置时回退 `admin123`，其余环境未设置强密码（≥8 位）时后端**拒绝创建**默认管理员；`backend/src/infrastructure/database/seed.ts` 的演示账号（demo）同理，部署公网前务必配置
-- **WebSocket**：/market 网关强制 JWT 认证（握手 `auth.token`），未认证连接立即断开
-- **数据库**：`backend/data/*.db` 为本地模拟数据，请勿提交到版本控制（已 gitignore）；默认 better-sqlite3 + WAL 增量写盘（强杀最多丢失一个 WAL 检查点周期，秒级），旧 sql.js 定时导出路径仅为兼容回退
+### Deployment security
 
----
-
-## 📦 版本与发布
-
-- **当前版本**：[v0.2.0](https://github.com/bobbychina32747/StockGameOnlinePro/releases)（BETA，真实订单簿/集合竞价/复权/多市场时段/两融三级强平等全拟真升级）
-- **下一版本**：v0.3.0（规划中，见上文「v0.3.0 计划」；Phase 6 回测平台已完成待发布）
-- **更新日志**：所有变更记录在 [CHANGELOG.md](CHANGELOG.md)（Keep a Changelog 格式，Unreleased 区块记录进行中的迭代）
-- **版本号**：遵循语义化版本（SemVer）——`v0.x.y`，`git tag` 打标签后推送，GitHub Releases 发布
-- **查看历史版本**：[Releases 页面](https://github.com/bobbychina32747/StockGameOnlinePro/releases) 查看每个版本的发布说明与可下载代码包
-
-> 每轮功能迭代都会更新 CHANGELOG 并视规模发布新版本。
+- **`JWT_SECRET`:** configure a strong secret in `backend/.env`; startup validation rejects weak secrets. See `jwt.strategy.ts`.
+- **Default accounts:** `ADMIN_PASSWORD` controls the administrator password. Only `NODE_ENV=development` falls back to `admin123`. Other environments refuse to create a default administrator without a strong password of at least eight characters. Demo-account seeding has similar constraints in `backend/src/infrastructure/database/seed.ts`.
+- **WebSocket:** the `/market` gateway requires JWT authentication through handshake `auth.token` and disconnects unauthenticated clients.
+- **Database:** do not commit `backend/data/*.db`; these files are ignored. The default better-sqlite3 driver uses WAL. The older sql.js periodic-export path remains for compatibility and rollback.
 
 ---
 
-## 📄 许可证
+## Versions and Releases
 
-**PolyForm Noncommercial License 1.0.0**（见 [LICENSE](LICENSE)）
+- **Legacy release reference:** [v0.2.0 and release history](https://github.com/bobbychina32747/StockGameOnlinePro/releases), covering order-book matching, auctions, adjustment, exchange sessions, and margin liquidation. This is the release reference from the legacy README; the unified production version is described at the top.
+- **Historical next-release plan:** v0.3.0, including the backtesting phase and rule/mobile milestones above.
+- **Changelog:** [CHANGELOG.md](CHANGELOG.md) uses Keep a Changelog; `Unreleased` records ongoing changes.
+- **Versioning:** semantic versions and Git tags identify releases; GitHub Releases provides notes and downloadable source archives.
+- **History:** see the [Releases page](https://github.com/bobbychina32747/StockGameOnlinePro/releases) for published versions.
 
-- ✅ 允许：自由 fork、修改、自用部署
-- ⚠️ 禁止：商业用途（除非获得授权）
-- 📌 必须：保留版权与许可声明
+Feature iterations update the changelog; release size determines whether a new version is published.
+
+## License
+
+**PolyForm Noncommercial License 1.0.0** — see [LICENSE](LICENSE).
+
+- Forking, modification, and personal deployments are allowed under the license.
+- Commercial use requires separate authorization.
+- Retain copyright and license notices.
