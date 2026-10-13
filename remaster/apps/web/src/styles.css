@@ -52,3 +52,4 @@ html,body,#root{height:100%;overflow:hidden;overscroll-behavior:none}
 @media(max-width:768px){.realm-badge{flex:1;min-height:34px;gap:8px}.realm-badge span{font-size:9px}.page-trade .sandbox-bar{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 
 .login-screen{height:100dvh;min-height:0;overflow:auto}.login-form .login-methods{margin:18px 0}.login-form .login-methods button{flex:1}.login-form form{gap:14px}.login-form .realm-selector{margin-top:18px}
+.capital-layout,.research-layout{display:grid;gap:16px}
