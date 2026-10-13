@@ -1,0 +1,915 @@
+{
+  "method": "Thirty simulated sessions for each of 69 market/industry groups; first five sessions discarded; seasonal activity removed. Seeded pure price and volume generators without news, jumps, matching or player data. Mechanism comparison, not a real-market fit or a predictive backtest.",
+  "summary": {
+    "groups": 69,
+    "old": {
+      "absoluteReturnAcf1": -0.00019067252659442726,
+      "volumeAbsoluteReturnCorrelation": 0.19801351894895367,
+      "volumeSignedReturnCorrelation": 0.001894115416159124
+    },
+    "updated": {
+      "absoluteReturnAcf1": 0.02858882370100351,
+      "volumeAbsoluteReturnCorrelation": 0.1935074486316341,
+      "volumeSignedReturnCorrelation": 0.0017481503136087344
+    }
+  },
+  "rows": [
+    {
+      "key": "CN|半导体",
+      "old": {
+        "absoluteReturnAcf1": 0.011519177594380257,
+        "volumeAbsoluteReturnCorrelation": 0.2181665213708194,
+        "volumeSignedReturnCorrelation": -0.013557579063029046
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.06436717002564148,
+        "volumeAbsoluteReturnCorrelation": 0.2232401541947839,
+        "volumeSignedReturnCorrelation": -0.01573933440953586
+      }
+    },
+    {
+      "key": "CN|人工智能",
+      "old": {
+        "absoluteReturnAcf1": -0.011796900920773103,
+        "volumeAbsoluteReturnCorrelation": 0.1520014370678143,
+        "volumeSignedReturnCorrelation": 0.01685410019413361
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.008419032154974344,
+        "volumeAbsoluteReturnCorrelation": 0.15338770556948375,
+        "volumeSignedReturnCorrelation": 0.015472710125098552
+      }
+    },
+    {
+      "key": "CN|软件与云服务",
+      "old": {
+        "absoluteReturnAcf1": 0.018983285784351506,
+        "volumeAbsoluteReturnCorrelation": 0.204331009918863,
+        "volumeSignedReturnCorrelation": 0.005412572610360483
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.06845801387333443,
+        "volumeAbsoluteReturnCorrelation": 0.20222061326676696,
+        "volumeSignedReturnCorrelation": 0.005917122338439373
+      }
+    },
+    {
+      "key": "CN|通信与网络",
+      "old": {
+        "absoluteReturnAcf1": 0.001088724542195244,
+        "volumeAbsoluteReturnCorrelation": 0.18875424780509278,
+        "volumeSignedReturnCorrelation": 0.0026878419083555052
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.016571066863284606,
+        "volumeAbsoluteReturnCorrelation": 0.18627298540911244,
+        "volumeSignedReturnCorrelation": 0.0018508000926522532
+      }
+    },
+    {
+      "key": "CN|银行",
+      "old": {
+        "absoluteReturnAcf1": 0.016002815675229234,
+        "volumeAbsoluteReturnCorrelation": 0.15020503763665619,
+        "volumeSignedReturnCorrelation": 0.01605494824058293
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.02773747792074973,
+        "volumeAbsoluteReturnCorrelation": 0.14974805977434255,
+        "volumeSignedReturnCorrelation": 0.016092208571169872
+      }
+    },
+    {
+      "key": "CN|券商与金融科技",
+      "old": {
+        "absoluteReturnAcf1": -0.0040654181785714305,
+        "volumeAbsoluteReturnCorrelation": 0.24899339274400356,
+        "volumeSignedReturnCorrelation": 0.007420360249742749
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.007606373771866779,
+        "volumeAbsoluteReturnCorrelation": 0.24925811531960812,
+        "volumeSignedReturnCorrelation": 0.007477962392808068
+      }
+    },
+    {
+      "key": "CN|保险",
+      "old": {
+        "absoluteReturnAcf1": -0.015042853557448901,
+        "volumeAbsoluteReturnCorrelation": 0.1915143330334603,
+        "volumeSignedReturnCorrelation": -0.00332124846833629
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.001939570622084183,
+        "volumeAbsoluteReturnCorrelation": 0.19206029634986735,
+        "volumeSignedReturnCorrelation": -0.002071254250022732
+      }
+    },
+    {
+      "key": "CN|医药与生物",
+      "old": {
+        "absoluteReturnAcf1": -0.01748976406864357,
+        "volumeAbsoluteReturnCorrelation": 0.1904463381578834,
+        "volumeSignedReturnCorrelation": 0.014616724059396277
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.029386551539875117,
+        "volumeAbsoluteReturnCorrelation": 0.17573408514826755,
+        "volumeSignedReturnCorrelation": 0.014244328624655819
+      }
+    },
+    {
+      "key": "CN|医疗器械与服务",
+      "old": {
+        "absoluteReturnAcf1": 0.019993015666176506,
+        "volumeAbsoluteReturnCorrelation": 0.16768702466984606,
+        "volumeSignedReturnCorrelation": -0.0041993673067715525
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.05206723053218381,
+        "volumeAbsoluteReturnCorrelation": 0.1688983077562589,
+        "volumeSignedReturnCorrelation": -0.005239035773351148
+      }
+    },
+    {
+      "key": "CN|食品饮料",
+      "old": {
+        "absoluteReturnAcf1": 0.01904369269728132,
+        "volumeAbsoluteReturnCorrelation": 0.19988002201790828,
+        "volumeSignedReturnCorrelation": 0.017330995512381105
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.05232346756104344,
+        "volumeAbsoluteReturnCorrelation": 0.1935074486316341,
+        "volumeSignedReturnCorrelation": 0.019188818998754475
+      }
+    },
+    {
+      "key": "CN|硬件与家电",
+      "old": {
+        "absoluteReturnAcf1": -0.0046081757271841765,
+        "volumeAbsoluteReturnCorrelation": 0.13374965038911096,
+        "volumeSignedReturnCorrelation": 0.014142126566829996
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.01802390321010086,
+        "volumeAbsoluteReturnCorrelation": 0.13519858794562467,
+        "volumeSignedReturnCorrelation": 0.009861235883950813
+      }
+    },
+    {
+      "key": "CN|新能源与电池",
+      "old": {
+        "absoluteReturnAcf1": -0.020396049426827344,
+        "volumeAbsoluteReturnCorrelation": 0.21969039035364005,
+        "volumeSignedReturnCorrelation": 0.00019824186960792816
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.007594854553655982,
+        "volumeAbsoluteReturnCorrelation": 0.22191328922391457,
+        "volumeSignedReturnCorrelation": 0.0017481503136087344
+      }
+    },
+    {
+      "key": "CN|汽车与出行",
+      "old": {
+        "absoluteReturnAcf1": -0.005261690593205026,
+        "volumeAbsoluteReturnCorrelation": 0.21359763676515936,
+        "volumeSignedReturnCorrelation": -0.023119720784104257
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.030376167265038764,
+        "volumeAbsoluteReturnCorrelation": 0.2193404710636076,
+        "volumeSignedReturnCorrelation": -0.021415267642977624
+      }
+    },
+    {
+      "key": "CN|工业与军工",
+      "old": {
+        "absoluteReturnAcf1": 0.014084340134139018,
+        "volumeAbsoluteReturnCorrelation": 0.29543092346939065,
+        "volumeSignedReturnCorrelation": -0.014560165619652886
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.025351933800666214,
+        "volumeAbsoluteReturnCorrelation": 0.29579562260143427,
+        "volumeSignedReturnCorrelation": -0.014997192733773342
+      }
+    },
+    {
+      "key": "CN|有色与材料",
+      "old": {
+        "absoluteReturnAcf1": 0.02658151203071608,
+        "volumeAbsoluteReturnCorrelation": 0.20684526048383536,
+        "volumeSignedReturnCorrelation": 0.015252670095867428
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.05396023915089434,
+        "volumeAbsoluteReturnCorrelation": 0.20555137806089072,
+        "volumeSignedReturnCorrelation": 0.01529848526485437
+      }
+    },
+    {
+      "key": "CN|能源与煤炭",
+      "old": {
+        "absoluteReturnAcf1": 0.0042482914523305736,
+        "volumeAbsoluteReturnCorrelation": 0.25217696609206963,
+        "volumeSignedReturnCorrelation": 0.003961590925786897
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.04776077352065095,
+        "volumeAbsoluteReturnCorrelation": 0.2635594768946557,
+        "volumeSignedReturnCorrelation": 0.004093803520070525
+      }
+    },
+    {
+      "key": "CN|地产与基建",
+      "old": {
+        "absoluteReturnAcf1": 0.011169950143922398,
+        "volumeAbsoluteReturnCorrelation": 0.10442669639359708,
+        "volumeSignedReturnCorrelation": 0.004362931216668533
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.029171217737600542,
+        "volumeAbsoluteReturnCorrelation": 0.10547491657942759,
+        "volumeSignedReturnCorrelation": 0.0032031874678305145
+      }
+    },
+    {
+      "key": "CN|游戏与互动娱乐",
+      "old": {
+        "absoluteReturnAcf1": 0.0012307601986594192,
+        "volumeAbsoluteReturnCorrelation": 0.2183039369606775,
+        "volumeSignedReturnCorrelation": 0.004168742322698555
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.020865299747809127,
+        "volumeAbsoluteReturnCorrelation": 0.21686884265785236,
+        "volumeSignedReturnCorrelation": 0.0051931930633391235
+      }
+    },
+    {
+      "key": "CN|传媒与文娱",
+      "old": {
+        "absoluteReturnAcf1": -0.018960023359846725,
+        "volumeAbsoluteReturnCorrelation": 0.13043120405761396,
+        "volumeSignedReturnCorrelation": 0.019796842982230008
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.06413267249603577,
+        "volumeAbsoluteReturnCorrelation": 0.12939186559236357,
+        "volumeSignedReturnCorrelation": 0.02038022251663441
+      }
+    },
+    {
+      "key": "CN|航空航运与物流",
+      "old": {
+        "absoluteReturnAcf1": 0.0038549175716965298,
+        "volumeAbsoluteReturnCorrelation": 0.1259795199173373,
+        "volumeSignedReturnCorrelation": 0.011559322138717557
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.04549171052326246,
+        "volumeAbsoluteReturnCorrelation": 0.12917581040627601,
+        "volumeSignedReturnCorrelation": 0.011751973378655876
+      }
+    },
+    {
+      "key": "HK|互联网与电商",
+      "old": {
+        "absoluteReturnAcf1": 0.008621524922760245,
+        "volumeAbsoluteReturnCorrelation": 0.2279889286629599,
+        "volumeSignedReturnCorrelation": 0.007942290808610359
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.02858882370100351,
+        "volumeAbsoluteReturnCorrelation": 0.23391653875454144,
+        "volumeSignedReturnCorrelation": 0.008382626210084327
+      }
+    },
+    {
+      "key": "HK|通信与网络",
+      "old": {
+        "absoluteReturnAcf1": -0.0011642062815135632,
+        "volumeAbsoluteReturnCorrelation": 0.2164254005758346,
+        "volumeSignedReturnCorrelation": 0.030002553385599155
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.03291214228367075,
+        "volumeAbsoluteReturnCorrelation": 0.2160226562221729,
+        "volumeSignedReturnCorrelation": 0.028645636601995417
+      }
+    },
+    {
+      "key": "HK|零售与消费",
+      "old": {
+        "absoluteReturnAcf1": 0.00815290358934346,
+        "volumeAbsoluteReturnCorrelation": 0.24986962266757523,
+        "volumeSignedReturnCorrelation": 0.018536599852720423
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.06368753475909777,
+        "volumeAbsoluteReturnCorrelation": 0.24844850435780666,
+        "volumeSignedReturnCorrelation": 0.01869964513232913
+      }
+    },
+    {
+      "key": "HK|银行",
+      "old": {
+        "absoluteReturnAcf1": -0.0034027403409510352,
+        "volumeAbsoluteReturnCorrelation": 0.15716440154868785,
+        "volumeSignedReturnCorrelation": -0.0019832002531030156
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.009962496841867962,
+        "volumeAbsoluteReturnCorrelation": 0.15553865849321313,
+        "volumeSignedReturnCorrelation": -0.0020518046220700113
+      }
+    },
+    {
+      "key": "HK|公用事业",
+      "old": {
+        "absoluteReturnAcf1": 0.015748342714135895,
+        "volumeAbsoluteReturnCorrelation": 0.3162960182025252,
+        "volumeSignedReturnCorrelation": -0.009906044786972868
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.03167008958326276,
+        "volumeAbsoluteReturnCorrelation": 0.31506237001550413,
+        "volumeSignedReturnCorrelation": -0.009715993128235172
+      }
+    },
+    {
+      "key": "HK|医药与生物",
+      "old": {
+        "absoluteReturnAcf1": 0.011610688947217335,
+        "volumeAbsoluteReturnCorrelation": 0.2244442346548036,
+        "volumeSignedReturnCorrelation": 0.010973089687643772
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.02691227336910875,
+        "volumeAbsoluteReturnCorrelation": 0.2223455210845348,
+        "volumeSignedReturnCorrelation": 0.010955214637529452
+      }
+    },
+    {
+      "key": "HK|地产与基建",
+      "old": {
+        "absoluteReturnAcf1": -0.0026638299934518698,
+        "volumeAbsoluteReturnCorrelation": 0.23057233756107504,
+        "volumeSignedReturnCorrelation": 0.0032076725019214926
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.08580851006103864,
+        "volumeAbsoluteReturnCorrelation": 0.2404480365438847,
+        "volumeSignedReturnCorrelation": 0.006558100703655687
+      }
+    },
+    {
+      "key": "HK|保险",
+      "old": {
+        "absoluteReturnAcf1": 0.0055248069765253165,
+        "volumeAbsoluteReturnCorrelation": 0.22138914967143178,
+        "volumeSignedReturnCorrelation": -0.008630898940397523
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.03363930992298512,
+        "volumeAbsoluteReturnCorrelation": 0.21865765771247928,
+        "volumeSignedReturnCorrelation": -0.009758193175993416
+      }
+    },
+    {
+      "key": "HK|航空航运与物流",
+      "old": {
+        "absoluteReturnAcf1": 0.0034378088346174365,
+        "volumeAbsoluteReturnCorrelation": 0.34527984197275824,
+        "volumeSignedReturnCorrelation": 0.0020091806465628455
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.031224085463959085,
+        "volumeAbsoluteReturnCorrelation": 0.3428435215530507,
+        "volumeSignedReturnCorrelation": 0.002305206251188339
+      }
+    },
+    {
+      "key": "HK|半导体",
+      "old": {
+        "absoluteReturnAcf1": -0.003647411108623595,
+        "volumeAbsoluteReturnCorrelation": 0.22413428422744902,
+        "volumeSignedReturnCorrelation": -0.013847931791475457
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.03272655886421325,
+        "volumeAbsoluteReturnCorrelation": 0.22560778942329668,
+        "volumeSignedReturnCorrelation": -0.011283556975712391
+      }
+    },
+    {
+      "key": "HK|汽车与出行",
+      "old": {
+        "absoluteReturnAcf1": -0.020878788598513876,
+        "volumeAbsoluteReturnCorrelation": 0.2669759231885949,
+        "volumeSignedReturnCorrelation": -0.01176514708777314
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.03669595334357837,
+        "volumeAbsoluteReturnCorrelation": 0.2840409551675197,
+        "volumeSignedReturnCorrelation": -0.012473031945712955
+      }
+    },
+    {
+      "key": "HK|医疗器械与服务",
+      "old": {
+        "absoluteReturnAcf1": 0.0029722951249743345,
+        "volumeAbsoluteReturnCorrelation": 0.31716499423994665,
+        "volumeSignedReturnCorrelation": 0.015464304419623763
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.011280102829858973,
+        "volumeAbsoluteReturnCorrelation": 0.3166060859690045,
+        "volumeSignedReturnCorrelation": 0.017141057191505615
+      }
+    },
+    {
+      "key": "HK|券商与金融科技",
+      "old": {
+        "absoluteReturnAcf1": 0.013462378301830315,
+        "volumeAbsoluteReturnCorrelation": 0.26282977429524873,
+        "volumeSignedReturnCorrelation": -0.0031809663695148305
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.028922429051726446,
+        "volumeAbsoluteReturnCorrelation": 0.2591027647157166,
+        "volumeSignedReturnCorrelation": -0.0019455874153764478
+      }
+    },
+    {
+      "key": "HK|食品饮料",
+      "old": {
+        "absoluteReturnAcf1": -0.00525709044025449,
+        "volumeAbsoluteReturnCorrelation": 0.24089840193704593,
+        "volumeSignedReturnCorrelation": 0.024431833968469544
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.01276299696310623,
+        "volumeAbsoluteReturnCorrelation": 0.23910784238399901,
+        "volumeSignedReturnCorrelation": 0.02217804647167371
+      }
+    },
+    {
+      "key": "HK|能源与煤炭",
+      "old": {
+        "absoluteReturnAcf1": 0.014634670897641805,
+        "volumeAbsoluteReturnCorrelation": 0.22345042963290004,
+        "volumeSignedReturnCorrelation": -0.0003494691918649481
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.04415545495426435,
+        "volumeAbsoluteReturnCorrelation": 0.22204694940021874,
+        "volumeSignedReturnCorrelation": 0.001051218895557033
+      }
+    },
+    {
+      "key": "HK|工业与军工",
+      "old": {
+        "absoluteReturnAcf1": -0.020675167375721535,
+        "volumeAbsoluteReturnCorrelation": 0.3184998237124439,
+        "volumeSignedReturnCorrelation": -2.2985701486919336e-7
+      },
+      "updated": {
+        "absoluteReturnAcf1": -0.006757422070034475,
+        "volumeAbsoluteReturnCorrelation": 0.32050799485450326,
+        "volumeSignedReturnCorrelation": 0.0011830683326236934
+      }
+    },
+    {
+      "key": "US|半导体",
+      "old": {
+        "absoluteReturnAcf1": 0.009894427969217946,
+        "volumeAbsoluteReturnCorrelation": 0.16520922647114117,
+        "volumeSignedReturnCorrelation": -0.01871012717700535
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.03166250273297995,
+        "volumeAbsoluteReturnCorrelation": 0.16113052268161893,
+        "volumeSignedReturnCorrelation": -0.020189835187989582
+      }
+    },
+    {
+      "key": "US|人工智能",
+      "old": {
+        "absoluteReturnAcf1": 0.014009294899448096,
+        "volumeAbsoluteReturnCorrelation": 0.09000224873116411,
+        "volumeSignedReturnCorrelation": 0.002527055221039358
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.05068157778975431,
+        "volumeAbsoluteReturnCorrelation": 0.0818930487043764,
+        "volumeSignedReturnCorrelation": 0.002388805033171561
+      }
+    },
+    {
+      "key": "US|汽车与出行",
+      "old": {
+        "absoluteReturnAcf1": -0.011870025636583759,
+        "volumeAbsoluteReturnCorrelation": 0.22016756822798844,
+        "volumeSignedReturnCorrelation": -0.01828569633022219
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.02447279722696984,
+        "volumeAbsoluteReturnCorrelation": 0.2313470395175578,
+        "volumeSignedReturnCorrelation": -0.019181703147084117
+      }
+    },
+    {
+      "key": "US|软件与云服务",
+      "old": {
+        "absoluteReturnAcf1": -0.0016100766445555454,
+        "volumeAbsoluteReturnCorrelation": 0.09068096156984165,
+        "volumeSignedReturnCorrelation": -0.005449639480042436
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.012168801847550651,
+        "volumeAbsoluteReturnCorrelation": 0.08631793237312403,
+        "volumeSignedReturnCorrelation": -0.004655529672581017
+      }
+    },
+    {
+      "key": "US|券商与金融科技",
+      "old": {
+        "absoluteReturnAcf1": 0.010918937253346816,
+        "volumeAbsoluteReturnCorrelation": 0.17699049838664613,
+        "volumeSignedReturnCorrelation": -0.00021698549067348277
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.060068415451720855,
+        "volumeAbsoluteReturnCorrelation": 0.17862775065126751,
+        "volumeSignedReturnCorrelation": -0.0018001400646036308
+      }
+    },
+    {
+      "key": "US|医药与生物",
+      "old": {
+        "absoluteReturnAcf1": -0.0006948552472037598,
+        "volumeAbsoluteReturnCorrelation": 0.14903163218921145,
+        "volumeSignedReturnCorrelation": 0.03191003259744902
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.03006492560201013,
+        "volumeAbsoluteReturnCorrelation": 0.149308595617583,
+        "volumeSignedReturnCorrelation": 0.0335436188887748
+      }
+    },
+    {
+      "key": "US|工业与军工",
+      "old": {
+        "absoluteReturnAcf1": -0.026390467055139807,
+        "volumeAbsoluteReturnCorrelation": 0.07196037000454947,
+        "volumeSignedReturnCorrelation": -0.0076011240476160135
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.02178800537308509,
+        "volumeAbsoluteReturnCorrelation": 0.06830550784900083,
+        "volumeSignedReturnCorrelation": -0.007041465180404615
+      }
+    },
+    {
+      "key": "US|银行",
+      "old": {
+        "absoluteReturnAcf1": 0.028298848219329667,
+        "volumeAbsoluteReturnCorrelation": 0.11771841586374271,
+        "volumeSignedReturnCorrelation": 0.020647268971382197
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.08981417514827532,
+        "volumeAbsoluteReturnCorrelation": 0.11344252547214433,
+        "volumeSignedReturnCorrelation": 0.02255817485302353
+      }
+    },
+    {
+      "key": "US|硬件与家电",
+      "old": {
+        "absoluteReturnAcf1": -0.01330686145641992,
+        "volumeAbsoluteReturnCorrelation": 0.23027908750423393,
+        "volumeSignedReturnCorrelation": 0.0056133817237420365
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.04231909756073242,
+        "volumeAbsoluteReturnCorrelation": 0.23596186883758657,
+        "volumeSignedReturnCorrelation": 0.0017111696168075397
+      }
+    },
+    {
+      "key": "US|互联网与电商",
+      "old": {
+        "absoluteReturnAcf1": -0.026471513840004054,
+        "volumeAbsoluteReturnCorrelation": 0.19005763115143504,
+        "volumeSignedReturnCorrelation": -0.0029693185858718674
+      },
+      "updated": {
+        "absoluteReturnAcf1": -0.0025179127290499283,
+        "volumeAbsoluteReturnCorrelation": 0.19137012647257148,
+        "volumeSignedReturnCorrelation": -0.0026319058477108407
+      }
+    },
+    {
+      "key": "US|食品饮料",
+      "old": {
+        "absoluteReturnAcf1": -0.01778425691355541,
+        "volumeAbsoluteReturnCorrelation": 0.15882429021505665,
+        "volumeSignedReturnCorrelation": -0.016864129552764354
+      },
+      "updated": {
+        "absoluteReturnAcf1": -0.00060278031654322,
+        "volumeAbsoluteReturnCorrelation": 0.15884268239882254,
+        "volumeSignedReturnCorrelation": -0.0170016923520565
+      }
+    },
+    {
+      "key": "US|传媒与文娱",
+      "old": {
+        "absoluteReturnAcf1": 0.006607644766313004,
+        "volumeAbsoluteReturnCorrelation": 0.10979437523493778,
+        "volumeSignedReturnCorrelation": 0.012785673550197224
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.03934543682399027,
+        "volumeAbsoluteReturnCorrelation": 0.10494237451256648,
+        "volumeSignedReturnCorrelation": 0.01142129118130228
+      }
+    },
+    {
+      "key": "US|零售与消费",
+      "old": {
+        "absoluteReturnAcf1": -0.01492243534520533,
+        "volumeAbsoluteReturnCorrelation": 0.09806088431453631,
+        "volumeSignedReturnCorrelation": -0.006210733152536663
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.005252688667461588,
+        "volumeAbsoluteReturnCorrelation": 0.09733761876254354,
+        "volumeSignedReturnCorrelation": -0.005143227734520123
+      }
+    },
+    {
+      "key": "US|能源与煤炭",
+      "old": {
+        "absoluteReturnAcf1": 0.00021433605602760752,
+        "volumeAbsoluteReturnCorrelation": 0.15480743478895498,
+        "volumeSignedReturnCorrelation": 0.008029914965718792
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.027488244184378143,
+        "volumeAbsoluteReturnCorrelation": 0.15849078841351294,
+        "volumeSignedReturnCorrelation": 0.007705642878259902
+      }
+    },
+    {
+      "key": "HK|人工智能",
+      "old": {
+        "absoluteReturnAcf1": -0.003947843654728327,
+        "volumeAbsoluteReturnCorrelation": 0.22805636780775942,
+        "volumeSignedReturnCorrelation": 0.0012009626463478312
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.021130200122634436,
+        "volumeAbsoluteReturnCorrelation": 0.22589906350930758,
+        "volumeSignedReturnCorrelation": 0.0015291729308363642
+      }
+    },
+    {
+      "key": "HK|软件与云服务",
+      "old": {
+        "absoluteReturnAcf1": -0.0055849188591704756,
+        "volumeAbsoluteReturnCorrelation": 0.24245400416394658,
+        "volumeSignedReturnCorrelation": -0.0003821465842393408
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.011668032398565377,
+        "volumeAbsoluteReturnCorrelation": 0.24017065243548927,
+        "volumeSignedReturnCorrelation": -0.003064925625594647
+      }
+    },
+    {
+      "key": "HK|游戏与互动娱乐",
+      "old": {
+        "absoluteReturnAcf1": 0.02075564962924173,
+        "volumeAbsoluteReturnCorrelation": 0.17545194224424668,
+        "volumeSignedReturnCorrelation": -0.002357754385796839
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.04645091708876466,
+        "volumeAbsoluteReturnCorrelation": 0.17489682777149762,
+        "volumeSignedReturnCorrelation": -0.004039504919021356
+      }
+    },
+    {
+      "key": "US|游戏与互动娱乐",
+      "old": {
+        "absoluteReturnAcf1": 0.005891465021642862,
+        "volumeAbsoluteReturnCorrelation": 0.1650364759334485,
+        "volumeSignedReturnCorrelation": 0.026920914492472022
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.020008707525570203,
+        "volumeAbsoluteReturnCorrelation": 0.16269157098533993,
+        "volumeSignedReturnCorrelation": 0.026445069605432123
+      }
+    },
+    {
+      "key": "HK|传媒与文娱",
+      "old": {
+        "absoluteReturnAcf1": -0.014771651582061052,
+        "volumeAbsoluteReturnCorrelation": 0.2489415536351145,
+        "volumeSignedReturnCorrelation": 0.0023742894904129975
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.023663583691430165,
+        "volumeAbsoluteReturnCorrelation": 0.248031900984877,
+        "volumeSignedReturnCorrelation": 0.003074693480552061
+      }
+    },
+    {
+      "key": "HK|硬件与家电",
+      "old": {
+        "absoluteReturnAcf1": 0.012770156135669768,
+        "volumeAbsoluteReturnCorrelation": 0.2737117264746445,
+        "volumeSignedReturnCorrelation": -0.014676826970090154
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.039347417380015674,
+        "volumeAbsoluteReturnCorrelation": 0.2722042672361798,
+        "volumeSignedReturnCorrelation": -0.016296549164872044
+      }
+    },
+    {
+      "key": "CN|互联网与电商",
+      "old": {
+        "absoluteReturnAcf1": -0.0022554186852272017,
+        "volumeAbsoluteReturnCorrelation": 0.143525263176463,
+        "volumeSignedReturnCorrelation": -0.00927597069479113
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.0059667122641174405,
+        "volumeAbsoluteReturnCorrelation": 0.14475722250547127,
+        "volumeSignedReturnCorrelation": -0.010555072263642547
+      }
+    },
+    {
+      "key": "HK|新能源与电池",
+      "old": {
+        "absoluteReturnAcf1": 0.002258305464382197,
+        "volumeAbsoluteReturnCorrelation": 0.23811124097303332,
+        "volumeSignedReturnCorrelation": -0.0005468062232822009
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.026020121053936508,
+        "volumeAbsoluteReturnCorrelation": 0.23848216704554656,
+        "volumeSignedReturnCorrelation": -0.00045237674363551714
+      }
+    },
+    {
+      "key": "US|新能源与电池",
+      "old": {
+        "absoluteReturnAcf1": -0.00019067252659442726,
+        "volumeAbsoluteReturnCorrelation": 0.1966161196214091,
+        "volumeSignedReturnCorrelation": -0.003618104039607243
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.030230172256194652,
+        "volumeAbsoluteReturnCorrelation": 0.19570979443924588,
+        "volumeSignedReturnCorrelation": -0.001149204474090216
+      }
+    },
+    {
+      "key": "US|保险",
+      "old": {
+        "absoluteReturnAcf1": -0.0028515466539731998,
+        "volumeAbsoluteReturnCorrelation": 0.11506439005455274,
+        "volumeSignedReturnCorrelation": 0.007512064054772804
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.003181188873767811,
+        "volumeAbsoluteReturnCorrelation": 0.11234048379578654,
+        "volumeSignedReturnCorrelation": 0.007482355888368138
+      }
+    },
+    {
+      "key": "US|医疗器械与服务",
+      "old": {
+        "absoluteReturnAcf1": 0.007817585729388806,
+        "volumeAbsoluteReturnCorrelation": 0.08587170143332215,
+        "volumeSignedReturnCorrelation": -0.0026625800593693084
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.02354759448634697,
+        "volumeAbsoluteReturnCorrelation": 0.0838489575117437,
+        "volumeSignedReturnCorrelation": -0.0023877963176288796
+      }
+    },
+    {
+      "key": "CN|零售与消费",
+      "old": {
+        "absoluteReturnAcf1": -0.02128687046788264,
+        "volumeAbsoluteReturnCorrelation": 0.01266289733810528,
+        "volumeSignedReturnCorrelation": -0.002368868617278742
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.005081456410292663,
+        "volumeAbsoluteReturnCorrelation": 0.012365700027652969,
+        "volumeSignedReturnCorrelation": -0.0037207976140760687
+      }
+    },
+    {
+      "key": "HK|有色与材料",
+      "old": {
+        "absoluteReturnAcf1": -0.022642888259434647,
+        "volumeAbsoluteReturnCorrelation": 0.26084124406666453,
+        "volumeSignedReturnCorrelation": 0.001894115416159124
+      },
+      "updated": {
+        "absoluteReturnAcf1": -0.007495545746963691,
+        "volumeAbsoluteReturnCorrelation": 0.25917492053016755,
+        "volumeSignedReturnCorrelation": 0.0035154118900083083
+      }
+    },
+    {
+      "key": "US|有色与材料",
+      "old": {
+        "absoluteReturnAcf1": 0.00137668502789852,
+        "volumeAbsoluteReturnCorrelation": 0.1725209341486698,
+        "volumeSignedReturnCorrelation": 0.01995824181615191
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.04389129172556988,
+        "volumeAbsoluteReturnCorrelation": 0.174693247747051,
+        "volumeSignedReturnCorrelation": 0.016367199331442206
+      }
+    },
+    {
+      "key": "US|地产与基建",
+      "old": {
+        "absoluteReturnAcf1": -0.0007280063528530925,
+        "volumeAbsoluteReturnCorrelation": 0.1511931352140314,
+        "volumeSignedReturnCorrelation": 0.017094099248854713
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.02115599812434827,
+        "volumeAbsoluteReturnCorrelation": 0.15229444117932178,
+        "volumeSignedReturnCorrelation": 0.018708657654128717
+      }
+    },
+    {
+      "key": "CN|公用事业",
+      "old": {
+        "absoluteReturnAcf1": -0.00534865867427029,
+        "volumeAbsoluteReturnCorrelation": 0.21139282320355818,
+        "volumeSignedReturnCorrelation": -0.033629981846445285
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.019979267234583504,
+        "volumeAbsoluteReturnCorrelation": 0.2181486158939044,
+        "volumeSignedReturnCorrelation": -0.034521201452409694
+      }
+    },
+    {
+      "key": "US|公用事业",
+      "old": {
+        "absoluteReturnAcf1": -0.016088610386946832,
+        "volumeAbsoluteReturnCorrelation": 0.13029367170272613,
+        "volumeSignedReturnCorrelation": -0.004053297570911402
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.0013077494823896393,
+        "volumeAbsoluteReturnCorrelation": 0.12828271367333866,
+        "volumeSignedReturnCorrelation": -0.003465285545180401
+      }
+    },
+    {
+      "key": "US|通信与网络",
+      "old": {
+        "absoluteReturnAcf1": -0.004171980998534314,
+        "volumeAbsoluteReturnCorrelation": 0.14950282004991647,
+        "volumeSignedReturnCorrelation": -0.010967450659076377
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.033236247868053174,
+        "volumeAbsoluteReturnCorrelation": 0.1519510924454532,
+        "volumeSignedReturnCorrelation": -0.009682483127081346
+      }
+    },
+    {
+      "key": "US|航空航运与物流",
+      "old": {
+        "absoluteReturnAcf1": 0.022595909004980725,
+        "volumeAbsoluteReturnCorrelation": 0.19801351894895367,
+        "volumeSignedReturnCorrelation": 0.01728610619197214
+      },
+      "updated": {
+        "absoluteReturnAcf1": 0.04617390221160284,
+        "volumeAbsoluteReturnCorrelation": 0.190212790041775,
+        "volumeSignedReturnCorrelation": 0.018242980329548155
+      }
+    }
+  ]
+}

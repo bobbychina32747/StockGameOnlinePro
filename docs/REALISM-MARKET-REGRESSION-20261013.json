@@ -1,0 +1,628 @@
+{
+  "method": "10 complete game days, full stock pools, real generateTick/postTickProcessing/virtual matching; no real-player accounts, orders or network. Seeded randomness. Not a profitability guarantee.",
+  "drift": {
+    "hotSignal": 0.5,
+    "oldDailyDrift": 2.25,
+    "newDailyDrift": 0.002655341614781328,
+    "oldGlobalEmotionDrift": 0.78,
+    "newGlobalEmotionDrift": 0.000934106400131169
+  },
+  "scenarios": [
+    {
+      "market": "CN",
+      "regime": "bull",
+      "premium": 1,
+      "seed": 17,
+      "stocks": 138,
+      "days": [
+        {
+          "day": 1,
+          "meanReturnPct": 0.7,
+          "upFraction": 0.5,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 2,
+          "meanReturnPct": -1.87,
+          "upFraction": 0.348,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 3,
+          "meanReturnPct": -3.09,
+          "upFraction": 0.283,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.022
+        },
+        {
+          "day": 4,
+          "meanReturnPct": 2.04,
+          "upFraction": 0.652,
+          "limitUpFraction": 0.022,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 5,
+          "meanReturnPct": -0.42,
+          "upFraction": 0.471,
+          "limitUpFraction": 0.014,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 6,
+          "meanReturnPct": -0.9,
+          "upFraction": 0.406,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0.007
+        },
+        {
+          "day": 7,
+          "meanReturnPct": -1.45,
+          "upFraction": 0.442,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0.014
+        },
+        {
+          "day": 8,
+          "meanReturnPct": 1.9,
+          "upFraction": 0.623,
+          "limitUpFraction": 0.036,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 9,
+          "meanReturnPct": 1.71,
+          "upFraction": 0.681,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 10,
+          "meanReturnPct": -0.69,
+          "upFraction": 0.435,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.014
+        }
+      ],
+      "ai": [
+        {
+          "id": "AI10",
+          "pnlPct": 8.52,
+          "fills": 392,
+          "closedTrades": 223,
+          "positions": 13
+        },
+        {
+          "id": "AI8",
+          "pnlPct": 4.47,
+          "fills": 399,
+          "closedTrades": 222,
+          "positions": 13
+        },
+        {
+          "id": "AI9",
+          "pnlPct": 3.09,
+          "fills": 386,
+          "closedTrades": 220,
+          "positions": 12
+        },
+        {
+          "id": "AI7",
+          "pnlPct": 2.53,
+          "fills": 406,
+          "closedTrades": 228,
+          "positions": 15
+        },
+        {
+          "id": "AI6",
+          "pnlPct": 1.86,
+          "fills": 406,
+          "closedTrades": 225,
+          "positions": 19
+        },
+        {
+          "id": "AI5",
+          "pnlPct": 0.63,
+          "fills": 345,
+          "closedTrades": 201,
+          "positions": 11
+        },
+        {
+          "id": "AI2",
+          "pnlPct": 0.58,
+          "fills": 233,
+          "closedTrades": 106,
+          "positions": 32
+        },
+        {
+          "id": "AI1",
+          "pnlPct": 0.22,
+          "fills": 238,
+          "closedTrades": 119,
+          "positions": 28
+        },
+        {
+          "id": "AI3",
+          "pnlPct": -0.07,
+          "fills": 394,
+          "closedTrades": 233,
+          "positions": 3
+        },
+        {
+          "id": "AI4",
+          "pnlPct": -0.55,
+          "fills": 362,
+          "closedTrades": 206,
+          "positions": 9
+        }
+      ],
+      "meanAiPnl": 2.13,
+      "worstDrawdownPct": 3.05,
+      "fills": 3561
+    },
+    {
+      "market": "CN",
+      "regime": "sideways",
+      "premium": 5,
+      "seed": 29,
+      "stocks": 138,
+      "days": [
+        {
+          "day": 1,
+          "meanReturnPct": -1.19,
+          "upFraction": 0.442,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.022
+        },
+        {
+          "day": 2,
+          "meanReturnPct": -3.78,
+          "upFraction": 0.239,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.029
+        },
+        {
+          "day": 3,
+          "meanReturnPct": -1.37,
+          "upFraction": 0.449,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0.014
+        },
+        {
+          "day": 4,
+          "meanReturnPct": -0.45,
+          "upFraction": 0.493,
+          "limitUpFraction": 0.007,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 5,
+          "meanReturnPct": -2.91,
+          "upFraction": 0.312,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.036
+        },
+        {
+          "day": 6,
+          "meanReturnPct": -4.74,
+          "upFraction": 0.145,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.065
+        },
+        {
+          "day": 7,
+          "meanReturnPct": -1.67,
+          "upFraction": 0.377,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.014
+        },
+        {
+          "day": 8,
+          "meanReturnPct": -5.15,
+          "upFraction": 0.167,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.138
+        },
+        {
+          "day": 9,
+          "meanReturnPct": -3.78,
+          "upFraction": 0.239,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.072
+        },
+        {
+          "day": 10,
+          "meanReturnPct": -1.68,
+          "upFraction": 0.384,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0.036
+        }
+      ],
+      "ai": [
+        {
+          "id": "AI2",
+          "pnlPct": 0,
+          "fills": 0,
+          "closedTrades": 0,
+          "positions": 0
+        },
+        {
+          "id": "AI5",
+          "pnlPct": 0,
+          "fills": 0,
+          "closedTrades": 0,
+          "positions": 0
+        },
+        {
+          "id": "AI9",
+          "pnlPct": 0,
+          "fills": 0,
+          "closedTrades": 0,
+          "positions": 0
+        },
+        {
+          "id": "AI10",
+          "pnlPct": 0,
+          "fills": 0,
+          "closedTrades": 0,
+          "positions": 0
+        },
+        {
+          "id": "AI3",
+          "pnlPct": -0.91,
+          "fills": 279,
+          "closedTrades": 141,
+          "positions": 2
+        },
+        {
+          "id": "AI7",
+          "pnlPct": -0.96,
+          "fills": 337,
+          "closedTrades": 159,
+          "positions": 11
+        },
+        {
+          "id": "AI6",
+          "pnlPct": -1.05,
+          "fills": 364,
+          "closedTrades": 176,
+          "positions": 7
+        },
+        {
+          "id": "AI4",
+          "pnlPct": -1.2,
+          "fills": 264,
+          "closedTrades": 129,
+          "positions": 7
+        },
+        {
+          "id": "AI8",
+          "pnlPct": -1.34,
+          "fills": 265,
+          "closedTrades": 129,
+          "positions": 4
+        },
+        {
+          "id": "AI1",
+          "pnlPct": -1.51,
+          "fills": 212,
+          "closedTrades": 104,
+          "positions": 8
+        }
+      ],
+      "meanAiPnl": -0.7,
+      "worstDrawdownPct": 2.11,
+      "fills": 1721
+    },
+    {
+      "market": "HK",
+      "regime": "bear",
+      "premium": 1,
+      "seed": 31,
+      "stocks": 138,
+      "days": [
+        {
+          "day": 1,
+          "meanReturnPct": -2.17,
+          "upFraction": 0.362,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 2,
+          "meanReturnPct": -1.11,
+          "upFraction": 0.464,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 3,
+          "meanReturnPct": -5.93,
+          "upFraction": 0.261,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 4,
+          "meanReturnPct": 5.09,
+          "upFraction": 0.674,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 5,
+          "meanReturnPct": -7.67,
+          "upFraction": 0.283,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 6,
+          "meanReturnPct": -8.08,
+          "upFraction": 0.217,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 7,
+          "meanReturnPct": -3.12,
+          "upFraction": 0.384,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 8,
+          "meanReturnPct": 4.68,
+          "upFraction": 0.652,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 9,
+          "meanReturnPct": -4.39,
+          "upFraction": 0.348,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 10,
+          "meanReturnPct": 0.72,
+          "upFraction": 0.449,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        }
+      ],
+      "ai": [
+        {
+          "id": "AI2",
+          "pnlPct": -0.24,
+          "fills": 308,
+          "closedTrades": 172,
+          "positions": 17
+        },
+        {
+          "id": "AI8",
+          "pnlPct": -1.59,
+          "fills": 465,
+          "closedTrades": 260,
+          "positions": 8
+        },
+        {
+          "id": "AI1",
+          "pnlPct": -1.77,
+          "fills": 372,
+          "closedTrades": 203,
+          "positions": 15
+        },
+        {
+          "id": "AI10",
+          "pnlPct": -2.06,
+          "fills": 508,
+          "closedTrades": 294,
+          "positions": 5
+        },
+        {
+          "id": "AI4",
+          "pnlPct": -2.67,
+          "fills": 510,
+          "closedTrades": 301,
+          "positions": 3
+        },
+        {
+          "id": "AI5",
+          "pnlPct": -3.67,
+          "fills": 462,
+          "closedTrades": 278,
+          "positions": 4
+        },
+        {
+          "id": "AI6",
+          "pnlPct": -4.74,
+          "fills": 511,
+          "closedTrades": 278,
+          "positions": 8
+        },
+        {
+          "id": "AI3",
+          "pnlPct": -4.8,
+          "fills": 532,
+          "closedTrades": 302,
+          "positions": 5
+        },
+        {
+          "id": "AI9",
+          "pnlPct": -5.26,
+          "fills": 502,
+          "closedTrades": 280,
+          "positions": 4
+        },
+        {
+          "id": "AI7",
+          "pnlPct": -8.29,
+          "fills": 401,
+          "closedTrades": 226,
+          "positions": 0
+        }
+      ],
+      "meanAiPnl": -3.51,
+      "worstDrawdownPct": 9.22,
+      "fills": 4571
+    },
+    {
+      "market": "US",
+      "regime": "sideways",
+      "premium": 5,
+      "seed": 43,
+      "stocks": 138,
+      "days": [
+        {
+          "day": 1,
+          "meanReturnPct": -3.88,
+          "upFraction": 0.254,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 2,
+          "meanReturnPct": -2.63,
+          "upFraction": 0.312,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 3,
+          "meanReturnPct": -5.67,
+          "upFraction": 0.181,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 4,
+          "meanReturnPct": -3.81,
+          "upFraction": 0.275,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 5,
+          "meanReturnPct": 1.8,
+          "upFraction": 0.572,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 6,
+          "meanReturnPct": -1.77,
+          "upFraction": 0.399,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 7,
+          "meanReturnPct": -5.41,
+          "upFraction": 0.203,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 8,
+          "meanReturnPct": -3.92,
+          "upFraction": 0.246,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 9,
+          "meanReturnPct": -1.63,
+          "upFraction": 0.413,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        },
+        {
+          "day": 10,
+          "meanReturnPct": -3.64,
+          "upFraction": 0.268,
+          "limitUpFraction": 0,
+          "limitDownFraction": 0
+        }
+      ],
+      "ai": [
+        {
+          "id": "AI2",
+          "pnlPct": 0,
+          "fills": 0,
+          "closedTrades": 0,
+          "positions": 0
+        },
+        {
+          "id": "AI5",
+          "pnlPct": 0,
+          "fills": 0,
+          "closedTrades": 0,
+          "positions": 0
+        },
+        {
+          "id": "AI9",
+          "pnlPct": 0,
+          "fills": 0,
+          "closedTrades": 0,
+          "positions": 0
+        },
+        {
+          "id": "AI10",
+          "pnlPct": 0,
+          "fills": 0,
+          "closedTrades": 0,
+          "positions": 0
+        },
+        {
+          "id": "AI4",
+          "pnlPct": -1.07,
+          "fills": 356,
+          "closedTrades": 174,
+          "positions": 5
+        },
+        {
+          "id": "AI3",
+          "pnlPct": -1.53,
+          "fills": 369,
+          "closedTrades": 177,
+          "positions": 5
+        },
+        {
+          "id": "AI7",
+          "pnlPct": -1.64,
+          "fills": 374,
+          "closedTrades": 184,
+          "positions": 2
+        },
+        {
+          "id": "AI1",
+          "pnlPct": -1.67,
+          "fills": 182,
+          "closedTrades": 86,
+          "positions": 8
+        },
+        {
+          "id": "AI8",
+          "pnlPct": -2.05,
+          "fills": 360,
+          "closedTrades": 174,
+          "positions": 5
+        },
+        {
+          "id": "AI6",
+          "pnlPct": -2.78,
+          "fills": 428,
+          "closedTrades": 206,
+          "positions": 7
+        }
+      ],
+      "meanAiPnl": -1.07,
+      "worstDrawdownPct": 2.89,
+      "fills": 2069
+    }
+  ]
+}

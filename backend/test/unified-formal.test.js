@@ -20,16 +20,19 @@ describe('统一正式版：原账本与校准股票池',()=>{
   }
   expect(STOCK_POOL.some(row=>row.symbol==='T1')).toBe(true);expect(HK_POOL.some(row=>row.symbol==='H1')).toBe(true);
  });
- test('校准模型生成不等幅的分钟冲击，且负冲击后条件波动率更高',()=>{
+ test('校准模型生成不等幅的分钟冲击，并使用有非对称参数行业的实际收益更新方差',()=>{
   let seed=1234;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return(seed+1)/4294967297;};
   const normal=()=>Math.sqrt(-2*Math.log(random()))*Math.cos(2*Math.PI*random());
   const row={symbol:'T1',minuteCounter:0};const values=[];
-  for(let i=0;i<4000;i++){row.minuteCounter=i%240;values.push(calibratedShock(row,normal,240,'CN',normal(),normal()));}
+  for(let i=0;i<4000;i++){row.minuteCounter=i%240;row.lastReturn=calibratedShock(row,normal,240,'CN',normal(),normal());values.push(row.lastReturn);}
   expect(values.every(Number.isFinite)).toBe(true);expect(new Set(values).size).toBeGreaterThan(3900);
   const sorted=values.map(Math.abs).sort((a,b)=>a-b);expect(sorted[3990]/sorted[2000]).toBeGreaterThan(4);
-  const positive={symbol:'T1',minuteCounter:100,calibratedVariance:{variance:1,shock:3}};
-  const negative={symbol:'T1',minuteCounter:100,calibratedVariance:{variance:1,shock:-3}};
-  calibratedShock(positive,normal,240,'CN',0,0);calibratedShock(negative,normal,240,'CN',0,0);
+  const profiles=require('../dist/src/common/unified-intraday-risk.json').profiles;
+  const instrument=[...unifiedInstruments.values()].find(row=>profiles[row.market+'|'+row.industry]?.gamma>0);
+  const length=instrument.market==='CN'?240:instrument.market==='HK'?330:390;
+  const positive={symbol:instrument.symbol,minuteCounter:100,lastReturn:.003,calibratedVariance:{variance:1,shock:0}};
+  const negative={...positive,lastReturn:-.003,calibratedVariance:{variance:1,shock:0}};
+  calibratedShock(positive,normal,length,instrument.market,0,0);calibratedShock(negative,normal,length,instrument.market,0,0);
   expect(negative.calibratedVariance.variance).toBeGreaterThan(positive.calibratedVariance.variance);
  });
  test('只读账本快照保留所有挂单，包括300条历史窗口之外的挂单；不调用save',async()=>{

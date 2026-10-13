@@ -1,0 +1,627 @@
+{
+  "version": 1,
+  "method": "Earliest two thirds of complete five-minute sessions train; remaining sessions are holdout. Conditional variance coefficients fitted on deseasonalized open-close returns. One-minute conversion is a bounded persistence approximation, not an exact temporal aggregation.",
+  "profiles": {
+    "CN|半导体": {
+      "alpha": 0.16,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.08999999999999997,
+      "wickScale": 0.5138644242272743,
+      "trainBars": 1042,
+      "holdoutBars": 568
+    },
+    "HK|半导体": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.06000000000000005,
+      "wickScale": 0.5538536962440197,
+      "trainBars": 1716,
+      "holdoutBars": 858
+    },
+    "US|半导体": {
+      "alpha": 0.06,
+      "beta": 0.9,
+      "gamma": 0,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.5424292231186542,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|人工智能": {
+      "alpha": 0.06,
+      "beta": 0.9,
+      "gamma": 0,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.5234670022247578,
+      "trainBars": 1035,
+      "holdoutBars": 565
+    },
+    "HK|人工智能": {
+      "alpha": 0.06,
+      "beta": 0.9,
+      "gamma": 0,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.8684352657870238,
+      "trainBars": 1716,
+      "holdoutBars": 858
+    },
+    "US|人工智能": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.06000000000000005,
+      "wickScale": 0.6131938321330855,
+      "trainBars": 2026,
+      "holdoutBars": 1014
+    },
+    "CN|软件与云服务": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.06000000000000005,
+      "wickScale": 0.6632712626017044,
+      "trainBars": 1041,
+      "holdoutBars": 568
+    },
+    "HK|软件与云服务": {
+      "alpha": 0.06,
+      "beta": 0.9,
+      "gamma": 0,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.3727236217195134,
+      "trainBars": 1716,
+      "holdoutBars": 857
+    },
+    "US|软件与云服务": {
+      "alpha": 0.06,
+      "beta": 0.9,
+      "gamma": 0,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.5467051239557795,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|游戏与互动娱乐": {
+      "alpha": 0.06,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.10000000000000009,
+      "wickScale": 0.5821344569205387,
+      "trainBars": 1034,
+      "holdoutBars": 563
+    },
+    "HK|游戏与互动娱乐": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.15000000000000002,
+      "wickScale": 0.5978939001818797,
+      "trainBars": 1716,
+      "holdoutBars": 859
+    },
+    "US|游戏与互动娱乐": {
+      "alpha": 0.06,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.18999999999999995,
+      "wickScale": 0.49297616771767944,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|传媒与文娱": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0.08,
+      "omega": 0.020000000000000018,
+      "wickScale": 0.252805719843337,
+      "trainBars": 1034,
+      "holdoutBars": 564
+    },
+    "HK|传媒与文娱": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.06000000000000005,
+      "wickScale": 0.3031244254936993,
+      "trainBars": 1716,
+      "holdoutBars": 854
+    },
+    "US|传媒与文娱": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.15000000000000002,
+      "wickScale": 0.5171089777626494,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|硬件与家电": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.15000000000000002,
+      "wickScale": 0.45869359838226703,
+      "trainBars": 1035,
+      "holdoutBars": 565
+    },
+    "HK|硬件与家电": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.15000000000000002,
+      "wickScale": 0.5911463498645341,
+      "trainBars": 1716,
+      "holdoutBars": 858
+    },
+    "US|硬件与家电": {
+      "alpha": 0.16,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.08999999999999997,
+      "wickScale": 0.529306057547368,
+      "trainBars": 2027,
+      "holdoutBars": 1014
+    },
+    "CN|互联网与电商": {
+      "alpha": 0.03,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.21999999999999997,
+      "wickScale": 0.9253567615341896,
+      "trainBars": 1025,
+      "holdoutBars": 561
+    },
+    "HK|互联网与电商": {
+      "alpha": 0.06,
+      "beta": 0.9,
+      "gamma": 0,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.5602962718832675,
+      "trainBars": 1716,
+      "holdoutBars": 858
+    },
+    "US|互联网与电商": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.15000000000000002,
+      "wickScale": 0.5619995051220434,
+      "trainBars": 2027,
+      "holdoutBars": 1014
+    },
+    "CN|新能源与电池": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0.04,
+      "omega": 0.13,
+      "wickScale": 0.4859275961557883,
+      "trainBars": 1034,
+      "holdoutBars": 564
+    },
+    "HK|新能源与电池": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.15000000000000002,
+      "wickScale": 0.549413683228576,
+      "trainBars": 1716,
+      "holdoutBars": 858
+    },
+    "US|新能源与电池": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.15000000000000002,
+      "wickScale": 0.5251539765960153,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|汽车与出行": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.06000000000000005,
+      "wickScale": 0.5579751181248589,
+      "trainBars": 1041,
+      "holdoutBars": 567
+    },
+    "HK|汽车与出行": {
+      "alpha": 0.16,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.08999999999999997,
+      "wickScale": 0.3889476968550172,
+      "trainBars": 1716,
+      "holdoutBars": 858
+    },
+    "US|汽车与出行": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0.04,
+      "omega": 0.13,
+      "wickScale": 0.564421911524721,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|银行": {
+      "alpha": 0.03,
+      "beta": 0.75,
+      "gamma": 0.04,
+      "omega": 0.19999999999999996,
+      "wickScale": 0.6201769391632018,
+      "trainBars": 1027,
+      "holdoutBars": 563
+    },
+    "HK|银行": {
+      "alpha": 0.06,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.18999999999999995,
+      "wickScale": 0.7323488903476917,
+      "trainBars": 1716,
+      "holdoutBars": 858
+    },
+    "US|银行": {
+      "alpha": 0.06,
+      "beta": 0.84,
+      "gamma": 0.08,
+      "omega": 0.06000000000000005,
+      "wickScale": 0.5167957483971831,
+      "trainBars": 2027,
+      "holdoutBars": 1014
+    },
+    "CN|保险": {
+      "alpha": 0.06,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.10000000000000009,
+      "wickScale": 0.6063761076695554,
+      "trainBars": 1040,
+      "holdoutBars": 567
+    },
+    "HK|保险": {
+      "alpha": 0.03,
+      "beta": 0.9,
+      "gamma": 0.08,
+      "omega": 0.029999999999999916,
+      "wickScale": 0.38837656533737813,
+      "trainBars": 1716,
+      "holdoutBars": 858
+    },
+    "US|保险": {
+      "alpha": 0.03,
+      "beta": 0.94,
+      "gamma": 0,
+      "omega": 0.030000000000000027,
+      "wickScale": 0.40110883964174127,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|券商与金融科技": {
+      "alpha": 0.06,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.18999999999999995,
+      "wickScale": 0.5378230363475771,
+      "trainBars": 1040,
+      "holdoutBars": 567
+    },
+    "HK|券商与金融科技": {
+      "alpha": 0.06,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.10000000000000009,
+      "wickScale": 0.45626425111517266,
+      "trainBars": 1716,
+      "holdoutBars": 858
+    },
+    "US|券商与金融科技": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0.04,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.4633674436993849,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|医药与生物": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0.04,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.41865569831598815,
+      "trainBars": 1042,
+      "holdoutBars": 567
+    },
+    "HK|医药与生物": {
+      "alpha": 0.06,
+      "beta": 0.9,
+      "gamma": 0,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.5843725857033791,
+      "trainBars": 1716,
+      "holdoutBars": 858
+    },
+    "US|医药与生物": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.15000000000000002,
+      "wickScale": 0.6242297097298772,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|医疗器械与服务": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.15000000000000002,
+      "wickScale": 0.49715437873561286,
+      "trainBars": 1034,
+      "holdoutBars": 564
+    },
+    "HK|医疗器械与服务": {
+      "alpha": 0.03,
+      "beta": 0.94,
+      "gamma": 0,
+      "omega": 0.030000000000000027,
+      "wickScale": 0.4456736894797272,
+      "trainBars": 1708,
+      "holdoutBars": 856
+    },
+    "US|医疗器械与服务": {
+      "alpha": 0.06,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.18999999999999995,
+      "wickScale": 0.5371287673074756,
+      "trainBars": 2027,
+      "holdoutBars": 1014
+    },
+    "CN|食品饮料": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.06000000000000005,
+      "wickScale": 0.5003047708015629,
+      "trainBars": 1041,
+      "holdoutBars": 568
+    },
+    "HK|食品饮料": {
+      "alpha": 0.06,
+      "beta": 0.9,
+      "gamma": 0,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.27046050946612676,
+      "trainBars": 1716,
+      "holdoutBars": 855
+    },
+    "US|食品饮料": {
+      "alpha": 0.06,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.18999999999999995,
+      "wickScale": 0.5447175567577927,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|零售与消费": {
+      "alpha": 0.06,
+      "beta": 0.75,
+      "gamma": 0.04,
+      "omega": 0.16999999999999993,
+      "wickScale": 0.05,
+      "trainBars": 908,
+      "holdoutBars": 486
+    },
+    "HK|零售与消费": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0.04,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.27146960734311776,
+      "trainBars": 1716,
+      "holdoutBars": 858
+    },
+    "US|零售与消费": {
+      "alpha": 0.06,
+      "beta": 0.9,
+      "gamma": 0,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.531285009090184,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|能源与煤炭": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0.04,
+      "omega": 0.13,
+      "wickScale": 0.8084765945228407,
+      "trainBars": 1041,
+      "holdoutBars": 567
+    },
+    "HK|能源与煤炭": {
+      "alpha": 0.06,
+      "beta": 0.75,
+      "gamma": 0.08,
+      "omega": 0.1499999999999999,
+      "wickScale": 0.8112934214822037,
+      "trainBars": 1716,
+      "holdoutBars": 855
+    },
+    "US|能源与煤炭": {
+      "alpha": 0.06,
+      "beta": 0.75,
+      "gamma": 0.04,
+      "omega": 0.16999999999999993,
+      "wickScale": 0.5289443519029751,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|有色与材料": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.06000000000000005,
+      "wickScale": 0.44004214686483256,
+      "trainBars": 1040,
+      "holdoutBars": 568
+    },
+    "HK|有色与材料": {
+      "alpha": 0.06,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.10000000000000009,
+      "wickScale": 0.39537355703504584,
+      "trainBars": 1716,
+      "holdoutBars": 848
+    },
+    "US|有色与材料": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.06000000000000005,
+      "wickScale": 0.4893326067503271,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|工业与军工": {
+      "alpha": 0.03,
+      "beta": 0.75,
+      "gamma": 0.04,
+      "omega": 0.19999999999999996,
+      "wickScale": 0.539716324466643,
+      "trainBars": 1041,
+      "holdoutBars": 567
+    },
+    "HK|工业与军工": {
+      "alpha": 0.06,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.18999999999999995,
+      "wickScale": 0.45037760259040205,
+      "trainBars": 1698,
+      "holdoutBars": 797
+    },
+    "US|工业与军工": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.06000000000000005,
+      "wickScale": 0.5660886485673233,
+      "trainBars": 2027,
+      "holdoutBars": 1014
+    },
+    "CN|地产与基建": {
+      "alpha": 0.06,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.18999999999999995,
+      "wickScale": 0.9023987361483528,
+      "trainBars": 1026,
+      "holdoutBars": 563
+    },
+    "HK|地产与基建": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0.04,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.42446079995807345,
+      "trainBars": 1716,
+      "holdoutBars": 857
+    },
+    "US|地产与基建": {
+      "alpha": 0.06,
+      "beta": 0.9,
+      "gamma": 0,
+      "omega": 0.040000000000000036,
+      "wickScale": 0.4465073636697613,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|公用事业": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.15000000000000002,
+      "wickScale": 0.6143260630925077,
+      "trainBars": 1041,
+      "holdoutBars": 568
+    },
+    "HK|公用事业": {
+      "alpha": 0.06,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.10000000000000009,
+      "wickScale": 0.6071895152227708,
+      "trainBars": 1688,
+      "holdoutBars": 841
+    },
+    "US|公用事业": {
+      "alpha": 0.06,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.10000000000000009,
+      "wickScale": 0.5626411681289055,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|通信与网络": {
+      "alpha": 0.06,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.18999999999999995,
+      "wickScale": 0.9869463624642206,
+      "trainBars": 1043,
+      "holdoutBars": 568
+    },
+    "HK|通信与网络": {
+      "alpha": 0.1,
+      "beta": 0.84,
+      "gamma": 0,
+      "omega": 0.06000000000000005,
+      "wickScale": 0.7040260928747126,
+      "trainBars": 1716,
+      "holdoutBars": 857
+    },
+    "US|通信与网络": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0.04,
+      "omega": 0.13,
+      "wickScale": 0.49280927161855304,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    },
+    "CN|航空航运与物流": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.15000000000000002,
+      "wickScale": 0.9150250020306773,
+      "trainBars": 1049,
+      "holdoutBars": 569
+    },
+    "HK|航空航运与物流": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.15000000000000002,
+      "wickScale": 0.4056816978988557,
+      "trainBars": 1706,
+      "holdoutBars": 846
+    },
+    "US|航空航运与物流": {
+      "alpha": 0.1,
+      "beta": 0.75,
+      "gamma": 0,
+      "omega": 0.15000000000000002,
+      "wickScale": 0.43809123797642746,
+      "trainBars": 2028,
+      "holdoutBars": 1014
+    }
+  }
+}

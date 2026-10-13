@@ -14,12 +14,12 @@ import * as market_maker_1 from './market-maker';
 import * as fundamentals_1 from './fundamentals';
 import * as ai_opponents_1 from './ai-opponents';
 import { gameTradingTime, tradingMinutesFor } from '../../common/data/trading-calendar';
-import { calibratedShock, heavyTail, unifiedInstruments } from '../../common/unified-market';
+import { calibratedShock, heavyTail, unifiedInstruments, intrabarRange } from '../../common/unified-market';
 import { HISTORY_CACHE_LIMITS, restoreHistoryCache, persistCandleBatches } from './history-cache';
 import { aiEntryScore, aiPolicyDirection, aiPortfolioRisk } from './ai-risk-policy';
 import { dailyFactorDrift, dailyValueDrift } from './price-drift';
 import { MarketRuntimeStore, encodeAiLedger, decodeAiLedger } from './runtime-state';
-import { calibratedVolume, modeledFloatShares } from '../../common/volume-model';
+import { calibratedVolume, modeledFloatShares, eventVolumeIncrement } from '../../common/volume-model';
 import { fiveMinuteHistory } from './candle-aggregation';
 
 // R5-⑧ 做市商库存风控阈值（每个做市商 / 每只标的的净库存上下限，单位：股）：
@@ -450,7 +450,7 @@ export class MarketDataService {
         // 恢复/生成后：确保最新价格作为开盘基准
         for (const st of this.stocks.values()) {
             const last = st.klineDaily[st.klineDaily.length - 1];
-            if (!savedRuntime && last && st.dayOpen === st.price) {
+            if (!savedRuntime && historyCount > 0 && last && st.dayOpen === st.price) {
                 st.price = last.close;
                 st.prevClose = last.close;
                 st.prevTickPrice = last.close;
@@ -886,6 +886,7 @@ export class MarketDataService {
         if (dir < 0 && stock.industry) {
             this.checkSellTrigger(stock.industry);
         }
+        const previousFillPrice = Number(stock.price);
         let newPrice = Math.max(0.5, stock.price * (1 + dir * impact));
         // P1-14: 冲击后成交价必须受涨跌停夹紧——原实现直接写回，同 tick 多笔成交可叠加越带，
         // 成交价越界会让日高/日低与前端涨跌幅失真（基准与引擎/委托校验同源）
@@ -894,6 +895,8 @@ export class MarketDataService {
             newPrice = this.clamp(newPrice, band.down, band.up);
         stock.price = newPrice;
         // P1-14: 成交价计入日内高低（原实现只有 generateTick 的随机行情进 dayHigh/dayLow）
+        stock.prevTickPrice = newPrice;
+        stock.lastReturn = newPrice / previousFillPrice - 1;
         if (!Number.isFinite(Number(stock.dayHigh)) || stock.price > Number(stock.dayHigh))
             stock.dayHigh = stock.price;
         if (!Number.isFinite(Number(stock.dayLow)) || stock.price < Number(stock.dayLow))
@@ -1655,6 +1658,14 @@ export class MarketDataService {
             };
         }
         const k5 = stock.current5min;
+        const range = unifiedInstruments.has(stock.symbol)
+            ? intrabarRange(stock, this.market, tradingMinutesFor(this.market), k1.open, price, this.randn.bind(this))
+            : {high:Math.max(k1.open,price),low:Math.min(k1.open,price)};
+        const band = this.cnBandOf?.(stock);
+        k1.high = Math.max(k1.high, band ? Math.min(band.up, range.high) : range.high);
+        k1.low = Math.min(k1.low, band ? Math.max(band.down, range.low) : range.low);
+        stock.dayHigh = Math.max(stock.dayHigh, k1.high);
+        stock.dayLow = Math.min(stock.dayLow, k1.low);
         k5.high = Math.max(k5.high, k1.high);
         k5.low = Math.min(k5.low, k1.low);
         k5.close = price;
@@ -2351,11 +2362,21 @@ export class MarketDataService {
         stock.prevTickPrice = next;
         stock.dayHigh = Math.max(Number(stock.dayHigh) || next, next);
         stock.dayLow = Math.min(Number(stock.dayLow) || next, next);
+        // Closed-session events affect the next opening, not the previous bar's
+        // volume. During a minute, keep all observable aggregates consistent.
+        const extra = stock.current1min ? eventVolumeIncrement(stock, this.market, tradingMinutesFor(this.market), before, next) : 0;
+        if (extra) {
+            stock.lastVolume = (Number(stock.lastVolume) || 0) + extra;
+            stock.dayVolume = (Number(stock.dayVolume) || 0) + extra;
+            stock.dayAmount = (Number(stock.dayAmount) || 0) + extra * (before + next) / 2;
+            stock.lastAmount = (Number(stock.lastAmount) || 0) + extra * (before + next) / 2;
+        }
         for (const bar of [stock.current1min, stock.current5min, stock.currentDaily]) {
             if (!bar) continue;
             bar.close = next;
             bar.high = Math.max(Number(bar.high) || next, next);
             bar.low = Math.min(Number(bar.low) || next, next);
+            bar.volume = (Number(bar.volume) || 0) + extra;
         }
     }
     // ─── P3 财报基本面模型：按个股披露日历触发；surprise = 披露增速 vs 分析师一致预期 ───

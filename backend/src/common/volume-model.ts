@@ -16,7 +16,7 @@ export function calibratedVolume(stock: any, market: string, length: number, nor
     const shock = clamp(phi * previous + sigma * Math.sqrt(1 - phi * phi) * normal(), -2.5, 2.5);
     stock.volumeState = { shock };
     const instrument = unifiedInstruments.get(stock.symbol);
-    const minuteSigma = Math.max(.0001, Number(stock.volatility || .02) * (instrument?.riskProfile?.intradayFraction ?? .8)
+    const minuteSigma = Math.max(.0001, Number(instrument?.volatility || stock.volumeReferenceVolatility || .02) * (instrument?.riskProfile?.intradayFraction ?? .8)
         / Math.sqrt(length) * activity(minute, length, market));
     const standardizedMove = Math.min(6, Math.abs(Number(stock.lastReturn) || 0) / minuteSigma);
     const beta = clamp(profile.minuteVolumeReturnBeta ?? profile.volumeReturnBeta * .5, 0, 1.2);
@@ -31,6 +31,20 @@ export function calibratedVolume(stock: any, market: string, length: number, nor
     const multiplier = eventActivity * Math.exp(clamp(shock - .5 * sigma * sigma + beta * (standardizedMove - .8), -3, 3));
     const base = Math.max(1, Number(stock.baseVolume) || 10000);
     return Math.max(0, Math.round(base * seasonal * multiplier));
+}
+
+export function eventVolumeIncrement(stock: any, market: string, length: number, before: number, after: number) {
+    const profile=volumeProfile(stock,market);
+    if(!profile||!(before>0)||!(after>0)||after===before)return 0;
+    const instrument=unifiedInstruments.get(stock.symbol);
+    const sigma=Math.max(.0001,Number(instrument?.volatility||stock.volumeReferenceVolatility||.02)
+        *(instrument?.riskProfile?.intradayFraction??.8)/Math.sqrt(length));
+    const z=Math.min(6,Math.abs(Math.log(after/before))/sigma);
+    const beta=clamp(profile.minuteVolumeReturnBeta??profile.volumeReturnBeta*.5,0,1.2);
+    const weights=calibration.marketSeasonality[market];
+    const minute=clamp(Number(stock.minuteCounter)||0,0,length-1);
+    const seasonal=weights?.[Math.min(11,Math.floor(minute/length*12))]||1;
+    return Math.max(0,Math.round((Number(stock.baseVolume)||10000)*seasonal*Math.min(4,Math.expm1(beta*z))));
 }
 export function modeledFloatShares(stock: any, market: string, length: number) {
     const profile = volumeProfile(stock, market);
