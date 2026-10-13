@@ -9,10 +9,10 @@ import { RuleError } from '../../packages/domain/types';
 export class UnifiedController {
   constructor(@Inject('AUTH') readonly auth:AuthBridge,@Inject('LEDGER') readonly ledger:UnifiedLedger){}
   private realm(value:unknown){try{return marketId(value);}catch{throw new BadRequestException('请选择有效区服');}}
-  private async player(request:any){const token=tokenFrom(request);const p=await this.auth.authenticate(token);return {token,p};}
+  private async player(request:any){const token=tokenFrom(request);const p=await this.auth.authenticate(token,String(request.headers.cookie??''));return {token,p};}
   private session(session:{token:string;principal:Principal},response:any){
     response.setHeader('Cache-Control','no-store');
-    response.setHeader('Set-Cookie',`rgp-role-${session.principal.market}=${session.token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${session.principal.mode==='site'?600:86400}${process.env.REMASTER_COOKIE_SECURE==='true'?'; Secure':''}`);
+    response.setHeader('Set-Cookie',`rgp-role-${session.principal.market}=${session.token}; Path=/; HttpOnly; SameSite=Strict${session.principal.rememberMe?'; Max-Age=604800':''}${process.env.REMASTER_COOKIE_SECURE==='true'?'; Secure':''}`);
     return {...session.principal,token:session.token};
   }
   @Get('config') config(){return {protocolVersion:2,sandbox:false,unified:true,mode:'real',version:'2.0.0',siteLogin:'https://bobbycn.cc/login/'};}
@@ -22,18 +22,20 @@ export class UnifiedController {
   @Post('auth/register') async register(@Body() body:any,@Req() request:any,@Res({passthrough:true}) response:any){return this.credentials(true,body,request,response);}
   private async credentials(register:boolean,body:any,request:any,response:any){
     this.auth.assertOrigin(request.headers.origin);const market=this.realm(body?.market);
+    if(body?.rememberMe!==undefined&&typeof body.rememberMe!=='boolean')throw new BadRequestException('记住我选项无效');
     if(typeof body.username!=='string'||body.username.trim().length<2||body.username.length>50||typeof body.password!=='string'||body.password.length<1||body.password.length>200)throw new BadRequestException('请输入有效账密');
     if(register&&(body.password.length<8||Buffer.byteLength(body.password,'utf8')>72))throw new BadRequestException('密码至少8位，不超过72个UTF-8字节');
-    const result=await this.auth.request('/api/auth/'+(register?'register':'login'),{username:body.username.trim(),password:body.password},undefined,undefined,request.ip);
+    const result=await this.auth.request('/api/auth/'+(register?'register':'login'),{username:body.username.trim(),password:body.password,...(body.rememberMe===true?{rememberMe:true}:{})},undefined,undefined,request.ip);
     if(!result.token)throw new BadRequestException(result.error??'注册失败');
-    return this.session(await this.auth.createGameSession(result.token,market),response);
+    return this.session(await this.auth.createGameSession(result.token,market,body.rememberMe===true),response);
   }
   @Post('auth/site-session') async site(@Body() body:any,@Req() request:any,@Res({passthrough:true}) response:any){
-    this.auth.assertOrigin(request.headers.origin);const market=this.realm(body?.market);const cookie=String(request.headers.cookie??'');
+    this.auth.assertOrigin(request.headers.origin);const market=this.realm(body?.market);
+    if(body?.rememberMe!==undefined&&typeof body.rememberMe!=='boolean')throw new BadRequestException('记住我选项无效');const cookie=String(request.headers.cookie??'');
     const linked=await this.auth.request('/api/auth/site-session',{create:body?.create===true},cookie);
     if(linked.needsAccountSetup)return {needsAccountSetup:true,identity:linked.identity};
     if(!linked.token||!linked.user?.id)throw new BadRequestException('请先登录站点账号');
-    return this.session(await this.auth.createSiteSession(linked.token,market,linked.user.username,'game:'+linked.user.id),response);
+    return this.session(await this.auth.createSiteSession(linked.token,market,linked.user.username,'game:'+linked.user.id,body.rememberMe===true),response);
   }
   @Post('auth/site-link') async link(@Body() body:any,@Req() request:any){
     this.auth.assertOrigin(request.headers.origin);
@@ -41,7 +43,7 @@ export class UnifiedController {
     await this.auth.request('/api/auth/site-link',{username:body.username,password:body.password},String(request.headers.cookie??''));return {success:true};
   }
   @Post('auth/logout') async logout(@Req() request:any,@Res({passthrough:true}) response:any){
-    this.auth.assertOrigin(request.headers.origin);const token=tokenFrom(request);let market='CN';try{market=(await this.auth.authenticate(token)).market;}catch{}this.auth.revoke(token);
+    this.auth.assertOrigin(request.headers.origin);const token=tokenFrom(request);let market=['CN','HK','US'].includes(request.headers['x-game-realm'])?request.headers['x-game-realm']:'CN';try{market=(await this.auth.authenticate(token)).market;}catch{}this.auth.revoke(token);
     response.setHeader('Set-Cookie',`rgp-role-${market}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${process.env.REMASTER_COOKIE_SECURE==='true'?'; Secure':''}`);return {success:true};
   }
   @Get('state') async state(@Req() request:any){const {token,p}=await this.player(request);return this.ledger.snapshot(token,p);}

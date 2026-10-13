@@ -35,7 +35,9 @@ Sign in with a game username/password or a linked site account. Choose a realm w
 
 New characters start with **100,000 units of their realm's simulated currency**. Commissions, taxes, borrowing costs, collateral, and liquidation checks are game rules calculated by the backend, not a statement of current brokerage or exchange requirements.
 
-The hosted game uses continuous simulation: one real minute advances one trading minute, even outside real exchange hours. The backend also supports exchange-calendar operation, including US daylight saving. These modes use different clocks; simulated days are not real calendar days.
+The hosted game follows real exchange dates and sessions: CN 09:30–11:30 / 13:00–15:00 (China time), HK 09:30–12:00 / 13:00–16:00 (Hong Kong time), and US 09:30–16:00 (New York time). Weekends, configured exchange holidays, 2026 half-day closures, and US daylight saving apply. New candles use actual timestamps; existing simulated history is preserved. Internal trading-day counters remain separate for settlement. Continuous or accelerated replay is an explicit development mode.
+
+“Remember me” keeps the selected realm signed in for up to **7 days**. The browser stores a secure HttpOnly role cookie, never the password. Remembered roles survive adapter restarts; signing out revokes that role session immediately. Site login remains subject to the parent site session being valid.
 
 ## Market simulation
 
@@ -65,7 +67,7 @@ Use Node.js 22 or 24 with npm. SQLite uses native `better-sqlite3` bindings; rei
 
 From the repository root, copy `backend/.env.example` to `backend/.env`. Set your own `JWT_SECRET`, `JWT_REFRESH_SECRET`, and `ADMIN_PASSWORD`; do not use the example placeholders or production credentials.
 
-For local continuous simulation, use these settings:
+For local exchange-calendar operation, use these settings:
 
 ```dotenv
 NODE_ENV=development
@@ -74,7 +76,7 @@ DB_SYNCHRONIZE=true
 PORT=8000
 TICK_INTERVAL_MS=60000
 SANDBOX_FAST=false
-FORMAL_CONTINUOUS_SIMULATION=true
+FORMAL_CONTINUOUS_SIMULATION=false
 ```
 
 `DB_SYNCHRONIZE=true` initializes a local development database. Manage production schema changes through reviewed migrations instead.
@@ -108,7 +110,7 @@ Open **[http://127.0.0.1:8321](http://127.0.0.1:8321)**. Select **Game account**
 | `SQLITE_PATH` | Backend ledger database; development default: `./data/stockgame.db` |
 | `TICK_INTERVAL_MS` | Real milliseconds per trading minute; normal pace: `60000` |
 | `SANDBOX_FAST` | Explicit opt-in for accelerated sandbox timing |
-| `FORMAL_CONTINUOUS_SIMULATION` | Run the production engine continuously rather than restricting it to exchange sessions |
+| `FORMAL_CONTINUOUS_SIMULATION` | Default `false`: real exchange sessions; `true` explicitly enables continuous development replay |
 | `REMASTER_IDENTITY_URL` | Adapter's backend/auth service URL; default: `http://127.0.0.1:8000` |
 | `REMASTER_PORT` | Unified service port; default: `8321` |
 | `REMASTER_ALLOWED_ORIGINS` | Comma-separated trusted browser origins |

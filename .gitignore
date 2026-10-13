@@ -4,6 +4,7 @@ dist/
 *.db-journal
 .env
 .DS_Store
+*.session-key
 *.log
 backend/data/
 

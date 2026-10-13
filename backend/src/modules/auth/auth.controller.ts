@@ -14,6 +14,10 @@ class SiteSessionDto {
 }
 
 class RegisterDto {
+    @IsOptional()
+    @IsBoolean()
+    rememberMe?: boolean;
+
     @IsString()
     @MinLength(2)
     @MaxLength(50)
@@ -26,6 +30,10 @@ class RegisterDto {
 }
 
 class LoginDto {
+    @IsOptional()
+    @IsBoolean()
+    rememberMe?: boolean;
+
     @IsString()
     @MinLength(2)
     @MaxLength(50)
@@ -84,7 +92,7 @@ export class AuthController {
 
     @Post('register')
     async register(@Body() dto: RegisterDto) {
-        return this.authService.register(dto.username, dto.password);
+        return dto.rememberMe === true ? this.authService.register(dto.username, dto.password, true) : this.authService.register(dto.username, dto.password);
     }
 
     @Post('login')
@@ -93,6 +101,6 @@ export class AuthController {
     // trust proxy 不在此处处理：main.ts 已按 TRUST_PROXY 统一 set('trust proxy')，开启后 req.ip
     // 才是 X-Forwarded-For 里的真实客户端 IP，否则为直连地址（本地/内网部署即直连地址）。
     async login(@Body() dto: LoginDto, @Req() req: any) {
-        return this.authService.login(dto.username, dto.password, req && req.ip);
+        return dto.rememberMe === true ? this.authService.login(dto.username, dto.password, req && req.ip, false, true) : this.authService.login(dto.username, dto.password, req && req.ip);
     }
 }

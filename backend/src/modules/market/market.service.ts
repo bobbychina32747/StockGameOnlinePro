@@ -8,7 +8,7 @@ import { RiskManagerService } from '../../core/risk-manager/risk-manager.service
 import { runBacktest } from '../../core/backtest/backtest-engine';
 import { BotPlayerService } from '../bots/bot-player.service';
 import { TIMEOUT, withTimeout } from '../../common/with-timeout';
-import { marketDateFor, marketSessionClosed, tradingMinuteIndex, tradingMinutesFor } from '../../common/data/trading-calendar';
+import { marketDateFor, marketSessionClosed, tradingMinuteIndex, tradingMinutesFor, realMarketClock } from '../../common/data/trading-calendar';
 import { FundService } from '../fund/fund.service';
 
 // G-4: 机器人旁路动作的硬上界（ms）——超过即放弃本 tick 的机器人动作，保证行情 tick 一定能往下走
@@ -196,6 +196,17 @@ export class MarketService {
                 }
             }
         }
+        if(this.tickIntervalMs===60000&&!this.debugMode.isMarketActive()) {
+            for(const [market,md] of [['CN',this.marketData],['HK',this.marketDataHK],['US',this.marketDataUS]] as const) {
+                const saved=md?.calendarState;
+                if(saved?.date)this.activeTradingDays[market]=saved.date;
+                if(saved?.closing)this.closingDays[market]=saved.closing;
+                if(saved?.closedDate)this.closedTradingDays[market]=saved.closedDate;
+                if(saved?.processedMinute)this.processedMinutes[market]=saved.processedMinute;
+                if(saved?.initializedDay!=null)this.initializedGameDays[market]=saved.initializedDay;
+                if(saved?.lastAuctionDay!=null)this.lastAuctionDay[market]=saved.lastAuctionDay;
+            }
+        }
         // B1 用户成交 → 行情引擎回调（价格冲击 + 成交量并入当前K线）
         this.engine.setUserFillHook((fill) => {
             try {
@@ -230,16 +241,18 @@ export class MarketService {
         try {
             const now = new Date();
             const realTime = this.tickIntervalMs === 60000 && !this.debugMode.isMarketActive();
-            const date = marketDateFor(market, now);
-            const tradingDay = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+            const calendar=realMarketClock(market,now);
+            const tradingDay=calendar.date;
             if (this.closingDays[market]) {
                 await this.finishMarketDay(market, marketData);
                 if (realTime && this.activeTradingDays[market]) this.closedTradingDays[market] = this.activeTradingDays[market];
+                if(marketData.calendarState){marketData.calendarState.closedDate=this.activeTradingDays[market];await marketData.persistRuntimeState?.(this[counterKey]||0,true);}
             }
             if (realTime && this.activeTradingDays[market] && this.closedTradingDays[market] !== this.activeTradingDays[market]
-                && (this.activeTradingDays[market] !== tradingDay || marketSessionClosed(market, now))) {
+                && (this.activeTradingDays[market] !== tradingDay || calendar.sessionClosed)) {
                 await this.finishMarketDay(market, marketData);
                 this.closedTradingDays[market] = this.activeTradingDays[market];
+                if(marketData.calendarState){marketData.calendarState.closedDate=this.activeTradingDays[market];await marketData.persistRuntimeState?.(this[counterKey]||0,true);}
             }
             // Phase B P1: 盘后固定价格交易窗口（仅 A 股 15:00-15:30）——不生成行情，下单由 HTTP 路径即时撮合；
             // 跨过 15:30 后一次性撤销未成交盘后申报（每天一次，按 gameDay 防重入）
@@ -263,6 +276,7 @@ export class MarketService {
             }
             // P1 三阶段集合竞价（仅 A 股 9:15-9:30）：整个窗口不生成连续行情
             // 9:15-9:20 可申报可撤单 / 9:20-9:25 可申报不可撤 / 9:25-9:30 撮合（每天仅一次，9:25 起执行）
+            if(realTime&&['auction-open','auction-locked','pre-open'].includes(calendar.phase))await marketData.bindCalendarDate?.(tradingDay);
             const auctionStage = constants_1.auctionStageFor(market);
             if (!this.debugMode.isMarketActive() && auctionStage) {
                 if (auctionStage === 'matching') {
@@ -279,12 +293,13 @@ export class MarketService {
                 return;
             }
             if (realTime) {
-                const minute = tradingMinuteIndex(market, now);
+                const minute = calendar.minute;
                 if (minute === null || this.closedTradingDays[market] === tradingDay) return;
                 const key = `${tradingDay}:${minute}`;
                 if (this.processedMinutes[market] === key) return;
                 this.processedMinutes[market] = key;
                 this.activeTradingDays[market] = tradingDay;
+                await marketData.bindCalendarDate?.(tradingDay);
                 this[counterKey] = minute;
             }
             marketData.setTradingMinute?.(this[counterKey] || 0);
@@ -441,7 +456,10 @@ export class MarketService {
             if (advanceCounter) {
                 const c = this[counterKey] || 0;
                 this[counterKey] = (c + 1) % tradingMinutesFor(market);
-                try { await marketData.persistRuntimeState?.(this[counterKey], this[counterKey] === 0); }
+                try {
+                    if(this.tickIntervalMs===60000&&!this.debugMode.isMarketActive()&&marketData.calendarState)Object.assign(marketData.calendarState,{processedMinute:this.processedMinutes[market],initializedDay:this.initializedGameDays[market],lastAuctionDay:this.lastAuctionDay[market]});
+                    await marketData.persistRuntimeState?.(this[counterKey], this[counterKey] === 0);
+                }
                 catch (e) { this.logger.error('行情与 AI 账本保存失败: ' + e.message); }
             }
         }
@@ -449,6 +467,8 @@ export class MarketService {
 
     private async finishMarketDay(market: string, marketData: MarketDataService) {
         const closing = this.closingDays[market] ||= { day: marketData.gameDay, prices: marketData.getPrices(), advanced: false };
+        const realTime=this.tickIntervalMs===60000&&!this.debugMode.isMarketActive();
+        if(realTime&&marketData.calendarState){marketData.calendarState.closing=closing;await marketData.persistRuntimeState?.(0,true);}
         const closePrices = closing.prices;
         if (market === 'CN' && this.funds) {
             await this.funds.updateNavs(closing.day + 1, closePrices);
@@ -462,9 +482,10 @@ export class MarketService {
         }
         await this.timeStage(`${market}:dayEnd`, () => marketData.endOfDay());
         closing.advanced = true;
+        if(realTime&&marketData.calendarState)await marketData.persistRuntimeState?.(0,true);
         const nightEvent = this.newsService.processNightEvent();
         if (nightEvent && nightEvent.impact !== 0) {
-            marketData.applyMarketwideShock(nightEvent.impact);
+            if(realTime)marketData.applyCalendarNightShock?.(nightEvent.impact);else marketData.applyMarketwideShock(nightEvent.impact);
             this.enqueueNews(market, {
                 title: `🌙 ${nightEvent.name}`, description: `隔夜影响: ${(nightEvent.impact * 100).toFixed(1)}%`, type: 'night', impact: {}, duration: 1,
             });
@@ -495,6 +516,7 @@ export class MarketService {
         }
         this.logger.log(`📅 [${market}] 第 ${day} 个交易日结束`);
         delete this.closingDays[market];
+        if(realTime&&marketData.calendarState){delete marketData.calendarState.closing;marketData.calendarState.closedDate=this.activeTradingDays[market];await marketData.persistRuntimeState?.(0,true);}
     }
 
     // P4 修复：tick 节奏——调试模式（无视限制）休市期走 1s/tick 高速回放，
@@ -505,12 +527,12 @@ export class MarketService {
     }
 
     async startTickLoop() {
-        this.lastTickAt = Date.now();
+        this.lastTickAt = this.tickIntervalMs===60000&&!this.debugMode.isMarketActive()?Math.floor(Date.now()/60000)*60000-60000:Date.now();
         const tick = async () => {
             // P4 修复：动态节奏——到点才跑；休眠期最多每 5s 重算一次 delay，
             // 调试模式开关/开盘时刻切换后 5s 内生效（旧实现要等满上一个 60s 定时器）
             const delay = this.tickDelay();
-            const elapsed = Date.now() - this.lastTickAt;
+            const elapsed = this.tickIntervalMs===60000&&!this.debugMode.isMarketActive()?Math.floor(Date.now()/60000)*60000-this.lastTickAt:Date.now()-this.lastTickAt;
             if (elapsed < delay) {
                 const wait = Math.min(Math.max(delay - elapsed, 500), 5000);
                 setTimeout(tick, wait);
@@ -521,7 +543,7 @@ export class MarketService {
                 return;
             }
             this.processing = true;
-            this.lastTickAt = Date.now();
+            this.lastTickAt = this.tickIntervalMs===60000&&!this.debugMode.isMarketActive()?Math.floor(Date.now()/60000)*60000:Date.now();
             this.tickStartedAt = Date.now(); // G-4: 看门狗基准
             const tickT0 = Date.now();
             try {
@@ -778,6 +800,7 @@ export class MarketService {
             HK: this.marketDataHK ? this.marketDataHK.getState() : null,
             US: this.marketDataUS ? this.marketDataUS.getState() : null,
         };
+        for(const market of ['CN','HK','US'] as const)if(cn.markets[market])cn.markets[market].clock={...realMarketClock(market),realtime:!this.debugMode.isMarketActive()&&this.tickIntervalMs===60000};
         return cn;
     }
 

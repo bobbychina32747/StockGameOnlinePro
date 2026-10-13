@@ -1,14 +1,15 @@
 import { createPublicKey, randomBytes, verify } from 'node:crypto';
 import { UnauthorizedException, ServiceUnavailableException, HttpException } from '@nestjs/common';
+import { RoleSessions, REMEMBER_SECONDS } from './role-sessions';
 import { MarketId, MARKETS } from '../../packages/domain/types';
-export interface Principal {owner:string;name:string;market:MarketId;token?:string;mode:'sandbox'|'site'|'game'}
+export interface Principal {owner:string;name:string;market:MarketId;token?:string;mode:'sandbox'|'site'|'game';rememberMe?:boolean}
 export interface AuthConfig {sandbox:boolean;identityBaseUrl:string;origin:string;allowedOrigins:string[]}
 export class AuthBridge {
   resolveOwner:(subject:string,market:MarketId,gameSubject?:string)=>string=(subject,market)=>subject+':'+market;
   private demos=new Map<string,{principal:Principal;expires:number}>();
-  private siteSessions=new Map<string,{principal:Principal;siteToken:string}>();
+  private siteSessions=new Map<string,{principal:Principal;siteToken:string;expires:number}>();
   private gameSessions=new Map<string,{principal:Principal;gameToken:string;expires:number}>();
-  constructor(readonly config:AuthConfig) {}
+  constructor(readonly config:AuthConfig, private readonly remembered?:RoleSessions) {}
   assertOrigin(origin?: string): void {if(origin&&!this.config.allowedOrigins.includes(origin)) throw new UnauthorizedException('请求来源不受信任');}
   createDemo(name: string,market:MarketId='CN'): {token:string;principal:Principal} {
     if(!this.config.sandbox) throw new UnauthorizedException('当前环境未开放沙盒账号');
@@ -17,31 +18,40 @@ export class AuthBridge {
     const token=randomBytes(32).toString('base64url');const principal:Principal={owner:'demo:'+randomBytes(12).toString('hex'),name,market,mode:'sandbox'};
     this.demos.set(token,{principal,expires:Date.now()+86400000});return {token,principal};
   }
-  async authenticate(token: string): Promise<Principal> {
+  async authenticate(token: string, cookie?:string): Promise<Principal> {
     if(!token||token.length>8192) throw new UnauthorizedException('请先登录');
+    if(!this.gameSessions.has(token)&&!this.siteSessions.has(token)){const saved=this.remembered?.load(token);if(saved?.principal?.mode==='game')this.gameSessions.set(token,saved);else if(saved?.principal?.mode==='site')this.siteSessions.set(token,saved);}
     const game=this.gameSessions.get(token);
     if(game) {
-      if(game.expires<=Date.now()) {this.gameSessions.delete(token);throw new UnauthorizedException('游戏会话已失效');}
+      if(game.expires<=Date.now()) {this.revoke(token);throw new UnauthorizedException('游戏会话已失效');}
       const profile=await this.request('/api/auth/game-profile',undefined,undefined,game.gameToken);
-      if(this.resolveOwner(profile.subject,game.principal.market,'game:'+profile.user.id)!==game.principal.owner) {this.gameSessions.delete(token);throw new UnauthorizedException('账号绑定已变化，请重新登录');}
+      if(this.resolveOwner(profile.subject,game.principal.market,'game:'+profile.user.id)!==game.principal.owner) {this.revoke(token);throw new UnauthorizedException('账号绑定已变化，请重新登录');}
       return game.principal;
     }
     if(this.config.sandbox) {const demo=this.demos.get(token);if(demo&&demo.expires>Date.now()) return demo.principal;throw new UnauthorizedException('沙盒会话已失效');}
     const session=this.siteSessions.get(token);if(!session) throw new UnauthorizedException('请重新选择区服角色登录');
+    if(session.expires<=Date.now()){this.revoke(token);throw new UnauthorizedException('站点角色会话已过期');}
+    const oldClaims=JSON.parse(Buffer.from(session.siteToken.split('.')[1],'base64url').toString('utf8'));
+    if(oldClaims.exp<=Date.now()/1000+60&&cookie){
+      const linked=await this.request('/api/auth/site-session',{create:false},cookie);
+      const claims=await this.verifySiteToken(linked.token);
+      if(claims.sub!==oldClaims.sub||claims.sid!==oldClaims.sid||this.resolveOwner('site:'+claims.sub,session.principal.market,'game:'+linked.user?.id)!==session.principal.owner){this.revoke(token);throw new UnauthorizedException('站点账号已变化，请重新登录');}
+      session.siteToken=linked.token;if(session.principal.rememberMe)this.remembered?.save(token,session,session.expires);
+    }
     await this.verifySiteToken(session.siteToken);return session.principal;
   }
-  async createSiteSession(siteToken:string,market:MarketId,name:string,gameSubject?:string):Promise<{token:string;principal:Principal}> {
+  async createSiteSession(siteToken:string,market:MarketId,name:string,gameSubject?:string,rememberMe=false):Promise<{token:string;principal:Principal}> {
     if(!MARKETS.includes(market)) throw new UnauthorizedException('请选择有效区服');
     const claims=await this.verifySiteToken(siteToken);const token=randomBytes(32).toString('base64url');
-    const principal:Principal={owner:this.resolveOwner('site:'+claims.sub,market,gameSubject),name,market,mode:'site'};
-    this.siteSessions.set(token,{principal,siteToken});return {token,principal};
+    const principal:Principal={owner:this.resolveOwner('site:'+claims.sub,market,gameSubject),name,market,mode:'site',rememberMe};
+    const entry={principal,siteToken,expires:Date.now()+(rememberMe?REMEMBER_SECONDS:86400)*1000};this.siteSessions.set(token,entry);if(rememberMe)this.remembered?.save(token,entry,entry.expires);return {token,principal};
   }
-  async createGameSession(gameToken:string,market:MarketId):Promise<{token:string;principal:Principal}> {
+  async createGameSession(gameToken:string,market:MarketId,rememberMe=false):Promise<{token:string;principal:Principal}> {
     if(!MARKETS.includes(market)||typeof gameToken!=='string'||gameToken.length>8192) throw new UnauthorizedException('游戏会话无效');
     const profile=await this.request('/api/auth/game-profile',undefined,undefined,gameToken);
     if(typeof profile.subject!=='string'||!profile.subject.match(/^(game|site):[A-Za-z0-9_-]{1,128}$/)||typeof profile.user?.username!=='string'||profile.user.isActive===false) throw new UnauthorizedException('游戏账号不可用');
-    const token=randomBytes(32).toString('base64url');const principal:Principal={owner:this.resolveOwner(profile.subject,market,'game:'+profile.user.id),name:profile.user.username,market,mode:'game'};
-    this.gameSessions.set(token,{principal,gameToken,expires:Date.now()+86400000});return {token,principal};
+    const token=randomBytes(32).toString('base64url');const principal:Principal={owner:this.resolveOwner(profile.subject,market,'game:'+profile.user.id),name:profile.user.username,market,mode:'game',rememberMe};
+    const entry={principal,gameToken,expires:Date.now()+(rememberMe?REMEMBER_SECONDS:86400)*1000};this.gameSessions.set(token,entry);if(rememberMe)this.remembered?.save(token,entry,entry.expires);return {token,principal};
   }
   async verifySiteToken(token: string): Promise<Record<string,any>> {
     try {
@@ -65,7 +75,7 @@ export class AuthBridge {
       if(!response.ok) throw new ServiceUnavailableException('账号服务暂不可用');return result;
     } catch(error) {if(error instanceof HttpException) throw error;throw new ServiceUnavailableException('无法连接账号服务');}
   }
-  revoke(token: string): void {this.demos.delete(token);this.siteSessions.delete(token);this.gameSessions.delete(token);}
+  revoke(token: string): void {this.remembered?.remove(token);this.demos.delete(token);this.siteSessions.delete(token);this.gameSessions.delete(token);}
 
   // Backend credentials stay on the server; the browser receives only an opaque role session.
   backendToken(token:string):string {

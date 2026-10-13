@@ -53,3 +53,6 @@ html,body,#root{height:100%;overflow:hidden;overscroll-behavior:none}
 
 .login-screen{height:100dvh;min-height:0;overflow:auto}.login-form .login-methods{margin:18px 0}.login-form .login-methods button{flex:1}.login-form form{gap:14px}.login-form .realm-selector{margin-top:18px}
 .capital-layout,.research-layout{display:grid;gap:16px}
+
+.exchange-clock{display:flex;flex-direction:column;gap:4px;white-space:nowrap;font-size:12px}.exchange-clock span{color:var(--muted)}
+@media(max-width:700px){.exchange-clock{font-size:10px}}

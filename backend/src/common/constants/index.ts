@@ -337,12 +337,9 @@ export function isAuctionTimeFor(mode, now?) {
 export function auctionStageFor(mode, now?) {
     if (mode !== 'CN')
         return null;
-    const d = now || new Date();
-    if (!CAL.CN.weekdays.includes(d.getDay()))
-        return null;
-    if (calendar_1.isMarketHoliday('CN', d))
-        return null;
-    const minutes = d.getHours() * 60 + d.getMinutes();
+    const local = calendar_1.exchangeParts('CN',now || new Date());
+    if(!calendar_1.isExchangeTradingDate('CN',local.date))return null;
+    const minutes=local.minute;
     if (minutes >= 555 && minutes < 560)
         return 'cancelable';
     if (minutes >= 560 && minutes < 565)
@@ -356,12 +353,9 @@ export function auctionStageFor(mode, now?) {
 export function afterHoursStageFor(mode, now?) {
     if (mode !== 'CN')
         return null;
-    const d = now || new Date();
-    if (!CAL.CN.weekdays.includes(d.getDay()))
-        return null;
-    if (calendar_1.isMarketHoliday('CN', d))
-        return null;
-    const minutes = d.getHours() * 60 + d.getMinutes();
+    const local = calendar_1.exchangeParts('CN',now || new Date());
+    if(!calendar_1.isExchangeTradingDate('CN',local.date))return null;
+    const minutes=local.minute;
     if (minutes >= 900 && minutes < 930)
         return 'fixedPrice';
     return null;
@@ -381,21 +375,7 @@ export function dividendTaxRate(market, holdDays) {
 // P1: 按市场判断是否处于交易时段（mode: CN/HK/US；未知/缺省回退 CN 保持向后兼容）
 // 美股：夏令时/冬令时动态时段 + 跨午夜交易日按美东日期判节假日
 export function isTradingTimeFor(mode, now?) {
-    const m = (mode && CAL[mode] ? mode : 'CN');
-    const cfg = MARKET_SESSIONS[m];
-    const raw = now || new Date();
-    const d = calendar_1.marketDateFor(m, raw);
-    if (!cfg.weekdays.includes(d.getDay()))
-        return false;
-    if (calendar_1.isMarketHoliday(m, raw))
-        return false;
-    const minutes = raw.getHours() * 60 + raw.getMinutes();
-    const sessions = m === 'US' ? calendar_1.usSessionsFor(raw) : cfg.sessions;
-    for (const s of sessions) {
-        if (minutes >= s[0] && minutes < s[1])
-            return true;
-    }
-    return false;
+    return calendar_1.realMarketClock(CAL[mode] ? mode : 'CN', now || new Date()).phase === 'continuous';
 }
 
 // B1 行业传导矩阵：行业间联动（源 → 目标: 关联度 0~1），每 5 tick 按动量传导

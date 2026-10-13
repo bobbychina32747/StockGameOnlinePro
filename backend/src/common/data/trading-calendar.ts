@@ -27,7 +27,7 @@ export const TRADING_CALENDAR: Record<'CN' | 'HK' | 'US', MarketCalendar> = {
     sessions: [[570, 720], [780, 960]],
     holidays: {
       '2025': ['2025-01-01', '2025-01-29', '2025-01-30', '2025-01-31', '2025-04-04', '2025-04-18', '2025-04-19', '2025-04-21', '2025-05-01', '2025-05-05', '2025-05-31', '2025-07-01', '2025-10-01', '2025-10-07', '2025-12-25', '2025-12-26'],
-      '2026': ['2026-01-01', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-04-03', '2026-04-06', '2026-04-07', '2026-05-01', '2026-06-19', '2026-07-01', '2026-09-25', '2026-10-01', '2026-12-25', '2026-12-26'],
+      '2026': ['2026-01-01', '2026-02-17', '2026-02-18', '2026-02-19', '2026-04-03', '2026-04-06', '2026-04-07', '2026-05-01', '2026-05-25', '2026-06-19', '2026-07-01', '2026-10-01', '2026-10-19', '2026-12-25'],
       // 2027 为预估（官方未发布）
       '2027': ['2027-01-01', '2027-02-05', '2027-02-08', '2027-02-09', '2027-03-26', '2027-03-29', '2027-04-05', '2027-05-01', '2027-05-13', '2027-06-09', '2027-07-01', '2027-09-24', '2027-10-01', '2027-12-25', '2027-12-27'],
     },
@@ -121,4 +121,57 @@ export function gameTradingTime(market: string, day: number, minute: number, dat
     offset -= end - start;
   }
   throw new RangeError('交易分钟超出当日时段');
+}
+
+export type CalendarMarket = 'CN' | 'HK' | 'US';
+const ZONES = {CN:'Asia/Shanghai', HK:'Asia/Hong_Kong', US:'America/New_York'};
+const HALF_DAYS: Record<string, string[]> = {
+  HK:['2026-02-16','2026-12-24','2026-12-31'],
+  US:['2026-11-27','2026-12-24'],
+};
+const EXCHANGE_FORMATTERS = Object.fromEntries(Object.entries(ZONES).map(([market,timeZone])=>[market,new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'})]));
+export function exchangeParts(market: CalendarMarket, time: Date) {
+  const parts = Object.fromEntries(EXCHANGE_FORMATTERS[market].formatToParts(time).map(p=>[p.type,p.value]));
+  return {date:`${parts.year}-${parts.month}-${parts.day}`,minute:Number(parts.hour)*60+Number(parts.minute)};
+}
+export function exchangeSessions(market: CalendarMarket, date: string): number[][] {
+  const half = HALF_DAYS[market]?.includes(date);
+  return market === 'US' ? [[570,half?780:960]] : market === 'HK' ? (half?[[570,720]]:[[570,720],[780,960]]) : [[570,690],[780,900]];
+}
+export function isExchangeTradingDate(market: CalendarMarket, date: string): boolean {
+  const weekday = new Date(date+'T12:00:00Z').getUTCDay();
+  // Lunar New Year's Eve is a half-day session in Hong Kong, not a full holiday.
+  return weekday>0 && weekday<6 && !TRADING_CALENDAR[market].holidays[date.slice(0,4)]?.includes(date);
+}
+export function exchangeTime(market: CalendarMarket, date: string, minute: number): Date {
+  const target = Date.parse(date+'T00:00:00Z') + minute*60000;
+  let utc = target;
+  for(let i=0;i<3;i++) {
+    const local = exchangeParts(market,new Date(utc));
+    utc += target-(Date.parse(local.date+'T00:00:00Z')+local.minute*60000);
+  }
+  return new Date(utc);
+}
+export function realTradingTime(market: CalendarMarket, date: string, minute: number): Date {
+  for(const [start,end] of exchangeSessions(market,date)) {
+    if(minute<end-start) return exchangeTime(market,date,start+minute);
+    minute-=end-start;
+  }
+  throw new RangeError('Trading minute is outside the session');
+}
+export function realMarketClock(market: CalendarMarket, now = new Date()) {
+  const local = exchangeParts(market,now), sessions = exchangeSessions(market,local.date);
+  const valid = isExchangeTradingDate(market,local.date);
+  let minute: number|null = null, offset=0;
+  for(const [start,end] of sessions) {if(valid&&local.minute>=start&&local.minute<end) minute=offset+local.minute-start;offset+=end-start;}
+  const phase = minute!==null?'continuous':valid&&market==='CN'&&local.minute>=555&&local.minute<560?'auction-open':valid&&market==='CN'&&local.minute>=560&&local.minute<565?'auction-locked':valid&&market==='CN'&&local.minute>=565&&local.minute<570?'pre-open':valid&&market==='CN'&&local.minute>=900&&local.minute<930?'post-close':'closed';
+  const status = phase!=='closed'?phase:valid&&sessions.length>1&&local.minute>=sessions[0][1]&&local.minute<sessions[1][0]?'break':'closed';
+  let nextOpen: string|null=null;
+  for(let d=0;d<370&&!nextOpen;d++) {
+    const date = new Date(Date.parse(local.date+'T00:00:00Z')+d*86400000).toISOString().slice(0,10);
+    if(!isExchangeTradingDate(market,date))continue;
+    for(const [start] of exchangeSessions(market,date)) {const open=exchangeTime(market,date,start);if(open>now){nextOpen=open.toISOString();break;}}
+  }
+  return {date:local.date, minute, phase, status, timeZone:ZONES[market], now:now.toISOString(), nextOpen,
+    sessionClosed:local.minute>=sessions[sessions.length-1][1],tradingMinutes:offset};
 }

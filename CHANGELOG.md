@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-13 — Remembered login and exchange clocks
+
+- Added optional seven-day login for game credentials and linked site accounts, with encrypted persistent role sessions and immediate logout revocation.
+- Switched the hosted default to real exchange calendars, timezone-aware session validation, actual candle dates, and restart-safe minute/day progress. Account balances and old history are preserved.
+- Corrected the 2026 Hong Kong holiday list and added HK/US half-day closures. The workbench and chart labels use each exchange's timezone.
+
+
 本项目的所有重要变更都会记录在此文件中。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)（SemVer）。
 
 > **当前状态：BETA** — 核心功能完整，持续迭代中。行情为模拟数据，不构成投资建议。

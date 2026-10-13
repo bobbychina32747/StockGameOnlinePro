@@ -35,7 +35,9 @@
 
 新角色获得 **100,000 单位区服模拟货币**。佣金、税费、借款成本、保证金和强平由后端按游戏规则计算，不代表现实券商或交易所的现行要求。
 
-线上采用连续模拟：一个真实分钟推进一个交易分钟，现实休市期间也可运行。后端同时支持交易所日历模式及美股夏令时。两种模式的时钟不同，模拟交易日不等于现实日历日。
+线上按现实交易日期和时段运行：中国区北京时间 09:30–11:30 / 13:00–15:00，香港区香港时间 09:30–12:00 / 13:00–16:00，美国区纽约时间 09:30–16:00。周末、已配置的交易所节假日、2026 年半日交易及美股夏令时生效。新 K 线使用真实时间戳，已有模拟历史保留；内部交易日计数仍用于结算。连续或加速回放需要显式开启开发模式。
+
+勾选“记住我”后，所选区服的登录最长保留 **7 天**。浏览器只保存安全的 HttpOnly 角色会话，不保存密码；适配服务重启后可以恢复，退出登录立即撤销该会话。站点账号仍要求上游站点会话有效。
 
 ## 行情模拟
 
@@ -65,7 +67,7 @@ AI 对手使用本地规则策略和决策树桩集成，受现金、持仓、�
 
 在仓库根目录，将 `backend/.env.example` 复制为 `backend/.env`。自行设置 `JWT_SECRET`、`JWT_REFRESH_SECRET` 和 `ADMIN_PASSWORD`，不要沿用示例占位值或生产凭证。
 
-本地连续模拟可以使用以下配置：
+本地交易所日历模式使用以下配置：
 
 ```dotenv
 NODE_ENV=development
@@ -74,7 +76,7 @@ DB_SYNCHRONIZE=true
 PORT=8000
 TICK_INTERVAL_MS=60000
 SANDBOX_FAST=false
-FORMAL_CONTINUOUS_SIMULATION=true
+FORMAL_CONTINUOUS_SIMULATION=false
 ```
 
 `DB_SYNCHRONIZE=true` 用于初始化本地开发数据库。生产表结构变更应使用经过审核的迁移。
@@ -108,7 +110,7 @@ npm run start:formal
 | `SQLITE_PATH` | 后端账本数据库，开发默认 `./data/stockgame.db` |
 | `TICK_INTERVAL_MS` | 每个交易分钟对应的真实毫秒数，正常速度为 `60000` |
 | `SANDBOX_FAST` | 显式允许沙盒加速时钟 |
-| `FORMAL_CONTINUOUS_SIMULATION` | 允许正式引擎连续运行，不限于交易所时段 |
+| `FORMAL_CONTINUOUS_SIMULATION` | 默认 `false`，按现实交易所时段运行；`true` 显式开启连续开发回放 |
 | `REMASTER_IDENTITY_URL` | 适配服务连接的后端/认证服务地址，默认 `http://127.0.0.1:8000` |
 | `REMASTER_PORT` | 统一服务端口，默认 `8321` |
 | `REMASTER_ALLOWED_ORIGINS` | 逗号分隔的可信浏览器来源 |

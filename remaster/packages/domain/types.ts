@@ -20,7 +20,7 @@ export interface Quote {
   volatilityState?: {variance:number;shock:number};
   pendingNews?: {kind:string;remainingReturn:number;remainingMinutes:number;halfLife:number;volatilityBoost:number}[];
 }
-export interface MarketClock { day: number; date: string; minute: number; phase: Phase; settledDay: number; lastRealMinute: string }
+export interface MarketClock { day: number; date: string; minute: number; phase: Phase; settledDay: number; lastRealMinute: string; now?:string; timeZone?:string; nextOpen?:string|null; status?:string }
 export interface MarketState {
   clock: MarketClock; sentiment: number; rate: number; inflation: number; growth: number;
   sectors: Record<string, { cycle: number; trend: number; heat: number }>; lastNavDay: number;

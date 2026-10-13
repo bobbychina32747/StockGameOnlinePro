@@ -215,6 +215,32 @@ function market(debug = true) {
   return { svc, md, e, risk };
 }
 describe('market session boundaries', () => {
+  test('real-time restart keeps the processed minute and resumes an interrupted close without another market day', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-10-13T07:59:00Z'));
+    try {
+      const first=market(false);first.md.calendarState={};
+      first.md.bindCalendarDate=async date=>{first.md.calendarState.date=date;};
+      let saved;
+      first.md.persistRuntimeState=async()=>{saved=structuredClone(first.md.calendarState);};
+      await first.svc.processMarket('HK',first.md,'tickCounterHK');
+      expect(saved.processedMinute).toBe('2026-10-13:329');
+      jest.setSystemTime(new Date('2026-10-13T08:00:00Z'));
+      first.risk.settleAllAccounts.mockRejectedValueOnce(Error('interrupted settlement'));
+      await first.svc.processMarket('HK',first.md,'tickCounterHK');
+      expect(saved.closing.advanced).toBe(true);expect(first.md.gameDay).toBe(1);
+      const second=market(false);second.md.gameDay=1;second.md.calendarState=saved;
+      second.md.init=async()=>{};second.e.setUserFillHook=()=>{};second.svc.startTickLoop=()=>{};
+      second.md.persistRuntimeState=async()=>{};
+      await second.svc.onModuleInit();
+      await second.svc.processMarket('HK',second.md,'tickCounterHK');
+      await second.svc.processMarket('HK',second.md,'tickCounterHK');
+      expect(second.md.endOfDay).not.toHaveBeenCalled();
+      expect(second.risk.settleAllAccounts.mock.calls).toEqual([[1,'HK']]);
+      expect(second.md.calendarState.closedDate).toBe('2026-10-13');
+      expect(second.md.calendarState.closing).toBeUndefined();
+      expect(second.md.generateTick).not.toHaveBeenCalled();
+    } finally {jest.useRealTimers();}
+  });
   test('a failed account close resumes the same day without advancing the market twice', async () => {
     const { svc, md, risk } = market();
     risk.settleAllAccounts.mockRejectedValueOnce(new Error('database unavailable'));

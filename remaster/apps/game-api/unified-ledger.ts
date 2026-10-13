@@ -59,8 +59,8 @@ export function adaptLedger(raw:any,principal:Principal,stocks:any[],state:any,f
     metrics:{maxDrawdown:num(raw.metrics?.maxDrawdown),sharpe:num(raw.metrics?.sharpeRatio),volatility:num(raw.metrics?.volatility),
       profitableDays:0,days:raw.history?.length??0,totalReturn:equity/Math.max(1,cents(a.initialEquity))-1}};
   const markets=Object.fromEntries(MARKETS.map(m=>{const src=state.markets?.[m]??state;return [m,{
-    clock:{day:num(src.gameDay),date:new Date(Date.UTC(2024,0,1+num(src.gameDay))).toISOString().slice(0,10),minute:num(src.tickCount)%({CN:240,HK:330,US:390}[m]),
-      phase:state.offHoursTrading||src.isTradingTime?'continuous':src.isPostCloseTrading?'post-close':'closed',settledDay:num(src.gameDay)-1,lastRealMinute:''},
+    clock:{...src.clock,day:num(src.gameDay),date:src.clock?.date??new Date().toISOString().slice(0,10),minute:src.clock?.minute??0,
+      phase:state.offHoursTrading?'continuous':src.clock?.phase??(src.isTradingTime?'continuous':src.isPostCloseTrading?'post-close':'closed'),settledDay:num(src.gameDay)-1,lastRealMinute:src.clock?.now??''},
     sentiment:num(src.factors?.['市场情绪']),rate:.025,inflation:0,growth:0,sectors:Object.fromEntries(Object.entries(src.industryCycles??{}).map(([industry,phase])=>[industry,{cycle:Math.max(0,['expansion','peak','contraction','trough'].indexOf(String(phase))),trend:0,heat:0}])),lastNavDay:day,
     fundNav:{money:Math.round(num(fundDefs.find(d=>d.id==='fund-2')?.nav)/cnyPerUnit(m)*10000),etf:Math.round(num(fundDefs.find(d=>d.id==='fund-1')?.nav)/cnyPerUnit(m)*10000),basket:0,dividend:0},
   }];})) as Snapshot['markets'];

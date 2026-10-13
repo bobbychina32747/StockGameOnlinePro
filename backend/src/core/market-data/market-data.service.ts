@@ -13,7 +13,7 @@ import * as market_utils_1 from '../../common/market-utils';
 import * as market_maker_1 from './market-maker';
 import * as fundamentals_1 from './fundamentals';
 import * as ai_opponents_1 from './ai-opponents';
-import { gameTradingTime, tradingMinutesFor } from '../../common/data/trading-calendar';
+import { gameTradingTime, tradingMinutesFor, realTradingTime, exchangeTime, exchangeParts } from '../../common/data/trading-calendar';
 import { calibratedShock, heavyTail, unifiedInstruments, intrabarRange } from '../../common/unified-market';
 import { HISTORY_CACHE_LIMITS, restoreHistoryCache, persistCandleBatches } from './history-cache';
 import { aiEntryScore, aiPolicyDirection, aiPortfolioRisk } from './ai-risk-policy';
@@ -477,7 +477,7 @@ export class MarketDataService {
 
     restoreRuntimeState(saved: any) {
         if (saved.version !== 1 || saved.market !== this.market || !Number.isInteger(saved.gameDay)
-            || saved.gameDay < this.gameDay || !Number.isInteger(saved.tickCount)
+            || (saved.gameDay < this.gameDay && !/^\d{4}-\d{2}-\d{2}$/.test(saved.calendarState?.date || '')) || saved.gameDay < 0 || !Number.isInteger(saved.tickCount)
             || !Number.isInteger(saved.counter) || saved.counter < 0 || saved.counter >= tradingMinutesFor(this.market)) {
             throw new Error('Invalid or stale market runtime snapshot');
         }
@@ -491,6 +491,7 @@ export class MarketDataService {
         }
         this.aiLedger = ledger; this.gameDay = saved.gameDay; this.tickCount = saved.tickCount;
         this.resumeCounter = saved.counter;
+        this.calendarState = saved.calendarState || {};
         for (const [symbol, row] of Object.entries(saved.stocks) as [string, any][]) {
             const st = this.stocks.get(symbol);
             const { recent1min, current1min, current5min, currentDaily, ...state } = row;
@@ -527,7 +528,7 @@ export class MarketDataService {
         for (const [symbol, st] of this.stocks) {
             const row = {};
             for (const key of ['price','prevClose','prevTickPrice','dayOpen','dayHigh','dayLow','dayVolume','minuteCounter',
-                'intrinsic','lastReturn','volatility','lastVolume','avgVolume','fund','calibratedVariance','volumeState','eventVolumeState','lastAmount','dayAmount','pead','nextReportDay','listedDay']) {
+                'pendingCalendarOpen','intrinsic','lastReturn','volatility','lastVolume','avgVolume','fund','calibratedVariance','volumeState','eventVolumeState','lastAmount','dayAmount','pead','nextReportDay','listedDay']) {
                 if (st[key] !== undefined) row[key] = st[key];
             }
             row['recent1min'] = st.kline1min.slice(-90);
@@ -535,7 +536,7 @@ export class MarketDataService {
             stocks[symbol] = row;
         }
         await this.runtimeStore.save(this.market, { version: 1, market: this.market, gameDay: this.gameDay, tickCount: this.tickCount,
-            counter, stocks, aiLedger: encodeAiLedger(this.aiLedger), factors: this.factors, hotTopics: this.hotTopics,
+            counter, calendarState:this.calendarState, stocks, aiLedger: encodeAiLedger(this.aiLedger), factors: this.factors, hotTopics: this.hotTopics,
             marketRegime: this.marketRegime, industryCycles: [...this.industryCycles], burstingIndustries: [...this.burstingIndustries],
             burstLastDay: [...this.burstLastDay], newsImpacts: this.newsImpacts, macroEvents: this.macroEvents, indexDivisors: this.indexDivisors });
         this.lastRuntimeSave = Date.now();
@@ -1611,7 +1612,31 @@ export class MarketDataService {
         return Math.min(1, Math.max(0, (days - 1) / 5));
     }
     // S2 交易时段时间映射：0-119 → 9:30-11:30；120-239 → 13:00-15:00（真实A股时段）
+    calendarState: {date?:string;closedDate?:string;processedMinute?:string;initializedDay?:number;lastAuctionDay?:number;closing?:{day:number;prices:Record<string,number>;advanced:boolean}} = {};
+    applyCalendarNightShock(impact: number) {
+        for(const stock of this.stocks.values())if(stock.pendingCalendarOpen>0){
+            let price=Math.max(.5,stock.pendingCalendarOpen*(1+impact));const band=this.cnBandOf(stock);
+            if(band)price=this.clamp(price,band.down,band.up);stock.pendingCalendarOpen=price;
+        }
+    }
+    async bindCalendarDate(date: string) {
+        this.calendarState ||= {};
+        if(this.calendarState.date===date)return;
+        const rows=[];
+        for(const [symbol,stock] of this.stocks) {
+            for(const [timeframe,key,history] of [['1min','current1min','kline1min'],['5min','current5min','kline5min'],['daily','currentDaily','klineDaily']]) {
+                const bar=stock[key];
+                if(bar){stock[history].push(bar);if(this.klineRepo?.create)rows.push(this.klineRepo.create({symbol,timeframe,...bar}));stock[key]=null;}
+            }
+            if(stock.pendingCalendarOpen>0){stock.price=stock.pendingCalendarOpen;delete stock.pendingCalendarOpen;}
+            stock.dayOpen=stock.price;stock.dayHigh=stock.price;stock.dayLow=stock.price;
+            stock.dayVolume=0;stock.dayAmount=0;stock.prevTickPrice=stock.price;
+        }
+        if(rows.length)await persistCandleBatches(this.klineRepo,rows);
+        this.calendarState.date=date;
+    }
     tradingTime(day, minute) {
+        if(this.calendarState?.date)return realTradingTime(this.market as any,this.calendarState?.date,minute);
         return gameTradingTime(this.market, day, minute);
     }
     setTradingMinute(minute: number) {
@@ -1630,7 +1655,9 @@ export class MarketDataService {
                     stock.kline1min.shift();
             }
             // 价格连续性：新 bar 的 open = 上一条 close（相邻 bar 区间自然交叠，消除图表割裂）
-            const prevClose1 = minute === 0 && Number(stock.dayOpen) > 0 ? Number(stock.dayOpen)
+            const previousBar=stock.kline1min[stock.kline1min.length-1];
+            const firstCalendarBar=this.calendarState?.date&&(!previousBar||exchangeParts(this.market as any,new Date(previousBar.time)).date!==this.calendarState.date);
+            const prevClose1 = (minute === 0 || firstCalendarBar) && Number(stock.dayOpen) > 0 ? Number(stock.dayOpen)
                 : stock.kline1min.length > 0 ? Number(stock.kline1min[stock.kline1min.length - 1].close) : price;
             stock.current1min = {
                 startMinute: minute,
@@ -1672,7 +1699,7 @@ export class MarketDataService {
         k5.volume += volume;
         if (!stock.currentDaily) {
             stock.currentDaily = {
-                time: new Date(2024, 0, 1 + this.gameDay),
+                time: this.calendarState?.date ? exchangeTime(this.market as any,this.calendarState?.date,0) : new Date(2024, 0, 1 + this.gameDay),
                 open: stock.dayOpen, high: stock.dayHigh, low: stock.dayLow, close: price, volume: stock.dayVolume,
             };
         }
@@ -1861,6 +1888,7 @@ export class MarketDataService {
         // P1 隔夜跳空：每市场每夜一次的市场级冲击（先于个股循环计算，全市场共享）
         const overnightMarketShock = market_math_1.drawOvernightMarketShock(undefined, this.randn.bind(this));
         for (const stock of this.stocks.values()) {
+            const closedStats={dayOpen:stock.dayOpen,dayHigh:stock.dayHigh,dayLow:stock.dayLow,dayVolume:stock.dayVolume,dayAmount:stock.dayAmount,lastAmount:stock.lastAmount};
             // S1 持久化：1min / 5min / daily 全部落库（重启可恢复历史）
             const persistBar = (timeframe, bar) => {
                 try {
@@ -1917,6 +1945,7 @@ export class MarketDataService {
             if (overnight.tag) {
                 this.logger.warn(`[隔夜] ${stock.symbol} ${overnight.tag} ${(overnight.gap * 100).toFixed(2)}%`);
             }
+            if(this.calendarState?.date){stock.pendingCalendarOpen=stock.price;stock.price=lastClose;stock.prevTickPrice=lastClose;}
             stock.dayHigh = stock.price;
             stock.dayLow = stock.price;
             stock.dayVolume = 0;
@@ -1927,10 +1956,11 @@ export class MarketDataService {
             stock.trendCounter = 0;
             stock.trendDirection = 0;
             stock.trendAccumulated = 0;
+            if(this.calendarState?.date)Object.assign(stock,closedStats);
         }
         // S1 补：当天完整 1min/5min 落库（current 只是最后一根，完整历史必须全量）
         if (!skipPersist) {
-            const dayStart = new Date(2024, 0, 1 + this.gameDay).getTime();
+            const dayStart = this.calendarState?.date ? exchangeTime(this.market as any,this.calendarState?.date,0).getTime() : new Date(2024, 0, 1 + this.gameDay).getTime();
             for (const stock of this.stocks.values()) {
                 for (const bar of stock.kline1min) {
                     if (new Date(bar.time).getTime() >= dayStart) {

@@ -8,6 +8,7 @@ test('SQLite restart retains actual AI cash, cost, loss, risk cooldown and marke
  const manager={query:async(sql,params=[])=>{const q=db.prepare(sql);return q.reader?q.all(...params):q.run(...params);}};
  const a=new MarketDataService(null,null,null,null,'CN');
  a.runtimeStore=new MarketRuntimeStore(manager);a.gameDay=40;a.tickCount=999;
+ a.calendarState={date:'2026-10-13',closedDate:'2026-10-12',processedMinute:'2026-10-13:123',initializedDay:40,lastAuctionDay:40};
  a.stocks.set('TEST',{symbol:'TEST',price:90,prevClose:100,dayOpen:100,dayHigh:100,dayLow:90,intrinsic:100,
  minuteCounter:123,kline1min:[{time:new Date(2024,1,10),open:91,high:91,low:90,close:90,volume:12}],current1min:null,current5min:null,currentDaily:null});
  Object.assign(a.stocks.get('TEST'),{volumeState:{shock:.25},eventVolumeState:{boost:1.84,remaining:12},lastAmount:1234,dayAmount:5678});
@@ -16,13 +17,14 @@ test('SQLite restart retains actual AI cash, cost, loss, risk cooldown and marke
  l.restingOrders=[{side:'buy',qty:4,price:90}];
  await a.persistRuntimeState(123,true);
  const saved=await new MarketRuntimeStore(manager).load('CN');
- const b=new MarketDataService(null,null,null,null,'CN');b.gameDay=40;
+ const b=new MarketDataService(null,null,null,null,'CN');b.gameDay=1017;
  b.stocks.set('TEST',{price:100,kline1min:[]});b.restoreRuntimeState(saved);
  expect(b.aiLedger[0].cash).toBe(l.cash);expect(b.aiLedger[0].initialCash).toBe(l.initialCash);
  expect(b.aiLedger[0].positions.get('TEST')).toEqual({qty:100,cost:100});
  expect(b.aiLedger[0].riskRecovery).toEqual(l.riskRecovery);expect(b.aiLedger[0].entryTicks).toEqual(l.entryTicks);
  expect(b.aiLedger[0].restingOrders).toEqual([]);expect(b.aiLedger[0].fills).toBe(3);
  expect(b.getResumeCounter()).toBe(123);expect(b.tickCount).toBe(999);
+ expect(b.gameDay).toBe(40);expect(b.calendarState).toEqual(a.calendarState);
  expect(b.stocks.get('TEST').volumeState).toEqual({shock:.25});
  expect(b.stocks.get('TEST').eventVolumeState).toEqual({boost:1.84,remaining:12});
  expect(b.stocks.get('TEST').dayAmount).toBe(5678);
