@@ -4,6 +4,7 @@ import { mergeBody, readOAuthForm } from './oauth-form';
 import { OAUTH_SCOPES, OauthService } from './oauth.service';
 import { CurrentIdentity, SessionAuthGuard, extractSessionToken } from './session-auth.guard';
 import { IdentityService } from './identity.service';
+import { localeCopy, requestLocale, SiteLocale } from './locale';
 
 /**
  * 授权系统 HTTP 层（2026-10-08）
@@ -65,7 +66,7 @@ export class OauthController {
         const result = await this.oauth.resolveAuthorize(params, session);
 
         if (result.kind === 'error') {
-            res.status(result.status).type('text/plain; charset=utf-8').send(result.message);
+            res.status(result.status).type('text/html; charset=utf-8').send(this.errorPage(result.message, requestLocale(req)));
             return;
         }
         if (result.kind === 'redirect') {
@@ -77,7 +78,9 @@ export class OauthController {
 
         if (!session) {
             // 登录页：线上与授权端点同源；本机开发由 SITE_LOGIN_BASE 指到门户静态站
-            const absolute = this.oauth.loginUrlFor(req.originalUrl || req.url || '', this.originOf(req));
+            const loginUrl = new URL(this.oauth.loginUrlFor(req.originalUrl || req.url || '', this.originOf(req)));
+            loginUrl.searchParams.set('lang', requestLocale(req));
+            const absolute = loginUrl.toString();
             if (String(req.headers && req.headers.accept || '').includes('application/json')) {
                 res.status(401).json({ error: 'login_required', login_url: absolute, next: absolute });
                 return;
@@ -104,6 +107,7 @@ export class OauthController {
                 redirect_uri: String(body.redirect_uri || ''),
                 response_type: 'code',
                 scope: String(body.scope || ''),
+                lang: requestLocale(req),
                 ...(body.state ? { state: String(body.state) } : {}),
                 ...(body.code_challenge ? { code_challenge: String(body.code_challenge), code_challenge_method: String(body.code_challenge_method || 'S256') } : {}),
             }).toString()}`;
@@ -132,7 +136,7 @@ export class OauthController {
         catch (e: any) {
             const err = e && e.getResponse ? e.getResponse() : null;
             const message = err && err.error_description ? `${err.error}：${err.error_description}` : (e?.message || '授权请求无法受理');
-            res.status(err && err.statusCode ? err.statusCode : 400).type('text/html; charset=utf-8').send(this.errorPage(message));
+            res.status(err && err.statusCode ? err.statusCode : 400).type('text/html; charset=utf-8').send(this.errorPage(message, requestLocale(req)));
         }
     }
 
@@ -244,14 +248,16 @@ export class OauthController {
      */
     private consentPage(result: Extract<Awaited<ReturnType<OauthService['resolveAuthorize']>>, { kind: 'page' }>, displayName: string, req: any): string {
         const p = result.params;
-        const scopeRows = result.scopes.map((s) => `<li><code>${this.escapeHtml(s)}</code><span>${this.escapeHtml(OAUTH_SCOPES[s] || '')}</span></li>`).join('');
-        const clientLabel = result.client.firstParty ? '站内应用' : '第三方应用';
+        const locale = requestLocale(req);
+        const copy = localeCopy(locale);
+        const scopeRows = result.scopes.map((s) => `<li><code>${this.escapeHtml(s)}</code><span>${this.escapeHtml(copy[s as keyof typeof copy] || '')}</span></li>`).join('');
+        const clientLabel = result.client.firstParty ? copy.firstParty : copy.thirdParty;
         return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${locale}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>授权 · bobbycn.cc</title>
+<title>${copy.authorize} · bobbycn.cc</title>
 <style>
  :root{color-scheme:dark}
  *{box-sizing:border-box}
@@ -281,9 +287,9 @@ export class OauthController {
 </head>
 <body>
 <form class="card" method="post" action="/api/auth/identity/oauth/authorize">
-  <div class="brand"><span class="dot"></span> bobbycn.cc 统一授权</div>
-  <h1>${this.escapeHtml(result.client.name)} 想访问你的账号</h1>
-  <div class="who">当前登录：<b>${this.escapeHtml(displayName || '站点账号')}</b> · ${this.escapeHtml(clientLabel)}</div>
+  <div class="brand"><span class="dot"></span> ${copy.unified}</div>
+  <h1>${this.escapeHtml(result.client.name)} ${copy.wants}</h1>
+  <div class="who">${copy.signedIn}<b>${this.escapeHtml(displayName || copy.siteAccount)}</b> · ${this.escapeHtml(clientLabel)}</div>
   <ul>${scopeRows}</ul>
   ${this.hidden('client_id', p.clientId)}
   ${this.hidden('redirect_uri', p.redirectUri)}
@@ -291,23 +297,26 @@ export class OauthController {
   ${this.hidden('state', p.state || '')}
   ${this.hidden('code_challenge', p.codeChallenge || '')}
   ${this.hidden('code_challenge_method', p.codeChallengeMethod || '')}
+  ${this.hidden('lang', locale)}
   <div class="row">
-    <button type="submit" name="decision" value="deny">拒绝</button>
-    <button type="submit" name="decision" value="allow" class="primary">允许</button>
+    <button type="submit" name="decision" value="deny">${copy.deny}</button>
+    <button type="submit" name="decision" value="allow" class="primary">${copy.allow}</button>
   </div>
-  <div class="foot">授权后你可以随时在 <a href="/account/">账号页</a> 解除。access token 只活 10 分钟，长期登录靠可撤销的刷新令牌。</div>
+  <div class="foot">${copy.revokeBefore}<a href="/account/?lang=${locale}">${copy.accountPage}</a>${copy.revokeAfter}</div>
 </form>
 </body>
 </html>`;
     }
 
-    private errorPage(message: string): string {
-        return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>授权失败 · bobbycn.cc</title>
+    private errorPage(message: string, locale: SiteLocale = 'zh-CN'): string {
+        const copy = localeCopy(locale);
+        const publicMessage = locale === 'zh-CN' ? message : copy.errorHeading;
+        return `<!DOCTYPE html><html lang="${locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${copy.errorTitle} · bobbycn.cc</title>
 <style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0f1a;color:#e8ecf4;
 font:15px/1.6 system-ui,"Noto Sans SC",sans-serif}.c{max-width:520px;padding:26px;border:1px solid #3a2740;border-radius:16px;background:#161020}
 h1{font-size:19px;margin:0 0 10px;color:#ff9aa2}p{color:#c9b8cc;word-break:break-all}</style></head>
-<body><div class="c"><h1>授权请求无法受理</h1><p>${this.escapeHtml(message)}</p>
-<p style="font-size:13px;color:#8d7f92">请回到应用重新发起授权；如果反复出现，请把这段文字发给站主。</p></div></body></html>`;
+<body><div class="c"><h1>${copy.errorHeading}</h1><p>${this.escapeHtml(publicMessage)}</p>
+<p style="font-size:13px;color:#8d7f92">${copy.errorAdvice}</p></div></body></html>`;
     }
 }

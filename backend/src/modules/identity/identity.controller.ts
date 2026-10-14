@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req, Res, Use
 
 import { ChangePasswordDto, LoginDto, RegisterDto, ResetPasswordDto, ResetRequestDto, VerifyDto } from './dto/identity.dto';
 import { IdentityService } from './identity.service';
+import { requestLocale } from './locale';
 import { KeysService } from './keys.service';
 import { CurrentIdentity, CurrentSession, SESSION_COOKIE, SessionAuthGuard } from './session-auth.guard';
 import { TokenExchangeService } from './token-exchange.service';
@@ -58,7 +59,7 @@ export class IdentityController {
     async register(@Body() dto: RegisterDto, @Req() req: any) {
         // 人机验证先于人机之外的任何查库/发信：机器人不该消耗邮件配额
         await this.turnstile.assertHuman(dto.cfToken, req && req.ip, 'register');
-        return this.identityService.register(dto.email, dto.password, req && req.ip);
+        return this.identityService.register(dto.email, dto.password, req && req.ip, requestLocale(req));
     }
 
     /** 验证邮箱：激活 + 签发会话（同时下发域级 Cookie，之后全站都是登录态） */
@@ -150,7 +151,7 @@ export class IdentityController {
     async resetRequest(@Body() dto: ResetRequestDto, @Req() req: any) {
         // 与注册同一道闸：重置邮件同样可被机器人用来轰炸他人邮箱
         await this.turnstile.assertHuman(dto.cfToken, req && req.ip, 'password-reset');
-        return this.identityService.requestPasswordReset(dto.email, req && req.ip);
+        return this.identityService.requestPasswordReset(dto.email, req && req.ip, requestLocale(req));
     }
 
     /** 重置口令：改密 + 撤销该账号全部会话 */

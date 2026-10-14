@@ -18,6 +18,7 @@ import { Session } from '../../infrastructure/database/entities/session.entity';
 import { IdentityToken, IdentityTokenPurpose } from '../../infrastructure/database/entities/identity-token.entity';
 
 import { MAILER, Mailer } from './mailer.service';
+import { systemEmail } from './locale';
 import { PasswordService } from './password.service';
 import { RateLimitService, sleep } from './rate-limit.service';
 import { IDENTITY_TOKEN_TTL_MS, SESSION_TTL_MS, TokenService } from './token.service';
@@ -89,7 +90,7 @@ export class IdentityService {
      * 注册：建 pending 身份 + 发验证邮件，**不签发会话**（规格 4-1）。
      * 响应恒定，不区分「新建 / 重复注册 / 邮箱已激活」，避免成为账号枚举面。
      */
-    async register(email: string, password: string, ip?: string) {
+    async register(email: string, password: string, ip?: string, locale = 'zh-CN') {
         const mail = this.normalizeEmail(email);
         // 体量限流（IP + 目标邮箱双维度）：拦批量试探某邮箱是否已注册
         this.rateLimit.assertAllowed('register', ip, mail);
@@ -101,7 +102,7 @@ export class IdentityService {
                 // 幂等重发：旧的验证链接立即作废，保证「同一时间只有一条可用链接」
                 await this.invalidateTokens(existing.id, IdentityTokenPurpose.VERIFY_EMAIL);
                 const token = await this.issueIdentityToken(existing.id, IdentityTokenPurpose.VERIFY_EMAIL);
-                await this.sendVerifyMail(mail, token);
+                await this.sendVerifyMail(mail, token, locale);
             }
             // active/disabled：静默受理（不发信、不报错、不透露存在性）
             return this.registerAccepted();
@@ -117,7 +118,7 @@ export class IdentityService {
             return this.registerAccepted();
         }
         const token = await this.issueIdentityToken(identity.id, IdentityTokenPurpose.VERIFY_EMAIL);
-        await this.sendVerifyMail(mail, token);
+        await this.sendVerifyMail(mail, token, locale);
         return this.registerAccepted();
     }
 
@@ -329,14 +330,14 @@ export class IdentityService {
     // ───────────────────────── 口令重置 / 修改 ─────────────────────────
 
     /** 请求重置：无论邮箱是否存在都返回同一响应（规格：不泄露邮箱是否注册） */
-    async requestPasswordReset(email: string, ip?: string) {
+    async requestPasswordReset(email: string, ip?: string, locale = 'zh-CN') {
         const mail = this.normalizeEmail(email);
         this.rateLimit.assertAllowed('reset', ip, mail);
         const identity = await this.identityRepo.findOne({ where: { email: mail, status: IdentityStatus.ACTIVE } });
         if (identity) {
             await this.invalidateTokens(identity.id, IdentityTokenPurpose.RESET_PASSWORD);
             const token = await this.issueIdentityToken(identity.id, IdentityTokenPurpose.RESET_PASSWORD);
-            await this.sendResetMail(mail, token);
+            await this.sendResetMail(mail, token, locale);
         }
         return { success: true, message: '如果该邮箱已注册，我们已发送重置邮件' };
     }
@@ -437,30 +438,12 @@ export class IdentityService {
 
     // ───────────────────────── 邮件 ─────────────────────────
 
-    private async sendVerifyMail(email: string, token: string): Promise<void> {
-        const link = `${this.appBaseUrl()}/verify-email?token=${encodeURIComponent(token)}`;
-        await this.safeSend({
-            to: email,
-            // 品牌是**站点**而不是股票游戏：这个身份系统现在覆盖博客/游戏厅/炒股等全部子站（2026-09-29 改）
-            subject: '【bobbycn.cc】验证你的邮箱',
-            html: `<p>欢迎注册 bobbycn.cc。</p>`
-                + `<p>一个账号走全站：博客、游戏厅、模拟炒股，以及以后的任何东西。</p>`
-                + `<p>请点击下面的链接完成邮箱验证（30 分钟内有效，仅可使用一次）：</p>`
-                + `<p><a href="${link}">${link}</a></p>`
-                + `<p style="color:#8a8a8a;font-size:12px">如果这不是你本人的操作，忽略本邮件即可；这封邮件由系统自动发出，不用回复。</p>`,
-        });
+    private async sendVerifyMail(email: string, token: string, locale: string): Promise<void> {
+        await this.safeSend({ to: email, ...systemEmail('verify', locale, this.appBaseUrl(), token) });
     }
 
-    private async sendResetMail(email: string, token: string): Promise<void> {
-        const link = `${this.appBaseUrl()}/reset-password?token=${encodeURIComponent(token)}`;
-        await this.safeSend({
-            to: email,
-            subject: '【bobbycn.cc】重置密码',
-            html: `<p>我们收到了重置 bobbycn.cc 账号密码的请求。</p>`
-                + `<p>请点击下面的链接设置新密码（30 分钟内有效，仅可使用一次）：</p>`
-                + `<p><a href="${link}">${link}</a></p>`
-                + `<p style="color:#8a8a8a;font-size:12px">重置后该账号的其它登录状态会全部失效。如果这不是你本人的操作，请忽略本邮件。</p>`,
-        });
+    private async sendResetMail(email: string, token: string, locale: string): Promise<void> {
+        await this.safeSend({ to: email, ...systemEmail('reset', locale, this.appBaseUrl(), token) });
     }
 
     private async safeSend(message: { to: string; subject: string; html: string }): Promise<void> {
