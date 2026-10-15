@@ -10,9 +10,9 @@
 
 | 项目 | 结论 | 花费 |
 |---|---|---|
-| 服务器 | 腾讯云轻量 · **海外（东京 · 东京二区）** · 入门型 · **2核8G / 80G SSD / 30M峰值 / 2560GB月流量** · 年付 | **≈734 元/年**（85 折）· **已购**：实例 `Bobbychina` / `43.133.165.97` / 到期 2027-09-28 |
-| 域名 | **bobbycn.cc**（`.cn` 排除：含 `china` 关键词须权益主体，见 §2.1） | **已购**（阿里云，3 年，到期 2029-09-28）· ⚠ **待实名**，未实名会被暂停解析 |
-| 实测线路（2026-09-28 晚） | 自家宽带 → `43.133.165.97`：ping 10/10、**均值 40ms**、0% 丢包；22 端口直连可用 | — |
+| 服务器 | 腾讯云轻量 · **海外（东京）** · 入门型 · **2核8G / 80G SSD / 30M峰值 / 2560GB月流量** · 年付 | 已购（实例名与到期日略） |
+| 域名 | **bobbycn.cc**（`.cn` 排除：含 `china` 关键词须权益主体，见 §2.1） | 已购 |
+| 实测线路 | 本地宽带 → 服务器：ping 10/10、**均值 40ms**、0% 丢包 | — |
 | 备案 | **不做**。服务器在香港/海外，域名解析过去直接可用 | 0 |
 | 边缘保护 | **Cloudflare 免费版（橙云）**：隐藏源站 IP + 免费 TLS + 静态缓存 + 基础 WAF，见 §11.5 | 0 |
 | HTTPS | **CF Origin CA 证书（15 年，免续期）**；不再用 Let's Encrypt HTTP-01（源站只放行 CF 后它验不过） | 0 |
@@ -22,7 +22,7 @@
 访客 ──HTTPS──► Cloudflare 边缘（橙云，bobbycn.cc / *.bobbycn.cc）
                     │ 回源（只允许 CF 回源段）
                     ▼
-              东京 43.133.165.97 · 宿主 Nginx
+              东京 <SERVER_IP> · 宿主 Nginx
 bobbycn.cc        ──► /var/www/portal   （个人主页，静态单文件）
 game.bobbycn.cc   ──► /var/www/sgp      （游戏前端，本地构建的 dist）
         └── /api/  /socket.io/ ──► 127.0.0.1:8000（sgp-backend 容器 + SQLite 卷）
@@ -76,7 +76,7 @@ game.bobbycn.cc   ──► /var/www/sgp      （游戏前端，本地构建的 
 
 ### 2.1 结论
 
-- **实际买的是 `bobbycn.cc`**（阿里云，2026-09-28 注册，3 年到 2029-09-28）。原首选 `.cn` 走不通：`bobbychina.cn` 在注册商侧显示「限制域名，不可注册，部分限制域名仅限指定权益主体申请」——含 `china` 关键词的 `.cn` 本来就要权益主体资质，不是"被别人占了"。`.com/.net/.io` 没有这条关键词审查。
+- **实际买的是 `bobbycn.cc`**（阿里云）。原首选 `.cn` 走不通：`bobbychina.cn` 在注册商侧显示「限制域名，不可注册，部分限制域名仅限指定权益主体申请」——含 `china` 关键词的 `.cn` 本来就要权益主体资质，不是"被别人占了"。`.com/.net/.io` 没有这条关键词审查。
 - **`bobbychina.com` 仍然空着**（Verisign RDAP 实测 404）。想和 GitHub / 游戏 ID 那个名字对齐就补一个，不补则 `bobbycn.cc` 就是正式主线。
 - **续费锚点**：`.cc` 首年 32 / **续费 80**（第二年起 2.5 倍，已用 3 年买断这轮涨价）；对照 `.com` 95、`.cn` 42。**开自动续费**——未实名的域名连续费都做不了。**不要买带 `32747` 的版本**——数字后缀在域名这一层没有价值：别人得对着屏幕抄，念出来是"三二七四七"，语音/名片/口语传播必崩。`32747` 留在 GitHub 和游戏 ID 那一层就好。
 
@@ -321,9 +321,9 @@ docker system prune -f          # 镜像/构建缓存最容易吃满盘
 
 1. CF 控制台 Add site → `bobbycn.cc` → Free 计划 → 拿到两个 NS。
 2. 先在 CF 里把记录建好（**切 NS 前**）：
-   - `A @    43.133.165.97`  🟠 Proxied
-   - `A www  43.133.165.97`  🟠 Proxied
-   - `A game 43.133.165.97`  🟠 Proxied
+   - `A @    <SERVER_IP>`  🟠 Proxied
+   - `A www  <SERVER_IP>`  🟠 Proxied
+   - `A game <SERVER_IP>`  🟠 Proxied
    - **AAAA 不要加**：源站 IPv6 还没配，加了 CF 会走 v6 回源失败。
 3. 阿里云域名控制台 → DNS 修改 → 把 NS 换成 CF 那两个（域名实名不受影响；`.cc` 注册局 NS 变更一般几分钟到几小时）。
 4. SSL/TLS 模式 = **Full (strict)**；打开 Always Use HTTPS、Automatic HTTPS Rewrites；HSTS 后开。
@@ -372,9 +372,9 @@ CF IP 段偶有变动，**每月跑一次** `sudo bash deploy/scripts/cf-allowli
 
 ## 12. 现在该做什么
 
-- [x] 腾讯云下单：轻量 · **东京二区** · 入门型 · **2核8G / 80G / 30M峰值 / 2560GB月流量** · 1 年（到期 2027-09-28）· 镜像 `Ubuntu Server 24.04 LTS 64bit` · 实例 `Bobbychina` / `43.133.165.97`
-- [x] 注册域名：`bobbycn.cc`（阿里云 3 年，到期 2029-09-28）
-- [ ] **域名实名认证**：已提交（2026-09-28，审核中）→ 通过后回域名控制台确认状态、**开自动续费**（未实名状态连续费都做不了）
+- [x] 腾讯云下单：轻量 · **东京** · 入门型 · **2核8G / 80G / 30M峰值 / 2560GB月流量** · 1 年 · 镜像 `Ubuntu Server 24.04 LTS 64bit`
+- [x] 注册域名：`bobbycn.cc`
+- [ ] **域名实名认证**
 - [x] 服务器初始化与加固（2026-09-28，脚本 `archive/sessions/2026-10/scripts/setup-remote.sh`）：时区 `Asia/Shanghai` / nginx / sqlite3 / rsync / 2G swap / Docker + compose v2 / `ufw`（22、80、443）/ `fail2ban` / 关密码登录 / 目录 `/var/www/{portal,sgp,certbot}` + `/opt/stockgame`
 - [ ] **Cloudflare 层**（§11.5）：Add site → 建 `@`/`www`/`game` 三条**橙云** A 记录 → 阿里云改 NS → SSL = Full (strict) → 签 **Origin CA 证书**（15 年）
 - [ ] 源站白名单：`sudo EXTRA_ALLOW="自家公网IP" bash deploy/scripts/cf-allowlist.sh` → `nginx -t && systemctl reload nginx`（之后直连 IP 应返回 403，说明保护生效）

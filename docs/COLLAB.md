@@ -20,7 +20,7 @@
 | 测试站地址 | `https://staging.bobbycn.cc/` |
 | 站点口令（Basic Auth） | `staging` / **‹由站长私发›** |
 | 管理员账号 | `admin` / **‹由站长私发›** |
-| 服务器 | `ubuntu@43.133.165.97`（需先提交公钥） |
+| 服务器 | `ubuntu@<SERVER_IP>`（需先提交公钥） |
 
 测试环境**故意没有配邮件密钥**：注册/找回口令的邮件只会写进容器日志（`docker compose logs backend`），这样测试绝不会给真实用户发信。Turnstile 用的是 Cloudflare 官方"永远通过"的测试密钥，所以人机校验不会挡你。
 
@@ -71,14 +71,14 @@ git push origin main        # 剩下的交给 GitHub Actions
 rsync -avz --delete \
   --exclude node_modules --exclude dist --exclude data --exclude .env \
   -e "ssh -i <你的密钥>" \
-  backend/ ubuntu@43.133.165.97:/opt/stockgame/backend/
+  backend/ ubuntu@<SERVER_IP>:/opt/stockgame/backend/
 
 # 2) 重建测试容器
-ssh -i <你的密钥> ubuntu@43.133.165.97 \
+ssh -i <你的密钥> ubuntu@<SERVER_IP> \
   'cd /opt/stockgame/staging && sudo docker compose up -d --build'
 
 # 3) 验收（必须看到 healthy，别只看 ssh 的退出码）
-ssh -i <你的密钥> ubuntu@43.133.165.97 \
+ssh -i <你的密钥> ubuntu@<SERVER_IP> \
   'sudo docker compose -f /opt/stockgame/staging/docker-compose.yml ps && curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8001/api/market/prices'
 ```
 
@@ -87,8 +87,8 @@ ssh -i <你的密钥> ubuntu@43.133.165.97 \
 ```bash
 cd frontend && npm run build
 tar -czf /tmp/sgp-frontend-dist.tgz -C dist .
-scp -i <你的密钥> /tmp/sgp-frontend-dist.tgz ubuntu@43.133.165.97:/tmp/
-ssh -i <你的密钥> ubuntu@43.133.165.97 \
+scp -i <你的密钥> /tmp/sgp-frontend-dist.tgz ubuntu@<SERVER_IP>:/tmp/
+ssh -i <你的密钥> ubuntu@<SERVER_IP> \
   'sudo rm -rf /var/www/sgp-staging/* && sudo tar -xzf /tmp/sgp-frontend-dist.tgz -C /var/www/sgp-staging && sudo chown -R www-data:www-data /var/www/sgp-staging'
 ```
 
@@ -100,7 +100,7 @@ ssh -i <你的密钥> ubuntu@43.133.165.97 \
 
 ```powershell
 # 在站长机器上（把 <你的公钥> 换成你发来的那一行）
-ssh -i $env:USERPROFILE\.ssh\Main.pem ubuntu@43.133.165.97 `
+ssh -i <你的私钥路径> ubuntu@<SERVER_IP> `
   "printf '%s\n' '<你的公钥>' >> ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys"
 ```
 

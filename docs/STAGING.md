@@ -18,7 +18,7 @@
 ```
                        Cloudflare（橙云）
                               │
-                    43.133.165.97 · 宿主 nginx
+                    <SERVER_IP> · 宿主 nginx
         ┌─────────────────────┼─────────────────────┐
         │                     │                     │
   bobbycn.cc           game.bobbycn.cc      staging.bobbycn.cc
@@ -55,7 +55,7 @@
 - 管理员账号：`admin` / `<口令>`（在 `/opt/stockgame/staging/prod.env` 的 `ADMIN_PASSWORD`）
 - **数据库是线上库的一次性快照**：真实游戏状态与账号都在，但之后两边各走各的，随便改。
 
-> 注：`staging.bobbycn.cc` 需要在 Cloudflare 加一条 A 记录指向 `43.133.165.97`（橙云）才能公网访问。证书是 `*.bobbycn.cc` 通配，已覆盖。
+> 注：`staging.bobbycn.cc` 需要在 Cloudflare 加一条 A 记录指向 `<SERVER_IP>`（橙云）才能公网访问。证书是 `*.bobbycn.cc` 通配，已覆盖。
 
 ## 3. 日常操作（在服务器上）
 
@@ -84,8 +84,8 @@ sudo bash /tmp/setup-staging.sh          # 幂等脚本，会重新做一次快�
 cd frontend && npm run build
 # 上传（把 dist 解到测试环境的静态根）
 tar -czf /tmp/sgp-frontend-dist.tgz -C dist .
-scp -i <你的密钥> /tmp/sgp-frontend-dist.tgz ubuntu@43.133.165.97:/tmp/
-ssh -i <你的密钥> ubuntu@43.133.165.97 \
+scp -i <你的密钥> /tmp/sgp-frontend-dist.tgz ubuntu@<SERVER_IP>:/tmp/
+ssh -i <你的密钥> ubuntu@<SERVER_IP> \
   'sudo rm -rf /var/www/sgp-staging/* && sudo tar -xzf /tmp/sgp-frontend-dist.tgz -C /var/www/sgp-staging && sudo chown -R www-data:www-data /var/www/sgp-staging'
 ```
 
