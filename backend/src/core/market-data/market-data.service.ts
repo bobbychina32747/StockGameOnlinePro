@@ -488,6 +488,9 @@ export class MarketDataService {
             for (const key of ['price','prevClose','dayOpen','dayHigh','dayLow','intrinsic']) {
                 if (!(row[key] > 0) || !Number.isFinite(row[key])) throw new Error('Invalid runtime price');
             }
+            for (const key of ['pendingCalendarOpen','pendingCalendarPrevClose']) {
+                if (row[key] !== undefined && (!(row[key] > 0) || !Number.isFinite(row[key]))) throw new Error('Invalid pending session price');
+            }
         }
         this.aiLedger = ledger; this.gameDay = saved.gameDay; this.tickCount = saved.tickCount;
         this.resumeCounter = saved.counter;
@@ -503,6 +506,17 @@ export class MarketDataService {
             st.kline1min = [...byTime.values()].sort((a: any,b: any) => a.time - b.time).slice(-HISTORY_CACHE_LIMITS['1min']);
             if (current5min) st.kline5min = (st.kline5min || []).filter(bar => new Date(bar.time).getTime() !== new Date(current5min.time).getTime());
             st.current1min = decodeBar(current1min); st.current5min = decodeBar(current5min); st.currentDaily = decodeBar(currentDaily);
+            // Older builds overwrote the displayed previous close at settlement.
+            // Recover it only when a completed daily bar proves the calendar date.
+            if (st.pendingCalendarOpen > 0 && !(st.pendingCalendarPrevClose > 0) && this.calendarState.date) {
+                const daily = st.klineDaily;
+                const latest = daily[daily.length - 1], previous = daily[daily.length - 2];
+                const expectedTime = exchangeTime(this.market as any, this.calendarState.date, 0).getTime();
+                if (latest && previous?.close > 0 && new Date(latest.time).getTime() === expectedTime) {
+                    st.pendingCalendarPrevClose = st.prevClose;
+                    st.prevClose = previous.close;
+                }
+            }
         }
         this.factors = saved.factors; this.hotTopics = saved.hotTopics;
         this.marketRegime = saved.marketRegime; this.industryCycles = new Map(saved.industryCycles);
@@ -528,7 +542,7 @@ export class MarketDataService {
         for (const [symbol, st] of this.stocks) {
             const row = {};
             for (const key of ['price','prevClose','prevTickPrice','dayOpen','dayHigh','dayLow','dayVolume','minuteCounter',
-                'pendingCalendarOpen','intrinsic','lastReturn','volatility','lastVolume','avgVolume','fund','calibratedVariance','volumeState','eventVolumeState','lastAmount','dayAmount','pead','nextReportDay','listedDay']) {
+                'pendingCalendarOpen','pendingCalendarPrevClose','intrinsic','lastReturn','volatility','lastVolume','avgVolume','fund','calibratedVariance','volumeState','eventVolumeState','lastAmount','dayAmount','pead','nextReportDay','listedDay']) {
                 if (st[key] !== undefined) row[key] = st[key];
             }
             row['recent1min'] = st.kline1min.slice(-90);
@@ -1615,7 +1629,8 @@ export class MarketDataService {
     calendarState: {date?:string;closedDate?:string;processedMinute?:string;initializedDay?:number;lastAuctionDay?:number;closing?:{day:number;prices:Record<string,number>;advanced:boolean}} = {};
     applyCalendarNightShock(impact: number) {
         for(const stock of this.stocks.values())if(stock.pendingCalendarOpen>0){
-            let price=Math.max(.5,stock.pendingCalendarOpen*(1+impact));const band=this.cnBandOf(stock);
+            let price=Math.max(.5,stock.pendingCalendarOpen*(1+impact));
+            const band=this.cnBandOf({...stock,prevClose:stock.pendingCalendarPrevClose??stock.prevClose});
             if(band)price=this.clamp(price,band.down,band.up);stock.pendingCalendarOpen=price;
         }
     }
@@ -1628,6 +1643,7 @@ export class MarketDataService {
                 const bar=stock[key];
                 if(bar){stock[history].push(bar);if(this.klineRepo?.create)rows.push(this.klineRepo.create({symbol,timeframe,...bar}));stock[key]=null;}
             }
+            if(stock.pendingCalendarPrevClose>0){stock.prevClose=stock.pendingCalendarPrevClose;delete stock.pendingCalendarPrevClose;}
             if(stock.pendingCalendarOpen>0){stock.price=stock.pendingCalendarOpen;delete stock.pendingCalendarOpen;}
             stock.dayOpen=stock.price;stock.dayHigh=stock.price;stock.dayLow=stock.price;
             stock.dayVolume=0;stock.dayAmount=0;stock.prevTickPrice=stock.price;
@@ -1888,7 +1904,7 @@ export class MarketDataService {
         // P1 隔夜跳空：每市场每夜一次的市场级冲击（先于个股循环计算，全市场共享）
         const overnightMarketShock = market_math_1.drawOvernightMarketShock(undefined, this.randn.bind(this));
         for (const stock of this.stocks.values()) {
-            const closedStats={dayOpen:stock.dayOpen,dayHigh:stock.dayHigh,dayLow:stock.dayLow,dayVolume:stock.dayVolume,dayAmount:stock.dayAmount,lastAmount:stock.lastAmount};
+            const closedStats={prevClose:stock.prevClose,dayOpen:stock.dayOpen,dayHigh:stock.dayHigh,dayLow:stock.dayLow,dayVolume:stock.dayVolume,dayAmount:stock.dayAmount,lastAmount:stock.lastAmount};
             // S1 持久化：1min / 5min / daily 全部落库（重启可恢复历史）
             const persistBar = (timeframe, bar) => {
                 try {
@@ -1945,7 +1961,7 @@ export class MarketDataService {
             if (overnight.tag) {
                 this.logger.warn(`[隔夜] ${stock.symbol} ${overnight.tag} ${(overnight.gap * 100).toFixed(2)}%`);
             }
-            if(this.calendarState?.date){stock.pendingCalendarOpen=stock.price;stock.price=lastClose;stock.prevTickPrice=lastClose;}
+            if(this.calendarState?.date){stock.pendingCalendarPrevClose=lastClose;stock.pendingCalendarOpen=stock.price;stock.price=lastClose;stock.prevTickPrice=lastClose;}
             stock.dayHigh = stock.price;
             stock.dayLow = stock.price;
             stock.dayVolume = 0;

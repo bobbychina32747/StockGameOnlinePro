@@ -1,0 +1,23 @@
+name: Go game API
+on:
+  push:
+    paths: ['backend-go/**', 'remaster/packages/domain/catalog.json', '.github/workflows/go-api.yml']
+  pull_request:
+    paths: ['backend-go/**', 'remaster/packages/domain/catalog.json', '.github/workflows/go-api.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.2'
+          cache-dependency-path: backend-go/go.sum
+      - run: go test -race ./... -count=1 -timeout=90s
+      - run: go vet ./...
+      - run: CGO_ENABLED=0 go build -trimpath -o /tmp/stockgame ./cmd/stockgame

@@ -1,5 +1,6 @@
 const { requestLocale, systemEmail } = require('../../../../dist/src/modules/identity/locale');
 const { createHarness, tokenFromMail, TEST_PASSWORD } = require('./_harness');
+const { OauthController } = require('../../../../dist/src/modules/identity/oauth.controller');
 
 test('language negotiation handles traditional regions, quality weights and unsupported input', () => {
   expect(requestLocale({headers:{'accept-language':'fr, zh-HK;q=0.9, en;q=0.8'}})).toBe('zh-TW');
@@ -21,6 +22,20 @@ test.each(['zh-CN','zh-TW','en'])('system emails preserve token, locale, expiry 
     expect(mail.html).toContain('30');
     if(locale==='en')expect(mail.html).not.toMatch(/[\u3400-\u9fff]/);
   }
+});
+
+test('consent languages preserve OAuth parameters and escape application and account names', () => {
+  const controller=new OauthController({},{});
+  const html=controller.consentPage({kind:'page',params:{clientId:'fixture',redirectUri:'https://app.example.test/callback',scope:'openid email saves',state:'fixture-state',codeChallenge:'fixture-challenge',codeChallengeMethod:'S256'},client:{name:'<App>',firstParty:true},scopes:['openid','email','saves']},'User <script>',{query:{lang:'en'},originalUrl:'/api/auth/identity/oauth/authorize?client_id=fixture&state=fixture-state&code_challenge=fixture-challenge'});
+  expect(html).toContain('<html lang="en">');
+  expect(html).toContain('&lt;App&gt;');expect(html).toContain('User &lt;script&gt;');
+  expect(html).toContain('name="state" value="fixture-state"');
+  const traditional=html.match(/<a href="([^"]+)" lang="zh-TW"/)[1].replace(/&amp;/g,'&');
+  const url=new URL(traditional,'https://site.example.test');
+  expect(url.searchParams.get('state')).toBe('fixture-state');
+  expect(url.searchParams.get('code_challenge')).toBe('fixture-challenge');
+  expect(url.searchParams.get('lang')).toBe('zh-TW');
+  expect(html.replace(/简体|繁體/g,'')).not.toMatch(/[\u3400-\u9fff]/);
 });
 
 test('registration, resend and reset use the selected locale without changing account activation', async () => {

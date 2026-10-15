@@ -1,0 +1,1933 @@
+[
+  {
+    "principal": {
+      "owner": "game:fixture:CN",
+      "name": "Synthetic",
+      "market": "CN",
+      "mode": "game"
+    },
+    "raw": {
+      "ledgerVersion": 123,
+      "account": {
+        "id": "synthetic-account-CN",
+        "cash": 12345.67,
+        "borrowed": 2000.05,
+        "shortCollateral": 100,
+        "leverage": 2,
+        "initialEquity": 100000,
+        "dayStartEquity": 20000,
+        "seasonPoints": 300,
+        "tier": "专家"
+      },
+      "fxRates": {
+        "CN": 1,
+        "HK": 0.93,
+        "US": 7.2
+      },
+      "positions": [
+        {
+          "symbol": "T1",
+          "longQty": 300,
+          "shortQty": 0,
+          "longCost": 10.01,
+          "shortCost": 13,
+          "boughtDay": 31,
+          "boughtToday": 100
+        }
+      ],
+      "funds": [
+        {
+          "fundId": "fund-2",
+          "shares": 500.1234,
+          "totalInvested": 500,
+          "firstBuyDay": 9
+        }
+      ],
+      "orders": [
+        {
+          "id": "synthetic-order",
+          "accountId": "synthetic-account-CN",
+          "symbol": "T1",
+          "side": "buy",
+          "type": "limit",
+          "quantity": 100,
+          "filledQty": 20,
+          "status": "partial",
+          "price": 11.99,
+          "avgFillPrice": 12,
+          "createdAt": "2024-02-01T00:00:00Z"
+        }
+      ],
+      "transactions": [],
+      "achievements": [
+        {
+          "code": "first_trade"
+        }
+      ],
+      "history": [
+        {
+          "day": 30,
+          "equity": 20000
+        }
+      ],
+      "reviews": [
+        {
+          "title": "Synthetic review"
+        },
+        {
+          "title": "Other realm",
+          "market": "US"
+        }
+      ],
+      "metrics": {
+        "maxDrawdown": 0.12,
+        "sharpeRatio": 0.7,
+        "volatility": 0.2
+      }
+    },
+    "stocks": [
+      {
+        "symbol": "T1",
+        "market": "CN",
+        "name": "Synthetic CN",
+        "code": "test",
+        "industry": "半导体",
+        "listDate": "2024-01-01",
+        "description": "fixture",
+        "price": 12.34,
+        "previousClose": 12,
+        "changePct": 2.83,
+        "dayOpen": 12.01,
+        "dayHigh": 13,
+        "dayLow": 11,
+        "dayVolume": 12345,
+        "dayAmount": 150000,
+        "intrinsic": 15,
+        "adjFactor": 1.01,
+        "adjustmentSeries": [],
+        "volumeSource": "simulated-plus-matched",
+        "relativeVolume": 1.2,
+        "modeledTurnoverPct": 0.03,
+        "priceLimits": {
+          "up": 13.2,
+          "down": 10.8
+        },
+        "fundamentals": {
+          "consensusGrowth": 0.15
+        }
+      },
+      {
+        "symbol": "H1",
+        "market": "HK",
+        "name": "Synthetic HK",
+        "code": "test",
+        "industry": "半导体",
+        "listDate": "2024-01-01",
+        "description": "fixture",
+        "price": 12.34,
+        "previousClose": 12,
+        "changePct": 2.83,
+        "dayOpen": 12.01,
+        "dayHigh": 13,
+        "dayLow": 11,
+        "dayVolume": 12345,
+        "dayAmount": 150000,
+        "intrinsic": 15,
+        "adjFactor": 1.01,
+        "adjustmentSeries": [],
+        "volumeSource": "simulated-plus-matched",
+        "relativeVolume": 1.2,
+        "modeledTurnoverPct": 0.03,
+        "priceLimits": null,
+        "fundamentals": {
+          "consensusGrowth": 0.15
+        }
+      },
+      {
+        "symbol": "U1",
+        "market": "US",
+        "name": "Synthetic US",
+        "code": "test",
+        "industry": "半导体",
+        "listDate": "2024-01-01",
+        "description": "fixture",
+        "price": 12.34,
+        "previousClose": 12,
+        "changePct": 2.83,
+        "dayOpen": 12.01,
+        "dayHigh": 13,
+        "dayLow": 11,
+        "dayVolume": 12345,
+        "dayAmount": 150000,
+        "intrinsic": 15,
+        "adjFactor": 1.01,
+        "adjustmentSeries": [],
+        "volumeSource": "simulated-plus-matched",
+        "relativeVolume": 1.2,
+        "modeledTurnoverPct": 0.03,
+        "priceLimits": null,
+        "fundamentals": {
+          "consensusGrowth": 0.15
+        }
+      },
+      {
+        "symbol": "NX999",
+        "market": "CN",
+        "name": "Synthetic IPO",
+        "code": "new",
+        "industry": "半导体",
+        "listDate": "2024-01-01",
+        "description": "fixture",
+        "price": 12.34,
+        "previousClose": 12,
+        "changePct": 2.83,
+        "dayOpen": 12.01,
+        "dayHigh": 13,
+        "dayLow": 11,
+        "dayVolume": 12345,
+        "dayAmount": 150000,
+        "intrinsic": 15,
+        "adjFactor": 1.01,
+        "adjustmentSeries": [],
+        "volumeSource": "simulated-plus-matched",
+        "relativeVolume": 1.2,
+        "modeledTurnoverPct": 0.03,
+        "priceLimits": {
+          "up": 13.2,
+          "down": 10.8
+        },
+        "fundamentals": {
+          "consensusGrowth": 0.15
+        }
+      }
+    ],
+    "state": {
+      "gameDay": 31,
+      "offHoursTrading": false,
+      "tickIntervalMs": 60000,
+      "news": [
+        {
+          "market": "CN",
+          "type": "bullish",
+          "publishedAt": "2026-10-15T06:00:00Z",
+          "title": "Synthetic news",
+          "description": "fixture"
+        },
+        {
+          "market": "US",
+          "type": "bearish",
+          "publishedAt": "2026-10-15T06:01:00Z",
+          "title": "Synthetic news",
+          "description": "fixture"
+        }
+      ],
+      "markets": {
+        "CN": {
+          "gameDay": 31,
+          "factors": {
+            "市场情绪": 0.01
+          },
+          "industryCycles": {
+            "半导体": "peak"
+          },
+          "hotTopics": [],
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": null,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z"
+          }
+        },
+        "HK": {
+          "gameDay": 32,
+          "factors": {
+            "市场情绪": 0.01
+          },
+          "industryCycles": {
+            "半导体": "peak"
+          },
+          "hotTopics": [],
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": null,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z"
+          }
+        },
+        "US": {
+          "gameDay": 33,
+          "factors": {
+            "市场情绪": 0.01
+          },
+          "industryCycles": {
+            "半导体": "peak"
+          },
+          "hotTopics": [],
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": null,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z"
+          }
+        }
+      }
+    },
+    "funds": [
+      {
+        "id": "fund-1",
+        "nav": 4.5
+      },
+      {
+        "id": "fund-2",
+        "nav": 1.001
+      }
+    ],
+    "expected": {
+      "protocolVersion": 2,
+      "kind": "snapshot",
+      "worldVersion": 123,
+      "sequence": 123,
+      "mode": "real",
+      "simulatedAt": {
+        "CN": {
+          "date": "2026-10-15",
+          "now": "2026-10-15T07:00:00Z",
+          "minute": 0,
+          "phase": "closed",
+          "status": "closed",
+          "nextOpen": "2026-10-16T01:30:00Z",
+          "day": 31,
+          "settledDay": 30,
+          "lastRealMinute": "2026-10-15T07:00:00Z"
+        },
+        "HK": {
+          "date": "2026-10-15",
+          "now": "2026-10-15T07:00:00Z",
+          "minute": 0,
+          "phase": "closed",
+          "status": "closed",
+          "nextOpen": "2026-10-16T01:30:00Z",
+          "day": 32,
+          "settledDay": 31,
+          "lastRealMinute": "2026-10-15T07:00:00Z"
+        },
+        "US": {
+          "date": "2026-10-15",
+          "now": "2026-10-15T07:00:00Z",
+          "minute": 0,
+          "phase": "closed",
+          "status": "closed",
+          "nextOpen": "2026-10-16T01:30:00Z",
+          "day": 33,
+          "settledDay": 32,
+          "lastRealMinute": "2026-10-15T07:00:00Z"
+        }
+      },
+      "instruments": [
+        {
+          "symbol": "T1",
+          "code": "test",
+          "name": "Synthetic CN",
+          "industry": "半导体",
+          "market": "CN",
+          "listedAt": "2024-01-01",
+          "description": "fixture",
+          "initialPrice": 4500,
+          "volatility": 0.023775,
+          "riskProfile": {
+            "marketWeight": 0.4479398341962556,
+            "sectorWeight": 0.2682191108862692,
+            "gapScale": 0.2458134196233164,
+            "intradayFraction": 0.913803583612139,
+            "wickScale": 0.24003976687439885,
+            "gjr": {
+              "alpha": 0.12,
+              "beta": 0.84,
+              "gamma": 0.02,
+              "omega": 0.030000000000000027,
+              "score": 1.076081000789944
+            },
+            "eventSensitivity": 0.85,
+            "dividendYield": 0.005,
+            "newsKinds": [
+              "出口限制",
+              "库存周期",
+              "研发突破"
+            ],
+            "business": "晶圆代工"
+          }
+        },
+        {
+          "symbol": "NX999",
+          "code": "new",
+          "name": "Synthetic IPO",
+          "market": "CN",
+          "industry": "半导体",
+          "listedAt": "2024-01-01",
+          "description": "fixture",
+          "initialPrice": 1234,
+          "volatility": 0.02
+        }
+      ],
+      "quotes": {
+        "T1": {
+          "symbol": "T1",
+          "price": 1234,
+          "previousClose": 1200,
+          "fairValue": 1500,
+          "open": 1201,
+          "high": 1300,
+          "low": 1100,
+          "volume": 12345,
+          "turnover": 15000000,
+          "volumeSource": "simulated-plus-matched",
+          "modeledTurnoverPct": 0.03,
+          "relativeVolume": 1.2,
+          "priceLimits": {
+            "up": 1320,
+            "down": 1080
+          },
+          "momentum": 0,
+          "bubble": 0,
+          "earningsGrowth": 0.15,
+          "pe": 0,
+          "dividendFactor": 1.01,
+          "change": 0.028300000000000002
+        },
+        "NX999": {
+          "symbol": "NX999",
+          "price": 1234,
+          "previousClose": 1200,
+          "fairValue": 1500,
+          "open": 1201,
+          "high": 1300,
+          "low": 1100,
+          "volume": 12345,
+          "turnover": 15000000,
+          "volumeSource": "simulated-plus-matched",
+          "modeledTurnoverPct": 0.03,
+          "relativeVolume": 1.2,
+          "priceLimits": {
+            "up": 1320,
+            "down": 1080
+          },
+          "momentum": 0,
+          "bubble": 0,
+          "earningsGrowth": 0.15,
+          "pe": 0,
+          "dividendFactor": 1.01,
+          "change": 0.028300000000000002
+        }
+      },
+      "markets": {
+        "CN": {
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": 0,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z",
+            "day": 31,
+            "settledDay": 30,
+            "lastRealMinute": "2026-10-15T07:00:00Z"
+          },
+          "sentiment": 0.01,
+          "rate": 0.025,
+          "inflation": 0,
+          "growth": 0,
+          "sectors": {
+            "半导体": {
+              "cycle": 1,
+              "trend": 0,
+              "heat": 0
+            }
+          },
+          "lastNavDay": 31,
+          "fundNav": {
+            "money": 10010,
+            "etf": 45000,
+            "basket": 0,
+            "dividend": 0
+          }
+        },
+        "HK": {
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": 0,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z",
+            "day": 32,
+            "settledDay": 31,
+            "lastRealMinute": "2026-10-15T07:00:00Z"
+          },
+          "sentiment": 0.01,
+          "rate": 0.025,
+          "inflation": 0,
+          "growth": 0,
+          "sectors": {
+            "半导体": {
+              "cycle": 1,
+              "trend": 0,
+              "heat": 0
+            }
+          },
+          "lastNavDay": 31,
+          "fundNav": {
+            "money": 10763,
+            "etf": 48387,
+            "basket": 0,
+            "dividend": 0
+          }
+        },
+        "US": {
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": 0,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z",
+            "day": 33,
+            "settledDay": 32,
+            "lastRealMinute": "2026-10-15T07:00:00Z"
+          },
+          "sentiment": 0.01,
+          "rate": 0.025,
+          "inflation": 0,
+          "growth": 0,
+          "sectors": {
+            "半导体": {
+              "cycle": 1,
+              "trend": 0,
+              "heat": 0
+            }
+          },
+          "lastNavDay": 31,
+          "fundNav": {
+            "money": 1390,
+            "etf": 6250,
+            "basket": 0,
+            "dividend": 0
+          }
+        }
+      },
+      "indices": [
+        {
+          "market": "CN",
+          "value": 637.1111111111111,
+          "change": 0.028300000000000002,
+          "advancing": 2,
+          "count": 2
+        }
+      ],
+      "accounts": {
+        "CN": {
+          "id": "synthetic-account-CN",
+          "owner": "game:fixture:CN",
+          "name": "Synthetic",
+          "market": "CN",
+          "actor": "player",
+          "cash": 1234567,
+          "debt": 200005,
+          "collateral": 10000,
+          "leverage": 2,
+          "initialEquity": 10000000,
+          "positions": [
+            {
+              "symbol": "T1",
+              "lots": [
+                {
+                  "quantity": 300,
+                  "cost": 1001,
+                  "boughtDay": 31,
+                  "debt": 0
+                }
+              ],
+              "quantity": 300,
+              "shortQuantity": 0,
+              "shortProceeds": 0,
+              "collateral": 0,
+              "sellable": 200,
+              "cost": 1001,
+              "pnl": 69900
+            }
+          ],
+          "funds": {
+            "money": 50012.340000000004,
+            "etf": 0
+          },
+          "achievements": [
+            "first_trade"
+          ],
+          "equityHistory": [
+            {
+              "day": 30,
+              "equity": 2000000
+            }
+          ],
+          "seasonPoints": 300,
+          "adaptation": 0,
+          "lastEquity": 2000000,
+          "available": 1234567,
+          "reserved": 95920,
+          "equity": 1464824,
+          "totalReturn": -0.8535176,
+          "marginRatio": null,
+          "metrics": {
+            "maxDrawdown": 0.12,
+            "sharpe": 0.7,
+            "volatility": 0.2,
+            "profitableDays": 0,
+            "days": 1,
+            "totalReturn": -0.8535176
+          }
+        },
+        "HK": null,
+        "US": null
+      },
+      "orders": [
+        {
+          "id": "synthetic-order",
+          "commandId": "synthetic-order",
+          "accountId": "synthetic-account-CN",
+          "symbol": "T1",
+          "side": "buy",
+          "type": "limit",
+          "quantity": 100,
+          "remaining": 80,
+          "filled": 20,
+          "averagePrice": 1200,
+          "price": 1199,
+          "visible": 80,
+          "sequence": 1706745600000,
+          "createdDay": 31,
+          "status": "partial",
+          "triggered": false,
+          "postClose": false
+        }
+      ],
+      "trades": [],
+      "events": [
+        {
+          "id": "news:2026-10-15T06:00:00Z:0",
+          "sequence": 0,
+          "market": "CN",
+          "day": 31,
+          "kind": "bullish",
+          "title": "Synthetic news",
+          "detail": "fixture",
+          "impact": 1,
+          "time": 1792044000000
+        }
+      ],
+      "seasons": [],
+      "rankings": [],
+      "formal": {
+        "ledger": "legacy-authoritative",
+        "tier": "专家",
+        "metrics": {
+          "maxDrawdown": 0.12,
+          "sharpeRatio": 0.7,
+          "volatility": 0.2
+        },
+        "reviews": [
+          {
+            "title": "Synthetic review"
+          }
+        ],
+        "achievements": [
+          {
+            "code": "first_trade"
+          }
+        ],
+        "fundHoldings": [
+          {
+            "fundId": "fund-2",
+            "shares": 500.1234,
+            "totalInvested": 500,
+            "firstBuyDay": 9
+          }
+        ],
+        "funds": [
+          {
+            "id": "fund-1",
+            "nav": 4.5
+          },
+          {
+            "id": "fund-2",
+            "nav": 1.001
+          }
+        ],
+        "tickIntervalMs": 60000,
+        "offHoursTrading": false
+      }
+    }
+  },
+  {
+    "principal": {
+      "owner": "game:fixture:HK",
+      "name": "Synthetic",
+      "market": "HK",
+      "mode": "game"
+    },
+    "raw": {
+      "ledgerVersion": 123,
+      "account": {
+        "id": "synthetic-account-HK",
+        "cash": 12345.67,
+        "borrowed": 2000.05,
+        "shortCollateral": 100,
+        "leverage": 2,
+        "initialEquity": 100000,
+        "dayStartEquity": 20000,
+        "seasonPoints": 300,
+        "tier": "专家"
+      },
+      "fxRates": {
+        "CN": 1,
+        "HK": 0.93,
+        "US": 7.2
+      },
+      "positions": [
+        {
+          "symbol": "H1",
+          "longQty": 300,
+          "shortQty": 20,
+          "longCost": 10.01,
+          "shortCost": 13,
+          "boughtDay": 31,
+          "boughtToday": 100
+        }
+      ],
+      "funds": [
+        {
+          "fundId": "fund-2",
+          "shares": 500.1234,
+          "totalInvested": 500,
+          "firstBuyDay": 9
+        }
+      ],
+      "orders": [
+        {
+          "id": "synthetic-order",
+          "accountId": "synthetic-account-HK",
+          "symbol": "H1",
+          "side": "buy",
+          "type": "limit",
+          "quantity": 100,
+          "filledQty": 20,
+          "status": "partial",
+          "price": 11.99,
+          "avgFillPrice": 12,
+          "createdAt": "2024-02-01T00:00:00Z"
+        }
+      ],
+      "transactions": [],
+      "achievements": [
+        {
+          "code": "first_trade"
+        }
+      ],
+      "history": [
+        {
+          "day": 30,
+          "equity": 20000
+        }
+      ],
+      "reviews": [
+        {
+          "title": "Synthetic review"
+        },
+        {
+          "title": "Other realm",
+          "market": "CN"
+        }
+      ],
+      "metrics": {
+        "maxDrawdown": 0.12,
+        "sharpeRatio": 0.7,
+        "volatility": 0.2
+      }
+    },
+    "stocks": [
+      {
+        "symbol": "T1",
+        "market": "CN",
+        "name": "Synthetic CN",
+        "code": "test",
+        "industry": "半导体",
+        "listDate": "2024-01-01",
+        "description": "fixture",
+        "price": 12.34,
+        "previousClose": 12,
+        "changePct": 2.83,
+        "dayOpen": 12.01,
+        "dayHigh": 13,
+        "dayLow": 11,
+        "dayVolume": 12345,
+        "dayAmount": 150000,
+        "intrinsic": 15,
+        "adjFactor": 1.01,
+        "adjustmentSeries": [],
+        "volumeSource": "simulated-plus-matched",
+        "relativeVolume": 1.2,
+        "modeledTurnoverPct": 0.03,
+        "priceLimits": {
+          "up": 13.2,
+          "down": 10.8
+        },
+        "fundamentals": {
+          "consensusGrowth": 0.15
+        }
+      },
+      {
+        "symbol": "H1",
+        "market": "HK",
+        "name": "Synthetic HK",
+        "code": "test",
+        "industry": "半导体",
+        "listDate": "2024-01-01",
+        "description": "fixture",
+        "price": 12.34,
+        "previousClose": 12,
+        "changePct": 2.83,
+        "dayOpen": 12.01,
+        "dayHigh": 13,
+        "dayLow": 11,
+        "dayVolume": 12345,
+        "dayAmount": 150000,
+        "intrinsic": 15,
+        "adjFactor": 1.01,
+        "adjustmentSeries": [],
+        "volumeSource": "simulated-plus-matched",
+        "relativeVolume": 1.2,
+        "modeledTurnoverPct": 0.03,
+        "priceLimits": null,
+        "fundamentals": {
+          "consensusGrowth": 0.15
+        }
+      },
+      {
+        "symbol": "U1",
+        "market": "US",
+        "name": "Synthetic US",
+        "code": "test",
+        "industry": "半导体",
+        "listDate": "2024-01-01",
+        "description": "fixture",
+        "price": 12.34,
+        "previousClose": 12,
+        "changePct": 2.83,
+        "dayOpen": 12.01,
+        "dayHigh": 13,
+        "dayLow": 11,
+        "dayVolume": 12345,
+        "dayAmount": 150000,
+        "intrinsic": 15,
+        "adjFactor": 1.01,
+        "adjustmentSeries": [],
+        "volumeSource": "simulated-plus-matched",
+        "relativeVolume": 1.2,
+        "modeledTurnoverPct": 0.03,
+        "priceLimits": null,
+        "fundamentals": {
+          "consensusGrowth": 0.15
+        }
+      },
+      {
+        "symbol": "NX999",
+        "market": "CN",
+        "name": "Synthetic IPO",
+        "code": "new",
+        "industry": "半导体",
+        "listDate": "2024-01-01",
+        "description": "fixture",
+        "price": 12.34,
+        "previousClose": 12,
+        "changePct": 2.83,
+        "dayOpen": 12.01,
+        "dayHigh": 13,
+        "dayLow": 11,
+        "dayVolume": 12345,
+        "dayAmount": 150000,
+        "intrinsic": 15,
+        "adjFactor": 1.01,
+        "adjustmentSeries": [],
+        "volumeSource": "simulated-plus-matched",
+        "relativeVolume": 1.2,
+        "modeledTurnoverPct": 0.03,
+        "priceLimits": {
+          "up": 13.2,
+          "down": 10.8
+        },
+        "fundamentals": {
+          "consensusGrowth": 0.15
+        }
+      }
+    ],
+    "state": {
+      "gameDay": 31,
+      "offHoursTrading": false,
+      "tickIntervalMs": 60000,
+      "news": [
+        {
+          "market": "CN",
+          "type": "bullish",
+          "publishedAt": "2026-10-15T06:00:00Z",
+          "title": "Synthetic news",
+          "description": "fixture"
+        },
+        {
+          "market": "US",
+          "type": "bearish",
+          "publishedAt": "2026-10-15T06:01:00Z",
+          "title": "Synthetic news",
+          "description": "fixture"
+        }
+      ],
+      "markets": {
+        "CN": {
+          "gameDay": 31,
+          "factors": {
+            "市场情绪": 0.01
+          },
+          "industryCycles": {
+            "半导体": "peak"
+          },
+          "hotTopics": [],
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": null,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z"
+          }
+        },
+        "HK": {
+          "gameDay": 32,
+          "factors": {
+            "市场情绪": 0.01
+          },
+          "industryCycles": {
+            "半导体": "peak"
+          },
+          "hotTopics": [],
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": null,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z"
+          }
+        },
+        "US": {
+          "gameDay": 33,
+          "factors": {
+            "市场情绪": 0.01
+          },
+          "industryCycles": {
+            "半导体": "peak"
+          },
+          "hotTopics": [],
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": null,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z"
+          }
+        }
+      }
+    },
+    "funds": [
+      {
+        "id": "fund-1",
+        "nav": 4.5
+      },
+      {
+        "id": "fund-2",
+        "nav": 1.001
+      }
+    ],
+    "expected": {
+      "protocolVersion": 2,
+      "kind": "snapshot",
+      "worldVersion": 123,
+      "sequence": 123,
+      "mode": "real",
+      "simulatedAt": {
+        "CN": {
+          "date": "2026-10-15",
+          "now": "2026-10-15T07:00:00Z",
+          "minute": 0,
+          "phase": "closed",
+          "status": "closed",
+          "nextOpen": "2026-10-16T01:30:00Z",
+          "day": 31,
+          "settledDay": 30,
+          "lastRealMinute": "2026-10-15T07:00:00Z"
+        },
+        "HK": {
+          "date": "2026-10-15",
+          "now": "2026-10-15T07:00:00Z",
+          "minute": 0,
+          "phase": "closed",
+          "status": "closed",
+          "nextOpen": "2026-10-16T01:30:00Z",
+          "day": 32,
+          "settledDay": 31,
+          "lastRealMinute": "2026-10-15T07:00:00Z"
+        },
+        "US": {
+          "date": "2026-10-15",
+          "now": "2026-10-15T07:00:00Z",
+          "minute": 0,
+          "phase": "closed",
+          "status": "closed",
+          "nextOpen": "2026-10-16T01:30:00Z",
+          "day": 33,
+          "settledDay": 32,
+          "lastRealMinute": "2026-10-15T07:00:00Z"
+        }
+      },
+      "instruments": [
+        {
+          "symbol": "H1",
+          "code": "test",
+          "name": "Synthetic HK",
+          "industry": "半导体",
+          "market": "HK",
+          "listedAt": "2024-01-01",
+          "description": "fixture",
+          "initialPrice": 32000,
+          "volatility": 0.030884,
+          "riskProfile": {
+            "marketWeight": 0.8126473702050016,
+            "sectorWeight": 0.17482672179303874,
+            "gapScale": 0.6191813332247523,
+            "intradayFraction": 0.7347539979830995,
+            "wickScale": 0.08,
+            "gjr": {
+              "alpha": 0.04,
+              "beta": 0.9,
+              "gamma": 0.02,
+              "omega": 0.04999999999999993,
+              "score": 1.217808160875731
+            },
+            "eventSensitivity": 0.85,
+            "dividendYield": 0.005,
+            "newsKinds": [
+              "监管变化",
+              "流量成本",
+              "交易额"
+            ],
+            "business": "本地服务"
+          }
+        }
+      ],
+      "quotes": {
+        "H1": {
+          "symbol": "H1",
+          "price": 1234,
+          "previousClose": 1200,
+          "fairValue": 1500,
+          "open": 1201,
+          "high": 1300,
+          "low": 1100,
+          "volume": 12345,
+          "turnover": 15000000,
+          "volumeSource": "simulated-plus-matched",
+          "modeledTurnoverPct": 0.03,
+          "relativeVolume": 1.2,
+          "priceLimits": null,
+          "momentum": 0,
+          "bubble": 0,
+          "earningsGrowth": 0.15,
+          "pe": 0,
+          "dividendFactor": 1.01,
+          "change": 0.028300000000000002
+        }
+      },
+      "markets": {
+        "CN": {
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": 0,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z",
+            "day": 31,
+            "settledDay": 30,
+            "lastRealMinute": "2026-10-15T07:00:00Z"
+          },
+          "sentiment": 0.01,
+          "rate": 0.025,
+          "inflation": 0,
+          "growth": 0,
+          "sectors": {
+            "半导体": {
+              "cycle": 1,
+              "trend": 0,
+              "heat": 0
+            }
+          },
+          "lastNavDay": 32,
+          "fundNav": {
+            "money": 10010,
+            "etf": 45000,
+            "basket": 0,
+            "dividend": 0
+          }
+        },
+        "HK": {
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": 0,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z",
+            "day": 32,
+            "settledDay": 31,
+            "lastRealMinute": "2026-10-15T07:00:00Z"
+          },
+          "sentiment": 0.01,
+          "rate": 0.025,
+          "inflation": 0,
+          "growth": 0,
+          "sectors": {
+            "半导体": {
+              "cycle": 1,
+              "trend": 0,
+              "heat": 0
+            }
+          },
+          "lastNavDay": 32,
+          "fundNav": {
+            "money": 10763,
+            "etf": 48387,
+            "basket": 0,
+            "dividend": 0
+          }
+        },
+        "US": {
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": 0,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z",
+            "day": 33,
+            "settledDay": 32,
+            "lastRealMinute": "2026-10-15T07:00:00Z"
+          },
+          "sentiment": 0.01,
+          "rate": 0.025,
+          "inflation": 0,
+          "growth": 0,
+          "sectors": {
+            "半导体": {
+              "cycle": 1,
+              "trend": 0,
+              "heat": 0
+            }
+          },
+          "lastNavDay": 32,
+          "fundNav": {
+            "money": 1390,
+            "etf": 6250,
+            "basket": 0,
+            "dividend": 0
+          }
+        }
+      },
+      "indices": [
+        {
+          "market": "HK",
+          "value": 38.5625,
+          "change": 0.028300000000000002,
+          "advancing": 1,
+          "count": 1
+        }
+      ],
+      "accounts": {
+        "CN": null,
+        "HK": {
+          "id": "synthetic-account-HK",
+          "owner": "game:fixture:HK",
+          "name": "Synthetic",
+          "market": "HK",
+          "actor": "player",
+          "cash": 1234567,
+          "debt": 200005,
+          "collateral": 10000,
+          "leverage": 2,
+          "initialEquity": 10000000,
+          "positions": [
+            {
+              "symbol": "H1",
+              "lots": [
+                {
+                  "quantity": 300,
+                  "cost": 1001,
+                  "boughtDay": 31,
+                  "debt": 0
+                }
+              ],
+              "quantity": 300,
+              "shortQuantity": 20,
+              "shortProceeds": 26000,
+              "collateral": 0,
+              "sellable": 300,
+              "cost": 1001,
+              "pnl": 71220
+            }
+          ],
+          "funds": {
+            "money": 50012.340000000004,
+            "etf": 0
+          },
+          "achievements": [
+            "first_trade"
+          ],
+          "equityHistory": [
+            {
+              "day": 30,
+              "equity": 2000000
+            }
+          ],
+          "seasonPoints": 300,
+          "adaptation": 0,
+          "lastEquity": 2000000,
+          "available": 1234567,
+          "reserved": 95920,
+          "equity": 1443912,
+          "totalReturn": -0.8556088,
+          "marginRatio": null,
+          "metrics": {
+            "maxDrawdown": 0.12,
+            "sharpe": 0.7,
+            "volatility": 0.2,
+            "profitableDays": 0,
+            "days": 1,
+            "totalReturn": -0.8556088
+          }
+        },
+        "US": null
+      },
+      "orders": [
+        {
+          "id": "synthetic-order",
+          "commandId": "synthetic-order",
+          "accountId": "synthetic-account-HK",
+          "symbol": "H1",
+          "side": "buy",
+          "type": "limit",
+          "quantity": 100,
+          "remaining": 80,
+          "filled": 20,
+          "averagePrice": 1200,
+          "price": 1199,
+          "visible": 80,
+          "sequence": 1706745600000,
+          "createdDay": 32,
+          "status": "partial",
+          "triggered": false,
+          "postClose": false
+        }
+      ],
+      "trades": [],
+      "events": [],
+      "seasons": [],
+      "rankings": [],
+      "formal": {
+        "ledger": "legacy-authoritative",
+        "tier": "专家",
+        "metrics": {
+          "maxDrawdown": 0.12,
+          "sharpeRatio": 0.7,
+          "volatility": 0.2
+        },
+        "reviews": [
+          {
+            "title": "Synthetic review"
+          }
+        ],
+        "achievements": [
+          {
+            "code": "first_trade"
+          }
+        ],
+        "fundHoldings": [
+          {
+            "fundId": "fund-2",
+            "shares": 500.1234,
+            "totalInvested": 500,
+            "firstBuyDay": 9
+          }
+        ],
+        "funds": [
+          {
+            "id": "fund-1",
+            "nav": 4.5
+          },
+          {
+            "id": "fund-2",
+            "nav": 1.001
+          }
+        ],
+        "tickIntervalMs": 60000,
+        "offHoursTrading": false
+      }
+    }
+  },
+  {
+    "principal": {
+      "owner": "game:fixture:US",
+      "name": "Synthetic",
+      "market": "US",
+      "mode": "game"
+    },
+    "raw": {
+      "ledgerVersion": 123,
+      "account": {
+        "id": "synthetic-account-US",
+        "cash": 12345.67,
+        "borrowed": 2000.05,
+        "shortCollateral": 100,
+        "leverage": 2,
+        "initialEquity": 100000,
+        "dayStartEquity": 20000,
+        "seasonPoints": 300,
+        "tier": "专家"
+      },
+      "fxRates": {
+        "CN": 1,
+        "HK": 0.93,
+        "US": 7.2
+      },
+      "positions": [
+        {
+          "symbol": "U1",
+          "longQty": 300,
+          "shortQty": 20,
+          "longCost": 10.01,
+          "shortCost": 13,
+          "boughtDay": 31,
+          "boughtToday": 100
+        }
+      ],
+      "funds": [
+        {
+          "fundId": "fund-2",
+          "shares": 500.1234,
+          "totalInvested": 500,
+          "firstBuyDay": 9
+        }
+      ],
+      "orders": [
+        {
+          "id": "synthetic-order",
+          "accountId": "synthetic-account-US",
+          "symbol": "U1",
+          "side": "buy",
+          "type": "limit",
+          "quantity": 100,
+          "filledQty": 20,
+          "status": "partial",
+          "price": 11.99,
+          "avgFillPrice": 12,
+          "createdAt": "2024-02-01T00:00:00Z"
+        }
+      ],
+      "transactions": [],
+      "achievements": [
+        {
+          "code": "first_trade"
+        }
+      ],
+      "history": [
+        {
+          "day": 30,
+          "equity": 20000
+        }
+      ],
+      "reviews": [
+        {
+          "title": "Synthetic review"
+        },
+        {
+          "title": "Other realm",
+          "market": "CN"
+        }
+      ],
+      "metrics": {
+        "maxDrawdown": 0.12,
+        "sharpeRatio": 0.7,
+        "volatility": 0.2
+      }
+    },
+    "stocks": [
+      {
+        "symbol": "T1",
+        "market": "CN",
+        "name": "Synthetic CN",
+        "code": "test",
+        "industry": "半导体",
+        "listDate": "2024-01-01",
+        "description": "fixture",
+        "price": 12.34,
+        "previousClose": 12,
+        "changePct": 2.83,
+        "dayOpen": 12.01,
+        "dayHigh": 13,
+        "dayLow": 11,
+        "dayVolume": 12345,
+        "dayAmount": 150000,
+        "intrinsic": 15,
+        "adjFactor": 1.01,
+        "adjustmentSeries": [],
+        "volumeSource": "simulated-plus-matched",
+        "relativeVolume": 1.2,
+        "modeledTurnoverPct": 0.03,
+        "priceLimits": {
+          "up": 13.2,
+          "down": 10.8
+        },
+        "fundamentals": {
+          "consensusGrowth": 0.15
+        }
+      },
+      {
+        "symbol": "H1",
+        "market": "HK",
+        "name": "Synthetic HK",
+        "code": "test",
+        "industry": "半导体",
+        "listDate": "2024-01-01",
+        "description": "fixture",
+        "price": 12.34,
+        "previousClose": 12,
+        "changePct": 2.83,
+        "dayOpen": 12.01,
+        "dayHigh": 13,
+        "dayLow": 11,
+        "dayVolume": 12345,
+        "dayAmount": 150000,
+        "intrinsic": 15,
+        "adjFactor": 1.01,
+        "adjustmentSeries": [],
+        "volumeSource": "simulated-plus-matched",
+        "relativeVolume": 1.2,
+        "modeledTurnoverPct": 0.03,
+        "priceLimits": null,
+        "fundamentals": {
+          "consensusGrowth": 0.15
+        }
+      },
+      {
+        "symbol": "U1",
+        "market": "US",
+        "name": "Synthetic US",
+        "code": "test",
+        "industry": "半导体",
+        "listDate": "2024-01-01",
+        "description": "fixture",
+        "price": 12.34,
+        "previousClose": 12,
+        "changePct": 2.83,
+        "dayOpen": 12.01,
+        "dayHigh": 13,
+        "dayLow": 11,
+        "dayVolume": 12345,
+        "dayAmount": 150000,
+        "intrinsic": 15,
+        "adjFactor": 1.01,
+        "adjustmentSeries": [],
+        "volumeSource": "simulated-plus-matched",
+        "relativeVolume": 1.2,
+        "modeledTurnoverPct": 0.03,
+        "priceLimits": null,
+        "fundamentals": {
+          "consensusGrowth": 0.15
+        }
+      },
+      {
+        "symbol": "NX999",
+        "market": "CN",
+        "name": "Synthetic IPO",
+        "code": "new",
+        "industry": "半导体",
+        "listDate": "2024-01-01",
+        "description": "fixture",
+        "price": 12.34,
+        "previousClose": 12,
+        "changePct": 2.83,
+        "dayOpen": 12.01,
+        "dayHigh": 13,
+        "dayLow": 11,
+        "dayVolume": 12345,
+        "dayAmount": 150000,
+        "intrinsic": 15,
+        "adjFactor": 1.01,
+        "adjustmentSeries": [],
+        "volumeSource": "simulated-plus-matched",
+        "relativeVolume": 1.2,
+        "modeledTurnoverPct": 0.03,
+        "priceLimits": {
+          "up": 13.2,
+          "down": 10.8
+        },
+        "fundamentals": {
+          "consensusGrowth": 0.15
+        }
+      }
+    ],
+    "state": {
+      "gameDay": 31,
+      "offHoursTrading": false,
+      "tickIntervalMs": 60000,
+      "news": [
+        {
+          "market": "CN",
+          "type": "bullish",
+          "publishedAt": "2026-10-15T06:00:00Z",
+          "title": "Synthetic news",
+          "description": "fixture"
+        },
+        {
+          "market": "US",
+          "type": "bearish",
+          "publishedAt": "2026-10-15T06:01:00Z",
+          "title": "Synthetic news",
+          "description": "fixture"
+        }
+      ],
+      "markets": {
+        "CN": {
+          "gameDay": 31,
+          "factors": {
+            "市场情绪": 0.01
+          },
+          "industryCycles": {
+            "半导体": "peak"
+          },
+          "hotTopics": [],
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": null,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z"
+          }
+        },
+        "HK": {
+          "gameDay": 32,
+          "factors": {
+            "市场情绪": 0.01
+          },
+          "industryCycles": {
+            "半导体": "peak"
+          },
+          "hotTopics": [],
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": null,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z"
+          }
+        },
+        "US": {
+          "gameDay": 33,
+          "factors": {
+            "市场情绪": 0.01
+          },
+          "industryCycles": {
+            "半导体": "peak"
+          },
+          "hotTopics": [],
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": null,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z"
+          }
+        }
+      }
+    },
+    "funds": [
+      {
+        "id": "fund-1",
+        "nav": 4.5
+      },
+      {
+        "id": "fund-2",
+        "nav": 1.001
+      }
+    ],
+    "expected": {
+      "protocolVersion": 2,
+      "kind": "snapshot",
+      "worldVersion": 123,
+      "sequence": 123,
+      "mode": "real",
+      "simulatedAt": {
+        "CN": {
+          "date": "2026-10-15",
+          "now": "2026-10-15T07:00:00Z",
+          "minute": 0,
+          "phase": "closed",
+          "status": "closed",
+          "nextOpen": "2026-10-16T01:30:00Z",
+          "day": 31,
+          "settledDay": 30,
+          "lastRealMinute": "2026-10-15T07:00:00Z"
+        },
+        "HK": {
+          "date": "2026-10-15",
+          "now": "2026-10-15T07:00:00Z",
+          "minute": 0,
+          "phase": "closed",
+          "status": "closed",
+          "nextOpen": "2026-10-16T01:30:00Z",
+          "day": 32,
+          "settledDay": 31,
+          "lastRealMinute": "2026-10-15T07:00:00Z"
+        },
+        "US": {
+          "date": "2026-10-15",
+          "now": "2026-10-15T07:00:00Z",
+          "minute": 0,
+          "phase": "closed",
+          "status": "closed",
+          "nextOpen": "2026-10-16T01:30:00Z",
+          "day": 33,
+          "settledDay": 32,
+          "lastRealMinute": "2026-10-15T07:00:00Z"
+        }
+      },
+      "instruments": [
+        {
+          "symbol": "U1",
+          "code": "test",
+          "name": "Synthetic US",
+          "industry": "半导体",
+          "market": "US",
+          "listedAt": "2024-01-01",
+          "description": "fixture",
+          "initialPrice": 48000,
+          "volatility": 0.028699,
+          "riskProfile": {
+            "marketWeight": 0.7074127340700451,
+            "sectorWeight": 0.2120402087595627,
+            "gapScale": 0.5279022534992043,
+            "intradayFraction": 0.8225631541844158,
+            "wickScale": 0.15270382592646384,
+            "gjr": {
+              "alpha": 0.04,
+              "beta": 0.9,
+              "gamma": 0.02,
+              "omega": 0.04999999999999993,
+              "score": 1.306356071147499
+            },
+            "eventSensitivity": 1,
+            "dividendYield": 0.008,
+            "newsKinds": [
+              "出口限制",
+              "库存周期",
+              "研发突破"
+            ],
+            "business": "模拟芯片"
+          }
+        }
+      ],
+      "quotes": {
+        "U1": {
+          "symbol": "U1",
+          "price": 1234,
+          "previousClose": 1200,
+          "fairValue": 1500,
+          "open": 1201,
+          "high": 1300,
+          "low": 1100,
+          "volume": 12345,
+          "turnover": 15000000,
+          "volumeSource": "simulated-plus-matched",
+          "modeledTurnoverPct": 0.03,
+          "relativeVolume": 1.2,
+          "priceLimits": null,
+          "momentum": 0,
+          "bubble": 0,
+          "earningsGrowth": 0.15,
+          "pe": 0,
+          "dividendFactor": 1.01,
+          "change": 0.028300000000000002
+        }
+      },
+      "markets": {
+        "CN": {
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": 0,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z",
+            "day": 31,
+            "settledDay": 30,
+            "lastRealMinute": "2026-10-15T07:00:00Z"
+          },
+          "sentiment": 0.01,
+          "rate": 0.025,
+          "inflation": 0,
+          "growth": 0,
+          "sectors": {
+            "半导体": {
+              "cycle": 1,
+              "trend": 0,
+              "heat": 0
+            }
+          },
+          "lastNavDay": 33,
+          "fundNav": {
+            "money": 10010,
+            "etf": 45000,
+            "basket": 0,
+            "dividend": 0
+          }
+        },
+        "HK": {
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": 0,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z",
+            "day": 32,
+            "settledDay": 31,
+            "lastRealMinute": "2026-10-15T07:00:00Z"
+          },
+          "sentiment": 0.01,
+          "rate": 0.025,
+          "inflation": 0,
+          "growth": 0,
+          "sectors": {
+            "半导体": {
+              "cycle": 1,
+              "trend": 0,
+              "heat": 0
+            }
+          },
+          "lastNavDay": 33,
+          "fundNav": {
+            "money": 10763,
+            "etf": 48387,
+            "basket": 0,
+            "dividend": 0
+          }
+        },
+        "US": {
+          "clock": {
+            "date": "2026-10-15",
+            "now": "2026-10-15T07:00:00Z",
+            "minute": 0,
+            "phase": "closed",
+            "status": "closed",
+            "nextOpen": "2026-10-16T01:30:00Z",
+            "day": 33,
+            "settledDay": 32,
+            "lastRealMinute": "2026-10-15T07:00:00Z"
+          },
+          "sentiment": 0.01,
+          "rate": 0.025,
+          "inflation": 0,
+          "growth": 0,
+          "sectors": {
+            "半导体": {
+              "cycle": 1,
+              "trend": 0,
+              "heat": 0
+            }
+          },
+          "lastNavDay": 33,
+          "fundNav": {
+            "money": 1390,
+            "etf": 6250,
+            "basket": 0,
+            "dividend": 0
+          }
+        }
+      },
+      "indices": [
+        {
+          "market": "US",
+          "value": 25.708333333333332,
+          "change": 0.028300000000000002,
+          "advancing": 1,
+          "count": 1
+        }
+      ],
+      "accounts": {
+        "CN": null,
+        "HK": null,
+        "US": {
+          "id": "synthetic-account-US",
+          "owner": "game:fixture:US",
+          "name": "Synthetic",
+          "market": "US",
+          "actor": "player",
+          "cash": 1234567,
+          "debt": 200005,
+          "collateral": 10000,
+          "leverage": 2,
+          "initialEquity": 10000000,
+          "positions": [
+            {
+              "symbol": "U1",
+              "lots": [
+                {
+                  "quantity": 300,
+                  "cost": 1001,
+                  "boughtDay": 31,
+                  "debt": 0
+                }
+              ],
+              "quantity": 300,
+              "shortQuantity": 20,
+              "shortProceeds": 26000,
+              "collateral": 0,
+              "sellable": 300,
+              "cost": 1001,
+              "pnl": 71220
+            }
+          ],
+          "funds": {
+            "money": 50012.340000000004,
+            "etf": 0
+          },
+          "achievements": [
+            "first_trade"
+          ],
+          "equityHistory": [
+            {
+              "day": 30,
+              "equity": 2000000
+            }
+          ],
+          "seasonPoints": 300,
+          "adaptation": 0,
+          "lastEquity": 2000000,
+          "available": 1234567,
+          "reserved": 95920,
+          "equity": 1397035,
+          "totalReturn": -0.8602965,
+          "marginRatio": null,
+          "metrics": {
+            "maxDrawdown": 0.12,
+            "sharpe": 0.7,
+            "volatility": 0.2,
+            "profitableDays": 0,
+            "days": 1,
+            "totalReturn": -0.8602965
+          }
+        }
+      },
+      "orders": [
+        {
+          "id": "synthetic-order",
+          "commandId": "synthetic-order",
+          "accountId": "synthetic-account-US",
+          "symbol": "U1",
+          "side": "buy",
+          "type": "limit",
+          "quantity": 100,
+          "remaining": 80,
+          "filled": 20,
+          "averagePrice": 1200,
+          "price": 1199,
+          "visible": 80,
+          "sequence": 1706745600000,
+          "createdDay": 33,
+          "status": "partial",
+          "triggered": false,
+          "postClose": false
+        }
+      ],
+      "trades": [],
+      "events": [
+        {
+          "id": "news:2026-10-15T06:01:00Z:0",
+          "sequence": 0,
+          "market": "US",
+          "day": 33,
+          "kind": "bearish",
+          "title": "Synthetic news",
+          "detail": "fixture",
+          "impact": -1,
+          "time": 1792044060000
+        }
+      ],
+      "seasons": [],
+      "rankings": [],
+      "formal": {
+        "ledger": "legacy-authoritative",
+        "tier": "专家",
+        "metrics": {
+          "maxDrawdown": 0.12,
+          "sharpeRatio": 0.7,
+          "volatility": 0.2
+        },
+        "reviews": [
+          {
+            "title": "Synthetic review"
+          }
+        ],
+        "achievements": [
+          {
+            "code": "first_trade"
+          }
+        ],
+        "fundHoldings": [
+          {
+            "fundId": "fund-2",
+            "shares": 500.1234,
+            "totalInvested": 500,
+            "firstBuyDay": 9
+          }
+        ],
+        "funds": [
+          {
+            "id": "fund-1",
+            "nav": 4.5
+          },
+          {
+            "id": "fund-2",
+            "nav": 1.001
+          }
+        ],
+        "tickIntervalMs": 60000,
+        "offHoursTrading": false
+      }
+    }
+  }
+]

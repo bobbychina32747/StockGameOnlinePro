@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — 2026-10-15
+
+- Fixed completed-session quotes losing their daily change when settlement advanced the previous-close reference. Preserve the visible close until the next exchange date and recover dated legacy snapshots without resetting assets.
+- Added an optional Go `/api/v2` service with bounded/coalesced snapshots, encrypted-session and command-journal compatibility, and SSE updates. The authoritative matching/market/identity backend remains TypeScript; this is the API migration stage.
+- Stop redundant HTTP snapshot polling while a live stream is current, retaining REST recovery and Socket.IO compatibility with the existing adapter.
+- Added a compute-only bridge to the unchanged v2 backtest engine and prepared separate, opt-in deployment images. No production service is switched automatically.
+
 ## 2026-10-13 — Remembered login and exchange clocks
 
 - Added optional seven-day login for game credentials and linked site accounts, with encrypted persistent role sessions and immediate logout revocation.

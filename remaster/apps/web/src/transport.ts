@@ -4,7 +4,7 @@ import { base } from './base';
 import { useSyncExternalStore } from 'react';
 import { Snapshot } from '../../../packages/protocol/snapshot';
 export interface Principal {owner:string;name:string;market:MarketId;mode:'sandbox'|'site'|'game';token?:string;rememberMe?:boolean}
-export interface Session {phase:'loading'|'login'|'ready'|'offline';principal:Principal|null;snapshot:Snapshot|null;connection:'connecting'|'live'|'stale'|'offline';error:string|null;lastReceived:number;config:{sandbox:boolean;unified?:boolean}|null}
+export interface Session {phase:'loading'|'login'|'ready'|'offline';principal:Principal|null;snapshot:Snapshot|null;connection:'connecting'|'live'|'stale'|'offline';error:string|null;lastReceived:number;config:{sandbox:boolean;unified?:boolean;transport?:'sse'|'socket.io'}|null}
 class ApiError extends Error {constructor(message:string,readonly status:number){super(message);}}
 class RuleRejected extends Error {}
 let bearer='';
@@ -13,16 +13,27 @@ export async function request<T=any>(path:string,body?:unknown,extraHeaders:Reco
   const result=await response.json().catch(()=>({}));if(!response.ok) throw new ApiError(result.error??(typeof result.message==='string'?result.message:'请求失败'),response.status);return result;
 }
 let state:Session={phase:'loading',principal:null,snapshot:null,connection:'connecting',error:null,lastReceived:0,config:null};
-const listeners=new Set<()=>void>();let socket:Socket|null=null;let booting:Promise<void>|null=null;let poll:ReturnType<typeof setInterval>|null=null;let renew:ReturnType<typeof setInterval>|null=null;let generation=0;let pending=new Map<string,{key:string;body:unknown}>();
+const listeners=new Set<()=>void>();let socket:Socket|null=null;let stream:EventSource|null=null;let booting:Promise<void>|null=null;let poll:ReturnType<typeof setInterval>|null=null;let renew:ReturnType<typeof setInterval>|null=null;let generation=0;let pending=new Map<string,{key:string;body:unknown}>();
 function update(patch:Partial<Session>){state={...state,...patch};for(const listener of listeners) listener();}
 export function useSession(){return useSyncExternalStore(listener=>{listeners.add(listener);return ()=>{listeners.delete(listener);};},()=>state);}
 function accept(snapshot:Snapshot){if(snapshot.protocolVersion!==2)return;if(state.snapshot&&snapshot.worldVersion<state.snapshot.worldVersion)return;update({snapshot,connection:'live',lastReceived:Date.now(),error:null});void publicCache(snapshot);}
 function connect(principal:Principal){
-  const current=++generation;socket?.disconnect();if(poll)clearInterval(poll);if(renew)clearInterval(renew);bearer=principal.token??'';sessionStorage.setItem('rgp.realm',principal.market);if(principal.rememberMe)localStorage.setItem('rgp.remembered-realm',principal.market);else localStorage.removeItem('rgp.remembered-realm');update({principal,phase:'ready',snapshot:null,connection:'connecting',error:null});
+  const current=++generation;socket?.disconnect();socket=null;stream?.close();stream=null;if(poll)clearInterval(poll);if(renew)clearInterval(renew);bearer=principal.token??'';sessionStorage.setItem('rgp.realm',principal.market);if(principal.rememberMe)localStorage.setItem('rgp.remembered-realm',principal.market);else localStorage.removeItem('rgp.remembered-realm');update({principal,phase:'ready',snapshot:null,connection:'connecting',error:null});
   try{pending=new Map(JSON.parse(sessionStorage.getItem('rgp.pending:'+principal.owner)??'[]'));}catch{pending=new Map();}
-  socket=io('/v2',{path:base+'socket.io',auth:bearer?{token:bearer,market:principal.market}:{market:principal.market},withCredentials:true,transports:['websocket'],reconnection:true,reconnectionDelay:1000,reconnectionDelayMax:6000});
-  socket.on('snapshot',value=>{if(current===generation)accept(value);});socket.on('disconnect',()=>{if(current===generation)update({connection:'stale'});});socket.on('connect_error',()=>{if(current===generation)update({connection:'stale'});});socket.on('session-expired',()=>{if(current===generation)void logout(false);});
-  const refresh=()=>void request<Snapshot>('/state').then(value=>{if(current===generation)accept(value);}).catch(error=>{if(current!==generation)return;if(error instanceof ApiError&&error.status===401)void logout(false);else update({connection:navigator.onLine?'stale':'offline'});});refresh();poll=setInterval(refresh,5000);
+  if(state.config?.transport==='sse'){
+    stream=new EventSource(base+'api/v2/events?market='+principal.market,{withCredentials:true});
+    stream.addEventListener('snapshot',event=>{if(current!==generation)return;try{accept(JSON.parse((event as MessageEvent).data));}catch{update({connection:'stale'});}});
+    stream.addEventListener('session-expired',()=>{if(current===generation)void logout(false);});
+    stream.addEventListener('backend-unavailable',()=>{if(current===generation)update({connection:'stale'});});
+    stream.onerror=()=>{if(current===generation)update({connection:navigator.onLine?'stale':'offline'});};
+  }else{
+    socket=io('/v2',{path:base+'socket.io',auth:bearer?{token:bearer,market:principal.market}:{market:principal.market},withCredentials:true,transports:['websocket'],reconnection:true,reconnectionDelay:1000,reconnectionDelayMax:6000});
+    socket.on('snapshot',value=>{if(current===generation)accept(value);});socket.on('disconnect',()=>{if(current===generation)update({connection:'stale'});});socket.on('connect_error',()=>{if(current===generation)update({connection:'stale'});});socket.on('session-expired',()=>{if(current===generation)void logout(false);});
+  }
+  let refreshing=false;
+  const refresh=async(force=false)=>{if(refreshing||current!==generation||(!force&&state.connection==='live'&&Date.now()-state.lastReceived<6000))return;refreshing=true;
+    try{const value=await request<Snapshot>('/state');if(current===generation)accept(value);}catch(error){if(current!==generation)return;if(error instanceof ApiError&&error.status===401)void logout(false);else update({connection:navigator.onLine?'stale':'offline'});}finally{refreshing=false;}};
+  void refresh(true);poll=setInterval(()=>void refresh(),5000);
 
 }
 export function boot():Promise<void>{if(booting)return booting;booting=(async()=>{try {const config=await request('/config');update({config});const principal=await request<Principal>('/auth/session');connect(principal);}catch(error){if(error instanceof ApiError&&error.status===401)update({phase:'login',connection:'offline'});else{const cached=await readPublicCache();update({phase:cached?'offline':'login',snapshot:cached,connection:'offline',error:'连接暂不可用，恢复后重试'});}}})();return booting;}
@@ -30,7 +41,7 @@ export async function loginDemo(name:string,market:MarketId){const principal=awa
 export async function gameCredentials(username:string,password:string,market:MarketId,register=false,rememberMe=false){bearer='';const principal=await request<Principal>('/auth/'+(register?'register':'login'),{username,password,market,rememberMe});connect(principal);}
 export async function siteSession(create=false,createRemaster=false,market:MarketId='CN',rememberMe=false){bearer='';const result=await request('/auth/site-session',{create,createRemaster,market,rememberMe});if(result.needsAccountSetup||result.needsRemasterAccount)return result;connect(result);return result;}
 export async function siteLink(username:string,password:string){return request('/auth/site-link',{username,password});}
-export async function logout(remote=true){const owner=state.principal?.owner;if(remote)await request('/auth/logout',{});localStorage.removeItem('rgp.remembered-realm');generation++;socket?.disconnect();socket=null;if(poll)clearInterval(poll);if(renew)clearInterval(renew);poll=null;renew=null;bearer='';pending.clear();if(owner)sessionStorage.removeItem('rgp.pending:'+owner);update({phase:'login',principal:null,snapshot:null,connection:'offline',error:null});}
+export async function logout(remote=true){const owner=state.principal?.owner;if(remote)await request('/auth/logout',{});localStorage.removeItem('rgp.remembered-realm');generation++;socket?.disconnect();socket=null;stream?.close();stream=null;if(poll)clearInterval(poll);if(renew)clearInterval(renew);poll=null;renew=null;bearer='';pending.clear();if(owner)sessionStorage.removeItem('rgp.pending:'+owner);update({phase:'login',principal:null,snapshot:null,connection:'offline',error:null});}
 export async function command(body:unknown):Promise<any>{
   if(state.connection!=='live'||!state.principal||Date.now()-state.lastReceived>15000)throw new Error('行情尚未同步，请连接后再操作');const current=generation;const identity=JSON.stringify(body);if(pending.size&&!pending.has(identity))throw new Error('存在结果未知的请求，请先重试原操作');const pendingCommand=pending.get(identity)??{key:crypto.randomUUID(),body};pending.set(identity,pendingCommand);savePending();
   try{

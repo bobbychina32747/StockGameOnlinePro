@@ -111,7 +111,9 @@ export class OauthController {
                 ...(body.state ? { state: String(body.state) } : {}),
                 ...(body.code_challenge ? { code_challenge: String(body.code_challenge), code_challenge_method: String(body.code_challenge_method || 'S256') } : {}),
             }).toString()}`;
-            const loginUrl = this.oauth.loginUrlFor(new URL(back).pathname + new URL(back).search, this.originOf(req));
+            const login = new URL(this.oauth.loginUrlFor(new URL(back).pathname + new URL(back).search, this.originOf(req)));
+            login.searchParams.set('lang', requestLocale(req));
+            const loginUrl = login.toString();
             res.setHeader('Cache-Control', 'no-store');
             res.redirect(302, loginUrl);
             return;
@@ -252,6 +254,11 @@ export class OauthController {
         const copy = localeCopy(locale);
         const scopeRows = result.scopes.map((s) => `<li><code>${this.escapeHtml(s)}</code><span>${this.escapeHtml(copy[s as keyof typeof copy] || '')}</span></li>`).join('');
         const clientLabel = result.client.firstParty ? copy.firstParty : copy.thirdParty;
+        const languages = [['zh-CN','简体'],['zh-TW','繁體'],['en','EN']].map(([code,label]) => {
+            const url = new URL(req?.originalUrl || req?.url || '/api/auth/identity/oauth/authorize', 'https://local.invalid');
+            url.searchParams.set('lang', code);
+            return `<a href="${this.escapeHtml(url.pathname + url.search)}" lang="${code}"${code === locale ? ' aria-current="true"' : ''}>${label}</a>`;
+        }).join(' · ');
         return `<!DOCTYPE html>
 <html lang="${locale}">
 <head>
@@ -287,6 +294,7 @@ export class OauthController {
 </head>
 <body>
 <form class="card" method="post" action="/api/auth/identity/oauth/authorize">
+  <nav class="foot" aria-label="Language">${languages}</nav>
   <div class="brand"><span class="dot"></span> ${copy.unified}</div>
   <h1>${this.escapeHtml(result.client.name)} ${copy.wants}</h1>
   <div class="who">${copy.signedIn}<b>${this.escapeHtml(displayName || copy.siteAccount)}</b> · ${this.escapeHtml(clientLabel)}</div>

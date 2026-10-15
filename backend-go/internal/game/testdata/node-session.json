@@ -1,0 +1,20 @@
+{
+  "key": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+  "token": "synthetic-role-token",
+  "entry": {
+    "principal": {
+      "owner": "game:fixture:CN",
+      "name": "Synthetic",
+      "market": "CN",
+      "mode": "game",
+      "rememberMe": true
+    },
+    "gameToken": "synthetic-upstream-token",
+    "expires": 4102444800000
+  },
+  "row": {
+    "digest": "dcbab6fd3095d060690b7a1d1f8e9580150c2229451872dac020fb56b8d50ddf",
+    "sealed": "xG7X5sXNBObp5z2gYqz/uSdEt5VTLs6cMMYYQ0fXDg38Hy6fAT7z2eseASahL9ScOVel6DFL4wG6n7IySffYRnJ8fSp/uyHE9WBLXN/sTUrzBy7clgPljiLqLR1gV8jB4EYVoJPh7XxA8LTeT3MfCGWD3jCKjb1QTvGoHxoXd01lG5TR7QSexe0OL9GFhsdM/VX0VwoGr9KGCDmnKOZ056yJej4pPc0MhaOWgO2jObreZxUmpAoDALER0bC2HZIQFMDJTvw=",
+    "expires": 4102444800000
+  }
+}

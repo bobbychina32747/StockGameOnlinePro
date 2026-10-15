@@ -1,0 +1,38 @@
+services:
+  game-go:
+    build:
+      context: ../..
+      dockerfile: backend-go/Dockerfile
+      target: game-api
+    image: stockgame-go:20261015
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8322:8320"
+    environment:
+      REMASTER_IDENTITY_URL: http://sgp-backend:8000
+      REMASTER_ALLOWED_ORIGINS: https://game.bobbycn.cc
+      REMASTER_SITE_ORIGIN: https://game.bobbycn.cc
+      REMASTER_COOKIE_SECURE: "true"
+      # Leave false unless this container is reached only through the trusted proxy.
+      REMASTER_TRUST_PROXY: "0"
+      GOMEMLIMIT: 64MiB
+      GOMAXPROCS: "2"
+    volumes:
+      - formal-command-data:/app/data
+    networks:
+      - site-identity
+    mem_limit: 128m
+    cpus: 1.0
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+volumes:
+  formal-command-data:
+    external: true
+    name: ${SGP_COMMAND_VOLUME:?Set the existing formal-command-data volume name after stopping the old adapter}
+networks:
+  site-identity:
+    external: true
+    name: docker_default
