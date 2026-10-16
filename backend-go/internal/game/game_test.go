@@ -580,6 +580,18 @@ func TestCommandJournalSurvivesRestartAndNodePropertyOrder(t *testing.T) {
 	if fixture.count("/api/fund/fund-2/subscribe") != 0 {
 		t.Fatal("duplicate financial write")
 	}
+	// Browser JSON property order must survive Go writes so rollback to Node can replay it.
+	json.Unmarshal([]byte(body), &command)
+	if _, err = reopened.ledger.command(context.Background(), recovered, command, "go-written-key", body); err != nil {
+		t.Fatal(err)
+	}
+	var stored string
+	if err = reopened.store.db.QueryRow("SELECT body FROM formal_commands WHERE owner=? AND key=?", session.Principal.Owner, "go-written-key").Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored != body {
+		t.Fatal("Go changed browser command order; Node rollback would reject the replay")
+	}
 }
 
 func TestShutdownRejectsNewStreamReservations(t *testing.T) {
@@ -588,6 +600,30 @@ func TestShutdownRejectsNewStreamReservations(t *testing.T) {
 	if app.reserveStream("fixture-owner") {
 		app.releaseStream("fixture-owner")
 		t.Fatal("stream accepted during shutdown")
+	}
+}
+
+func TestSiteRejectsTamperedSignatureAndMalformedClaims(t *testing.T) {
+	fixture := newFixture(t)
+	app := newTestApp(t, fixture.server.URL, ":memory:")
+	_, claims, parts, err := splitJWT(fixture.siteToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signature, _ := base64.RawURLEncoding.DecodeString(parts[2])
+	signature[0] ^= 1
+	tampered := parts[0] + "." + parts[1] + "." + base64.RawURLEncoding.EncodeToString(signature)
+	if _, err = app.auth.verifySite(context.Background(), tampered); err == nil {
+		t.Fatal("forged signature accepted")
+	}
+	claims["exp"] = numberString(claims["exp"])
+	encoded, _ := json.Marshal(claims)
+	malformed := parts[0] + "." + base64.RawURLEncoding.EncodeToString(encoded) + "." + parts[2]
+	if _, err = app.auth.verifySite(context.Background(), malformed); err == nil {
+		t.Fatal("string expiry accepted")
+	}
+	if fixture.count("/api/auth/identity/introspect") != 0 {
+		t.Fatal("unverified identity reached introspection")
 	}
 }
 

@@ -31,6 +31,8 @@ go build -trimpath -o stockgame ./cmd/stockgame
 
 `GET /api/v2/config` 宣告 `transport: "sse"`，客户端据此选择 `/api/v2/events?market=CN|HK|US`。角色令牌通过原 HttpOnly cookie 发送，不放进 URL。旧版客户端仍可用 REST 补取；旧 Node 服务与新版前端继续使用 Socket.IO。Nginx 对 SSE 路由须关闭缓冲、关闭缓存，读取超时至少 60 秒。
 
+Go 服务不实现 `/v2` Socket.IO。独立订阅客户端需要改用 SSE（脚本可使用 Authorization 请求头）或暂留在旧入口；不能把传输切换当作对所有外部客户端透明的更新。
+
 ## 数据与兼容
 
 只打开原适配器的命令数据库，不直接打开生产玩家账本。`formal_commands` 和 `remembered_roles` 的表结构、角色 owner、令牌摘要、加密密钥文件均兼容原实现。记住的角色和幂等结果可沿用；未持久化的一次性角色登录需要重新登录。原账号、现金、负债、持仓、订单 ID 和基金份额由原账本返回。
@@ -43,7 +45,11 @@ go build -trimpath -o stockgame ./cmd/stockgame
 
 ## 部署准备与回退
 
-本次没有停止、重启或发布线上服务。`Dockerfile` 从仓库根构建两个目标：
+本机验证记录（2026-10-15）：Go 功能测试与 `-race` 竞争检查通过；原后端全量 64 套/823 项通过，最终收盘、回测桥和时钟定向检查 26 项通过；原重制版 38 项通过，前端构建及类型检查通过。浏览器使用本地合成账号完成登录、持续 SSE、100 股请求参数、断线只读和恢复检查；连续 5 次有效推送期间新增 `/state` 请求为零。
+
+`GOMAXPROCS=2` 下，414 支公共目录/138 支当前区服的冷快照适配与 JSON 编码约 1.34ms/次；合成账号、小负载的 Go API 进程工作集约 19MB。前者不含账本 I/O，后者不含原后端进程，均不是目标服务器的整机压测。Linux amd64 二进制已交叉编译；镜像随后在服务器完成构建、隔离试运行及生产检查。
+
+2026-10-15 已按用户授权上线，实际镜像、数据保留校验与回退入口见 [发布记录](../docs/GO-API-RELEASE-20261015.md)。本次使用旧依赖镜像叠加补丁，服务器未安装 Go 工具链。下列通用 `Dockerfile` 从仓库根构建两个目标：
 
 ```sh
 docker build -f backend-go/Dockerfile --target legacy-core -t stockgame-core:go-api-20261015 .
@@ -53,6 +59,8 @@ docker build -f backend-go/Dockerfile --target game-api -t stockgame-go:20261015
 `legacy-core` 保留原账本服务，加入收盘修复和兼容回测模块。按原生产 Compose 配置、原数据卷更新该镜像；不要另起第二个行情/撮合写者，不启用自动改表，不重置数据。具体生产服务配置须部署前核对。
 
 `deploy/compose.yml` 将 Go 服务绑定在宿主回环 `8322`，使用现有身份网络，并强制显式指定原命令卷名。它是待审核的部署配置，不能直接推断现有卷名。切换步骤：
+
+本次实际发布沿用原生产 Compose，以镜像覆盖文件切换原 `sgp-unified-formal` 容器，保留 `8321` 端口；没有另起第二个正式适配器。以下 `8322` 模板用于独立迁移流程，不代表当前线上端口。
 
 1. 记录旧镜像与代理配置；一致性备份原命令数据库及其 `.session-key`，账本沿用既有备份方案。
 2. 更新并验证原账本服务：时钟、收盘涨跌幅、账号接口、回测模块均正常。

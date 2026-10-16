@@ -193,8 +193,10 @@ func (auth *Auth) verifySite(ctx context.Context, token string) (object, error) 
 	now := float64(time.Now().Unix())
 	exp := num(claims["exp"])
 	issued := num(claims["iat"])
+	_, validExpiryType := claims["exp"].(float64)
+	_, validIssuedType := claims["iat"].(float64)
 	if header["alg"] != "EdDSA" || claims["iss"] != "https://bobbycn.cc" || claims["aud"] != "bobbycn.cc" ||
-		str(claims["sub"]) == "" || str(claims["sid"]) == "" || claims["client_id"] != nil || exp != float64(int64(exp)) || issued != float64(int64(issued)) || exp <= now || issued > now+60 || exp-issued > 600 {
+		str(claims["sub"]) == "" || str(claims["sid"]) == "" || claims["client_id"] != nil || !validExpiryType || !validIssuedType || exp != float64(int64(exp)) || issued != float64(int64(issued)) || exp <= now || issued > now+60 || exp-issued > 600 {
 		return nil, errorf(401, "站点会话已失效")
 	}
 	if err = auth.verifySignature(ctx, token, header, parts); err != nil {

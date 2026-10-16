@@ -1,6 +1,7 @@
 package game
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -181,13 +182,13 @@ func (server *Server) route(w http.ResponseWriter, req *http.Request) (any, erro
 	if req.Method == "GET" {
 		return server.readRoute(req, session, path)
 	}
-	body, err := readBody(w, req)
+	body, raw, err := readBodyJSON(w, req)
 	if err != nil {
 		return nil, err
 	}
 	switch path {
 	case "commands":
-		return server.ledger.command(req.Context(), session, body, req.Header.Get("Idempotency-Key"))
+		return server.ledger.command(req.Context(), session, body, req.Header.Get("Idempotency-Key"), string(raw))
 	case "orders/estimate":
 		return server.ledger.estimate(req.Context(), session, body)
 	case "backtest":
@@ -196,18 +197,26 @@ func (server *Server) route(w http.ResponseWriter, req *http.Request) (any, erro
 	return nil, errorf(404, "接口不存在")
 }
 func readBody(w http.ResponseWriter, req *http.Request) (object, error) {
+	value, _, err := readBodyJSON(w, req)
+	return value, err
+}
+func readBodyJSON(w http.ResponseWriter, req *http.Request) (object, []byte, error) {
 	reader := http.MaxBytesReader(w, req.Body, 64*1024)
 	defer reader.Close()
-	decoder := json.NewDecoder(reader)
+	raw, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, nil, errorf(400, "请求超过64KB或读取失败")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
 	var value object
 	if err := decoder.Decode(&value); err != nil || value == nil {
-		return nil, errorf(400, "请求必须是有效 JSON 对象（最多64KB）")
+		return nil, nil, errorf(400, "请求必须是有效 JSON 对象（最多64KB）")
 	}
 	var extra any
 	if decoder.Decode(&extra) != io.EOF {
-		return nil, errorf(400, "请求只能包含一个 JSON 对象")
+		return nil, nil, errorf(400, "请求只能包含一个 JSON 对象")
 	}
-	return value, nil
+	return value, raw, nil
 }
 func writeError(w http.ResponseWriter, err error) {
 	status, message := 503, "服务暂不可用"

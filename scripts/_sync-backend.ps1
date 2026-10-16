@@ -1,4 +1,4 @@
-# Manual backend source sync to the server (no bash/rsync locally: Windows tar + ssh, same excludes).
+﻿# Manual backend source sync to the server (no bash/rsync locally: Windows tar + ssh, same excludes).
 # Usage: powershell -File scripts\_sync-backend.ps1 -DryRun   |   powershell -File scripts\_sync-backend.ps1
 #
 # Keeps the same exclusions as .partner-kit/scripts/deploy-backend.sh (all of them are past incidents):
@@ -12,7 +12,7 @@ param(
     [switch]$DryRun,
     [switch]$Prod,
     [string]$RepoRoot = 'E:\Files\Games\stockGameOnlinePro',
-    [string]$Key = 'E:\Files\bobbychina-pages\.partner-kit\keys\id_ed25519',
+    [string]$Key = $(if ($env:SGP_SSH_KEY) { $env:SGP_SSH_KEY } else { Join-Path $env:USERPROFILE '.ssh\main_2026' }),
     [string]$SshHost = 'ubuntu@43.133.165.97'
 )
 $ErrorActionPreference = 'Stop'

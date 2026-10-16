@@ -1,6 +1,7 @@
 package game
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -139,7 +140,7 @@ func (ledger *Ledger) existing(owner, key, body string) (any, bool, error) {
 	}
 	return result, true, nil
 }
-func (ledger *Ledger) command(ctx context.Context, session *Session, body object, key string) (any, error) {
+func (ledger *Ledger) command(ctx context.Context, session *Session, body object, key string, originalBody ...string) (any, error) {
 	if !idempotencyKey.MatchString(key) {
 		return nil, errorf(400, "需要有效的幂等键")
 	}
@@ -148,6 +149,18 @@ func (ledger *Ledger) command(ctx context.Context, session *Session, body object
 		return nil, errorf(400, "命令数据无效")
 	}
 	canonicalBody := string(encoded)
+	storedBody := canonicalBody
+	if len(originalBody) > 0 {
+		canonicalOriginal, err := canonical([]byte(originalBody[0]))
+		if err != nil || canonicalOriginal != canonicalBody {
+			return nil, errorf(400, "命令数据无效")
+		}
+		var compact bytes.Buffer
+		if err = json.Compact(&compact, []byte(originalBody[0])); err != nil {
+			return nil, errorf(400, "命令数据无效")
+		}
+		storedBody = compact.String()
+	}
 	owner := session.Principal.Owner
 	if result, exists, err := ledger.existing(owner, key, canonicalBody); exists || err != nil {
 		return result, err
@@ -156,7 +169,7 @@ func (ledger *Ledger) command(ctx context.Context, session *Session, body object
 	if err != nil {
 		return nil, err
 	}
-	inserted, err := ledger.store.db.Exec("INSERT OR IGNORE INTO formal_commands(owner,key,body,state) VALUES(?,?,?,'pending')", owner, key, canonicalBody)
+	inserted, err := ledger.store.db.Exec("INSERT OR IGNORE INTO formal_commands(owner,key,body,state) VALUES(?,?,?,'pending')", owner, key, storedBody)
 	if err != nil {
 		return nil, errorf(503, "无法记录操作，未向账本发送")
 	}
