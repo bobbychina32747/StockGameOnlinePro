@@ -1,5 +1,7 @@
 **English** | [中文](README.zh.md)
 
+> Documentation check: 2026-10-22. Compared with package scripts, the unified service entry point and health route. No services, accounts, orders or deployments were exercised. Research figures and dated regression results remain historical evidence; hosted service availability was not checked.
+
 # StockGame Online Pro
 
 A multiplayer stock-trading simulation with persistent accounts, three market realms, AI opponents, and a chart-focused trading workbench.
@@ -37,7 +39,7 @@ New characters start with **100,000 units of their realm's simulated currency**.
 
 The hosted game follows real exchange dates and sessions: CN 09:30–11:30 / 13:00–15:00 (China time), HK 09:30–12:00 / 13:00–16:00 (Hong Kong time), and US 09:30–16:00 (New York time). Weekends, configured exchange holidays, 2026 half-day closures, and US daylight saving apply. New candles use actual timestamps; existing simulated history is preserved. Internal trading-day counters remain separate for settlement. Continuous or accelerated replay is an explicit development mode.
 
-“Remember me” keeps the selected realm signed in for up to **7 days**. The browser stores a secure HttpOnly role cookie, never the password. Remembered roles survive adapter restarts; signing out revokes that role session immediately. Site login remains subject to the parent site session being valid.
+“Remember me” keeps the selected realm signed in for up to **7 days**. The browser uses an HttpOnly role cookie; the Secure attribute is added when `REMASTER_COOKIE_SECURE=true`. Local HTTP and hosted HTTPS therefore have different settings. The remember-me mechanism does not save the password. Remembered roles survive adapter restarts; signing out revokes that role session immediately. Site login remains subject to the parent site session being valid.
 
 ## Market simulation
 
@@ -61,11 +63,11 @@ Historical Level 2 depth, calibrated price-level memory, and sector-specific jum
 
 ## Run locally
 
-Use Node.js 22 or 24 with npm. SQLite uses native `better-sqlite3` bindings; reinstall dependencies if you change Node versions.
+Use a maintained Node.js LTS compatible with the lockfiles. Node 22 and 24 remain LTS at this review date; check the [release schedule](https://nodejs.org/en/about/previous-releases) before a later upgrade. SQLite uses native `better-sqlite3` bindings; reinstall dependencies if you change Node versions.
 
 ### 1. Configure and start the backend
 
-From the repository root, copy `backend/.env.example` to `backend/.env`. Set your own `JWT_SECRET`, `JWT_REFRESH_SECRET`, and `ADMIN_PASSWORD`; do not use the example placeholders or production credentials.
+From the repository root, copy `backend/.env.example` to `backend/.env` only for a new local setup; preserve an existing configuration. Run backend commands from `backend/`, because its environment file is resolved from the working directory. Set your own `JWT_SECRET`, `JWT_REFRESH_SECRET`, and `ADMIN_PASSWORD`; do not use the example placeholders or production credentials.
 
 For local exchange-calendar operation, use these settings:
 
@@ -102,6 +104,14 @@ npm run start:formal
 ```
 
 Open **[http://127.0.0.1:8321](http://127.0.0.1:8321)**. Select **Game account**, register, and choose a realm. The adapter connects to the backend at `http://127.0.0.1:8000` by default. Site-account login requires a configured identity service and trusted origins; it is not an automatic local SSO setup.
+
+### Verify the first local session
+
+Keep both service terminals running. Open `http://127.0.0.1:8321/api/v2/health`; expect `healthy: true` and `ledger: "legacy-authoritative"`. This checks that the adapter can reach the backend, not that every trade path works. Use the same host spelling consistently when opening the workbench and signing in.
+
+Register a test game account, choose a realm and select a stock. Confirm the chart, cash and positions load. During an open simulated session, submit a small order within the displayed rules, then inspect its status and any execution or position change. A pending limit order is not a failed application; a closed market is not expected to fill immediately. Refresh and confirm the account and realm remain consistent. Use a separate local database when experimenting with replay or resets.
+
+`EADDRINUSE`: identify the process using the port or choose another free port and update dependent settings. `healthy` fails: inspect the backend terminal and `REMASTER_IDENTITY_URL`. An origin error: check the actual browser URL against `REMASTER_ALLOWED_ORIGINS`. Native SQLite binding errors: check Node compatibility and reinstall using the project lockfile. `npm ci` replaces `node_modules`; use it in the intended project directory. [npm ci reference](https://docs.npmjs.com/cli/v11/commands/npm-ci).
 
 ### Configuration reference
 
@@ -164,8 +174,8 @@ cd backend
 npm run build
 npm test -- --runInBand
 
-# Unified workbench, from the repository root
-cd remaster
+# Unified workbench, continuing from backend/
+cd ../remaster
 npm run verify
 ```
 
