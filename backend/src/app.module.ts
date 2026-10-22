@@ -17,6 +17,8 @@ import { BlogPublicModule } from './modules/blog-public/blog-public.module';
 import { ArcadeModule } from './modules/arcade/arcade.module';
 // 2026-09-30：站内发信—— /api/admin/mail/*（站主以 contact@bobbycn.cc 回信）
 import { WebmailModule } from './modules/webmail/webmail.module';
+// 2026-10-21：共享资源—— /api/resources/*（公开）与 /api/admin/resources/*（写作台维护）
+import { ResourceModule } from './modules/resources/resource.module';
 // 2026-10-08：云存档（服务端托管密钥）—— /api/auth/identity/saves/*
 import { GameSavesModule } from './modules/game-saves/game-saves.module';
 import { UserModule } from './modules/user/user.module';
@@ -112,6 +114,8 @@ const logger = new Logger('AppModule');
         ArcadeModule,
         // 站内发信：/api/admin/mail/*（以 contact@bobbycn.cc 发信）
         WebmailModule,
+        // 共享资源：/api/resources/*（公开列表 + 文件下载）、/api/admin/resources/*（后台维护）
+        ResourceModule,
         // 云存档：/api/auth/identity/saves/*（站点授权令牌 + saves scope 读写）
         GameSavesModule,
         UserModule,
