@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — 2026-10-27
+
+- Added the site private line (`/api/chat/*`): a two-person conversation between the site owner and invited `role=subadmin` identities, with text, files (20MB), links, built-in emoji, read receipts, presence, paginated history, and SSE live updates with a polling fallback.
+- Added `identities.role` (`user | subadmin | admin`, default `user`) as a plain `varchar` column so existing rows migrate with a single `ALTER TABLE ADD COLUMN`; the owner criterion stays `ADMIN_EMAILS` / earliest verified identity.
+- Added `scripts/seed-chat-peer.mjs` (idempotent invitee account creation, argon2id credentials, optional role-column backfill) and `scripts/chat-e2e.mjs` (52 end-to-end checks against a local backend).
+- Added `deploy/nginx/chat.conf` (local Nest proxy with `proxy_buffering off` for SSE and 24MB body budget) plus `deploy/scripts/install-private-line.sh` (idempotent nginx + account + self-check).
+- Extracted `IdentityService.isOwnerIdentity` so the blog admin guard and the private line share one owner rule. `/api/auth/identity/me` now returns `role` and `isOwner`.
+- Chat unit suite: 20 tests. Full backend suite: 66 suites / 845 tests passing.
+
 ## Unreleased — 2026-10-15
 
 - Fixed completed-session quotes losing their daily change when settlement advanced the previous-close reference. Preserve the visible close until the next exchange date and recover dated legacy snapshots without resetting assets.

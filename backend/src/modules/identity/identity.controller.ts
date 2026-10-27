@@ -95,11 +95,12 @@ export class IdentityController {
         return this.identityService.logout(session);
     }
 
-    /** 当前身份信息（不含口令/令牌等内部字段） */
+    /** 当前身份信息（不含口令/令牌等内部字段；2026-10-27 起附带 isOwner，供站内入口按角色显示） */
     @Get('me')
     @UseGuards(SessionAuthGuard)
     async me(@CurrentIdentity() identity: any) {
-        return this.identityService.toSafeIdentity(identity);
+        const safe = this.identityService.toSafeIdentity(identity);
+        return { ...safe, isOwner: await this.identityService.isOwnerIdentity(identity) };
     }
 
     // ───────────── 阶段一：跨服务统一身份（别的服务"一次登录、本地验签"） ─────────────

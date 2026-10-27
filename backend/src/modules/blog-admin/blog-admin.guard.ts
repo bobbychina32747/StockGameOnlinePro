@@ -19,8 +19,6 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
  */
 @Injectable()
 export class BlogAdminGuard implements CanActivate {
-    private ownerId: { id: string; at: number } | null = null;
-
     constructor(
         private readonly jwt: JwtAuthGuard,
         private readonly identity: IdentityService,
@@ -62,23 +60,8 @@ export class BlogAdminGuard implements CanActivate {
         }
     }
 
-    /** 站主 = ADMIN_EMAILS 命中，或最早注册且已验证的那个身份 */
+    /** 站主 = ADMIN_EMAILS 命中，或最早注册且已验证的那个身份（判据在 IdentityService，2026-10-27 抽出复用给私线） */
     private async isOwner(identity: any): Promise<boolean> {
-        if (!identity || !identity.id)
-            return false;
-        const listed = String(process.env.ADMIN_EMAILS || '')
-            .split(',')
-            .map((s) => s.trim().toLowerCase())
-            .filter(Boolean);
-        const email = String(identity.email || '').toLowerCase();
-        if (listed.length && email && listed.includes(email))
-            return true;
-
-        const now = Date.now();
-        if (this.ownerId && now - this.ownerId.at < 60_000)
-            return this.ownerId.id === identity.id;
-        const oldest = await this.identity.findOldestActiveIdentityId();
-        this.ownerId = { id: oldest, at: now };
-        return !!oldest && oldest === identity.id;
+        return this.identity.isOwnerIdentity(identity);
     }
 }

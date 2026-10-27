@@ -13,6 +13,17 @@ export enum IdentityStatus {
     DISABLED = 'disabled',
 }
 
+// 身份角色（2026-10-27 站内私线引入）：个人站只有三档，够用就好。
+//   user     = 普通注册用户（默认，与引入该字段前的行为完全一致）
+//   subadmin = 站主邀请的朋友/副手，唯一特权是「能和站主对话」
+//   admin    = 站主本人（历史上站主判据是「最早注册且已验证」，见 IdentityService.isOwnerIdentity；
+//              该列不替代它，只用于显式标注与未来多站主场景）
+export enum IdentityRole {
+    USER = 'user',
+    SUBADMIN = 'subadmin',
+    ADMIN = 'admin',
+}
+
 @Entity('identities')
 // (provider, providerUid) 唯一：GitHub 绑定后同一 GH 账号不能落到两条身份上。
 // email provider 的 providerUid 为 NULL，SQLite 唯一索引视 NULL 互不相等，故不影响邮箱注册。
@@ -41,6 +52,12 @@ export class Identity {
 
     @Column({ type: 'simple-enum', enum: IdentityStatus, default: IdentityStatus.PENDING })
     status: IdentityStatus;
+
+    // 用 varchar 而不是 simple-enum：线上 identities 表已有真实数据，加 simple-enum 列会让
+    // TypeORM 在 SQLite 上重建整张表（复制行），没必要冒这个风险；varchar + 默认值就是一条
+    // ALTER TABLE ADD COLUMN，老数据自动落 'user'。写入口只认 IdentityRole 的枚举值。
+    @Column({ type: 'varchar', length: 16, default: IdentityRole.USER })
+    role: IdentityRole;
 
     // pending 身份的存活期：到期即失效并释放用户名（未验证邮箱不得长期占用账号名）
     @Column('datetime', { nullable: true })

@@ -19,6 +19,8 @@ import { ArcadeModule } from './modules/arcade/arcade.module';
 import { WebmailModule } from './modules/webmail/webmail.module';
 // 2026-10-21：共享资源—— /api/resources/*（公开）与 /api/admin/resources/*（写作台维护）
 import { ResourceModule } from './modules/resources/resource.module';
+// 2026-10-27：站内私线—— /api/chat/*（站主 ↔ 受邀 subadmin，SSE 实时）
+import { ChatModule } from './modules/chat/chat.module';
 // 2026-10-08：云存档（服务端托管密钥）—— /api/auth/identity/saves/*
 import { GameSavesModule } from './modules/game-saves/game-saves.module';
 import { UserModule } from './modules/user/user.module';
@@ -116,6 +118,8 @@ const logger = new Logger('AppModule');
         WebmailModule,
         // 共享资源：/api/resources/*（公开列表 + 文件下载）、/api/admin/resources/*（后台维护）
         ResourceModule,
+        // 站内私线：/api/chat/*（站主 ↔ 受邀 subadmin；SSE 推送 + REST 上行）
+        ChatModule,
         // 云存档：/api/auth/identity/saves/*（站点授权令牌 + saves scope 读写）
         GameSavesModule,
         UserModule,

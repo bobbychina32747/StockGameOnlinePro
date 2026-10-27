@@ -12,7 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes } from 'crypto';
 import { Repository } from 'typeorm';
 
-import { Identity, IdentityProvider, IdentityStatus } from '../../infrastructure/database/entities/identity.entity';
+import { Identity, IdentityProvider, IdentityRole, IdentityStatus } from '../../infrastructure/database/entities/identity.entity';
 import { Credential } from '../../infrastructure/database/entities/credential.entity';
 import { Session } from '../../infrastructure/database/entities/session.entity';
 import { IdentityToken, IdentityTokenPurpose } from '../../infrastructure/database/entities/identity-token.entity';
@@ -61,8 +61,30 @@ export class IdentityService {
             username: identity.username,
             provider: identity.provider,
             status: identity.status,
+            // 2026-10-27：站内私线要按角色分流（站主 / 受邀朋友），但不外泄其它内部字段
+            role: identity.role || IdentityRole.USER,
             createdAt: identity.createdAt,
         };
+    }
+
+    /**
+     * 「站主」判据（写作台/私线共用，2026-10-27 从 BlogAdminGuard 抽出来）：
+     *   ① 环境变量 ADMIN_EMAILS（逗号分隔）里列出的邮箱，或
+     *   ② 数据库里**最早注册且已验证**的那个身份（个人站：第一次注册的就是站主本人）。
+     * 判定结果在 findOldestActiveIdentityId 里缓存 60 秒。
+     */
+    async isOwnerIdentity(identity: Identity | any): Promise<boolean> {
+        if (!identity || !identity.id)
+            return false;
+        const listed = String(process.env.ADMIN_EMAILS || '')
+            .split(',')
+            .map((s) => s.trim().toLowerCase())
+            .filter(Boolean);
+        const email = String(identity.email || '').toLowerCase();
+        if (listed.length && email && listed.includes(email))
+            return true;
+        const oldest = await this.findOldestActiveIdentityId();
+        return !!oldest && String(oldest) === String(identity.id);
     }
 
     // ───────────────────────── 归一化 ─────────────────────────
