@@ -1,6 +1,6 @@
 **English** | [中文](README.zh.md)
 
-> Documentation check: 2026-10-22. Compared with package scripts, the unified service entry point and health route. No services, accounts, orders or deployments were exercised. Research figures and dated regression results remain historical evidence; hosted service availability was not checked.
+> Audit: 2026-10-29. Backend, Go API, both frontends, and synthetic browser checks were exercised. Production health was checked without player actions. The dependency audit reports zero critical/high packages in the three lockfiles; moderate/low findings remain. See [security findings and validation](docs/SECURITY-AUDIT-20261029.md).
 
 # StockGame Online Pro
 

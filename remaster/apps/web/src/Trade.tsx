@@ -1,7 +1,7 @@
 import { translate } from './localization';
 import { useEffect, useRef, useState } from 'react';
 import { Instrument, OrderType, Side } from '../../../packages/domain/types';
-import { useSession, command, request } from './transport';
+import { useSession, command, request, isSessionFresh } from './transport';
 import { useWorkspace, setWorkspace, toggleWatch, updateDraft, cents } from './workspace';
 import { Change, Empty, Icon, money, Panel, useTranslate } from './ui';
 import { Chart } from './Chart';
@@ -26,7 +26,7 @@ function Book({symbol}:{symbol:string}){const [book,setBook]=useState<{asks:{pri
 function Ticket({symbol,notify}:{symbol:string;notify:(text:string,kind?:string)=>void}) {
   const session=useSession();const workspace=useWorkspace();const t=useTranslate();const [submitting,setSubmitting]=useState(false);const guard=useRef(false);const [estimate,setEstimate]=useState<any>(null);
   const draft=workspace.drafts[workspace.market+':'+symbol]??{type:'market' as OrderType,side:'buy' as Side,quantity:'100',price:'',trigger:'',display:'20'};
-  const phase=session.snapshot?.markets[workspace.market].clock.phase;const held=session.snapshot?.accounts[workspace.market];const blocked=session.connection!=='live'||!held||['closed','pre-open'].includes(phase??'closed');
+  const phase=session.snapshot?.markets[workspace.market].clock.phase;const held=session.snapshot?.accounts[workspace.market];const blocked=!isSessionFresh(session)||!held||['closed','pre-open'].includes(phase??'closed');
   function input(){const quantity=Number(draft.quantity);if(!Number.isSafeInteger(quantity)||quantity<1)throw new Error(translate("数量必须为正整数"));return {symbol,side:draft.side,type:draft.type,quantity,...(['limit','stop-limit','fok','ioc','iceberg'].includes(draft.type)?{price:cents(draft.price)}:{}),...(['stop','stop-limit'].includes(draft.type)?{triggerPrice:cents(draft.trigger)}:{}),...(draft.type==='iceberg'?{displayQuantity:Number(draft.display)}:{})};}
   useEffect(()=>{let cancelled=false;const timer=setTimeout(()=>{if(blocked)return;try {void request('/orders/estimate',{market:workspace.market,input:input()}).then(value=>{if(!cancelled)setEstimate(value);}).catch(()=>{if(!cancelled)setEstimate(null);});}catch{setEstimate(null);}},350);return()=>{cancelled=true;clearTimeout(timer);};},[symbol,draft.type,draft.side,draft.quantity,draft.price,draft.trigger,draft.display,workspace.market,blocked]);
   const submit=async(event:React.FormEvent)=>{event.preventDefault();if(guard.current||blocked)return;guard.current=true;setSubmitting(true);try {const result=await command({kind:'order',market:workspace.market,input:input()});if(!result.order){notify(translate("委托已提交，请查看成交与订单记录"));setWorkspace({ticketOpen:false});return;}notify(result.order.filled?translate(`成交 ${result.order.filled} / ${result.order.quantity} 股 · ${money(result.order.averagePrice)}`):translate(`订单状态：${result.order.status}${result.order.error?' · '+result.order.error:''}`));setWorkspace({ticketOpen:false});}catch(error){notify(error instanceof Error?error.message:translate("下单失败"),'error');}finally{guard.current=false;setSubmitting(false);}};

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-29 — Dependency security and browser state
+
+- Updated request/upload dependencies, constrained multipart field nesting and counts, and upgraded bcrypt while retaining legacy hash compatibility. Removed the legacy node-pre-gyp/tar chain.
+- Updated ECharts to 6.1.0 and Vite to 6.4.5; patched follow-redirects, YAML, lodash, and query parsing dependencies. All three npm lockfile audits report zero critical/high affected packages; moderate/low findings remain documented.
+- Stop streams and polling immediately when logout starts; reject late snapshots and prevent delayed logout responses from replacing a later login.
+- Serialize chart-history polling and retain legend selections and zoom on refresh. Apply the same fifteen-second freshness check to order buttons and command submission.
+- Added regressions for delayed/failed logout, delayed history, legend/zoom retention, compressed-request parsing, nested uploads, and bcrypt compatibility.
+
+
 ## Unreleased — 2026-10-27
 
 - Added the site private line (`/api/chat/*`): a two-person conversation between the site owner and invited `role=subadmin` identities, with text, files (20MB), links, built-in emoji, read receipts, presence, paginated history, and SSE live updates with a polling fallback.

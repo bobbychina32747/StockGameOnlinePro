@@ -5,6 +5,7 @@ import { useSyncExternalStore } from 'react';
 import { Snapshot } from '../../../packages/protocol/snapshot';
 export interface Principal {owner:string;name:string;market:MarketId;mode:'sandbox'|'site'|'game';token?:string;rememberMe?:boolean}
 export interface Session {phase:'loading'|'login'|'ready'|'offline';principal:Principal|null;snapshot:Snapshot|null;connection:'connecting'|'live'|'stale'|'offline';error:string|null;lastReceived:number;config:{sandbox:boolean;unified?:boolean;transport?:'sse'|'socket.io'}|null}
+export function isSessionFresh(session:Pick<Session,'connection'|'lastReceived'>,now=Date.now()):boolean{return session.connection==='live'&&session.lastReceived>0&&now-session.lastReceived<=15000;}
 class ApiError extends Error {constructor(message:string,readonly status:number){super(message);}}
 class RuleRejected extends Error {}
 let bearer='';
@@ -41,9 +42,17 @@ export async function loginDemo(name:string,market:MarketId){const principal=awa
 export async function gameCredentials(username:string,password:string,market:MarketId,register=false,rememberMe=false){bearer='';const principal=await request<Principal>('/auth/'+(register?'register':'login'),{username,password,market,rememberMe});connect(principal);}
 export async function siteSession(create=false,createRemaster=false,market:MarketId='CN',rememberMe=false){bearer='';const result=await request('/auth/site-session',{create,createRemaster,market,rememberMe});if(result.needsAccountSetup||result.needsRemasterAccount)return result;connect(result);return result;}
 export async function siteLink(username:string,password:string){return request('/auth/site-link',{username,password});}
-export async function logout(remote=true){const owner=state.principal?.owner;if(remote)await request('/auth/logout',{});localStorage.removeItem('rgp.remembered-realm');generation++;socket?.disconnect();socket=null;stream?.close();stream=null;if(poll)clearInterval(poll);if(renew)clearInterval(renew);poll=null;renew=null;bearer='';pending.clear();if(owner)sessionStorage.removeItem('rgp.pending:'+owner);update({phase:'login',principal:null,snapshot:null,connection:'offline',error:null});}
+export async function logout(remote=true){
+  const owner=state.principal?.owner;const current=++generation;
+  socket?.disconnect();socket=null;stream?.close();stream=null;if(poll)clearInterval(poll);if(renew)clearInterval(renew);poll=null;renew=null;
+  update({connection:'offline'});
+  try{if(remote)await request('/auth/logout',{});}catch(error){if(current===generation)update({error:'退出未完成，请恢复连接后重试'});throw error;}
+  if(current!==generation)return;
+  localStorage.removeItem('rgp.remembered-realm');bearer='';pending.clear();if(owner)sessionStorage.removeItem('rgp.pending:'+owner);
+  update({phase:'login',principal:null,snapshot:null,connection:'offline',error:null});
+}
 export async function command(body:unknown):Promise<any>{
-  if(state.connection!=='live'||!state.principal||Date.now()-state.lastReceived>15000)throw new Error('行情尚未同步，请连接后再操作');const current=generation;const identity=JSON.stringify(body);if(pending.size&&!pending.has(identity))throw new Error('存在结果未知的请求，请先重试原操作');const pendingCommand=pending.get(identity)??{key:crypto.randomUUID(),body};pending.set(identity,pendingCommand);savePending();
+  if(!isSessionFresh(state)||!state.principal)throw new Error('行情尚未同步，请连接后再操作');const current=generation;const identity=JSON.stringify(body);if(pending.size&&!pending.has(identity))throw new Error('存在结果未知的请求，请先重试原操作');const pendingCommand=pending.get(identity)??{key:crypto.randomUUID(),body};pending.set(identity,pendingCommand);savePending();
   try{
     const result=await request('/commands',body,{'Idempotency-Key':pendingCommand.key});return await finish(result);
   }catch(error){if(current!==generation)throw new RuleRejected('账号已切换，原操作结果可在原账户记录中查看');if(error instanceof RuleRejected)throw error;if(error instanceof ApiError&&error.status<500){pending.delete(identity);savePending();throw error;}

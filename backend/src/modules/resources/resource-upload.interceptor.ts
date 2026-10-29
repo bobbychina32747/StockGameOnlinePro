@@ -25,7 +25,7 @@ const InnerFileInterceptor: any = FileInterceptor('file', {
             cb(null, crypto.randomBytes(16).toString('hex') + safeExt);
         },
     }),
-    limits: { fileSize: RESOURCE_FILE_LIMIT, files: 1 },
+    limits: { fileSize: RESOURCE_FILE_LIMIT, files: 1, fields: 8, parts: 9, fieldNameSize: 100, ...{ fieldNestingDepth: 0 } },
 });
 
 function mapUploadError(err: any) {
