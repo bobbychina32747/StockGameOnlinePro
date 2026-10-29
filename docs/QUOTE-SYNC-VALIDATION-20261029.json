@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "syntheticOnly": true,
+  "injectedHistoryDelayMilliseconds": 8000,
+  "injectedStateDelayMilliseconds": 20000,
+  "injectedBootRouteDelayMilliseconds": 800,
+  "coldMilliseconds": 8084,
+  "memoryWarmMilliseconds": 57,
+  "diskPreviewMilliseconds": 933,
+  "configSessionGapMilliseconds": 0,
+  "returnMilliseconds": 4,
+  "legacyCachesRecovered": true,
+  "abandonedHistoryAborted": true,
+  "hiddenPageStopsHistory": true,
+  "cachedPreviewTradingDisabled": true,
+  "freshSnapshotEnablesTrading": true,
+  "oneAndFiveMinuteRendered": true,
+  "legendAndZoomPreserved": true,
+  "consoleErrors": 0
+}

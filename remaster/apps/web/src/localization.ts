@@ -21,6 +21,8 @@ Object.assign(english,{
  '泡沫破灭的教训：板块连续暴涨（涨幅远超基本面）时，任何细小抛售都可能引发连锁崩盘。识别泡沫：关注涨幅是否离谱、回调时是否放量下跌。破灭期不要抄底，等价格回归价值企稳后再介入':'Bubble risk: prices far above fundamentals can unwind together. Compare valuation and selling volume; do not assume a falling price has stabilized.',
 });
 Object.assign(english, {
+ '历史行情暂未更新':'Historical data has not refreshed', '更新中…':'Updating…',
+ '暂无历史行情':'No historical candles',
  '角色':'Role',
  '盘口队列失衡 QI':'Queue imbalance (QI)', '期末队列失衡 QI':'Terminal queue imbalance (QI)',
  '市场微观结构实验室':'Market microstructure laboratory', '独立合成账户 · 有限订单簿 · 不影响正式资产':'Synthetic accounts · Finite order book · Separate from live assets',

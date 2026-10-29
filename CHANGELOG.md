@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-29 — Faster quote synchronization and chart switching
+
+- Load configuration and session checks concurrently. Show realm-filtered public market previews while authenticated snapshots load; cached data contains no balances/orders and cannot enable trading. Recover legacy snapshot and candle keys.
+- Add a bounded 48-entry candle memory cache, cancel abandoned history fetches, and stop history polling outside Trading. Keep chart zoom/legend state and distinguish cached, refreshed, unavailable, and genuinely empty history.
+- Reuse the date formatter and skip identical candle redraws. Bound IndexedDB opening, throttle public snapshot persistence, and close failed/late database connections.
+- Retry stale snapshot recovery every 1.5 seconds only when needed; refresh immediately on network/visibility recovery. Preserve the fifteen-second trading freshness boundary and remove recovery listeners on logout.
+- Added startup, cancellation, cache-isolation, capacity, hidden-page and blocked-storage regressions, plus a browser check under delayed history/state and legacy caches.
+
 ## 2026-10-29 — Reproducible market microstructure laboratory
 
 - Added a separate Research laboratory with finite price/time-priority matching, cash/share reservations, self-trade protection, integer-cent settlement, and a conserved fee pool. Unfilled market remainders cancel; depth is never filled by an unlimited fallback.

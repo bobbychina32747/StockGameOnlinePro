@@ -44,6 +44,8 @@ The hosted game follows real exchange dates and sessions: CN 09:30–11:30 / 13:
 
 ## Market simulation
 
+The workbench checks configuration and login in parallel. Cached public quotes and candles can appear while live data loads; account balances, orders, and trading permission still come from fresh authenticated snapshots. Chart selection cancels abandoned history requests, preserves a bounded memory cache, and pauses history polling outside Trading. See [the synthetic slow-network check](docs/QUOTE-SYNC-VALIDATION-20261029.json) for measured conditions and results; these are controlled test timings, not production latency guarantees.
+
 Prices combine sector-calibrated stochastic returns, conditional volatility, heavy-tailed shocks, overnight gaps, bounded valuation drift, macro factors, news, and execution impact. China price limits apply to the resulting quotes. Volume responds to absolute price moves, persistent activity, sector parameters, and market-specific intraday patterns.
 
 One-minute data feeds recent five-minute aggregation. News and executions update price, volume, traded value, and candle state. Simulated intrabar extrema produce candle shadows within the price boundaries. Market and AI snapshots retain the clock, cash, positions, costs, and activity state across backend restarts.
