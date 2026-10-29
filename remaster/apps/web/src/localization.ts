@@ -20,6 +20,40 @@ Object.assign(english,{
  '配对胜率':'Paired win rate','市场恐慌情绪蔓延':'Spreading market panic','获利盘集体出逃':'Profit-taking exits','细小抛售引发连锁恐慌':'Selling triggered cascading panic',
  '泡沫破灭的教训：板块连续暴涨（涨幅远超基本面）时，任何细小抛售都可能引发连锁崩盘。识别泡沫：关注涨幅是否离谱、回调时是否放量下跌。破灭期不要抄底，等价格回归价值企稳后再介入':'Bubble risk: prices far above fundamentals can unwind together. Compare valuation and selling volume; do not assume a falling price has stabilized.',
 });
+Object.assign(english, {
+ '角色':'Role',
+ '盘口队列失衡 QI':'Queue imbalance (QI)', '期末队列失衡 QI':'Terminal queue imbalance (QI)',
+ '市场微观结构实验室':'Market microstructure laboratory', '独立合成账户 · 有限订单簿 · 不影响正式资产':'Synthetic accounts · Finite order book · Separate from live assets',
+ '随机种子':'Random seed', '实验步数':'Experiment steps', '目标股数':'Target shares', '实验方向':'Experiment side',
+ '每档基础股数':'Base shares per level', '补单间隔（步）':'Quote refresh (steps)', '公开信息延迟（步）':'Public information delay (steps)',
+ '知情账户数':'Informed accounts', '库存风险系数':'Inventory risk factor', '消息冲击（bp）':'News shock (bp)',
+ '流动性与信息设置':'Liquidity and information settings', '运行对照实验':'Run comparison', '取消实验':'Cancel experiment',
+ '导出事件日志':'Export event log', '导入并校验重放':'Import and verify replay', '导入实验文件':'Import experiment file',
+ '文件超过 8 MB。':'The file exceeds 8 MB.', '实验超时，请减少步数后重试。':'The experiment timed out. Reduce the steps and retry.',
+ '参数超出范围，请检查输入。':'A parameter is outside its allowed range.', '实验未完成，请重试。':'The experiment could not finish. Please retry.',
+ '实验文件无效，版本或校验值不匹配。':'Invalid experiment file, version, or checksum.', '事件重放完成，全部校验值一致。':'Event replay complete. All checksums match.',
+ '实验完成。':'Experiment complete.', '实验已取消。':'Experiment cancelled.', '模型假设与指标':'Model assumptions and metrics',
+ '单标的、连续交易、T+0、只做多；三家做市商和六个噪声账户使用有限资金与持仓。每笔成交双边各收 5 bp 手续费，按分向上取整。':'One asset, continuous trading, T+0, long only. Three market makers and six noise accounts have finite cash and inventory. Each participant pays 5 bp per fill, rounded up to a cent.',
+ '潜在价值影响交易者判断；成交价只由挂单撮合产生。知情账户先看到价值变化，其他账户只看到延迟公开的信号。做市商按库存调整报价。':'Latent value informs decisions; only resting-order matches produce trade prices. Informed accounts see value changes first; others see a delayed public signal. Market makers adjust quotes for inventory.',
+ 'VWAP 按预设的 U 型预期成交量曲线拆单，不读取未来成交量。市价单未成交部分取消；拆单策略不会额外补追未成交数量。':'VWAP follows an ex-ante U-shaped expected-volume profile, without future realized volume. Market remainders are cancelled; later slices do not retry unfilled shares.',
+ '四组共享相同外部随机信号。正的执行成本表示更贵；总短缺计入费用和未成交的期末机会成本。成交率不同的结果不能只比较均价。':'All four runs share external random signals. Positive execution cost means more expensive. Shortfall includes fees and the terminal opportunity cost of unfilled shares. Compare fill rates alongside prices.',
+ 'OFI 累加逐次最优报价的数量变化；静态盘口失衡另算。5 步成交后变动是未扣费的方向收益，不是账户收益率。':'OFI sums successive best-quote changes; static queue imbalance is separate. Five-step markout is a directional price return before fees, not an account return.',
+ '实验步不是现实分钟。配对冲击与恢复只描述本模型；单次结果不是统计证明，也没有用真实 Level 2 数据校准。':'Steps are not real minutes. Paired impact and recovery describe this model only. A single run is not statistical evidence; the model is not calibrated to real Level 2 data.',
+ '无目标订单':'No parent order', '一次性下单':'Lump order', 'TWAP 等时拆单':'TWAP equal-time slices', 'VWAP 预设量曲线':'VWAP expected-volume slices',
+ '做市商':'Market makers', '噪声交易者':'Noise traders', '知情交易者':'Informed traders', '目标账户':'Parent account',
+ '执行成本对照':'Execution cost comparison', '种子':'Seed', '步':'steps', '成交 / 目标':'Filled / target', '成交率':'Fill rate',
+ '成交均价':'Average fill', '手续费':'Fees', '执行成本':'Execution cost', '机会成本':'Opportunity cost', '总执行短缺':'Implementation shortfall',
+ '总执行短缺 = 成交率 × 执行成本 + 机会成本；1 bp = 0.01%。':'Shortfall = fill rate × execution cost + opportunity cost; 1 bp = 0.01%.',
+ '价格发现与信息延迟':'Price discovery and information delay', '流动性与冲击':'Liquidity and impact', '观察策略':'Observed policy', '观察指标':'Observed metric',
+ '深度与价差':'Depth and spread', '订单流与成交量':'Order flow and volume', '相对基线冲击':'Impact versus baseline',
+ '平均价差':'Average spread', '平均单边深度':'Average one-sided depth', '缺少双边报价':'Missing two-sided quotes', 'OFI / 收益相关':'OFI / return correlation',
+ '绝对收益自相关':'Absolute-return autocorrelation', '峰值冲击':'Peak impact', '期末冲击':'Terminal impact', '尾段恢复半衰期（步）':'Tail recovery half-life (steps)',
+ '未观测到':'Not observed', '策略生态与账本':'Agents and ledger', '5 步有效观测':'Valid five-step observations', '5 步成交后变动':'Five-step markout',
+ '期末库存':'Terminal inventory', '期末盯市损益':'Terminal mark-to-market P&L', '重放校验值（SHA-256）':'Replay checksums (SHA-256)',
+ '潜在价值':'Latent value', '公开信号':'Public signal', '买方挂单深度':'Bid depth', '卖方挂单深度':'Ask depth', '价差（bp）':'Spread (bp)',
+ '事件 OFI':'Event OFI', '实验价格路径':'Experiment price paths', '实验流动性图表':'Experiment liquidity chart',
+});
+Object.assign(traditional, {潜:'潛',声:'聲',验:'驗',账:'帳',资:'資',产:'產',补:'補',单:'單',间:'間',迟:'遲',库:'庫',变:'變',报:'報',值:'值',预:'預',计:'計',观:'觀',测:'測',则:'則',簿:'簿',噪:'噪',价:'價',损:'損',衰:'衰',亏:'虧',双:'雙',险:'險',复:'復'});
 const keys=Object.keys(english).sort((a,b)=>b.length-a.length);
 export function translate(text:string,language=currentLanguage()):string {
   if(language==='zh-CN')return text;

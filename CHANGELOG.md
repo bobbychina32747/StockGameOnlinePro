@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-29 — Reproducible market microstructure laboratory
+
+- Added a separate Research laboratory with finite price/time-priority matching, cash/share reservations, self-trade protection, integer-cent settlement, and a conserved fee pool. Unfilled market remainders cancel; depth is never filled by an unlimited fallback.
+- Compare a lump order, fifteen-slice TWAP, and ex-ante expected-volume VWAP against a no-parent-order baseline using common external random streams. Synthetic informed traders observe latent value before the delayed public signal; market makers adjust quotes for inventory.
+- Added fill ratios, fees, implementation shortfall with opportunity cost, quote-event OFI, spread/depth, paired-path impact/recovery, and gross five-step role markouts. Missing observations remain missing.
+- Corrected the formal research panel's static depth signal label to queue imbalance (QI); the legacy `flow.ofi` wire field remains compatible. The laboratory exposes event OFI separately.
+- Run bounded experiments in a cancellable browser worker. Export versioned event tapes, replay ledger transitions, and verify SHA-256 checksums. English and both Chinese interfaces are supported; production accounts, history, and live execution rules are unchanged.
+
 ## 2026-10-29 — Dependency security and browser state
 
 - Updated request/upload dependencies, constrained multipart field nesting and counts, and upgraded bcrypt while retaining legacy hash compatibility. Removed the legacy node-pre-gyp/tar chain.

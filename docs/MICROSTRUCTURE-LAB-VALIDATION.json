@@ -1,0 +1,439 @@
+{
+  "model": "sgp-microstructure-1",
+  "validatedAt": "2026-10-29T11:35:43.806Z",
+  "node": "v24.18.0",
+  "scope": "Isolated synthetic laboratory. No production trades or account writes.",
+  "automated": {
+    "remasterSuite": {
+      "passed": 60,
+      "failed": 0
+    },
+    "labTests": 16,
+    "browser": {
+      "passed": true,
+      "syntheticOnly": true,
+      "nodeBrowserDigestsMatch": true,
+      "sameSeed": true,
+      "exportAndReplay": true,
+      "tamperRejected": true,
+      "cancelAndUnmountStopWorker": true,
+      "charts": [
+        "paths",
+        "liquidity",
+        "flow",
+        "impact"
+      ],
+      "EnglishComplete": true,
+      "Traditional": true,
+      "mobileNoHorizontalOverflow": true,
+      "consoleErrors": 0
+    }
+  },
+  "defaultExperiment": {
+    "config": {
+      "seed": 20261029,
+      "ticks": 180,
+      "quantity": 3000,
+      "side": "buy",
+      "quoteSize": 80,
+      "replenishEvery": 5,
+      "informationDelay": 20,
+      "informedCount": 2,
+      "inventoryAversion": 2,
+      "newsJumpBps": 100
+    },
+    "reports": {
+      "baseline": {
+        "digest": "311b8af9aa5ac727f593ed6bf4eaeb64fddf42f1e3618d733eaa206be24516ba",
+        "events": 2404,
+        "fills": 541,
+        "metrics": {
+          "requested": 0,
+          "filled": 0,
+          "fillRatio": 0,
+          "averagePrice": null,
+          "fees": 0,
+          "arrivalPrice": 9997.5,
+          "terminalPrice": 10105,
+          "executionCostBps": null,
+          "opportunityCostBps": 0,
+          "implementationShortfallBps": 0,
+          "marketVwap": 10046.783420006119,
+          "averageSpreadBps": 33.924559586060354,
+          "averageDepth": 1035.7472222222223,
+          "illiquidTicks": 0,
+          "ofiReturnCorrelation": 0.5742223098337639,
+          "absoluteReturnAutocorrelation": 0.3471606033705469,
+          "roleMarkouts": [
+            {
+              "role": "maker",
+              "trades": 359,
+              "fiveTickMarkoutBps": 14.275309532436289
+            },
+            {
+              "role": "noise",
+              "trades": 644,
+              "fiveTickMarkoutBps": -8.509972779670962
+            },
+            {
+              "role": "informed",
+              "trades": 41,
+              "fiveTickMarkoutBps": 8.67283775520658
+            },
+            {
+              "role": "parent",
+              "trades": 0,
+              "fiveTickMarkoutBps": null
+            }
+          ]
+        }
+      },
+      "lump": {
+        "digest": "d5e200f4769781ce11ff1eaa21db4971245389fe37f7669cd035a075889fc06e",
+        "events": 2392,
+        "fills": 549,
+        "metrics": {
+          "requested": 3000,
+          "filled": 1165,
+          "fillRatio": 0.3883333333333333,
+          "averagePrice": 10037.322746781116,
+          "fees": 5853,
+          "arrivalPrice": 9997.5,
+          "terminalPrice": 10108.5,
+          "executionCostBps": 44.85799561478352,
+          "opportunityCostBps": 67.91197799449863,
+          "implementationShortfallBps": 85.33183295823956,
+          "marketVwap": 10047.425946258307,
+          "averageSpreadBps": 34.52799684015121,
+          "averageDepth": 1024.338888888889,
+          "illiquidTicks": 1,
+          "ofiReturnCorrelation": 0.6251884459377218,
+          "absoluteReturnAutocorrelation": 0.29574421892585834,
+          "roleMarkouts": [
+            {
+              "role": "maker",
+              "trades": 367,
+              "fiveTickMarkoutBps": 16.281917299831896
+            },
+            {
+              "role": "noise",
+              "trades": 633,
+              "fiveTickMarkoutBps": -9.438226045337007
+            },
+            {
+              "role": "informed",
+              "trades": 42,
+              "fiveTickMarkoutBps": 9.532108449931377
+            },
+            {
+              "role": "parent",
+              "trades": 14,
+              "fiveTickMarkoutBps": -28.672508374078454
+            }
+          ]
+        }
+      },
+      "twap": {
+        "digest": "7a41de4a2c64decc2fb80d55a8a2c2d5283cb6cd3165edf57bab0a53cf5998f0",
+        "events": 2368,
+        "fills": 604,
+        "metrics": {
+          "requested": 3000,
+          "filled": 3000,
+          "fillRatio": 1,
+          "averagePrice": 10058.167333333333,
+          "fees": 15124,
+          "arrivalPrice": 9997.5,
+          "terminalPrice": 10111.5,
+          "executionCostBps": 65.72509794115196,
+          "opportunityCostBps": 0,
+          "implementationShortfallBps": 65.72509794115196,
+          "marketVwap": 10050.306657665144,
+          "averageSpreadBps": 37.214168299431314,
+          "averageDepth": 983.0611111111111,
+          "illiquidTicks": 0,
+          "ofiReturnCorrelation": 0.6033156646914555,
+          "absoluteReturnAutocorrelation": 0.22433355395963503,
+          "roleMarkouts": [
+            {
+              "role": "maker",
+              "trades": 400,
+              "fiveTickMarkoutBps": 17.27242207756534
+            },
+            {
+              "role": "noise",
+              "trades": 664,
+              "fiveTickMarkoutBps": -8.850054567837844
+            },
+            {
+              "role": "informed",
+              "trades": 39,
+              "fiveTickMarkoutBps": 10.339928771342894
+            },
+            {
+              "role": "parent",
+              "trades": 67,
+              "fiveTickMarkoutBps": -21.42969880692813
+            }
+          ]
+        }
+      },
+      "vwap": {
+        "digest": "97301c034d4b1e418a78418b8cf6c84a73bcbbe33d1f53787bab1d185f1820ef",
+        "events": 2372,
+        "fills": 605,
+        "metrics": {
+          "requested": 3000,
+          "filled": 3000,
+          "fillRatio": 1,
+          "averagePrice": 10066.9,
+          "fees": 15131,
+          "arrivalPrice": 9997.5,
+          "terminalPrice": 10111.5,
+          "executionCostBps": 74.46228223722596,
+          "opportunityCostBps": 0,
+          "implementationShortfallBps": 74.46228223722596,
+          "marketVwap": 10052.311493128827,
+          "averageSpreadBps": 37.39479647822617,
+          "averageDepth": 984.3055555555555,
+          "illiquidTicks": 0,
+          "ofiReturnCorrelation": 0.4878453650660153,
+          "absoluteReturnAutocorrelation": 0.1606962296139276,
+          "roleMarkouts": [
+            {
+              "role": "maker",
+              "trades": 400,
+              "fiveTickMarkoutBps": 16.48790067988774
+            },
+            {
+              "role": "noise",
+              "trades": 674,
+              "fiveTickMarkoutBps": -8.206574116060876
+            },
+            {
+              "role": "informed",
+              "trades": 39,
+              "fiveTickMarkoutBps": 5.57038630061065
+            },
+            {
+              "role": "parent",
+              "trades": 59,
+              "fiveTickMarkoutBps": -21.714820058540436
+            }
+          ]
+        }
+      }
+    }
+  },
+  "seedSweep": {
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19
+    ],
+    "reportsChecked": 80,
+    "allConserved": true,
+    "fillRates": [
+      {
+        "seed": 0,
+        "fillRates": {
+          "lump": 0.31866666666666665,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 1,
+        "fillRates": {
+          "lump": 0.35433333333333333,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 2,
+        "fillRates": {
+          "lump": 0.353,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 3,
+        "fillRates": {
+          "lump": 0.37333333333333335,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 4,
+        "fillRates": {
+          "lump": 0.38033333333333336,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 5,
+        "fillRates": {
+          "lump": 0.3873333333333333,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 6,
+        "fillRates": {
+          "lump": 0.37033333333333335,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 7,
+        "fillRates": {
+          "lump": 0.343,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 8,
+        "fillRates": {
+          "lump": 0.3373333333333333,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 9,
+        "fillRates": {
+          "lump": 0.303,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 10,
+        "fillRates": {
+          "lump": 0.36833333333333335,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 11,
+        "fillRates": {
+          "lump": 0.38,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 12,
+        "fillRates": {
+          "lump": 0.333,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 13,
+        "fillRates": {
+          "lump": 0.3426666666666667,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 14,
+        "fillRates": {
+          "lump": 0.42233333333333334,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 15,
+        "fillRates": {
+          "lump": 0.32266666666666666,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 16,
+        "fillRates": {
+          "lump": 0.3943333333333333,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 17,
+        "fillRates": {
+          "lump": 0.341,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 18,
+        "fillRates": {
+          "lump": 0.3393333333333333,
+          "twap": 1,
+          "vwap": 1
+        }
+      },
+      {
+        "seed": 19,
+        "fillRates": {
+          "lump": 0.3496666666666667,
+          "twap": 1,
+          "vwap": 1
+        }
+      }
+    ],
+    "note": "Mechanical diagnostic under this uncalibrated model; not real-market validation."
+  },
+  "boundsExercise": {
+    "config": {
+      "seed": 4294967295,
+      "ticks": 300,
+      "quantity": 20000,
+      "side": "buy",
+      "quoteSize": 400,
+      "replenishEvery": 3,
+      "informationDelay": 60,
+      "informedCount": 4,
+      "inventoryAversion": 10,
+      "newsJumpBps": 300
+    },
+    "events": {
+      "baseline": 5716,
+      "lump": 5688,
+      "twap": 5652,
+      "vwap": 5576
+    },
+    "exportBytes": 2217326,
+    "replayVerified": true
+  }
+}

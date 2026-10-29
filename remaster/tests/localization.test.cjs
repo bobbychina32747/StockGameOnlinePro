@@ -4,7 +4,7 @@ const local=new Module(filename,module);local.filename=filename;local.require=id
 local._compile(ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,filename);
 const {translate,interfaceTranslations}=local.exports;
 test('English covers formal panels, preferences, limits and dynamic numbers; traditional labels remain Chinese',()=>{
- for(const text of ['交易复盘记录','融资设置','界面语言','涨停价','AI 对手盘','订单流与融券','市场风险事件','游戏账号登录'])assert(!/[\u3400-\u9fff]/.test(translate(text,'en')));
+ for(const text of ['交易复盘记录','融资设置','界面语言','涨停价','AI 对手盘','订单流与融券','市场风险事件','游戏账号登录','市场微观结构实验室','盘口队列失衡 QI','期末队列失衡 QI','角色'])assert(!/[\u3400-\u9fff]/.test(translate(text,'en')));
  assert.equal(translate('当前债务 123.45','en'),'Current debt 123.45');
  assert.equal(translate('资产账本','zh-Hant'),'資產帳本');
  assert.equal(translate('暂停','zh-Hant'),'暫停');

@@ -21,6 +21,7 @@ A multiplayer stock-trading simulation with persistent accounts, three market re
 - Explore earnings, consensus surprises, dividends, macro releases, sector cycles, news, and order flow.
 - Use funds and margin, and short stocks where the realm permits it.
 - Compete in seasons, compare AI opponents, review performance, and test MA crossover, RSI reversal, and momentum strategies.
+- Run a reproducible microstructure experiment: compare lump orders, TWAP, and an expected-volume VWAP schedule against a no-parent-order baseline with finite liquidity, delayed information, and inventory-sensitive market makers.
 - Use the workbench on desktop or mobile, with English, Simplified Chinese, or Traditional Chinese and dark/light themes.
 
 The unified workbench uses the original backend as its authoritative ledger and matching engine. It does not maintain a second set of production assets.
@@ -48,6 +49,14 @@ Prices combine sector-calibrated stochastic returns, conditional volatility, hea
 One-minute data feeds recent five-minute aggregation. News and executions update price, volume, traded value, and candle state. Simulated intrabar extrema produce candle shadows within the price boundaries. Market and AI snapshots retain the clock, cash, positions, costs, and activity state across backend restarts.
 
 AI opponents run local rule strategies and a decision-stump ensemble. They have cash and position constraints, exposure limits, cooldowns, and drawdown controls. Their displayed returns come from simulated assets and executions; profitability is not guaranteed. Backtest results are independent simulations and do not change player account returns.
+
+### Controlled market experiments
+
+Open **Research → Market microstructure laboratory**. Choose a seed, target size and side, then run all four policies under the same external random signals. Adjust quote depth, replenishment, public information delay, informed accounts, inventory aversion, and a synthetic news shock. Charts expose price paths, spread, depth, event OFI, volume, paired impact, and role-level markouts. Execution reports include fill rates, fees, and the opportunity cost of unfilled shares.
+
+The laboratory uses separate synthetic accounts in a browser worker. Its continuous, single-asset, T+0, long-only market has integer-cent accounting, reserved cash/shares, price-time priority, self-trade prevention, and **no unlimited liquidity fallback**. It does not place live orders or change player balances. Export the versioned JSON event log and import it to mechanically replay the ledger and verify SHA-256 checksums. A checksum checks content consistency, not authorship.
+
+The lab is a controlled teaching model, **not a replacement for the hosted price generator or a calibrated Level 2 simulator**. Latent value remains exogenous; only order-book matches create trade prices. Market making uses an inventory heuristic rather than an optimal-control solution. VWAP uses an ex-ante expected-volume profile, and a single seed does not establish a real-market law. See [the model, metric definitions, and replay contract](docs/MICROSTRUCTURE-LAB.md).
 
 ### Data and validation
 
