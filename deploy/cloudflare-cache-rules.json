@@ -1,0 +1,46 @@
+{
+  "rules": [
+    {
+      "ref": "portal_public_assets_v1",
+      "description": "Portal public assets: respect origin cache headers",
+      "enabled": true,
+      "action": "set_cache_settings",
+      "expression": "(http.host in {\"bobbycn.cc\" \"www.bobbycn.cc\"} and http.cookie eq \"\" and not any(http.request.headers[\"authorization\"][*] ne \"\") and http.request.uri.path.extension in {\"css\" \"js\" \"mjs\" \"png\" \"jpg\" \"jpeg\" \"gif\" \"webp\" \"avif\" \"svg\" \"ico\" \"woff\" \"woff2\" \"ttf\" \"otf\" \"eot\" \"wasm\" \"mp4\" \"webm\" \"ogg\" \"mp3\" \"wav\"})",
+      "action_parameters": {
+        "cache": true,
+        "edge_ttl": {
+          "mode": "bypass_by_default"
+        },
+        "browser_ttl": {
+          "mode": "respect_origin"
+        }
+      }
+    },
+    {
+      "ref": "portal_public_html_v1",
+      "description": "Portal anonymous static HTML: origin sets 60 second edge TTL",
+      "enabled": true,
+      "action": "set_cache_settings",
+      "expression": "(http.host in {\"bobbycn.cc\" \"www.bobbycn.cc\"} and http.cookie eq \"\" and not any(http.request.headers[\"authorization\"][*] ne \"\") and (http.request.uri.path in {\"/\" \"/index.html\"} or ((starts_with(http.request.uri.path, \"/games/\") or starts_with(http.request.uri.path, \"/posts/\") or starts_with(http.request.uri.path, \"/resources/\") or starts_with(http.request.uri.path, \"/sponsor/\") or starts_with(http.request.uri.path, \"/hosted/\")) and (ends_with(http.request.uri.path, \"/\") or ends_with(http.request.uri.path, \"/index.html\")))))",
+      "action_parameters": {
+        "cache": true,
+        "edge_ttl": {
+          "mode": "bypass_by_default"
+        },
+        "browser_ttl": {
+          "mode": "respect_origin"
+        }
+      }
+    },
+    {
+      "ref": "portal_private_bypass_v1",
+      "description": "Portal private routes and sessions: bypass cache (keep last)",
+      "enabled": true,
+      "action": "set_cache_settings",
+      "expression": "(http.host in {\"bobbycn.cc\" \"www.bobbycn.cc\"} and (http.cookie ne \"\" or any(http.request.headers[\"authorization\"][*] ne \"\") or lower(http.request.uri.path) eq \"/api\" or starts_with(lower(http.request.uri.path), \"/api/\") or lower(http.request.uri.path) eq \"/oauth\" or starts_with(lower(http.request.uri.path), \"/oauth/\") or lower(http.request.uri.path) eq \"/admin\" or starts_with(lower(http.request.uri.path), \"/admin/\") or lower(http.request.uri.path) eq \"/account\" or starts_with(lower(http.request.uri.path), \"/account/\") or lower(http.request.uri.path) eq \"/login\" or starts_with(lower(http.request.uri.path), \"/login/\") or lower(http.request.uri.path) eq \"/register\" or starts_with(lower(http.request.uri.path), \"/register/\") or lower(http.request.uri.path) eq \"/reset-password\" or starts_with(lower(http.request.uri.path), \"/reset-password/\") or lower(http.request.uri.path) eq \"/verify-email\" or starts_with(lower(http.request.uri.path), \"/verify-email/\") or lower(http.request.uri.path) eq \"/chat\" or starts_with(lower(http.request.uri.path), \"/chat/\") or lower(http.request.uri.path) eq \"/mail\" or starts_with(lower(http.request.uri.path), \"/mail/\") or lower(http.request.uri.path) eq \"/secret\" or starts_with(lower(http.request.uri.path), \"/secret/\") or lower(http.request.uri.path) eq \"/socket.io\" or starts_with(lower(http.request.uri.path), \"/socket.io/\") or http.request.uri.path contains \"/.\" or ends_with(lower(http.request.uri.path), \"/oauth-callback.html\") or ends_with(lower(http.request.uri.path), \"/sw.js\") or ends_with(lower(http.request.uri.path), \"/service-worker.js\") or ends_with(lower(http.request.uri.path), \"/retire-remaster-sw.js\") or http.request.uri.path.extension in {\"webmanifest\" \"map\"}))",
+      "action_parameters": {
+        "cache": false
+      }
+    }
+  ]
+}
