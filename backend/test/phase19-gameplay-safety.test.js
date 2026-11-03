@@ -253,18 +253,18 @@ describe('market session boundaries', () => {
   });
 
   test('US real-time midnight stays on the same session and closes after 04:00', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-08-18T23:59:00'));
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-18T23:59:00+08:00'));
     try {
       const { svc, md, e } = market(false);
       await svc.processMarket('US', md, 'tickCounterUS');
-      jest.setSystemTime(new Date('2026-08-19T00:00:00'));
+      jest.setSystemTime(new Date('2026-08-19T00:00:00+08:00'));
       await svc.processMarket('US', md, 'tickCounterUS');
       expect(md.setTradingMinute.mock.calls).toEqual([[149], [150]]);
       expect(md.gameDay).toBe(0);
-      jest.setSystemTime(new Date('2026-08-19T03:59:00'));
+      jest.setSystemTime(new Date('2026-08-19T03:59:00+08:00'));
       await svc.processMarket('US', md, 'tickCounterUS');
       expect(md.endOfDay).not.toHaveBeenCalled();
-      jest.setSystemTime(new Date('2026-08-19T04:00:00'));
+      jest.setSystemTime(new Date('2026-08-19T04:00:00+08:00'));
       await svc.processMarket('US', md, 'tickCounterUS');
       await svc.processMarket('US', md, 'tickCounterUS');
       expect(md.endOfDay).toHaveBeenCalledTimes(1);
@@ -291,7 +291,7 @@ describe('market session boundaries', () => {
   });
 
   test('real-time HK starts at 14:30 index 240 and does not restart the day or duplicate the minute', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-08-18T14:30:00'));
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-18T14:30:00+08:00'));
     try {
       const { svc, md } = market(false);
       await svc.processMarket('HK', md, 'tickCounterHK');
@@ -299,7 +299,7 @@ describe('market session boundaries', () => {
       expect(md.setTradingMinute).toHaveBeenCalledWith(240);
       expect(md.generateTick).toHaveBeenCalledTimes(1);
       expect(md.endOfDay).not.toHaveBeenCalled();
-      jest.setSystemTime(new Date('2026-08-18T16:00:01'));
+      jest.setSystemTime(new Date('2026-08-18T16:00:01+08:00'));
       await svc.processMarket('HK', md, 'tickCounterHK');
       await svc.processMarket('HK', md, 'tickCounterHK');
       expect(md.endOfDay).toHaveBeenCalledTimes(1);

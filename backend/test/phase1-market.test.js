@@ -1,3 +1,4 @@
+// Session fixtures use explicit China/Hong Kong instants, independent of the runner time zone.
 // P1 行情真实性：美股夏令时 / 三阶段竞价 / 隔夜跳空 / 厚尾跳跃
 const { isTradingTimeFor, isUsDaylightSaving, usSessionsFor, auctionStageFor, isAuctionTimeFor } = require('../dist/src/common/constants');
 const { drawOvernightMarketShock, drawOvernightGap, drawBigJump, OVERNIGHT_PARAMS, standardNormal } = require('../dist/src/core/market-data/market-math');
@@ -25,48 +26,48 @@ describe('P1 美股夏令时（EDT/EST）', () => {
   });
 
   test('冬令时 22:00 休市、22:30 开市、05:00 收盘', () => {
-    expect(isTradingTimeFor('US', new Date(2026, 0, 15, 22, 0))).toBe(false);
-    expect(isTradingTimeFor('US', new Date(2026, 0, 15, 22, 30))).toBe(true);
-    expect(isTradingTimeFor('US', new Date(2026, 0, 16, 4, 59))).toBe(true);
-    expect(isTradingTimeFor('US', new Date(2026, 0, 16, 5, 0))).toBe(false);
+    expect(isTradingTimeFor('US', new Date('2026-01-15T22:00:00+08:00'))).toBe(false);
+    expect(isTradingTimeFor('US', new Date('2026-01-15T22:30:00+08:00'))).toBe(true);
+    expect(isTradingTimeFor('US', new Date('2026-01-16T04:59:00+08:00'))).toBe(true);
+    expect(isTradingTimeFor('US', new Date('2026-01-16T05:00:00+08:00'))).toBe(false);
   });
 
   test('跨午夜交易日归属：节假日翌日凌晨按美东日期休市', () => {
     // 2026-07-03（周五）独立日假期 → 北京时间 07-04 01:00 仍属周五美盘 → 休市
-    expect(isTradingTimeFor('US', new Date(2026, 6, 4, 1, 0))).toBe(false);
+    expect(isTradingTimeFor('US', new Date('2026-07-04T01:00:00+08:00'))).toBe(false);
     // 普通周五 → 次日凌晨正常开市
-    expect(isTradingTimeFor('US', new Date(2026, 6, 11, 1, 0))).toBe(true);
+    expect(isTradingTimeFor('US', new Date('2026-07-11T01:00:00+08:00'))).toBe(true);
   });
 
   test('未知市场回退 A 股规则（不崩溃）', () => {
-    expect(isTradingTimeFor('XX', new Date(2026, 7, 17, 10, 0))).toBe(true);
-    expect(isTradingTimeFor('XX', new Date(2026, 7, 17, 12, 0))).toBe(false);
+    expect(isTradingTimeFor('XX', new Date('2026-08-17T10:00:00+08:00'))).toBe(true);
+    expect(isTradingTimeFor('XX', new Date('2026-08-17T12:00:00+08:00'))).toBe(false);
   });
 });
 
 describe('P1 A股三阶段集合竞价', () => {
   test('9:15-9:20 可撤单 / 9:20-9:25 锁定 / 9:25-9:30 撮合', () => {
-    expect(auctionStageFor('CN', new Date(2026, 7, 17, 9, 14))).toBeNull();
-    expect(auctionStageFor('CN', new Date(2026, 7, 17, 9, 15))).toBe('cancelable');
-    expect(auctionStageFor('CN', new Date(2026, 7, 17, 9, 19))).toBe('cancelable');
-    expect(auctionStageFor('CN', new Date(2026, 7, 17, 9, 20))).toBe('locked');
-    expect(auctionStageFor('CN', new Date(2026, 7, 17, 9, 24))).toBe('locked');
-    expect(auctionStageFor('CN', new Date(2026, 7, 17, 9, 25))).toBe('matching');
-    expect(auctionStageFor('CN', new Date(2026, 7, 17, 9, 29))).toBe('matching');
-    expect(auctionStageFor('CN', new Date(2026, 7, 17, 9, 30))).toBeNull();
+    expect(auctionStageFor('CN', new Date('2026-08-17T09:14:00+08:00'))).toBeNull();
+    expect(auctionStageFor('CN', new Date('2026-08-17T09:15:00+08:00'))).toBe('cancelable');
+    expect(auctionStageFor('CN', new Date('2026-08-17T09:19:00+08:00'))).toBe('cancelable');
+    expect(auctionStageFor('CN', new Date('2026-08-17T09:20:00+08:00'))).toBe('locked');
+    expect(auctionStageFor('CN', new Date('2026-08-17T09:24:00+08:00'))).toBe('locked');
+    expect(auctionStageFor('CN', new Date('2026-08-17T09:25:00+08:00'))).toBe('matching');
+    expect(auctionStageFor('CN', new Date('2026-08-17T09:29:00+08:00'))).toBe('matching');
+    expect(auctionStageFor('CN', new Date('2026-08-17T09:30:00+08:00'))).toBeNull();
   });
 
   test('仅 A 股生效；周末/节假日无效', () => {
-    expect(auctionStageFor('HK', new Date(2026, 7, 17, 9, 20))).toBeNull();
-    expect(auctionStageFor('US', new Date(2026, 7, 17, 9, 20))).toBeNull();
-    expect(auctionStageFor('CN', new Date(2026, 7, 15, 9, 20))).toBeNull(); // 周六
-    expect(auctionStageFor('CN', new Date(2026, 9, 1, 9, 20))).toBeNull(); // 国庆
+    expect(auctionStageFor('HK', new Date('2026-08-17T09:20:00+08:00'))).toBeNull();
+    expect(auctionStageFor('US', new Date('2026-08-17T09:20:00+08:00'))).toBeNull();
+    expect(auctionStageFor('CN', new Date('2026-08-15T09:20:00+08:00'))).toBeNull(); // 周六
+    expect(auctionStageFor('CN', new Date('2026-10-01T09:20:00+08:00'))).toBeNull(); // 国庆
   });
 
   test('isAuctionTimeFor 兼容整个 9:15-9:30 窗口', () => {
-    expect(isAuctionTimeFor('CN', new Date(2026, 7, 17, 9, 20))).toBe(true);
-    expect(isAuctionTimeFor('CN', new Date(2026, 7, 17, 9, 28))).toBe(true);
-    expect(isAuctionTimeFor('CN', new Date(2026, 7, 17, 9, 30))).toBe(false);
+    expect(isAuctionTimeFor('CN', new Date('2026-08-17T09:20:00+08:00'))).toBe(true);
+    expect(isAuctionTimeFor('CN', new Date('2026-08-17T09:28:00+08:00'))).toBe(true);
+    expect(isAuctionTimeFor('CN', new Date('2026-08-17T09:30:00+08:00'))).toBe(false);
   });
 });
 

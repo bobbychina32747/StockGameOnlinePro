@@ -65,6 +65,13 @@
       "core/trading-engine/trading-engine.service.js": "626b424c8609b8a758d9d509a32e7688605353ff3b7ce381684be7614a57014a",
       "core/trading-engine/finite-execution.js": "60ae069585f18aad1d3d757635cefc6bca86d4749e9031c404bab60ea5774401",
       "core/trading-engine/order-flow.js": "9e930b31077adc21a8c30ba8c31dabfaee907e35fd80a7f4099279a53f3672c2"
+    },
+    "timezoneFixtures": {
+      "timeZone": "UTC",
+      "suites": 4,
+      "tests": 65,
+      "failed": 0,
+      "reason": "Legacy fixtures now state +08:00 for exchange-session instants instead of inheriting the host timezone."
     }
   },
   "deployment": {
