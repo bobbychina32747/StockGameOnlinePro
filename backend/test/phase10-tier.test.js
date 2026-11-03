@@ -103,9 +103,9 @@ describe('Phase D checkPendingOrders 批量预载（行为级验收，teams 门�
     const accountRepo = countingRepo([makeAccount('AC1', 100000), makeAccount('AC2', 100000)]);
     const engine = new TradingEngineService(orderRepo, accountRepo, countingRepo(), countingRepo(), null);
     engine.prices.set('T1', 9); engine.prices.set('T2', 9); engine.prices.set('T3', 9);
-    engine.placeRestingOrder('T1', 'r1', 'RX1', 'sell', 9, 100);
-    engine.placeRestingOrder('T2', 'r2', 'RX2', 'sell', 9, 100);
-    engine.placeRestingOrder('T3', 'r3', 'RX3', 'sell', 9, 100);
+    engine.placeVirtualOrder('T1', 'sell', 9, 100, 999);
+    engine.placeVirtualOrder('T2', 'sell', 9, 100, 999);
+    engine.placeVirtualOrder('T3', 'sell', 9, 100, 999);
     const fills = await engine.checkPendingOrders();
     expect(fills.length).toBe(3);
     expect(orderRepo.rows.find((r) => r.id === 'O1').status).toBe('filled');
@@ -115,10 +115,10 @@ describe('Phase D checkPendingOrders 批量预载（行为级验收，teams 门�
     expect(accountRepo.calls.find).toBe(1);
     expect(accountRepo.calls.lastFindWhere.id._type).toBe('in');
     expect(accountRepo.calls.lastFindWhere.id.value.map(String).sort()).toEqual(['AC1', 'AC2']);
-    // AC1 三次 findOne = O1 结算内部重读(1) + O2 脏刷新(1) + O2 结算内部重读(1)——证明脏刷新恰好一次
-    expect(accountRepo.calls.findOneById.get('AC1')).toBe(3);
-    // AC2 一次 findOne = O3 结算内部重读（未触发脏刷新，直接命中批量 Map）
-    expect(accountRepo.calls.findOneById.get('AC2')).toBe(1);
+    // AC1 五次 findOne = O1 预校验与结算(2) + O2 脏刷新(1) + O2 预校验与结算(2)——证明脏刷新恰好一次
+    expect(accountRepo.calls.findOneById.get('AC1')).toBe(5);
+    // AC2 两次 findOne = O3 内存适配器预校验与结算重读（未触发脏刷新，直接命中批量 Map）
+    expect(accountRepo.calls.findOneById.get('AC2')).toBe(2);
   });
 
   test('同账户第二单读到结算后现金：资金不足校验失败取消（脏刷新数据新鲜度）', async () => {
@@ -126,16 +126,16 @@ describe('Phase D checkPendingOrders 批量预载（行为级验收，teams 门�
     const accountRepo = countingRepo([makeAccount('AC1', 100000)]);
     const engine = new TradingEngineService(orderRepo, accountRepo, countingRepo(), countingRepo(), null);
     engine.prices.set('T1', 9); engine.prices.set('T2', 9);
-    engine.placeRestingOrder('T1', 'r1', 'RX1', 'sell', 9, 9500);
-    engine.placeRestingOrder('T2', 'r2', 'RX2', 'sell', 9, 2000);
+    engine.placeVirtualOrder('T1', 'sell', 9, 9500, 999);
+    engine.placeVirtualOrder('T2', 'sell', 9, 2000, 999);
     const fills = await engine.checkPendingOrders();
     expect(fills.length).toBe(1); // 只有第一单成交
     const o2 = orderRepo.rows.find((r) => r.id === 'O2');
     expect(o2.status).toBe('cancelled');
     expect(o2.rejectReason).toContain('资金不足');
-    // 行为锚点：批量 find 1 次；AC1 两次 findOne = O1 结算内部重读(1) + O2 脏刷新(1)
+    // 行为锚点：批量 find 1 次；AC1 三次 findOne = O1 内存适配器预校验与结算重读(2) + O2 脏刷新(1)
     // （刷新读到结算后现金，validateOrder 才正确取消第二单——数据新鲜度的行为级证明）
     expect(accountRepo.calls.find).toBe(1);
-    expect(accountRepo.calls.findOneById.get('AC1')).toBe(2);
+    expect(accountRepo.calls.findOneById.get('AC1')).toBe(3);
   });
 });

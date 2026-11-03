@@ -52,6 +52,14 @@ One-minute data feeds recent five-minute aggregation. News and executions update
 
 AI opponents run local rule strategies and a decision-stump ensemble. They have cash and position constraints, exposure limits, cooldowns, and drawdown controls. Their displayed returns come from simulated assets and executions; profitability is not guaranteed. Backtest results are independent simulations and do not change player account returns.
 
+### Production execution and observable flow
+
+Continuous orders now consume **finite, shared depth**. Player orders, virtual quotes, and synthetic levels compete by price and queue priority; consumed synthetic quantities cannot be reused before a quote refresh. No fixed-slippage fallback manufactures the missing shares. Market/IOC remainders cancel, limit remainders keep waiting, and FOK rejects without changing the book or AI balances if the entire quantity is unavailable.
+
+The order ticket previews executable shares, average price, fees, and adverse movement from the best eligible price. Preview and execution share the same planner; a preview does not reserve liquidity. Real-account continuous submissions settle both sides and their order records in a database transaction, then publish virtual-counterparty updates. Rollback restores the original depth and iceberg queues. Exact cent notional, rather than rounded display VWAP, determines cash settlement.
+
+Research exposes **static QI** separately from a bounded window of **best-quote event OFI**, including quote insertions, cancellations, replacements, and committed executions. Synthetic quote refreshes contribute to this observable; it is not a measure of informed trading. Production prices remain a hybrid of exogenous market factors and order-book execution prices. Historical OHLCV backtests retain an approximate cost model and do not claim to replay live depth. See [the execution contract, definitions, and limits](docs/PRODUCTION-MICROSTRUCTURE.md) and [the validation record](docs/PRODUCTION-MICROSTRUCTURE-VALIDATION-20261103.json).
+
 ### Controlled market experiments
 
 Open **Research → Market microstructure laboratory**. Choose a seed, target size and side, then run all four policies under the same external random signals. Adjust quote depth, replenishment, public information delay, informed accounts, inventory aversion, and a synthetic news shock. Charts expose price paths, spread, depth, event OFI, volume, paired impact, and role-level markouts. Execution reports include fill rates, fees, and the opportunity cost of unfilled shares.

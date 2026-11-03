@@ -14,7 +14,7 @@ import { DividendSnapshot } from '../../infrastructure/database/entities/dividen
 import { CN_FEES, HK_FEES, RISK, STOCK_POOL, US_FEES, dividendTaxRate, shortMarginRateFor } from '../../common/constants';
 // Phase B: 跨市场校验与涨跌停统一区间
 import { cnPriceLimits, symbolMarket } from '../../common/market-utils';
-import { MatchingEngine } from './matching-engine';
+import { MatchingEngine, ExecutionOptions } from './matching-engine';
 
 // 成交明细入参：撮合引擎输出 / 对手方挂单成交 / 集合竞价成交共用。各调用点字段略有差异
 // （对手方成交无 symbol/side 语义、竞价成交无 totalCost 兜底），故保留索引签名，均价+数量为结算必需字段
@@ -25,6 +25,14 @@ interface TradeFill {
     avgPrice: number;
     totalCost?: number;
     [key: string]: any;
+}
+interface SettlementContext {
+    accountRepo: Repository<Account>;
+    positionRepo: Repository<Position>;
+    txRepo: Repository<Transaction>;
+    orderRepo: Repository<Order>;
+    effects: Array<() => void>;
+    shortDeltas: Map<string, number>;
 }
 
 @Injectable()
@@ -48,6 +56,7 @@ export class TradingEngineService {
     closingBook: Map<string, { bids: any[]; asks: any[] }>;
     // F4 修复：成交结算串行队列，防止并发下单导致读-改-写竞态（超买/超卖）
     settlementQueue: Promise<void>;
+    private orderQueue: Promise<void> = Promise.resolve();
     // B1 用户成交 → 行情引擎（价格冲击/成交量纳入）
     userFillHook: ((fill: any) => void) | null;
 
@@ -107,6 +116,7 @@ export class TradingEngineService {
     getOrderBook(symbol: string) {
         return this.matching.getOrderBook(symbol);
     }
+    getOrderFlow(symbol: string) { return this.matching.getOrderFlow(symbol); }
     placeRestingOrder(symbol: string, orderId: string, accountId: string, side: string, price: number, qty: number, opts?: { displayQty?: number; hiddenQty?: number }) {
         this.matching.placeRestingOrder(symbol, orderId, accountId, side, price, qty, opts);
     }
@@ -116,12 +126,16 @@ export class TradingEngineService {
     matchAgainstBook(symbol: string, side: string, quantity: number, limitPrice: number, excludeAccountId: string) {
         return this.matching.matchAgainstBook(symbol, side, quantity, limitPrice, excludeAccountId);
     }
-    executeMarketOrder(symbol: string, side: string, quantity: number, excludeAccountId?: string) {
-        return this.matching.executeMarketOrder(symbol, side, quantity, excludeAccountId);
+    executeMarketOrder(symbol: string, side: string, quantity: number, excludeAccountId?: string, options?: ExecutionOptions) {
+        return this.matching.executeMarketOrder(symbol, side, quantity, excludeAccountId, options);
     }
-    executeMarketOrderLimited(symbol: string, side: string, quantity: number, limitPrice: number, excludeAccountId?: string) {
-        return this.matching.executeMarketOrderLimited(symbol, side, quantity, limitPrice, excludeAccountId);
+    executeMarketOrderLimited(symbol: string, side: string, quantity: number, limitPrice: number, excludeAccountId?: string, options?: ExecutionOptions) {
+        return this.matching.executeMarketOrderLimited(symbol, side, quantity, limitPrice, excludeAccountId, options);
     }
+    previewMarketOrder(symbol: string, side: string, quantity: number, limitPrice?: number, excludeAccountId?: string) {
+        return this.matching.previewMarketOrder(symbol, side, quantity, limitPrice, excludeAccountId);
+    }
+    waitForExecution(symbol: string) { return this.matching.waitForExecution(symbol); }
     // P0-3: opts 增加 tag 透传（AI 虚拟挂单归属标识，成交回调按 tag 定位 AI 账本）
     placeVirtualOrder(symbol: string, side: string, price: number, qty: number, expiresAtTick: number, opts?: { orderId?: string; mmId?: string; tag?: string }) {
         this.matching.placeVirtualOrder(symbol, side, price, qty, expiresAtTick, opts);
@@ -238,87 +252,48 @@ export class TradingEngineService {
     }
     // order 既可能是 DB 订单实体（挂单触发路径）也可能是下单 DTO（提交路径），两者字段超集不同，故用宽松类型
     async submitOrder(orderData: any, account: Account) {
+        return this.runOrderExclusive(() => this.submitOrderInner(orderData, account));
+    }
+    private async submitOrderInner(orderData: any, account: Account) {
+        if (orderData.clientOrderId) {
+            const existing = await this.orderRepo.findOne({ where: { accountId: account.id, clientOrderId: orderData.clientOrderId } });
+            if (existing) return { success: true, order: existing, duplicate: true };
+        }
         const validation = await this.validateOrder(orderData, account);
         if (!validation.valid) {
             return { success: false, error: validation.error };
         }
         if (orderData.type === OrderType.MARKET) {
-            const fill = this.executeMarketOrder(orderData.symbol, orderData.side, orderData.quantity, orderData.accountId);
+            const order = this.newImmediateOrder(orderData);
+            const fill = this.executeMarketOrder(orderData.symbol, orderData.side, orderData.quantity, orderData.accountId, { deferVirtualFills: true });
             if (!fill) {
                 return { success: false, error: '市场深度不足，无法成交' };
             }
-            // P0: 本方结算失败则对手方订单放回盘口（防止对方已卖、本方未买的坏账）
-            const settle = await this.settleFill(account.id, orderData.symbol, orderData.side, fill, account.marketMode);
+            // Settle the reserved book and both account ledgers together.
+            const settle = await this.settleFiniteFill(account.id, orderData.symbol, orderData.side, fill, account.marketMode, order);
             if (!settle.success) {
-                if (fill.counterFills && fill.counterFills.length > 0) {
-                    for (const cf of fill.counterFills) {
-                        // P1-6 修复：AI/做市商虚拟挂单（无 orderId、无账户）不得被固化成无主真实挂单，
-                        // 否则盘口出现永远无人结算的幽灵单（与 settleCounterFillsInner 的过滤口径一致）
-                        if (cf.virtual || !cf.orderId)
-                            continue;
-                        this.placeRestingOrder(orderData.symbol, cf.orderId, cf.accountId, cf.side, cf.price, cf.qty);
-                    }
-                }
                 return { success: false, error: settle.error };
             }
-            if (fill.counterFills && fill.counterFills.length > 0) {
-                await this.settleCounterFills(orderData.symbol, account.marketMode, fill.counterFills);
-            }
-            return { success: true, fill, settle };
+            return { success: true, fill, settle, order };
         }
         if (orderData.type === OrderType.FOK || orderData.type === OrderType.IOC) {
             // P2 FOK（全部成交否则取消）/ IOC（立即成交否则取消剩余）：按限价立即撮合，不进入盘口排队
             const limitPrice = Number(orderData.price);
-            const fill = this.executeMarketOrderLimited(orderData.symbol, orderData.side, orderData.quantity, limitPrice, orderData.accountId);
             const isFok = orderData.type === OrderType.FOK;
-            const rollback = () => {
-                if (fill && fill.counterFills) {
-                    for (const cf of fill.counterFills) {
-                        // P1-6 修复：虚拟挂单不进真实盘口（同上）
-                        if (cf.virtual || !cf.orderId)
-                            continue;
-                        this.placeRestingOrder(orderData.symbol, cf.orderId, cf.accountId, cf.side, cf.price, cf.qty);
-                    }
-                }
-            };
+            const order = this.newImmediateOrder(orderData);
+            const fill = this.executeMarketOrderLimited(orderData.symbol, orderData.side, orderData.quantity, limitPrice, orderData.accountId, { deferVirtualFills: true, requireFull: isFok });
             if (!fill) {
                 return { success: false, error: isFok ? 'FOK 无法成交，已撤销' : 'IOC 无可成交数量，已撤销' };
             }
             if (isFok && fill.filledQuantity < Number(orderData.quantity)) {
-                rollback();
+                this.matching.rollbackExecution(fill);
                 return { success: false, error: 'FOK 无法全部成交，已撤销' };
             }
-            const settle = await this.settleFill(account.id, orderData.symbol, orderData.side, fill, account.marketMode);
+            const settle = await this.settleFiniteFill(account.id, orderData.symbol, orderData.side, fill, account.marketMode, order);
             if (!settle.success) {
-                rollback();
                 return { success: false, error: settle.error };
             }
-            if (fill.counterFills && fill.counterFills.length > 0) {
-                await this.settleCounterFills(orderData.symbol, account.marketMode, fill.counterFills);
-            }
-            // 记录成交订单实体（不排队）
-            // P2 修复：IOC 部分成交必须落 PARTIAL（原实现无条件 FILLED，把未成交的剩余量谎报为全部成交）；
-            // FOK 语义不变——上方已保证 filledQuantity >= quantity 才会走到这里，仍为 FILLED（要么全成要么撤）
-            const filledQty = Number(fill.filledQuantity);
-            const requestedQty = Number(orderData.quantity);
-            const orderStatus = filledQty >= requestedQty ? OrderStatus.FILLED : OrderStatus.PARTIAL;
-            const order = this.orderRepo.create({
-                userId: orderData.userId,
-                accountId: orderData.accountId,
-                symbol: orderData.symbol,
-                type: orderData.type,
-                side: orderData.side,
-                price: orderData.price,
-                triggerPrice: orderData.triggerPrice,
-                quantity: orderData.quantity,
-                status: orderStatus,
-                filledQty: fill.filledQuantity,
-                avgFillPrice: fill.avgPrice,
-                // R5-⑥: FOK/IOC 立即成交路径自建订单实体且不向上返回，幂等键只能在此落库
-                clientOrderId: orderData.clientOrderId,
-            });
-            await this.orderRepo.save(order);
-            return { success: true, fill, settle };
+            return { success: true, fill, settle, order };
         }
         const isIceberg = orderData.type === OrderType.ICEBERG;
         const displayQty = isIceberg ? Number(orderData.displayQty) : Number(orderData.quantity);
@@ -349,46 +324,26 @@ export class TradingEngineService {
             // 立即尝试撮合：挂单价与对手方真实挂单交叉时按对手价成交（价格改善）
             // 冰山单首轮撮合只针对显示量（隐藏量不提前暴露）
             const crossQty = isIceberg ? displayQty : Number(orderData.quantity);
-            const crossed = this.matchAgainstBook(orderData.symbol, orderData.side, crossQty, Number(orderData.price), orderData.accountId);
-            if (crossed.fills.length > 0) {
-                const filledQty = Number(orderData.quantity) - crossed.remaining;
-                this.removeRestingOrder(orderData.symbol, saved.id, filledQty);
-                let totalCost = 0;
-                for (const f of crossed.fills)
-                    totalCost += f.qty * f.price;
-                const avgPrice = filledQty > 0 ? totalCost / filledQty : Number(orderData.price);
-                saved.filledQty = filledQty;
-                saved.avgFillPrice = Number(avgPrice.toFixed(4));
-                if (filledQty >= Number(orderData.quantity)) {
-                    saved.status = OrderStatus.FILLED;
-                }
-                await this.orderRepo.save(saved);
-                const ownFill = {
-                    symbol: orderData.symbol,
-                    side: orderData.side,
-                    filledQuantity: filledQty,
-                    avgPrice: Number(avgPrice.toFixed(4)),
-                    totalCost: Number(totalCost.toFixed(2)),
-                };
+            const ownFill = this.executeMarketOrderLimited(orderData.symbol, orderData.side, crossQty, Number(orderData.price), orderData.accountId, { deferVirtualFills: true });
+            if (ownFill) {
                 // P0: 先结算本方；失败则对手方订单放回盘口、本方订单取消（避免单边坏账）
-                const settle = await this.settleFill(account.id, orderData.symbol, orderData.side, ownFill, account.marketMode);
+                const settle = await this.settleFiniteFill(account.id, orderData.symbol, orderData.side, ownFill, account.marketMode, saved);
                 if (!settle.success) {
-                    for (const f of crossed.fills) {
-                        // P1-6 修复：虚拟挂单不入真实盘口（同上）
-                        if (f.virtual || !f.orderId)
-                            continue;
-                        this.placeRestingOrder(orderData.symbol, f.orderId, f.accountId, f.side, f.price, f.qty);
-                    }
                     saved.status = OrderStatus.CANCELLED;
                     saved.rejectReason = settle.error;
                     await this.orderRepo.save(saved);
                     this.removeRestingOrder(orderData.symbol, saved.id);
                     return { success: false, error: settle.error };
                 }
-                await this.settleCounterFills(orderData.symbol, account.marketMode, crossed.fills);
             }
         }
         return { success: true, order: saved };
+    }
+    private newImmediateOrder(data: any): Order {
+        return this.orderRepo.create({ userId: data.userId, accountId: data.accountId, symbol: data.symbol,
+            type: data.type, side: data.side, price: data.price, triggerPrice: data.triggerPrice,
+            quantity: data.quantity, status: OrderStatus.PENDING, filledQty: 0,
+            clientOrderId: data.clientOrderId });
     }
     // order 为订单 DTO 或订单实体（见 submitOrder 注释），字段可能缺省，故用宽松类型
     async validateOrder(order: any, account: Account) {
@@ -547,16 +502,105 @@ export class TradingEngineService {
         this.settlementQueue = run.then(() => undefined, () => undefined);
         return run;
     }
-    async settleFillInner(accountId: string, symbol: string, side: OrderSide, fill: TradeFill, mode?: string) {
+    private runOrderExclusive<T>(fn: () => Promise<T>): Promise<T> {
+        const run = this.orderQueue.then(fn);
+        this.orderQueue = run.then(() => undefined, () => undefined);
+        return run;
+    }
+    /** Settle both sides in one database transaction before publishing virtual fills. */
+    private async settleFiniteFill(accountId: string, symbol: string, side: OrderSide, fill: TradeFill, mode: string, ownOrder?: Order) {
+        return this.runExclusive(async () => {
+            const effects: Array<() => void> = [];
+            let savedOwn: Order | undefined;
+            const counterparts = new Map<string, any>();
+            for (const cf of fill.counterFills || []) {
+                if (cf.virtual || !cf.orderId) continue;
+                const key = cf.orderId;
+                const aggregate = counterparts.get(key) || { ...cf, qty: 0, totalCost: 0 };
+                aggregate.qty += cf.qty;
+                aggregate.totalCost = Math.round((aggregate.totalCost + cf.qty * cf.price) * 100) / 100;
+                aggregate.price = aggregate.totalCost / aggregate.qty;
+                counterparts.set(key, aggregate);
+            }
+            const settle = async (context: SettlementContext) => {
+                const own = await this.settleFillInner(accountId, symbol, side, fill, mode, context);
+                if (!own.success) throw new Error(own.error);
+                for (const cf of counterparts.values()) {
+                    const result = await this.settleFillInner(cf.accountId, symbol, cf.side, {
+                        symbol, filledQuantity: cf.qty, avgPrice: cf.price, totalCost: cf.totalCost,
+                        recordMarketImpact: false,
+                    }, mode, context);
+                    if (!result.success) throw new Error(`对手方无法结算：${result.error}`);
+                    const order = await context.orderRepo.findOne({ where: { id: cf.orderId } });
+                    if (order) {
+                        if (order.status !== OrderStatus.PENDING || Number(order.filledQty || 0) + cf.qty > Number(order.quantity)) throw new Error('对手订单已撤销或剩余数量不足');
+                        const oldQty = Number(order.filledQty || 0);
+                        order.avgFillPrice = ((Number(order.avgFillPrice || 0) * oldQty) + cf.totalCost) / (oldQty + cf.qty);
+                        order.filledQty = oldQty + cf.qty;
+                        if (order.filledQty >= Number(order.quantity)) order.status = OrderStatus.FILLED;
+                        await context.orderRepo.save(order);
+                    }
+                }
+                if (ownOrder) {
+                    const order = { ...ownOrder } as Order;
+                    const oldQty = Number(order.filledQty || 0);
+                    order.filledQty = oldQty + fill.filledQuantity;
+                    order.avgFillPrice = ((Number(order.avgFillPrice || 0) * oldQty) + Number(fill.totalCost)) / order.filledQty;
+                    const immediate = order.type === OrderType.MARKET || order.type === OrderType.IOC || order.type === OrderType.FOK;
+                    order.status = order.filledQty >= Number(order.quantity) ? OrderStatus.FILLED : immediate ? OrderStatus.PARTIAL : OrderStatus.PENDING;
+                    savedOwn = await context.orderRepo.save(order);
+                }
+                return own;
+            };
+            const repos = (manager?: any): SettlementContext => ({
+                accountRepo: manager ? manager.getRepository(Account) : this.accountRepo,
+                positionRepo: manager ? manager.getRepository(Position) : this.positionRepo,
+                txRepo: manager ? manager.getRepository(Transaction) : this.txRepo,
+                orderRepo: manager ? manager.getRepository(Order) : this.orderRepo, effects, shortDeltas: new Map(),
+            });
+            try {
+                const manager = this.accountRepo.manager;
+                let result: any;
+                if (manager?.transaction) result = await manager.transaction(m => settle(repos(m)));
+                else {
+                    // In-memory repository adapters used by unit tests have no transaction manager.
+                    const checks = [{ accountId, side, filledQuantity: fill.filledQuantity, avgPrice: fill.avgPrice, totalCost: fill.totalCost },
+                        ...[...counterparts.values()].map(cf => ({ accountId: cf.accountId, side: cf.side, filledQuantity: cf.qty, avgPrice: cf.price, totalCost: cf.totalCost }))];
+                    for (const candidate of checks) {
+                        const check = await this.precheckFill(candidate.accountId, symbol, candidate.side, candidate);
+                        if (!check.success) throw new Error(check.error);
+                    }
+                    result = await settle(repos());
+                }
+                if (savedOwn && ownOrder) {
+                    const wasResting = !!ownOrder.id && ![OrderType.MARKET, OrderType.IOC, OrderType.FOK].includes(ownOrder.type);
+                    Object.assign(ownOrder, savedOwn);
+                    if (wasResting) this.removeRestingOrder(symbol, ownOrder.id, ownOrder.status === OrderStatus.FILLED ? undefined : fill.filledQuantity);
+                }
+                this.matching.commitExecution(fill);
+                for (const effect of effects) effect();
+                return result;
+            } catch (error) {
+                this.matching.rollbackExecution(fill);
+                const message = error instanceof Error ? error.message : String(error);
+                this.logger.warn(`成交结算已撤回 ${symbol}: ${message}`);
+                return { success: false, error: message };
+            }
+        });
+    }
+    async settleFillInner(accountId: string, symbol: string, side: OrderSide, fill: TradeFill, mode?: string, context?: SettlementContext) {
+        const accountRepo = context?.accountRepo || this.accountRepo;
+        const positionRepo = context?.positionRepo || this.positionRepo;
+        const txRepo = context?.txRepo || this.txRepo;
         // Phase B P1#7: 费率按股票所属市场路由（mode 参数仅兼容保留，不信任调用方账户模式）
         const feeMode = symbolMarket(symbol);
-        const account = await this.accountRepo.findOne({ where: { id: accountId } });
+        const account = await accountRepo.findOne({ where: { id: accountId } });
         if (!account) {
             return { success: false, error: '账户不存在' };
         }
-        let pos = await this.positionRepo.findOne({ where: { accountId: account.id, symbol } });
-        const totalCost = fill.filledQuantity * fill.avgPrice;
-        const fees = this.calcFees(side, fill.totalCost, fill.filledQuantity, feeMode);
+        let pos = await positionRepo.findOne({ where: { accountId: account.id, symbol } });
+        const totalCost = Number.isFinite(fill.totalCost) ? Number(fill.totalCost) : Math.round(fill.filledQuantity * fill.avgPrice * 100) / 100;
+        const fees = this.calcFees(side, totalCost, fill.filledQuantity, feeMode);
         // SECURITY: 结算队列内复核持仓与T+1（validateOrder 在队列外执行，并发下会双卖/双平空刷钱）
         if (side === OrderSide.SELL) {
             const longQty = pos ? Number(pos.longQty) : 0;
@@ -585,7 +629,10 @@ export class TradingEngineService {
             if (Number(account.cash) < margin) {
                 return { success: false, error: `保证金不足，需要 ${margin.toFixed(2)}` };
             }
+            if (context && this.getShortPool(symbol).available + (context.shortDeltas.get(symbol) || 0) < fill.filledQuantity) return { success: false, error: '可融券数量不足' };
         }
+        if (context && (side === OrderSide.SHORT || side === OrderSide.COVER)) context.shortDeltas.set(symbol,
+            (context.shortDeltas.get(symbol) || 0) + (side === OrderSide.COVER ? fill.filledQuantity : -fill.filledQuantity));
         if (side === OrderSide.SHORT) {
             // 卖出得现金，冻结保证金（按个股折算率）
             const collateral = totalCost * shortMarginRateFor(symbol, this.volatilities.get(symbol));
@@ -594,7 +641,7 @@ export class TradingEngineService {
         } else if (side === OrderSide.COVER) {
             // 买回平仓，按平仓比例释放冻结保证金（pos.shortQty 为平仓前的空仓量）
             const collateralBefore = Number(account.shortCollateral || 0);
-            const positions = await this.positionRepo.find({ where: { accountId: account.id } });
+            const positions = await positionRepo.find({ where: { accountId: account.id } });
             const released = this.shortCollateralRelease(account, positions, symbol, fill.filledQuantity);
             // SECURITY: 平空资金校验，防止亏损平空导致现金为负
             if (Number(account.cash) + released < totalCost + fees.totalFees) {
@@ -625,23 +672,24 @@ export class TradingEngineService {
         // FIX(H4): 现金规范化到分，减少浮点累积误差
         account.cash = Math.round(account.cash * 100) / 100;
         account.totalTrades = (Number(account.totalTrades) || 0) + 1;
-        await this.accountRepo.save(account);
+        await accountRepo.save(account);
         if (!pos) {
             // Phase E: 建仓记 lockDay=建仓日（修复红利税持有期恒 0 → CN 长线玩家恒按 20% 档错收）；
             // 加仓不刷新（保留最早建仓日=建仓字面语义，快照单值锁定的简化口径）
-            pos = this.positionRepo.create({ accountId: account.id, symbol, longQty: 0, shortQty: 0, longCost: 0, shortCost: 0, boughtToday: 0, lockDay: Number(account.currentDay) || 0 });
+            pos = positionRepo.create({ accountId: account.id, symbol, longQty: 0, shortQty: 0, longCost: 0, shortCost: 0, boughtToday: 0, lockDay: Number(account.currentDay) || 0 });
         }
         const gameDay = this.marketGameDays.get(feeMode) ?? (Number(account.currentDay) || 0);
         if (side === OrderSide.BUY && Number.isInteger(pos.boughtDay) && pos.boughtDay < gameDay) pos.boughtToday = 0;
         this.updatePosition(pos, side, fill);
         if (side === OrderSide.BUY) pos.boughtDay = gameDay;
-        await this.positionRepo.save(pos);
-        const tx = this.txRepo.create({ accountId: account.id, symbol, side, quantity: fill.filledQuantity, price: fill.avgPrice, turnover: totalCost, ...fees });
-        await this.txRepo.save(tx);
+        await positionRepo.save(pos);
+        const tx = txRepo.create({ accountId: account.id, symbol, side, quantity: fill.filledQuantity, price: fill.avgPrice, turnover: totalCost, ...fees });
+        await txRepo.save(tx);
         // B1 用户成交计入行情：价格冲击 + 成交量并入当前 tick 的 K 线
-        if (this.userFillHook) {
+        const publish = () => {
+        if (this.userFillHook && fill.recordMarketImpact !== false) {
             try {
-                this.userFillHook({ symbol, side, filledQuantity: fill.filledQuantity, avgPrice: fill.avgPrice });
+                this.userFillHook({ symbol, side, filledQuantity: fill.filledQuantity, avgPrice: fill.avgPrice, execution: fill.execution });
             }
             catch (e) { }
         }
@@ -656,6 +704,9 @@ export class TradingEngineService {
         catch (e) {
             this.logger.warn('券源池更新失败: ' + (e && e.message ? e.message : e));
         }
+        };
+        if (context) context.effects.push(publish);
+        else publish();
         return {
             success: true,
             fill: { symbol: fill.symbol, side, quantity: fill.filledQuantity, price: fill.avgPrice, totalCost, fees },
@@ -664,30 +715,31 @@ export class TradingEngineService {
     }
     // Phase D：抽纯函数——现价是否将触发成交（预扫与执行共用同一判断，防两遍逻辑漂移）
     shouldFillNow(order: Order, currentPrice: number) {
-        if (order.type === OrderType.LIMIT) {
-            return (order.side === OrderSide.BUY && currentPrice <= order.price) ||
-                (order.side === OrderSide.SELL && currentPrice >= order.price);
+        const isBuy = order.side === OrderSide.BUY || order.side === OrderSide.COVER;
+        if (order.type === OrderType.LIMIT || order.type === OrderType.ICEBERG) {
+            return isBuy ? currentPrice <= order.price : currentPrice >= order.price;
         }
         if (order.type === OrderType.STOP) {
-            return (order.side === OrderSide.BUY && currentPrice >= order.triggerPrice) ||
-                (order.side === OrderSide.SELL && currentPrice <= order.triggerPrice);
+            return !!order.triggerLog || (isBuy ? currentPrice >= order.triggerPrice : currentPrice <= order.triggerPrice);
         }
         if (order.type === OrderType.STOP_LIMIT) {
-            const triggered = (order.side === OrderSide.BUY && currentPrice >= order.triggerPrice) ||
-                (order.side === OrderSide.SELL && currentPrice <= order.triggerPrice);
+            const triggered = !!order.triggerLog || (isBuy ? currentPrice >= order.triggerPrice : currentPrice <= order.triggerPrice);
             if (!triggered)
                 return false;
-            return (order.side === OrderSide.BUY && currentPrice <= order.price) ||
-                (order.side === OrderSide.SELL && currentPrice >= order.price);
+            return isBuy ? currentPrice <= order.price : currentPrice >= order.price;
         }
         return false;
     }
     async checkPendingOrders() {
+        return this.runOrderExclusive(() => this.checkPendingOrdersInner());
+    }
+    private async checkPendingOrdersInner() {
         const pending = await this.orderRepo.find({
             where: [
                 { status: OrderStatus.PENDING, type: OrderType.LIMIT, postClose: false },
                 { status: OrderStatus.PENDING, type: OrderType.STOP, postClose: false },
                 { status: OrderStatus.PENDING, type: OrderType.STOP_LIMIT, postClose: false },
+                { status: OrderStatus.PENDING, type: OrderType.ICEBERG, postClose: false },
             ],
         });
         // ── Phase D 批量预载：按「当前价将成交」预扫，收集 accountId 一次 In 查询（原每单 findOne 的 N+1）──
@@ -716,11 +768,13 @@ export class TradingEngineService {
             const shouldFill = this.shouldFillNow(order, currentPrice);
             if (shouldFill) {
                 // P0: 部分成交的挂单按剩余数量继续撮合（真实订单簿支持排队部分成交）
-                const remainingQty = Number(order.quantity) - Number(order.filledQty || 0);
+                const remainingQty = order.type === OrderType.ICEBERG
+                    ? Math.min(Number(order.displayQty), Number(order.quantity) - Number(order.filledQty || 0))
+                    : Number(order.quantity) - Number(order.filledQty || 0);
                 if (remainingQty <= 0)
                     continue;
                 // SECURITY: 限价/止损限价按限价封顶撮合，避免成交价突破限价；自成交排除
-                const isPriced = order.type === OrderType.LIMIT || order.type === OrderType.STOP_LIMIT;
+                const isPriced = order.type === OrderType.LIMIT || order.type === OrderType.STOP_LIMIT || order.type === OrderType.ICEBERG;
                 const isStopType = order.type === OrderType.STOP || order.type === OrderType.STOP_LIMIT;
                 // P2 止损单簿记：首次触发记录审计（转换模式/触发价/现价）
                 if (isStopType && !order.triggerLog) {
@@ -728,25 +782,6 @@ export class TradingEngineService {
                         action: 'triggered', triggerPrice: Number(order.triggerPrice), currentPrice: Number(currentPrice),
                         convertTo: isPriced ? 'limit' : 'market', limitPrice: isPriced ? Number(order.price) : null,
                     });
-                }
-                const fill = isPriced
-                    ? this.executeMarketOrderLimited(order.symbol, order.side, remainingQty, Number(order.price), order.accountId)
-                    : this.executeMarketOrder(order.symbol, order.side, remainingQty, order.accountId);
-                if (!fill) {
-                    // P2 止损单簿记：触发后无流动性 → 记录重试，超限取消（限价单保持排队语义，不做重试计数）
-                    if (isStopType) {
-                        const retries = (Number(order.triggerRetries) || 0) + 1;
-                        order.triggerRetries = retries;
-                        this.appendTriggerLog(order, { action: 'converted-no-liquidity', currentPrice: Number(currentPrice), retries });
-                        if (retries >= 10) {
-                            order.status = OrderStatus.CANCELLED;
-                            order.rejectReason = '止损触发后 10 次尝试均无流动性，已取消';
-                            this.appendTriggerLog(order, { action: 'cancelled', reason: order.rejectReason });
-                            this.logger.warn(`止损单 ${order.id} 触发后无流动性已取消`);
-                        }
-                        await this.orderRepo.save(order);
-                    }
-                    continue;
                 }
                 // Phase D: 批量 Map 取值；已结算过的账户（脏）与缺失条目在 validateOrder 前单查刷新
                 let account = accountsById.get(order.accountId);
@@ -770,31 +805,39 @@ export class TradingEngineService {
                     this.logger.warn(`挂单 ${order.id} 触发但校验失败已取消: ${recheck.error}`);
                     continue;
                 }
-                const settle = await this.settleFill(order.accountId, order.symbol, order.side, fill, account.marketMode);
+                const fill = isPriced
+                    ? this.executeMarketOrderLimited(order.symbol, order.side, remainingQty, Number(order.price), order.accountId, { deferVirtualFills: true })
+                    : this.executeMarketOrder(order.symbol, order.side, remainingQty, order.accountId, { deferVirtualFills: true });
+                if (!fill) {
+                    // P2 止损单簿记：触发后无流动性 → 记录重试，超限取消（限价单保持排队语义，不做重试计数）
+                    if (isStopType) {
+                        const retries = (Number(order.triggerRetries) || 0) + 1;
+                        order.triggerRetries = retries;
+                        this.appendTriggerLog(order, { action: 'converted-no-liquidity', currentPrice: Number(currentPrice), retries });
+                        if (retries >= 10) {
+                            order.status = OrderStatus.CANCELLED;
+                            order.rejectReason = '止损触发后 10 次尝试均无流动性，已取消';
+                            this.appendTriggerLog(order, { action: 'cancelled', reason: order.rejectReason });
+                            this.logger.warn(`止损单 ${order.id} 触发后无流动性已取消`);
+                        }
+                        await this.orderRepo.save(order);
+                    }
+                    continue;
+                }
+                const settle = await this.settleFiniteFill(order.accountId, order.symbol, order.side, fill, account.marketMode, order);
                 if (settle.success) {
                     // Phase D: 本方账户资金/持仓已变 → 标脏（同账户后续挂单 validateOrder 前重读）；
                     // 结算正确性不依赖 Map（settleFillInner 内部自查），脏标记只保证预校验新鲜
                     dirtyAccountIds.add(order.accountId);
                     // P0: 先结算本方，成功后结算对手方真实挂单并同步其订单实体
                     if (fill.counterFills && fill.counterFills.length > 0) {
-                        await this.settleCounterFills(order.symbol, account.marketMode, fill.counterFills);
                         // 对手方账户同样作废 Map 条目（其结算走 settleFillInner 自查，此处仅为预校验新鲜度）
                         for (const cf of fill.counterFills)
                             dirtyAccountIds.add(cf.accountId);
                     }
-                    order.filledQty = Number(order.filledQty || 0) + fill.filledQuantity;
-                    order.avgFillPrice = fill.avgPrice;
                     // P2 止损单簿记：成交结果审计
                     if (isStopType) {
                         this.appendTriggerLog(order, { action: 'filled', qty: fill.filledQuantity, price: fill.avgPrice });
-                    }
-                    if (Number(order.filledQty) >= Number(order.quantity)) {
-                        order.status = OrderStatus.FILLED;
-                        this.removeUserOrder(order.symbol, order.id);
-                    }
-                    else {
-                        // 部分成交：剩余数量继续在真实盘口排队
-                        this.removeRestingOrder(order.symbol, order.id, fill.filledQuantity);
                     }
                     await this.orderRepo.save(order);
                     fills.push({ ...fill, side: order.side, fees: settle.fees });
@@ -809,7 +852,6 @@ export class TradingEngineService {
                             // P1-6 修复：虚拟挂单（AI/做市商）无账户无订单实体，不得固化成无主真实挂单
                             if (cf.virtual || !cf.orderId)
                                 continue;
-                            this.placeRestingOrder(order.symbol, cf.orderId, cf.accountId, cf.side, cf.price, cf.qty);
                             dirtyAccountIds.add(cf.accountId);
                         }
                     }
@@ -835,6 +877,9 @@ export class TradingEngineService {
         return fills;
     }
     async cancelOrder(orderId: string, accountId: string) {
+        return this.runOrderExclusive(() => this.cancelOrderInner(orderId, accountId));
+    }
+    private async cancelOrderInner(orderId: string, accountId: string) {
         const order = await this.orderRepo.findOne({
             where: { id: orderId, accountId, status: OrderStatus.PENDING },
         });
@@ -1032,9 +1077,9 @@ export class TradingEngineService {
         if (!account)
             return { success: false, error: '账户不存在' };
         const pos = await this.positionRepo.findOne({ where: { accountId, symbol } });
-        const totalCost = fill.filledQuantity * fill.avgPrice;
+        const totalCost = Number.isFinite(fill.totalCost) ? Number(fill.totalCost) : Math.round(fill.filledQuantity * fill.avgPrice * 100) / 100;
         const feeMode = symbolMarket(symbol);
-        const fees = this.calcFees(side, fill.totalCost, fill.filledQuantity, feeMode);
+        const fees = this.calcFees(side, totalCost, fill.filledQuantity, feeMode);
         if (side === OrderSide.SELL) {
             const longQty = pos ? Number(pos.longQty) : 0;
             if (longQty < fill.filledQuantity)

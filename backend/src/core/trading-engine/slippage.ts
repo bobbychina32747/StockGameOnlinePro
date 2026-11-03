@@ -1,4 +1,5 @@
-// Phase B: 动态滑点模型唯一实现（实盘撮合与回测共用，消除双份漂移）
+// Legacy OHLCV backtest approximation, retained for historical compatibility.
+// Production matching uses finite-execution.ts and never invokes this fallback.
 // 公式搬自 matching-engine 原 slipStepFor/executeMarketOrder：
 //   步长 = 0.0008 × 波动率压力(1+min(2,max(0,(vol-0.02)*25))) × OFI 修正（逆风×放大、顺风收窄）
 //   每 500 股一档恶化，步长钳 [0.0002, 0.004]，总滑点上限 2%，触顶后剩余量按触顶价兜底成交（Phase A P0#5）
@@ -13,7 +14,7 @@ export function slipStepFor(vol, ofi, side) {
     return Math.min(0.004, Math.max(0.0002, step));
 }
 
-// 按实盘口径模拟"吃穿合成档后的剩余量"滑点成交：
+// Approximate historical fills when no order book is supplied (not live depth):
 // anchor=最深档价（或现价），limitPrice 为限价约束（缺省=不限价，市价单语义）
 // 返回 { totalCost, totalQty, remaining } —— remaining=0 表示全部成交（含触顶兜底）
 export function liveFillPrice(anchor, qty, side, vol, ofi, limitPrice) {

@@ -210,7 +210,10 @@ export class MarketService {
         // B1 用户成交 → 行情引擎回调（价格冲击 + 成交量并入当前K线）
         this.engine.setUserFillHook((fill) => {
             try {
-                this.marketDataFor(fill.symbol).applyUserFill(fill);
+                const marketData = this.marketDataFor(fill.symbol);
+                marketData.applyUserFill(fill);
+                const price = marketData.getLastPrice(fill.symbol);
+                if (Number.isFinite(price) && price > 0) this.engine.updatePrices({ [fill.symbol]: price });
             }
             catch (e) { }
         });
@@ -700,6 +703,7 @@ export class MarketService {
         for (const symbol of Object.keys(prevCloses)) {
             let result;
             try {
+                await this.engine.waitForExecution?.(symbol);
                 result = this.engine.runOpeningAuction(symbol, prevCloses[symbol]);
             }
             catch (e) {

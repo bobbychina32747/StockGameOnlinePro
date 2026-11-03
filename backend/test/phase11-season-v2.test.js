@@ -207,7 +207,7 @@ describe('Phase E lockDay 记账（红利税持有期真实化）', () => {
     const posRepo = repo([]);
     const engine = new TradingEngineService(repo([]), accountRepo, posRepo, repo([]), null);
     engine.prices.set('T1', 10);
-    engine.placeRestingOrder('T1', 'r1', 'RX', 'sell', 10, 10000);
+    engine.placeVirtualOrder('T1', 'sell', 10, 10000, 999);
     return { engine, posRepo, accountRepo };
   }
 

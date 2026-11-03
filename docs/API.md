@@ -97,16 +97,16 @@ Body：
 }
 ```
 
-**幂等键 `clientOrderId`（REFACTOR-5 新增，可选，≤64 字符）**：客户端网络重试时携带同一键 → 服务端按 `(账户, clientOrderId)` 命中既有订单，直接返回该订单且 `duplicate:true`，**不再走引擎**（不会二次撮合/二次扣款/二次建仓）。未传或纯空白时行为与修复前完全一致。注意：① 只有 `limit/stop/stop-limit/iceberg/fok/ioc/盘后申报` 会落订单实体，**市价单 `market` 不落实体 → 幂等键对市价单不生效**；② 命中只按键，**不校验 payload 差异**（同键但改了参数仍返回旧订单），故重下不同参数的委托请换键。
+**幂等键 `clientOrderId`（REFACTOR-5 新增，可选，≤64 字符）**：客户端网络重试时携带同一键 → 服务端按 `(账户, clientOrderId)` 命中既有订单，直接返回该订单且 `duplicate:true`，**不再走引擎**（不会二次撮合/二次扣款/二次建仓）。未传或纯空白时行为与修复前完全一致。注意：① 连续交易的 `market/limit/stop/stop-limit/iceberg/fok/ioc` 和盘后申报均落实体，市价单也保存幂等键；② 命中只按键，**不校验 payload 差异**（同键但改了参数仍返回旧订单），故重下不同参数的委托请换键。
 
 **订单类型语义**：
 | type | 语义 |
 |---|---|
-| `market` | 即时按盘口深度+滑点全量市价成交，不进盘口；深度不足报错 |
+| `market` | 即时消耗有限盘口，可部分成交，剩余撤销；无可成交数量时报错，不生成兜底流动性 |
 | `limit` | 挂真实盘口排队（价格-时间优先），触发后限价封顶撮合，支持部分成交续排 |
 | `stop` | 止损单：价格穿越 `triggerPrice` 转市价；触发后无流动性重试 10 次后取消；**不挂盘口** |
 | `stop-limit` | 止损限价：触发后才按 `price` 限价撮合，**触发前严禁入盘口**（防止无视触发价被提前成交） |
-| `fok` | Fill-or-Kill：按限价立即撮合，必须全部成交否则整体撤销并回滚对手方 |
+| `fok` | Fill-or-Kill：先检查限价内全部深度；不足则不改盘口、不触发 AI 回调 |
 | `ioc` | Immediate-or-Cancel：按限价立即撮合，成交部分（订单落库状态为 `partial`，Phase 13 修复：原实现部分成交谎报 `filled`）、剩余撤销 |
 | `iceberg` | 冰山单：`quantity` 为总量、`displayQty` 为盘口显示量，显示量吃尽后同价队尾补量 |
 
@@ -120,6 +120,12 @@ Body：
 - `limit`/`stop`/`stop-limit`/`iceberg`：`{success, order:{id,status,quantity,filledQty,avgFillPrice,triggerLog,displayQty,hiddenQty,postClose,...}}`
 - 幂等命中：`{success:true, order:{...既有订单}, duplicate:true}`
 - 拒绝：`{success:false, error}`（HTTP 200）
+
+### POST /trading/estimate?mode=US — 有限盘口预估
+
+请求与下单 DTO 相同，不修改盘口或账户。返回 `{valid,price,fees,preview}`，其中 `preview` 包含 `requestedQuantity/filledQuantity/remainingQuantity/avgPrice/totalCost/busy/waitingForTrigger/rejectedFok/observedAt/execution`；无对手方身份标识。Nest 内部价格与金额使用货币单位。`execution.model=finite-depth-v1`，逐档冲击和相对现价成本使用 bp，不含费用。
+
+Go `/api/v2/orders/estimate` 适配价格和金额为分，返回 `filled/remaining/total/fee/depthPreview`，并保持 `estimated=true`：预估不预占深度，提交时重新撮合。未触发止损单与不能全部成交的 FOK 显示立即成交数量为零。完整边界见 [正式撮合契约](PRODUCTION-MICROSTRUCTURE.md)。
 
 ### DELETE /trading/order/:id?mode=US — 撤单
 仅 PENDING 挂单可撤（`postClose:true` 的盘后单从独立队列移除）；找不到返回 `{success:false}`。CN 集合竞价 9:20-9:25（申报锁定）与 9:25-9:30（撮合中）禁撤单（400）。

@@ -214,7 +214,7 @@ describe('Phase 13 P0-2 对手方结算失败必须回滚（不再静默记账�
     expect(Number(orderRepo.rows[0].filledQty)).toBe(100);
   });
 
-  test('P0-2 submitOrder 市价路径：对手单结算失败时本方成交照常、对手挂单回到盘口并保持 PENDING', async () => {
+  test('对手无资金时整笔成交撤回，本方资金持仓与对手挂单均保留', async () => {
     const { engine, orderRepo, accountRepo } = makeEnv({
       accounts: [makeAccount('AC1', { cash: 1000 }), makeAccount('AC2', { cash: 0 })],
       positions: [makePosition('AC1', 'T1', 100, { longCost: 1000 })],
@@ -225,7 +225,8 @@ describe('Phase 13 P0-2 对手方结算失败必须回滚（不再静默记账�
       { userId: 'U1', accountId: 'AC1', symbol: 'T1', type: 'market', side: 'sell', quantity: 100 },
       makeAccount('AC1', { cash: 1000 })
     );
-    expect(r.success).toBe(true); // 调用方语义不变（await 语义与返回值均向后兼容）
+    expect(r.success).toBe(false);
+    expect(Number(accountRepo.rows.find((a) => a.id === 'AC1').cash)).toBe(1000);
     const oB = orderRepo.rows.find((o) => o.id === 'oB');
     expect(oB.status).toBe('pending');
     expect(Number(oB.filledQty)).toBe(0);
@@ -249,14 +250,14 @@ describe('Phase 13 P1-6 回滚不得固化 AI 虚拟挂单', () => {
     return { env, resting, orderData, stale };
   }
 
-  test('P1-6 市价单回滚：虚拟单不进真实盘口（placeRestingOrder 未被调用、盘口无无主残留）', async () => {
+  test('市价单回滚恢复原始虚拟单，不将其固化为无主真实挂单', async () => {
     const { env, resting, orderData, stale } = virtualEnv('market');
     const r = await env.engine.submitOrder(orderData, stale);
     expect(r.success).toBe(false);
     expect(resting).toEqual([]); // 关键断言：不得把虚拟单固化成无主真实挂单
     const asks = env.engine.realBooks.get('T1')?.asks || [];
-    expect(asks.filter((a) => !a.orderId).length).toBe(0);
-    expect(asks.length).toBe(0); // 虚拟单已被吃掉，不得被写回
+    expect(asks).toHaveLength(1);
+    expect(asks[0]).toMatchObject({ virtual: true, qty: 100, accountId: null });
   });
 
   test('P1-6 IOC 回滚：同上（虚拟单不入盘口）', async () => {
@@ -264,7 +265,7 @@ describe('Phase 13 P1-6 回滚不得固化 AI 虚拟挂单', () => {
     const r = await env.engine.submitOrder(orderData, stale);
     expect(r.success).toBe(false);
     expect(resting).toEqual([]);
-    expect((env.engine.realBooks.get('T1')?.asks || []).length).toBe(0);
+    expect(env.engine.realBooks.get('T1')?.asks).toEqual([expect.objectContaining({virtual:true,qty:100,accountId:null})]);
   });
 });
 

@@ -890,7 +890,8 @@ export class MarketDataService {
         const stock = this.stocks.get(fill.symbol);
         if (!stock)
             return;
-        // 价格冲击：成交额 / (日均成交额×2)，买推高卖压低，上限 1%（防大单操纵过度）
+        // Finite-depth executions use the last matched price. Legacy external callers
+        // retain their turnover approximation; do not apply it on top of book impact.
         const turnover = Number(fill.filledQuantity) * Number(fill.avgPrice);
         const avgTurnover = (stock.avgVolume || 8000) * (Number(stock.price) || 1);
         const impact = Math.min(0.01, (turnover / Math.max(1, avgTurnover * 2)) * 0.5);
@@ -902,7 +903,8 @@ export class MarketDataService {
             this.checkSellTrigger(stock.industry);
         }
         const previousFillPrice = Number(stock.price);
-        let newPrice = Math.max(0.5, stock.price * (1 + dir * impact));
+        const matchedPrice = fill.execution?.model === 'finite-depth-v1' ? Number(fill.execution.lastPrice) : 0;
+        let newPrice = matchedPrice > 0 ? matchedPrice : Math.max(0.5, stock.price * (1 + dir * impact));
         // P1-14: 冲击后成交价必须受涨跌停夹紧——原实现直接写回，同 tick 多笔成交可叠加越带，
         // 成交价越界会让日高/日低与前端涨跌幅失真（基准与引擎/委托校验同源）
         const band = this.cnBandOf(stock);
@@ -936,6 +938,13 @@ export class MarketDataService {
             k5.high = Math.max(k5.high, stock.price);
             k5.low = Math.min(k5.low, stock.price);
             k5.close = stock.price;
+        }
+        const daily = stock.currentDaily;
+        if (daily) {
+            daily.volume += qty;
+            daily.high = Math.max(daily.high, stock.price);
+            daily.low = Math.min(daily.low, stock.price);
+            daily.close = stock.price;
         }
     }
     // ─── B1 行业复合传导：行业动量按关联矩阵传导给相关行业（半导体涨 → 消费电子/软件跟涨） ───
@@ -1369,11 +1378,11 @@ export class MarketDataService {
                         }
                     }
                     // 价格冲击 + 成交量并入 K 线（与用户成交同一路径，AI 抛售可戳破泡沫）
-                    this.applyUserFill({ symbol: target.symbol, side, filledQuantity: fill.filledQuantity, avgPrice: fill.avgPrice });
+                    this.applyUserFill({ symbol: target.symbol, side, filledQuantity: fill.filledQuantity, avgPrice: fill.avgPrice, execution: fill.execution });
                     ledger.fills = Number(ledger.fills || 0) + 1;
                     // P3 更新资金/持仓账本；P4 平仓记入绩效（已实现盈亏/胜率）
                     if (side === 'buy') {
-                        ledger.cash -= fill.filledQuantity * fill.avgPrice;
+                        ledger.cash -= fill.totalCost ?? fill.filledQuantity * fill.avgPrice;
                         const pos = ledger.positions.get(target.symbol) || { qty: 0, cost: 0 };
                         const newQty = pos.qty + fill.filledQuantity;
                         pos.cost = pos.qty > 0 ? (pos.cost * pos.qty + fill.avgPrice * fill.filledQuantity) / newQty : fill.avgPrice;
@@ -1382,7 +1391,7 @@ export class MarketDataService {
                         ledger.entryTicks ||= {}; ledger.entryTicks[target.symbol] = this.tickCount;
                     }
                     else {
-                        ledger.cash += fill.filledQuantity * fill.avgPrice;
+                        ledger.cash += fill.totalCost ?? fill.filledQuantity * fill.avgPrice;
                         ledger.entryTicks ||= {}; ledger.entryTicks[target.symbol] = this.tickCount;
                         const pos = ledger.positions.get(target.symbol);
                         if (pos) {
@@ -1509,6 +1518,9 @@ export class MarketDataService {
         catch (e) { }
         return {
             symbol,
+            queueImbalance: Number(ofi.toFixed(3)),
+            eventOfi: this.engine?.getOrderFlow?.(symbol) || null,
+            // Legacy wire field retained for existing clients; it is static QI.
             ofi: Number(ofi.toFixed(3)),
             bigNetFlow: net,
             bigNetFlowWan: Number((net / 10000).toFixed(1)),

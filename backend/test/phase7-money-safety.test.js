@@ -29,8 +29,8 @@ function fakeRepo(seed = []) {
   };
 }
 
-describe('Phase A 市价单滑点触顶兜底（P0#5）', () => {
-  test('滑点触顶后剩余量按触顶价兜底成交，不再静默丢弃', () => {
+describe('市价单有限深度（替代旧滑点触顶兜底）', () => {
+  test('只成交真实可见的 300 股，显式返回未成交量', () => {
     const m = new MatchingEngine();
     m.prices.set('T1', 10);
     m.orderBooks.set('T1', {
@@ -38,8 +38,10 @@ describe('Phase A 市价单滑点触顶兜底（P0#5）', () => {
       asks: [{ price: 10.01, size: 100 }, { price: 10.02, size: 200 }],
     });
     const fill = m.executeMarketOrder('T1', 'buy', 100000, 'BUYER');
-    expect(fill.filledQuantity).toBe(100000); // 全部成交，无剩余丢弃
-    expect(fill.avgPrice).toBeGreaterThan(10.02);
+    expect(fill.filledQuantity).toBe(300);
+    expect(fill.remainingQuantity).toBe(99700);
+    expect(fill.totalCost).toBe(3005);
+    expect(fill.avgPrice).toBeCloseTo(3005 / 300, 4);
   });
 
   test('封板时不兜底（无报价不可成交）', () => {

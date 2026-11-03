@@ -168,12 +168,14 @@ describe('TradingEngineService 真实订单簿（P0）', () => {
       expect(fill.counterFills[0]).toMatchObject({ orderId: 'o1', qty: 60 });
     });
 
-    test('市价单滑点：吃穿合成深度后剩余量按恶化价格成交', () => {
+    test('市价单只消耗有限深度，未成交部分不生成兜底流动性', () => {
       engine.prices.set('T1', 10.0);
-      // 合成卖盘 10.01x100 + 10.02x200，买 10000 股 → 剩余按滑点成交
+      // 合成卖盘 10.01x100 + 10.02x200，买 10000 股只能成交 300 股。
       const fill = engine.executeMarketOrder('T1', 'buy', 10000, 'BUYER');
-      expect(fill.filledQuantity).toBe(10000);
-      expect(fill.avgPrice).toBeGreaterThan(10.02); // 平均价高于最深档
+      expect(fill.filledQuantity).toBe(300);
+      expect(fill.remainingQuantity).toBe(9700);
+      expect(fill.avgPrice).toBeCloseTo(3005 / 300, 4);
+      expect(engine.getOrderBook('T1').asks).toHaveLength(0);
     });
 
     test('封板时市价单不受滑点模型影响（仍无法成交）', () => {

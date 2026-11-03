@@ -248,5 +248,19 @@ func (ledger *Ledger) estimate(ctx context.Context, session *Session, body objec
 		}
 	}
 	price := nonzero(float64(cents(validation["price"])), num(obj(obj(state["quotes"])[symbol])["price"]))
-	return object{"valid": true, "price": price, "quantity": input["quantity"], "filled": 0, "total": price * num(input["quantity"]), "fee": cents(obj(validation["fees"])["totalFees"]), "cash": held["cash"], "availableSell": sellable, "status": "pending", "worldVersion": state["worldVersion"], "estimated": true}, nil
+	result := object{"valid": true, "price": price, "quantity": input["quantity"], "filled": 0, "total": price * num(input["quantity"]), "fee": cents(obj(validation["fees"])["totalFees"]), "cash": held["cash"], "availableSell": sellable, "status": "pending", "worldVersion": state["worldVersion"], "estimated": true}
+	if preview, ok := validation["preview"].(map[string]any); ok {
+		result["filled"] = preview["filledQuantity"]
+		result["remaining"] = preview["remainingQuantity"]
+		result["total"] = cents(preview["totalCost"])
+		if execution := obj(preview["execution"]); execution["model"] != nil {
+			result["execution"] = object{"model": execution["model"], "referencePrice": cents(execution["referencePrice"]), "touchPrice": cents(execution["touchPrice"]), "lastPrice": cents(execution["lastPrice"]), "priceImpactBps": execution["priceImpactBps"], "costBps": execution["costBps"], "levelsConsumed": execution["levelsConsumed"], "truncated": execution["truncated"]}
+		}
+		result["depthPreview"] = true
+		result["waitingForTrigger"] = preview["waitingForTrigger"]
+		result["rejectedFok"] = preview["rejectedFok"]
+		result["busy"] = preview["busy"]
+		result["observedAt"] = preview["observedAt"]
+	}
+	return result, nil
 }

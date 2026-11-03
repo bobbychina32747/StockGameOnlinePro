@@ -1,0 +1,90 @@
+{
+  "verifiedAt": "2026-11-03T05:46:34.753Z",
+  "scope": "Authoritative continuous execution, quote preview and observed best-quote flow",
+  "checks": {
+    "backend": {
+      "compile": true,
+      "suites": 70,
+      "tests": 877,
+      "failed": 0,
+      "includes": "SQL.js transactions, injected write failure, exact notional, FOK, iceberg priority, concurrent idempotency, liquidation residuals"
+    },
+    "nativeSqliteInReleaseImage": {
+      "passed": true,
+      "driver": "better-sqlite3",
+      "database": ":memory:",
+      "finiteDepth": true,
+      "fokNoMutation": true,
+      "writeFailureRollsBack": true,
+      "deferredVirtualCallbacks": true,
+      "playerDatabaseOpened": false
+    },
+    "go": {
+      "testAllPackages": true,
+      "linuxAmd64StaticBuild": true,
+      "includes": "Finite-preview quantity/notional/fee and cent-unit HTTP contract"
+    },
+    "remaster": {
+      "webTypecheck": true,
+      "productionBuild": true,
+      "tests": 66,
+      "failed": 0
+    },
+    "localSyntheticBrowser": {
+      "passed": true,
+      "syntheticOnly": true,
+      "finiteQuantityShown": true,
+      "averagePriceShown": true,
+      "depthImpactShown": true,
+      "draftChangeUpdatesEstimate": true,
+      "mobileSummaryFits": true,
+      "englishLabels": true,
+      "estimates": 3,
+      "readBeforeResize": 2,
+      "productionAccountWrites": 0,
+      "consoleErrors": []
+    },
+    "publicAnonymousBrowser": {
+      "passed": true,
+      "url": "https://game.bobbycn.cc/",
+      "loginPage": true,
+      "publicHealth": {
+        "healthy": true,
+        "runtime": "go",
+        "mode": "real"
+      },
+      "productionWorkerMatchesNode": true,
+      "allPublicAssetHashesMatch": true,
+      "assetsChecked": 7,
+      "authenticated": false,
+      "accountWrites": 0,
+      "consoleErrors": 0
+    },
+    "compiledProductionHashes": {
+      "core/trading-engine/matching-engine.js": "7e86f00ff67edfce2efc65e26f70fdb775319b2032bd7a48bcc799bac22c29de",
+      "core/trading-engine/trading-engine.service.js": "626b424c8609b8a758d9d509a32e7688605353ff3b7ce381684be7614a57014a",
+      "core/trading-engine/finite-execution.js": "60ae069585f18aad1d3d757635cefc6bca86d4749e9031c404bab60ea5774401",
+      "core/trading-engine/order-flow.js": "9e930b31077adc21a8c30ba8c31dabfaee907e35fd80a7f4099279a53f3672c2"
+    }
+  },
+  "deployment": {
+    "url": "https://game.bobbycn.cc/",
+    "coreImage": "sha256:2751e16efaf3e49d73ab6c0739bafb6bf481c3e541d382c2eb9a81be71d43423",
+    "goImage": "sha256:5a1ba78af0f0b2f6f8b99842b60280fb4ce670d2bae1857fcf3d336f146fa866",
+    "webIndexSha256": "0a9fb397994d9d83891cde26ecb60f4a46427cbcb788f1f6f66bad33381d81ed",
+    "ledgerBackupRetainedOnServer": true,
+    "imageAndStaticRollbackRetained": true,
+    "accountOrMarketReset": false,
+    "credentialsChanged": false,
+    "realTradingClockChanged": false,
+    "testWritesToPlayerAccounts": 0
+  },
+  "limits": [
+    "The production generator remains a hybrid of exogenous market factors and order-book execution prices.",
+    "Synthetic depth is finite between refreshes but does not form a closed cash/share-conserving population.",
+    "Production event OFI includes synthetic quote replacement and samples sweeps at committed endpoints; it is not real Level 2 or informed-trading attribution.",
+    "The database transaction boundary covers continuous real-account submissions and pending orders, not every auction, forced-liquidation or AI-initiated workflow.",
+    "No real-player trade or live login was performed by the validation; browser account flows used a local synthetic upstream.",
+    "No claim of long-run profitability, calibrated resilience, optimal execution or improved real-market prediction is made."
+  ]
+}

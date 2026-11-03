@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-03 — Finite production execution and observable order flow
+
+- Replace unlimited synthetic fills with shared, depleted depth and merged price/queue priority. Market and IOC orders can partially fill; FOK preflights the full quantity before any mutation or virtual callback.
+- Use one non-mutating planner for order estimates and execution. The Go adapter preserves exact notional and cent units; desktop/mobile tickets show executable shares, average price, and depth impact.
+- Settle continuous real-account submissions and both sides' order records in a database transaction. Restore iceberg queues and synthetic depth on failure; defer AI/MM fill callbacks until commit. Persist market-order idempotency keys and settle cash using exact cent notional.
+- Drive finite-execution prints from the last matched book price without adding a second turnover shock. Publish one print per submitted trade, update daily candles, and preserve unliquidated shares when depth is exhausted.
+- Expose best-quote event OFI separately from static QI, with bounded event storage and no fabricated events for missing quotes or rejected/rolled-back executions. Document synthetic replacement flow and the hybrid generator/backtest limitations.
+- Add deterministic matching, transactional rollback/fault injection, public-preview, precision, liquidation, flow, and Go contract regressions. Update legacy tests that previously required unlimited liquidity or one-sided settlement.
+
 ## 2026-10-29 — Faster quote synchronization and chart switching
 
 - Load configuration and session checks concurrently. Show realm-filtered public market previews while authenticated snapshots load; cached data contains no balances/orders and cannot enable trading. Recover legacy snapshot and candle keys.

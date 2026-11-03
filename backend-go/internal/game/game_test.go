@@ -253,6 +253,13 @@ func (fixture *upstreamFixture) handle(w http.ResponseWriter, req *http.Request)
 		}
 	case "/api/trading/estimate":
 		result = object{"valid": true, "price": 12, "fees": object{"totalFees": 5}}
+		if req.URL.Query().Get("mode") == "CN" {
+			var input object
+			json.NewDecoder(req.Body).Decode(&input)
+			if num(input["quantity"]) == 123 {
+				result = object{"valid": true, "price": 12.345, "fees": object{"totalFees": 5.25}, "preview": object{"filledQuantity": 75, "remainingQuantity": 48, "totalCost": 925.88, "observedAt": 123456789, "waitingForTrigger": false, "rejectedFok": false, "busy": false, "execution": object{"model": "finite-depth-v1", "referencePrice": 12.30, "touchPrice": 12.34, "lastPrice": 12.35, "priceImpactBps": 4.0519, "costBps": 36.5854, "levelsConsumed": 2, "truncated": false}}}
+			}
+		}
 	case "/api/account/leverage", "/api/account/reset", "/api/fund/fund-2/subscribe", "/api/season/enroll":
 		result = object{"success": true}
 	case "/api/market/backtest-v2":
@@ -355,6 +362,11 @@ func TestHTTPIdentityLedgerCommandsAndIsolation(t *testing.T) {
 	status, estimate := call(t, client, server.URL, "orders/estimate", "POST", token, body, nil)
 	if status != 200 || num(estimate["fee"]) != 500 || num(estimate["availableSell"]) != 200 {
 		t.Fatal(status, estimate)
+	}
+	previewBody := object{"market": "CN", "input": object{"symbol": symbol, "side": "buy", "type": "market", "quantity": 123}}
+	status, preview := call(t, client, server.URL, "orders/estimate", "POST", token, previewBody, nil)
+	if status != 200 || !truth(preview["estimated"]) || !truth(preview["depthPreview"]) || num(preview["filled"]) != 75 || num(preview["remaining"]) != 48 || num(preview["total"]) != 92588 || num(preview["fee"]) != 525 || num(obj(preview["execution"])["referencePrice"]) != 1230 || num(obj(preview["execution"])["lastPrice"]) != 1235 {
+		t.Fatal("finite preview lost shares, exact notional or cent units", status, preview)
 	}
 	status, backtest := call(t, client, server.URL, "backtest", "POST", token, object{"symbol": symbol, "strategy": "ma"}, nil)
 	if status != 200 || backtest["execution"] != "original fixture" {

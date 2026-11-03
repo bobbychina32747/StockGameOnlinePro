@@ -51,10 +51,11 @@ describe('P2 MatchingEngine 抽取后行为保持', () => {
     expect(fill.filledQuantity).toBe(60);
   });
 
-  test('市价滑点仍然存在（动态模型下平均价高于最深档）', () => {
+  test('成交均价来自实际档位，深度不足显式部分成交', () => {
     const fill = m.executeMarketOrder('T1', 'buy', 10000, 'BUYER');
-    expect(fill.filledQuantity).toBe(10000);
-    expect(fill.avgPrice).toBeGreaterThan(10.02);
+    expect(fill.filledQuantity).toBe(300);
+    expect(fill.remainingQuantity).toBe(9700);
+    expect(fill.avgPrice).toBeCloseTo(3005 / 300, 4);
   });
 
   test('封板时市价单不成交（滑点模型不适用）', () => {
@@ -146,19 +147,19 @@ describe('P2 OFI 动态滑点', () => {
     expect(stressed).toBeGreaterThan(calm);
   });
 
-  test('总滑点上限 2%：触顶后按触顶价兜底成交（Phase A：市价单全部成交不丢量）', () => {
+  test('吃完 400 股后停止，不在固定滑点价格下制造余量', () => {
     const fill = m.executeMarketOrder('T1', 'buy', 50000, 'BUYER');
-    // 合成档全吃；滑点逐档恶化至 2% 触顶后，剩余量按触顶价兜底成交（不再静默丢弃）
-    expect(fill.filledQuantity).toBe(50000);
-    expect(fill.avgPrice).toBeGreaterThan(10.02);
-    expect(fill.avgPrice).toBeLessThanOrEqual(10.02 * 1.02 + 1e-6);
+    expect(fill.filledQuantity).toBe(400);
+    expect(fill.remainingQuantity).toBe(49600);
+    expect(fill.totalCost).toBe(4006);
+    expect(fill.avgPrice).toBeCloseTo(10.015, 4);
   });
 
   test('限价单滑点受限价约束（不成交超限价档）', () => {
     const fill = m.executeMarketOrderLimited('T1', 'buy', 50000, 10.02, 'BUYER');
-    // 合成 10.01×200 + 10.02×200 全吃；滑点第 1 档按锚点价 10.02 成交 500（≤限价），
-    // 第 2 档 10.02×(1+step) > 10.02 停止
-    expect(fill.filledQuantity).toBe(900);
+    // 只有两档实际深度 400 股，不再以锚点价格额外生成 500 股。
+    expect(fill.filledQuantity).toBe(400);
+    expect(fill.remainingQuantity).toBe(49600);
     expect(fill.avgPrice).toBeLessThanOrEqual(10.02 + 1e-9);
   });
 });
@@ -231,7 +232,7 @@ describe('P2 止损单簿记（触发审计/无流动性重试/超限取消）',
   test('触发转市价成交：审计记录 triggered → filled', async () => {
     const stop = { id: 'S1', accountId: 'AC1', userId: 'U1', symbol: 'T1', type: 'stop', side: 'buy', quantity: 100, price: null, triggerPrice: 10.0, filledQty: 0, status: 'pending', postClose: false };
     const { engine, orderRepo } = makeEngine([stop]);
-    engine.placeRestingOrder('T1', 'o1', 'A9', 'sell', 10.4, 100);
+    engine.placeVirtualOrder('T1', 'sell', 10.4, 100, 999);
     const fills = await engine.checkPendingOrders();
     expect(fills.length).toBe(1);
     const saved = orderRepo.rows.find((r) => r.id === 'S1');
@@ -268,7 +269,7 @@ describe('P2 止损单簿记（触发审计/无流动性重试/超限取消）',
   test('止损限价触发后按限价撮合（审计 convertTo=limit）', async () => {
     const stopLimit = { id: 'S3', accountId: 'AC1', userId: 'U1', symbol: 'T1', type: 'stop-limit', side: 'buy', quantity: 100, price: 10.5, triggerPrice: 10.0, filledQty: 0, status: 'pending', postClose: false };
     const { engine, orderRepo } = makeEngine([stopLimit]);
-    engine.placeRestingOrder('T1', 'o1', 'A9', 'sell', 10.4, 100);
+    engine.placeVirtualOrder('T1', 'sell', 10.4, 100, 999);
     const fills = await engine.checkPendingOrders();
     expect(fills.length).toBe(1);
     const saved = orderRepo.rows.find((r) => r.id === 'S3');

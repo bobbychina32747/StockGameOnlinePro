@@ -36,8 +36,20 @@ export class OrderService {
         const order = { ...dto, filledQty: 0, accountId: account.id } as Order;
         if (mode === 'CN' && ['short', 'cover'].includes(dto.side)) return { valid: false, error: 'A股不支持做空' };
         const validation = await this.engine.validateOrder(order, account);
-        const price = dto.price || this.engine.prices.get(dto.symbol) || 0;
-        return { ...validation, price, fees: this.engine.calcFees(dto.side, price * dto.quantity, dto.quantity, mode) };
+        if (!validation.valid) return validation;
+        const isStop = order.type === OrderType.STOP || order.type === OrderType.STOP_LIMIT;
+        const waitingForTrigger = isStop && !this.engine.shouldFillNow(order, Number(this.engine.prices.get(dto.symbol)) || 0);
+        const priced = [OrderType.LIMIT, OrderType.STOP_LIMIT, OrderType.FOK, OrderType.IOC, OrderType.ICEBERG].includes(order.type);
+        const quantity = order.type === OrderType.ICEBERG ? Number(dto.displayQty) : Number(dto.quantity);
+        const preview = waitingForTrigger ? { filledQuantity: 0, remainingQuantity: dto.quantity, avgPrice: 0, totalCost: 0, busy: false }
+            : this.engine.previewMarketOrder(dto.symbol, dto.side, quantity, priced ? Number(order.price) : undefined, account.id);
+        const rejectedFok = order.type === OrderType.FOK && preview.filledQuantity < dto.quantity;
+        const executable = rejectedFok ? 0 : preview.filledQuantity;
+        return { valid: true, price: executable ? preview.avgPrice : Number(order.price || this.engine.prices.get(dto.symbol) || 0),
+            fees: executable ? this.engine.calcFees(dto.side, preview.totalCost, executable, mode) : { totalFees: 0 },
+            preview: { ...preview, filledQuantity: executable, remainingQuantity: Number(dto.quantity) - executable,
+                totalCost: executable ? preview.totalCost : 0, waitingForTrigger, rejectedFok,
+                requestedQuantity: Number(dto.quantity), observedAt: Date.now() } };
     }
 
     async placeOrder(userId: string, mode: string, symbol: string, type: OrderType, side: OrderSide, quantity: number, price: number, triggerPrice: number, displayQty: number, clientOrderId?: string) {
@@ -99,7 +111,8 @@ export class OrderService {
         }
         if (type === OrderType.MARKET) {
             // P0: 本方与对手方结算已由引擎 submitOrder 完成（返回 settle），避免二次撮合
-            // R5-⑥: 市价单该路径不落订单实体（无 orderId 可回填），幂等键对市价单不生效——见 REFACTOR-5 备注
+            // Market orders now persist their record in the same settlement transaction,
+            // including clientOrderId; retain the existing HTTP fill response shape.
             return result.settle || result;
         }
         await this.backfillClientOrderId(result, idempotencyKey);
