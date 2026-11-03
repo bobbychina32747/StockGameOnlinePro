@@ -72,6 +72,16 @@
       "tests": 65,
       "failed": 0,
       "reason": "Legacy fixtures now state +08:00 for exchange-session instants instead of inheriting the host timezone."
+    },
+    "isolatedEmptyDatabaseBootstrap": {
+      "httpStatus": 200,
+      "observedReadyWithinSeconds": 330.0,
+      "stocksAfterStartup": 416,
+      "historyDaysPerMarket": 30,
+      "markets": 3,
+      "playerDatabaseOpened": false,
+      "ciDeadlineSeconds": 600,
+      "ciHeapLimitMiB": 4096
     }
   },
   "deployment": {

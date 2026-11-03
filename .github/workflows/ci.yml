@@ -18,6 +18,8 @@ jobs:
         working-directory: backend
     env:
       NODE_ENV: development
+      # Seeding all three empty markets briefly exceeds 2 GiB before caches settle.
+      NODE_OPTIONS: --max-old-space-size=4096
       JWT_SECRET: ci-only-secret-9f3a2c1b
       ADMIN_PASSWORD: admin123456
       PORT: '8000'
@@ -38,20 +40,29 @@ jobs:
       - name: 单元测试（--runInBand）
         run: npm test -- --runInBand
       - name: 启动冒烟（等待 /api/market/stocks 返回 200）
+        timeout-minutes: 12
         run: |
           mkdir -p data
-          node dist/src/main.js &
+          # An empty database seeds thirty days for all three markets before listening.
+          # Keep this full bootstrap in the smoke test and allow bounded cold-start time.
+          SMOKE_LOG="$RUNNER_TEMP/stockgame-startup.log"
+          node dist/src/main.js >"$SMOKE_LOG" 2>&1 &
           SERVER_PID=$!
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:8000/api/market/stocks >/dev/null; then
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 200); do
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "SMOKE FAILED: server exited during startup"
+              tail -n 100 "$SMOKE_LOG"
+              exit 1
+            fi
+            if curl --max-time 5 -sf http://localhost:8000/api/market/stocks >/dev/null; then
               echo "SMOKE OK (attempt $i)"
-              kill $SERVER_PID
               exit 0
             fi
             sleep 3
           done
-          echo "SMOKE FAILED"
-          kill $SERVER_PID
+          echo "SMOKE FAILED: cold bootstrap exceeded 600 seconds"
+          tail -n 100 "$SMOKE_LOG"
           exit 1
 
   frontend:
