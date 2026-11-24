@@ -169,13 +169,14 @@ export class MarketService {
     }
 
     async onModuleInit() {
-        await this.marketData.init();
+        const initOptions = this.tickIntervalMs === 60000 && !this.debugMode.isMarketActive() ? { calendarNow: new Date() } : undefined;
+        await this.marketData.init(initOptions);
         // 三服务器：HK/US 实例手动初始化（factory 创建不触发生命周期钩子）
         if (this.marketDataHK) {
-            await this.marketDataHK.init();
+            await this.marketDataHK.init(initOptions);
         }
         if (this.marketDataUS) {
-            await this.marketDataUS.init();
+            await this.marketDataUS.init(initOptions);
         }
         // P4 修复：引擎预热（最新价/波动率/合成盘口）——休市启动或调试模式开启后，订单与盘口立即可用，
         // 不再等第一个 tick（此前实时档首个 tick 需等 60s，市价单报"市场深度不足"）

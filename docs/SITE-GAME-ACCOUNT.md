@@ -1,5 +1,7 @@
 # 游戏接入站点账号
 
+2026-11-10：站点实现已从游戏源码拆到独立本地项目，线上切换尚未执行。当前接口边界和配置以 [SITE-SEPARATION.md](SITE-SEPARATION.md) 为准。下面原有映射迁移仅用于尚未建立 users.identityId 的历史数据库，不应重复初始化账号或资产。
+
 游戏使用现有站点身份服务、域级 HttpOnly `sid` Cookie 和 10 分钟 Ed25519 访问令牌，不新增第三套账号密码。站点登录后，通过站内 `/api/auth/identity/game-return` 跳转回游戏；回跳目标采用完整 origin 白名单，不把令牌放进 URL。主站只把 `/api/auth/identity/` 转发给本机身份服务，其余 `/api/` 仍转发到旧云后端，因此回跳必须使用身份路径。
 
 ## 玩家流程
@@ -33,6 +35,6 @@ node scripts/migrate-site-game-account.cjs --db /app/data/stockgame.db
 
 该脚本先建立 `.before-site-game-account.sqlite` 一致性备份，再增加 `users.identityId` 可空列及唯一索引。多条旧账号的 NULL 不冲突；不读取或批量修改旧玩家映射。脚本必须从宿主挂入容器，因为当前 Dockerfile 不复制 scripts 目录。
 
-保持 `DB_SYNCHRONIZE=false`。后端和前端须一起发布，站点主域与游戏子域必须反代到同一身份数据库。独立 staging/本地数据库需要自己的测试身份会话，不能拿生产 Cookie 直接访问另一份数据库。
+保持 `DB_SYNCHRONIZE=false`。站点后端独立持有身份数据库；游戏通过 SITE_IDENTITY_URL 调用其接口，不再共享身份表或签名私钥。游戏适配器通过 REMASTER_SITE_IDENTITY_URL 调用同一个身份权威。独立 staging/本地数据库需要自己的测试身份会话，不能拿生产 Cookie 直接访问另一份数据库。
 
 回退代码可以保留新增列和当前数据，不自动恢复数据库备份，避免丢失发布后的玩家操作。已有绑定需要新版本鉴权逻辑；生产绑定开放后不要长期运行仅支持独立登录的旧版本。

@@ -3,6 +3,13 @@ dist/
 *.db
 *.db-journal
 .env
+.env.game
+.env.site
+.env.*.local
+*.pem
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 .DS_Store
 *.session-key
 *.log

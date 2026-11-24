@@ -2,8 +2,8 @@ import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Post,
 import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
 import { SiteGameAuthService } from './site-game-auth.service';
-import { CurrentSession, SessionAuthGuard } from '../identity/session-auth.guard';
-import { Session } from '../../infrastructure/database/entities/session.entity';
+import { CurrentSiteSession, SiteSessionGuard } from './site-session.guard';
+import { SiteSession } from './site-identity.client';
 import { JwtAuthGuard, CurrentUser } from '../../common/guards/jwt-auth.guard';
 import { User } from '../../infrastructure/database/entities/user.entity';
 
@@ -58,8 +58,8 @@ export class AuthController {
 
     @Post('site-session')
     @HttpCode(HttpStatus.OK)
-    @UseGuards(SessionAuthGuard)
-    async siteSession(@CurrentSession() session: Session, @Body() dto: SiteSessionDto, @Req() req: any, @Res({ passthrough: true }) res: any) {
+    @UseGuards(SiteSessionGuard)
+    async siteSession(@CurrentSiteSession() session: SiteSession, @Body() dto: SiteSessionDto, @Req() req: any, @Res({ passthrough: true }) res: any) {
         this.assertGameOrigin(req);
         res.setHeader('Cache-Control', 'no-store');
         return this.siteAuth.session(session, dto?.create === true);
@@ -67,14 +67,14 @@ export class AuthController {
 
     @Post('site-link')
     @HttpCode(HttpStatus.OK)
-    @UseGuards(SessionAuthGuard)
-    async siteLink(@CurrentSession() session: Session, @Body() dto: LoginDto, @Req() req: any, @Res({ passthrough: true }) res: any) {
+    @UseGuards(SiteSessionGuard)
+    async siteLink(@CurrentSiteSession() session: SiteSession, @Body() dto: LoginDto, @Req() req: any, @Res({ passthrough: true }) res: any) {
         this.assertGameOrigin(req);
         res.setHeader('Cache-Control', 'no-store');
         return this.siteAuth.link(session, dto.username, dto.password, req.ip);
     }
 
-    @Get(['site-return', 'identity/game-return'])
+    @Get('site-return')
     siteReturn(@Query('origin') origin: string, @Res() res: any) {
         const allowed = ['https://game.bobbycn.cc', 'https://staging.bobbycn.cc', 'http://localhost:5173', 'http://localhost:3000'];
         if (!allowed.includes(origin)) throw new BadRequestException('不支持的游戏回跳地址');

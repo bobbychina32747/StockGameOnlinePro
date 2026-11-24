@@ -10,7 +10,7 @@ import { GameService } from './service';
 import { AuthBridge, tokenFrom } from './auth';
 import { GameController } from './controller';
 import { snapshot } from './read-model';
-export async function createApplication(options:{port?:number;database?:string;sandbox?:boolean;authSandbox?:boolean;tickMs?:number;identityBaseUrl?:string;allowedOrigins?:string[]}={}) {
+export async function createApplication(options:{port?:number;database?:string;sandbox?:boolean;authSandbox?:boolean;tickMs?:number;identityBaseUrl?:string;siteIdentityBaseUrl?:string;allowedOrigins?:string[]}={}) {
   const sandbox=options.sandbox??process.env.REMASTER_SANDBOX!=='false';
   if(sandbox&&process.env.NODE_ENV==='production') throw new Error('Sandbox accounts are disabled in production');
   const root=resolve(__dirname,'../../..');const dataRoot=resolve(root,'data');mkdirSync(dataRoot,{recursive:true});
@@ -20,7 +20,7 @@ export async function createApplication(options:{port?:number;database?:string;s
   const port=options.port??Number(process.env.REMASTER_PORT??8320);const origins=options.allowedOrigins??(process.env.REMASTER_ALLOWED_ORIGINS?.split(',').map(value=>value.trim()).filter(Boolean)??[`http://127.0.0.1:${port}`,`http://localhost:${port}`,'http://127.0.0.1:3320','http://localhost:3320']);
   if(origins.some(origin=>new URL(origin).origin!==origin)) throw new Error('Allowed origins must be exact HTTP(S) origins');
   const authSandbox=options.authSandbox??(process.env.REMASTER_AUTH_MODE==='site'?false:sandbox);
-  const auth=new AuthBridge({sandbox:authSandbox,identityBaseUrl:options.identityBaseUrl??process.env.REMASTER_IDENTITY_URL??'http://127.0.0.1:8000',origin:process.env.REMASTER_SITE_ORIGIN??'https://game.bobbycn.cc',allowedOrigins:origins});
+  const auth=new AuthBridge({sandbox:authSandbox,identityBaseUrl:options.identityBaseUrl??process.env.REMASTER_IDENTITY_URL??'http://127.0.0.1:8000',siteIdentityBaseUrl:options.siteIdentityBaseUrl??process.env.REMASTER_SITE_IDENTITY_URL,origin:process.env.REMASTER_SITE_ORIGIN??'https://game.bobbycn.cc',allowedOrigins:origins});
   auth.resolveOwner=(subject,market,gameSubject)=>{
     const subjects=[...new Set([subject,...(gameSubject?[gameSubject]:[])])];
     return repository.db.transaction(()=>{

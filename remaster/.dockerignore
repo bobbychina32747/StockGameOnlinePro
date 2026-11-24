@@ -3,3 +3,9 @@ dist
 apps/web/dist
 data
 *.log
+.env
+.env.*
+*.pem
+*.key
+*.db*
+*.sqlite*

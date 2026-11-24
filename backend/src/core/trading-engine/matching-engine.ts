@@ -2,15 +2,15 @@
 // 真实盘口（价格-时间优先）与合成深度的全部撮合逻辑、冰山单逐档补量、
 // 有限深度成交、开盘集合竞价、AI 虚拟挂单、做市商成交回调。
 // TradingEngineService 持有本类实例并全部委托（maps 以别名共享，旧代码/测试无需改动）。
-import market_utils_1 = require("../../common/market-utils");
+import { isCnSymbol, cnPriceLimits } from '../../common/market-utils';
 
 // Legacy OHLCV backtest cost approximation; live matching uses finite-execution.
-import slippage_1 = require("./slippage");
-import { planFiniteExecution, FinitePlan } from './finite-execution';
+import { slipStepFor } from './slippage';
+import { planFiniteExecution, FinitePlan, ExternalLiquidity } from './finite-execution';
 import { BestQuoteOrderFlowObserver } from './order-flow';
 
 // 公共常量/工具（symbolHash：券源池等按代码稳定取值，循环上界常量见 constants）
-import constants_1 = require("../../common/constants");
+import { symbolHash } from '../../common/constants';
 
 // P5 类型安全：盘口条目 / 成交明细 / 盘口结构接口（替换裸 any）
 export interface BookEntry {
@@ -48,26 +48,64 @@ export interface OrderBook {
 }
 
 export interface ExecutionOptions { deferVirtualFills?: boolean; requireFull?: boolean }
+export interface SyntheticOrderBook {
+    bids: ExternalLiquidity[];
+    asks: ExternalLiquidity[];
+    sealedUp?: boolean;
+    sealedDown?: boolean;
+}
+export interface VirtualFill {
+    symbol: string;
+    orderId: string | null;
+    side: string;
+    price: number;
+    qty: number;
+    mmId: string | null;
+    tag: string | null;
+}
+export interface ExecutionMetadata {
+    model: 'finite-depth-v1';
+    referencePrice: number;
+    touchPrice: number;
+    lastPrice: number;
+    priceImpactBps: number;
+    costBps: number;
+    levelsConsumed: number;
+    truncated: boolean;
+}
+export interface MarketFill {
+    symbol: string;
+    side: string;
+    requestedQuantity: number;
+    filledQuantity: number;
+    remainingQuantity: number;
+    avgPrice: number;
+    totalCost: number;
+    counterFills: Fill[];
+    execution: ExecutionMetadata;
+}
+interface ShortPool { available: number; initial: number; feeRate: number }
 interface ExecutionReservation {
     symbol: string;
-    synthetic: any | null;
+    synthetic: SyntheticOrderBook | null;
     resting: OrderBook | null;
-    hooks: any[];
+    hooks: VirtualFill[];
     deferred: Array<() => void>;
     released: Promise<void>;
     release: () => void;
 }
 
 export class MatchingEngine {
-    [key: string]: any;
-    orderBooks: Map<string, any>;
+    orderBooks: Map<string, SyntheticOrderBook>;
     realBooks: Map<string, OrderBook>;
-    prices: Map<string, any>;
-    dayOpenPrices: Map<string, any>;
+    prices: Map<string, number>;
+    dayOpenPrices: Map<string, number>;
     // Phase B: 昨收价（涨跌停统一基准，market.service 每 tick 同步）
-    prevCloses: Map<string, any>;
-    volatilities: Map<string, any>;
-    virtualFillHook: ((fill: any) => void) | null;
+    prevCloses: Map<string, number>;
+    volatilities: Map<string, number>;
+    shortPool: Map<string, ShortPool>;
+    ipoFirstDay: Set<string>;
+    virtualFillHook: ((fill: VirtualFill) => void) | null;
     private quoteSequence = 0;
     private readonly reservedSymbols = new Map<string, ExecutionReservation>();
     private readonly reservedFills = new WeakMap<object, ExecutionReservation>();
@@ -95,7 +133,7 @@ export class MatchingEngine {
     async waitForExecution(symbol: string): Promise<void> {
         while (this.reservedSymbols.has(symbol)) await this.reservedSymbols.get(symbol)!.released;
     }
-    private emitVirtualFill(payload: any): void {
+    private emitVirtualFill(payload: VirtualFill): void {
         if (!this.virtualFillHook) return;
         try { this.virtualFillHook(payload); }
         catch { this.virtualCallbackFailures++; }
@@ -105,9 +143,9 @@ export class MatchingEngine {
     }
     private observeOrderFlow(symbol: string): void { this.orderFlow.observe(symbol, this.getOrderBook(symbol)); }
     getOrderFlow(symbol: string) { return this.orderFlow.get(symbol); }
-    private releaseExecution(fill: any, commit: boolean): boolean {
+    private releaseExecution(fill: object | null | undefined, commit: boolean): boolean {
         const reservation = fill && this.reservedFills.get(fill);
-        if (!reservation) return false;
+        if (!fill || !reservation) return false;
         this.reservedFills.delete(fill);
         if (!commit) {
             if (reservation.synthetic) this.orderBooks.set(reservation.symbol, reservation.synthetic);
@@ -122,9 +160,10 @@ export class MatchingEngine {
         finally { reservation.release(); }
         return true;
     }
-    commitExecution(fill: any): boolean { return this.releaseExecution(fill, true); }
-    rollbackExecution(fill: any): boolean { return this.releaseExecution(fill, false); }
-    private planExecution(symbol: string, side: any, quantity: number, limitPrice?: number, excludeAccountId?: string, external = true): FinitePlan {
+    commitExecution(fill: object): boolean { return this.releaseExecution(fill, true); }
+    rollbackExecution(fill: object): boolean { return this.releaseExecution(fill, false); }
+    private planExecution(symbol: string, side: string, quantity: number, limitPrice?: number, excludeAccountId?: string, external = true): FinitePlan {
+        if (side !== 'buy' && side !== 'sell' && side !== 'short' && side !== 'cover') throw new RangeError('Invalid execution side');
         const isBuy = side === 'buy' || side === 'cover';
         const resting = this.realBooks.get(symbol);
         const synthetic = external ? this.orderBooks.get(symbol) : null;
@@ -132,7 +171,7 @@ export class MatchingEngine {
             resting: resting ? (isBuy ? resting.asks : resting.bids) : [],
             external: synthetic ? (isBuy ? synthetic.asks : synthetic.bids) : [] });
     }
-    private executionResult(symbol: string, side: string, plan: FinitePlan) {
+    private executionResult(symbol: string, side: string, plan: FinitePlan): MarketFill {
         const isBuy = side === 'buy' || side === 'cover';
         // Exclude one's own resting orders from the executable touch benchmark.
         const touch = plan.slices[0]?.price || 0;
@@ -164,12 +203,13 @@ export class MatchingEngine {
         if (!plan.filled || (options.requireFull && plan.remaining > 0)) return null;
         this.observeOrderFlow(symbol);
         const result = this.executionResult(symbol, side, plan);
-        const clone = (book: any) => book ? { ...book, bids: book.bids.map((o: any) => ({ ...o })), asks: book.asks.map((o: any) => ({ ...o })) } : null;
+        const cloneSynthetic = (book?: SyntheticOrderBook): SyntheticOrderBook | null => book ? { ...book, bids: book.bids.map(o => ({ ...o })), asks: book.asks.map(o => ({ ...o })) } : null;
+        const cloneResting = (book?: OrderBook): OrderBook | null => book ? { ...book, bids: book.bids.map(o => ({ ...o })), asks: book.asks.map(o => ({ ...o })) } : null;
         let reservation: ExecutionReservation | undefined;
         if (options.deferVirtualFills) {
             let release!: () => void;
             const released = new Promise<void>(resolve => { release = resolve; });
-            reservation = { symbol, synthetic: clone(this.orderBooks.get(symbol)), resting: clone(this.realBooks.get(symbol)), hooks: [], deferred: [], released, release };
+            reservation = { symbol, synthetic: cloneSynthetic(this.orderBooks.get(symbol)), resting: cloneResting(this.realBooks.get(symbol)), hooks: [], deferred: [], released, release };
             this.reservedSymbols.set(symbol, reservation);
             this.reservedFills.set(result, reservation);
         }
@@ -183,79 +223,78 @@ export class MatchingEngine {
         const synthetic = this.orderBooks.get(symbol);
         if (external && synthetic) {
             for (const slice of plan.slices) if (slice.source === 'external') synthetic[sideKey][slice.index].size -= slice.quantity;
-            synthetic[sideKey] = synthetic[sideKey].filter((level: any) => level.size > 0);
+            synthetic[sideKey] = synthetic[sideKey].filter(level => level.size > 0);
         }
         for (const cf of result.counterFills) if (cf.virtual) {
-            const payload = { mmId: cf.mmId, tag: cf.tag, orderId: cf.orderId, symbol, side: cf.side, qty: cf.qty, price: cf.price };
+            const payload = { mmId: cf.mmId ?? null, tag: cf.tag ?? null, orderId: cf.orderId, symbol, side: cf.side, qty: cf.qty, price: cf.price };
             if (reservation) reservation.hooks.push(payload);
             else this.emitVirtualFill(payload);
         }
         if (!reservation) this.observeOrderFlow(symbol);
         return result;
     }
-    initShortPool(symbol) {
-        if (this.shortPool.has(symbol))
-            return;
+    initShortPool(symbol: string): ShortPool {
+        const existing = this.shortPool.get(symbol);
+        if (existing) return existing;
         // 券源池量化：改用公共 symbolHash（原内联循环上界取自用户输入的 symbol.length，CodeQL js/loop-bound-injection）
-        const h = constants_1.symbolHash(symbol);
+        const h = symbolHash(symbol);
         const available = 30000 + (h % 20) * 5000;
-        this.shortPool.set(symbol, { available, initial: available, feeRate: Number((0.04 + (h % 60) / 1000).toFixed(4)) });
+        const pool = { available, initial: available, feeRate: Number((0.04 + (h % 60) / 1000).toFixed(4)) };
+        this.shortPool.set(symbol, pool);
+        return pool;
     }
-    getShortPool(symbol) {
-        this.initShortPool(symbol);
-        return { ...this.shortPool.get(symbol) };
+    getShortPool(symbol: string) {
+        return { ...this.initShortPool(symbol) };
     }
-    consumeShort(symbol, qty) {
-        this.initShortPool(symbol);
-        const p = this.shortPool.get(symbol);
+    consumeShort(symbol: string, qty: number) {
+        const p = this.initShortPool(symbol);
         p.available = Math.max(0, p.available - Number(qty));
         return p.available;
     }
-    returnShort(symbol, qty) {
-        this.initShortPool(symbol);
-        const p = this.shortPool.get(symbol);
+    returnShort(symbol: string, qty: number) {
+        const p = this.initShortPool(symbol);
         p.available = Math.min(p.initial, p.available + Number(qty));
         return p.available;
     }
-    setIpoFirstDays(symbols) {
+    setIpoFirstDays(symbols: string[]) {
         this.ipoFirstDay = new Set(Array.isArray(symbols) ? symbols : []);
     }
     // 合成深度（5 档，按 mid 生成）
-    updatePrices(prices) {
+    updatePrices(prices: Record<string, number>) {
         for (const [sym, price] of Object.entries(prices)) {
             this.prices.set(sym, price);
         }
     }
-    setDayOpen(prices) {
+    setDayOpen(prices: Record<string, number>) {
         for (const [sym, price] of Object.entries(prices)) {
             this.dayOpenPrices.set(sym, price);
         }
     }
     // Phase B: 昨收同步（涨跌停/委托价校验基准）
-    setPrevCloses(prevCloses) {
+    setPrevCloses(prevCloses: Record<string, number>) {
         for (const [sym, price] of Object.entries(prevCloses || {})) {
             if (Number(price) > 0)
                 this.prevCloses.set(sym, Number(price));
         }
     }
     // P2 波动率供滑点模型使用（由行情引擎每 tick 同步）
-    setVolatilities(vols) {
+    setVolatilities(vols: Record<string, number>) {
         for (const [sym, v] of Object.entries(vols)) {
             this.volatilities.set(sym, v);
         }
     }
     // P2 做市商虚拟成交回调（mmId → 库存更新）
-    setVirtualFillHook(fn) {
+    setVirtualFillHook(fn: ((fill: VirtualFill) => void) | null) {
         this.virtualFillHook = fn;
     }
-    refreshOrderBooks(prices) {
+    refreshOrderBooks(prices: Record<string, number>) {
         for (const [sym, price] of Object.entries(prices)) {
             this.refreshOrderBook(sym, price);
         }
     }
     // P0 真实订单簿：挂单进入盘口队列（bids/asks 按价格-时间优先排序）
     // P2 冰山单：opts.displayQty 为显示量（默认=全部），opts.hiddenQty 为隐藏量（补量池）
-    placeRestingOrder(symbol, orderId, accountId, side, price, qty, opts?) {
+    placeRestingOrder(symbol: string, orderId: string, accountId: string, side: string, price: number, qty: number, opts?: { displayQty?: number; hiddenQty?: number }) {
         if (this.deferBookChange(symbol, () => this.placeRestingOrder(symbol, orderId, accountId, side, price, qty, opts))) return;
         if (!Number.isFinite(Number(price)) || Number(price) <= 0 || !Number.isFinite(Number(qty)) || Number(qty) <= 0)
             return;
@@ -278,13 +317,13 @@ export class MatchingEngine {
     }
     // P0: 从盘口移除挂单（qty 缺省=整单移除；给定 qty=扣减部分数量）
     // P2: 冰山单在盘口可能有多个补量切片（同 orderId），整单移除时全部清除
-    removeRestingOrder(symbol, orderId, qty?) {
+    removeRestingOrder(symbol: string, orderId: string, qty?: number) {
         if (this.deferBookChange(symbol, () => this.removeRestingOrder(symbol, orderId, qty))) return;
         const book = this.realBooks.get(symbol);
         if (!book)
             return;
         let toRemove = qty;
-        for (const sideKey of ['bids', 'asks']) {
+        for (const sideKey of ['bids', 'asks'] as const) {
             const arr = book[sideKey];
             for (let i = arr.length - 1; i >= 0; i--) {
                 if (arr[i].orderId !== orderId)
@@ -318,11 +357,11 @@ export class MatchingEngine {
     }
     // P0 真实订单簿撮合：按价格-时间优先吃对手方真实挂单；返回对手方成交明细与剩余量
     // P2 冰山单：显示量被吃尽后从隐藏量补量（同价队尾，价格-时间优先）；做市商成交回调
-    matchAgainstBook(symbol, side, quantity, limitPrice, excludeAccountId) {
+    matchAgainstBook(symbol: string, side: string, quantity: number, limitPrice?: number | null, excludeAccountId?: string) {
         const result = this.executeFinite(symbol, side, quantity, limitPrice ?? undefined, excludeAccountId, {}, false);
         return { fills: result?.counterFills || [], remaining: result?.remainingQuantity ?? quantity };
     }
-    refreshOrderBook(symbol, midPrice) {
+    refreshOrderBook(symbol: string, midPrice: number) {
         if (this.deferBookChange(symbol, () => this.refreshOrderBook(symbol, midPrice))) return;
         const levels = 5;
         const baseSpread = 0.001;
@@ -340,14 +379,14 @@ export class MatchingEngine {
                 liquidityMul = 0.2;
             }
         }
-        let asks = [];
-        let bids = [];
+        let asks: ExternalLiquidity[] = [];
+        let bids: ExternalLiquidity[] = [];
         // Phase B: 涨跌停统一基准=昨收（真实涨停价=昨收×1.1 全天固定），新股首日 +44%/-36%（发行价口径）
         // prevClose 由 market.service 通过 setPrevCloses 同步（竞价前刷新）
-        const isCN = market_utils_1.isCnSymbol(symbol);
+        const isCN = isCnSymbol(symbol);
         const firstDay = this.ipoFirstDay.has(symbol);
         const base = isCN ? ((this.prevCloses.get(symbol) && Number(this.prevCloses.get(symbol)) > 0) ? Number(this.prevCloses.get(symbol)) : (dayOpen && Number(dayOpen) > 0 ? Number(dayOpen) : null)) : null;
-        const band = isCN && base ? market_utils_1.cnPriceLimits(base, firstDay) : null;
+        const band = isCN && base ? cnPriceLimits(base, firstDay) : null;
         const limitUp = band ? band.up : null;
         const limitDown = band ? band.down : null;
         const sealedUp = limitUp !== null && midPrice >= limitUp - 1e-6;
@@ -371,9 +410,9 @@ export class MatchingEngine {
         this.observeOrderFlow(symbol);
     }
     // Phase B: 输出层动态合并真实挂单（按价格聚合，同价先合成后真实，最多 10 档）
-    mergeReal(symbol, synthetic, side) {
+    mergeReal(symbol: string, synthetic: ExternalLiquidity[], side: 'bid' | 'ask') {
         const realBook = this.realBooks.get(symbol);
-        const map = new Map();
+        const map = new Map<number, number>();
         for (const l of synthetic)
             if (Number(l.size) > 0) map.set(l.price, (map.get(l.price) || 0) + l.size);
         if (realBook) {
@@ -387,7 +426,7 @@ export class MatchingEngine {
             .sort((a, b) => (side === 'bid' ? b.price - a.price : a.price - b.price))
             .slice(0, 10);
     }
-    getOrderBook(symbol) {
+    getOrderBook(symbol: string) {
         const book = this.orderBooks.get(symbol) || { asks: [], bids: [] };
         const asks = this.mergeReal(symbol, book.asks, 'ask');
         const bids = this.mergeReal(symbol, book.bids, 'bid');
@@ -402,7 +441,7 @@ export class MatchingEngine {
         };
     }
     // Compatibility name: this is static queue imbalance (QI), not event OFI.
-    calcBookOFI(symbol) {
+    calcBookOFI(symbol: string) {
         const book = this.orderBooks.get(symbol) || { asks: [], bids: [] };
         const asks = this.mergeReal(symbol, book.asks, 'ask');
         const bids = this.mergeReal(symbol, book.bids, 'bid');
@@ -416,18 +455,18 @@ export class MatchingEngine {
         return (bid - ask) / total;
     }
     // Kept for legacy callers/backtests; production fills do not use this approximation.
-    slipStepFor(symbol, side) {
+    slipStepFor(symbol: string, side: string) {
         const ofi = this.calcBookOFI(symbol);
         const vol = Number(this.volatilities.get(symbol)) || 0.02;
-        return { step: slippage_1.slipStepFor(vol, ofi, side), ofi };
+        return { step: slipStepFor(vol, ofi, side), ofi };
     }
-    executeMarketOrder(symbol, side, quantity, excludeAccountId?, options: ExecutionOptions = {}) {
+    executeMarketOrder(symbol: string, side: string, quantity: number, excludeAccountId?: string, options: ExecutionOptions = {}) {
         return this.executeFinite(symbol, side, quantity, undefined, excludeAccountId, options);
     }
     // P2: AI 虚拟限价挂单（进入盘口排队，TTL tick 到期自动撤单，无账户不结算）
     // opts.orderId 供做市商报价撤换 / AI 挂单追踪；opts.mmId 触发做市商成交回调（库存更新）
     // P0-3: opts.tag 为任意标识（AI 侧放 agent.id）——AI 限价单成交同样触发 virtualFillHook，供账本回调定位
-    placeVirtualOrder(symbol, side, price, qty, expiresAtTick, opts?) {
+    placeVirtualOrder(symbol: string, side: string, price: number, qty: number, expiresAtTick: number, opts?: { orderId?: string; mmId?: string; tag?: string }) {
         if (this.deferBookChange(symbol, () => this.placeVirtualOrder(symbol, side, price, qty, expiresAtTick, opts))) return;
         if (!Number.isFinite(Number(price)) || Number(price) <= 0 || !Number.isFinite(Number(qty)) || Number(qty) <= 0)
             return;
@@ -448,15 +487,15 @@ export class MatchingEngine {
     // P2: 清理到期的 AI 虚拟挂单（每 tick 由行情引擎调用）
     // G-3: 可选 matchSymbol 过滤——三市场共享同一个引擎、tickCount 各自独立（闭市市场不前进），
     // 用别市场的 tick 去清理会把本市场"还没到期"的挂单提前删掉（虚拟流动性凭空消失）。
-    pruneExpiredVirtualOrders(currentTick, matchSymbol?: (symbol: string) => boolean) {
+    pruneExpiredVirtualOrders(currentTick: number, matchSymbol?: (symbol: string) => boolean) {
         for (const [symbol, book] of this.realBooks) {
             if (matchSymbol && !matchSymbol(symbol))
                 continue;
             if (this.deferBookChange(symbol, () => this.pruneExpiredVirtualOrders(currentTick, s => s === symbol))) continue;
-            for (const sideKey of ['bids', 'asks']) {
+            for (const sideKey of ['bids', 'asks'] as const) {
                 const arr = book[sideKey];
                 for (let i = arr.length - 1; i >= 0; i--) {
-                    if (arr[i].virtual && arr[i].expiresAtTick <= currentTick) {
+                    if (arr[i].virtual && arr[i].expiresAtTick !== undefined && arr[i].expiresAtTick! <= currentTick) {
                         arr.splice(i, 1);
                     }
                 }
@@ -465,13 +504,13 @@ export class MatchingEngine {
         }
     }
     // P2: AI 虚拟市价单——只吃真实盘口（AI 虚拟挂单 + 用户挂单），不吃合成深度
-    executeVirtualMarketOrder(symbol, side, quantity) {
+    executeVirtualMarketOrder(symbol: string, side: string, quantity: number) {
         return this.executeFinite(symbol, side, quantity, undefined, undefined, {}, false);
     }
     // P1 开盘集合竞价：按最大成交量原则形成开盘价，交叉挂单以开盘价撮合（用户订单走真实结算）
     // 返回 { auctionPrice, fills }；fills 中买卖双方各一条（virtual 标记区分 AI 虚拟挂单）
     // 注：冰山单隐藏量不参与竞价（只按显示量计），与交易所简化口径一致
-    runOpeningAuction(symbol, prevClose) {
+    runOpeningAuction(symbol: string, prevClose: number) {
         if (this.reservedSymbols.has(symbol)) throw new Error('Continuous execution must settle before the opening auction');
         const book = this.realBooks.get(symbol);
         if (!book)
@@ -480,7 +519,7 @@ export class MatchingEngine {
         const asks = book.asks.slice();
         if (bids.length === 0 || asks.length === 0)
             return { auctionPrice: Number(prevClose) || 0, fills: [] };
-        const isCN = market_utils_1.isCnSymbol(symbol);
+        const isCN = isCnSymbol(symbol);
         const base = Number(prevClose) || Number(bids[0].price) || 1;
         // P5 新股首日竞价区间同样放宽到 +44%/-36%
         const firstDay = this.ipoFirstDay.has(symbol);
@@ -494,7 +533,7 @@ export class MatchingEngine {
             candidates.add(p);
         }
         candidates.add(Math.min(Math.max(base, limitDown), limitUp));
-        const volumeAt = (p) => {
+        const volumeAt = (p: number) => {
             let bidVol = 0;
             for (const e of bids)
                 if (e.price >= p)
@@ -505,7 +544,7 @@ export class MatchingEngine {
                     askVol += e.qty;
             return Math.min(bidVol, askVol);
         };
-        let best = null;
+        let best: { price: number; volume: number } | null = null;
         for (const p of [...candidates].sort((a, b) => a - b)) {
             const v = volumeAt(p);
             if (best === null || v > best.volume || (v === best.volume && Math.abs(p - base) < Math.abs(best.price - base))) {
@@ -515,11 +554,11 @@ export class MatchingEngine {
         const auctionPrice = best ? best.price : base;
         const bidQueue = bids.filter((e) => e.price >= auctionPrice);
         const askQueue = asks.filter((e) => e.price <= auctionPrice);
-        const fills = [];
+        const fills: Fill[] = [];
         // R5-⑬: 竞价虚拟成交的钩子载荷（本函数是纯计算、无 DB，钩子在 return 前统一触发）。
         // fills 内容保持不变（不含 mmId/tag），故单独收集源挂单的归属信息。
-        const virtualHooks = [];
-        const removeEntry = (arr, entry, qty) => {
+        const virtualHooks: VirtualFill[] = [];
+        const removeEntry = (arr: BookEntry[], entry: BookEntry, qty: number) => {
             const idx = arr.indexOf(entry);
             if (idx < 0)
                 return;
@@ -574,7 +613,7 @@ export class MatchingEngine {
         return { auctionPrice: Number(Number(auctionPrice).toFixed(2)), fills };
     }
     // SECURITY: 限价单按限价封顶撮合——买入只吃价格<=限价的档位，卖出相反；不足则部分成交
-    executeMarketOrderLimited(symbol, side, quantity, limitPrice, excludeAccountId?, options: ExecutionOptions = {}) {
+    executeMarketOrderLimited(symbol: string, side: string, quantity: number, limitPrice: number, excludeAccountId?: string, options: ExecutionOptions = {}) {
         return this.executeFinite(symbol, side, quantity, limitPrice, excludeAccountId, options);
     }
 }

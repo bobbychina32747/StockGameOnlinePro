@@ -80,13 +80,15 @@ AI 对手使用本地规则策略和决策树桩集成，受现金、持仓、�
 
 历史 Level 2 深度、经过校准的价位记忆和行业跳跃事件频率仍有缺口。影线是模拟报价范围，不是复原真实分钟成交路径。本项目是市场模拟，不是经过验证的真实市场副本或预测系统。
 
+交易日历使用带官方来源与核验程度的数据快照，并提供更新校验；现实交易日期缺少覆盖时明确闭市。参见[日历维护与核验程度](docs/TRADING-CALENDAR.md)。
+
 ## 本地运行
 
 使用满足锁文件依赖的受维护 Node.js LTS 与 npm；核验时 Node 22 / 24 仍处于 LTS，后续升级先查 [Node 维护状态](https://nodejs.org/en/about/previous-releases)。SQLite 依赖原生 `better-sqlite3` 绑定，切换 Node 版本后应重新安装依赖。
 
 ### 1. 配置并启动后端
 
-首次本地配置时，将 `backend/.env.example` 复制为 `backend/.env`；已有配置不要覆盖。后端命令从 `backend/` 运行，因为 `.env` 相对于工作目录读取。自行设置 `JWT_SECRET`、`JWT_REFRESH_SECRET` 和 `ADMIN_PASSWORD`，不要沿用示例占位值或生产凭证。
+首次本地配置时，将 `backend/.env.game.example` 复制为 `backend/.env.game`；已有配置不要覆盖。后端命令从 `backend/` 运行，因为 `.env` 相对于工作目录读取。自行设置 `JWT_SECRET`、`JWT_REFRESH_SECRET` 和 `ADMIN_PASSWORD`，不要沿用示例占位值或生产凭证。
 
 本地交易所日历模式使用以下配置：
 
@@ -154,7 +156,9 @@ npm run start:formal
 ```mermaid
 flowchart LR
     Player[浏览器工作台] --> Adapter[统一 API 与会话适配服务]
-    Adapter --> Core[后端：身份、账本、撮合、行情]
+    Adapter --> Core[游戏核心：账本、撮合、行情]
+    Adapter --> Identity[外部站点身份服务]
+    Core --> Identity
     Core --> Ledger[(stockgame.db)]
     Adapter --> Commands[(formal-commands.sqlite)]
 ```
@@ -163,13 +167,16 @@ flowchart LR
 | --- | --- |
 | `backend/` | NestJS 后端：账户、认证、交易、行情、风控、基金与赛季 |
 | `remaster/apps/web/` | React/Vite/ECharts 工作台 |
-| `remaster/apps/game-api/` | 正式账本适配、区服会话、REST 命令与 Socket.IO 快照 |
+| `backend-go/` | 正式 HTTP/SSE 与游戏会话适配；资金写入委托给 NestJS 游戏核心 |
+| `remaster/apps/game-api/` | 可选 Node 兼容入口，使用 REST/Socket.IO 传输 |
 | `remaster/packages/domain/` | 共享类型、股票目录和独立模拟组件 |
 | `remaster/tooling/` | 构建工具、目录导入和研究工具 |
 | `frontend/` | 保留兼容用途的旧前端，不是统一游戏的主入口 |
 | `docs/` | 架构、API、研究、迁移和验证报告 |
 
 主要技术为 TypeScript、React、Vite、ECharts、NestJS、TypeORM、SQLite 和 Socket.IO。适配服务的命令数据库保存幂等记录，不是第二套资产账本。
+
+站点身份、OAuth、博客、邮箱、私信、资源、游戏厅绑定和云存档已从游戏源码移到独立站点后端。StockGame 仅保留外部身份客户端与游戏账号映射，两者分库，游戏不持有站点签名私钥。参见[边界与切换要求](docs/SITE-SEPARATION.md)。本地拆分尚未切换线上部署。
 
 ## API 与策略接入
 
@@ -181,7 +188,8 @@ flowchart LR
 | `GET /api/v2/history/:symbol?interval=1m` | 当前区服标的的蜡烛历史 |
 | `GET /api/v2/book/:symbol` | 可见盘口深度 |
 | `POST /api/v2/commands` | 交易及账户命令，使用 `Idempotency-Key` |
-| Socket.IO `/v2` | 实时快照 |
+| `GET /api/v2/events?market=CN` | Go 适配器的实时 SSE 快照 |
+| Socket.IO `/v2` | 可选 Node 兼容传输 |
 
 请求仍受认证、区服、资金、费用和交易规则约束。v2 契约见[适配控制器](remaster/apps/game-api/unified-controller.ts)，后端接口见 [API 文档](docs/API.md)。仓库另提供[机器人示例](backend/scripts/quant-bot.js)和[回测 CLI](backend/scripts/backtest.js)。
 

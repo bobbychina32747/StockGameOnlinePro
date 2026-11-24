@@ -19,6 +19,7 @@ import (
 
 type Config struct {
 	BackendURL, SiteOrigin, Database, Catalog, WebRoot string
+	SiteIdentityURL                                    string
 	AllowedOrigins                                     []string
 	SecureCookies, TrustProxy                          bool
 	MaxStreams                                         int
@@ -51,6 +52,9 @@ func New(config Config) (*Server, error) {
 	}
 	up, err := NewUpstream(config.BackendURL, config.SiteOrigin)
 	if err != nil {
+		return nil, err
+	}
+	if err = up.setSiteIdentity(config.SiteIdentityURL); err != nil {
 		return nil, err
 	}
 	store, err := openStore(config.Database)
@@ -380,5 +384,5 @@ func ConfigFromEnv() Config {
 		}
 		return fallback
 	}
-	return Config{BackendURL: get("REMASTER_IDENTITY_URL", "http://127.0.0.1:8000"), SiteOrigin: get("REMASTER_SITE_ORIGIN", "https://game.bobbycn.cc"), Database: get("UNIFIED_COMMAND_DB", "data/formal-commands.sqlite"), Catalog: get("SGP_CATALOG", "../remaster/packages/domain/catalog.json"), WebRoot: get("SGP_WEB_ROOT", "../remaster/apps/web/dist"), AllowedOrigins: strings.Split(get("REMASTER_ALLOWED_ORIGINS", "http://127.0.0.1:8321,http://localhost:8321"), ","), SecureCookies: get("REMASTER_COOKIE_SECURE", "") == "true", TrustProxy: get("REMASTER_TRUST_PROXY", "") == "1"}
+	return Config{SiteIdentityURL: os.Getenv("REMASTER_SITE_IDENTITY_URL"), BackendURL: get("REMASTER_IDENTITY_URL", "http://127.0.0.1:8000"), SiteOrigin: get("REMASTER_SITE_ORIGIN", "https://game.bobbycn.cc"), Database: get("UNIFIED_COMMAND_DB", "data/formal-commands.sqlite"), Catalog: get("SGP_CATALOG", "../remaster/packages/domain/catalog.json"), WebRoot: get("SGP_WEB_ROOT", "../remaster/apps/web/dist"), AllowedOrigins: strings.Split(get("REMASTER_ALLOWED_ORIGINS", "http://127.0.0.1:8321,http://localhost:8321"), ","), SecureCookies: get("REMASTER_COOKIE_SECURE", "") == "true", TrustProxy: get("REMASTER_TRUST_PROXY", "") == "1"}
 }

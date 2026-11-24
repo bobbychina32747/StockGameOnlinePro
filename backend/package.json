@@ -8,7 +8,13 @@
     "start:dev": "node --watch dist/src/main.js",
     "test": "jest --config jest.config.js",
     "db:migrate": "node scripts/migrate-sqljs-to-better-sqlite3.mjs",
-    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json"
+    "build": "npm run check:calendar && npm run check:boundaries && npm run check:core-types && npm run build:compile",
+    "check:boundaries": "node scripts/check-boundaries.cjs",
+    "check:core-types": "node scripts/check-core-types.cjs",
+    "check:calendar": "node scripts/calendar-data.cjs --check",
+    "build:compile": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
+    "build:container": "node scripts/calendar-data.cjs --schema-only && npm run check:boundaries && npm run check:core-types && npm run build:compile",
+    "db:export-game": "node scripts/export-game-database.cjs"
   },
   "devDependencies": {
     "jest": "^29.7.0",

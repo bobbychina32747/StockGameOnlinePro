@@ -8,7 +8,7 @@ services:
     container_name: sgp-backend
     restart: unless-stopped
     env_file:
-      - ../.env            # = backend/.env（PORT/JWT/ADMIN；无 DB_TYPE/SQLITE_PATH → 默认 better-sqlite3 ./data/stockgame.db）
+      - ../.env.game       # Game-only environment. Never reuse the combined site/game environment.
     environment:
       - TRUST_PROXY=1      # 前面有 nginx 反代：限流/日志需真实客户端 IP
     ports:

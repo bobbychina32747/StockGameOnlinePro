@@ -1,0 +1,241 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-11-10",
+  "markets": {
+    "CN": {
+      "years": {
+        "2025": {
+          "confidence": "historical",
+          "holidays": [
+            "2025-01-01",
+            "2025-01-28",
+            "2025-01-29",
+            "2025-01-30",
+            "2025-01-31",
+            "2025-02-03",
+            "2025-02-04",
+            "2025-04-04",
+            "2025-05-01",
+            "2025-05-02",
+            "2025-05-05",
+            "2025-06-02",
+            "2025-10-01",
+            "2025-10-02",
+            "2025-10-03",
+            "2025-10-06",
+            "2025-10-07",
+            "2025-10-08"
+          ],
+          "halfDays": [],
+          "sources": [
+            "https://www.sse.com.cn/disclosure/dealinstruc/closed/"
+          ]
+        },
+        "2026": {
+          "confidence": "verified",
+          "holidays": [
+            "2026-01-01",
+            "2026-01-02",
+            "2026-02-16",
+            "2026-02-17",
+            "2026-02-18",
+            "2026-02-19",
+            "2026-02-20",
+            "2026-02-23",
+            "2026-04-06",
+            "2026-05-01",
+            "2026-05-04",
+            "2026-05-05",
+            "2026-06-19",
+            "2026-09-25",
+            "2026-10-01",
+            "2026-10-02",
+            "2026-10-05",
+            "2026-10-06",
+            "2026-10-07"
+          ],
+          "halfDays": [],
+          "sources": [
+            "https://www.sse.com.cn/disclosure/dealinstruc/closed/"
+          ]
+        }
+      },
+      "notes": "No verified 2027 exchange schedule was retrieved. Forecast dates are excluded; real-time trading fails closed outside coverage."
+    },
+    "HK": {
+      "years": {
+        "2025": {
+          "confidence": "historical",
+          "holidays": [
+            "2025-01-01",
+            "2025-01-29",
+            "2025-01-30",
+            "2025-01-31",
+            "2025-04-04",
+            "2025-04-18",
+            "2025-04-19",
+            "2025-04-21",
+            "2025-05-01",
+            "2025-05-05",
+            "2025-05-31",
+            "2025-07-01",
+            "2025-10-01",
+            "2025-10-07",
+            "2025-12-25",
+            "2025-12-26"
+          ],
+          "halfDays": [],
+          "sources": [
+            "https://www.hkex.com.hk/News/HKEX-Calendar?sc_lang=en"
+          ]
+        },
+        "2026": {
+          "confidence": "verified",
+          "holidays": [
+            "2026-01-01",
+            "2026-02-17",
+            "2026-02-18",
+            "2026-02-19",
+            "2026-04-03",
+            "2026-04-06",
+            "2026-04-07",
+            "2026-05-01",
+            "2026-05-25",
+            "2026-06-19",
+            "2026-07-01",
+            "2026-10-01",
+            "2026-10-19",
+            "2026-12-25"
+          ],
+          "halfDays": [
+            "2026-02-16",
+            "2026-12-24",
+            "2026-12-31"
+          ],
+          "sources": [
+            "https://www.hkex.com.hk/-/media/HKEX-Market/Services/Circulars-and-Notices/Participant-and-Members-Circulars/SEHK/2025/ce_SEHK_CT_075_2025.pdf"
+          ]
+        },
+        "2027": {
+          "confidence": "rule-derived",
+          "holidays": [
+            "2027-01-01",
+            "2027-02-08",
+            "2027-02-09",
+            "2027-03-26",
+            "2027-03-29",
+            "2027-04-05",
+            "2027-05-01",
+            "2027-05-13",
+            "2027-06-09",
+            "2027-07-01",
+            "2027-09-16",
+            "2027-10-01",
+            "2027-10-08",
+            "2027-12-25",
+            "2027-12-27"
+          ],
+          "halfDays": [
+            "2027-02-05",
+            "2027-12-24",
+            "2027-12-31"
+          ],
+          "sources": [
+            "https://www.hkex.com.hk/News/HKEX-Calendar?sc_lang=en",
+            "https://www.hkex.com.hk/eng/prod/dataprod/Documents/MDS3%208%20MDF%20Transmission%20Specification%20v7.8.pdf"
+          ]
+        }
+      },
+      "notes": "2027 full closures were checked against HKEX calendar entries. Half-day eves apply the exchange rule; no 2027 annual securities circular was retrieved. Historical 2025 half-day coverage is unchanged."
+    },
+    "US": {
+      "years": {
+        "2025": {
+          "confidence": "historical",
+          "holidays": [
+            "2025-01-01",
+            "2025-01-09",
+            "2025-01-20",
+            "2025-02-17",
+            "2025-04-18",
+            "2025-05-26",
+            "2025-06-19",
+            "2025-07-04",
+            "2025-09-01",
+            "2025-11-27",
+            "2025-12-25"
+          ],
+          "halfDays": [],
+          "sources": [
+            "https://www.nyse.com/trade/hours-calendars"
+          ]
+        },
+        "2026": {
+          "confidence": "verified",
+          "holidays": [
+            "2026-01-01",
+            "2026-01-19",
+            "2026-02-16",
+            "2026-04-03",
+            "2026-05-25",
+            "2026-06-19",
+            "2026-07-03",
+            "2026-09-07",
+            "2026-11-26",
+            "2026-12-25"
+          ],
+          "halfDays": [
+            "2026-11-27",
+            "2026-12-24"
+          ],
+          "sources": [
+            "https://www.nyse.com/trade/hours-calendars"
+          ]
+        },
+        "2027": {
+          "confidence": "verified",
+          "holidays": [
+            "2027-01-01",
+            "2027-01-18",
+            "2027-02-15",
+            "2027-03-26",
+            "2027-05-31",
+            "2027-06-18",
+            "2027-07-05",
+            "2027-09-06",
+            "2027-11-25",
+            "2027-12-24"
+          ],
+          "halfDays": [
+            "2027-11-26"
+          ],
+          "sources": [
+            "https://www.nyse.com/trade/hours-calendars"
+          ]
+        },
+        "2028": {
+          "confidence": "verified",
+          "holidays": [
+            "2028-01-17",
+            "2028-02-21",
+            "2028-04-14",
+            "2028-05-29",
+            "2028-06-19",
+            "2028-07-04",
+            "2028-09-04",
+            "2028-11-23",
+            "2028-12-25"
+          ],
+          "halfDays": [
+            "2028-07-03",
+            "2028-11-24"
+          ],
+          "sources": [
+            "https://www.nyse.com/trade/hours-calendars"
+          ]
+        }
+      },
+      "notes": "NYSE cash equities regular sessions; overnight/extended sessions and bond-market calendars are not substituted. Historical 2025 half-day coverage is unchanged."
+    }
+  }
+}

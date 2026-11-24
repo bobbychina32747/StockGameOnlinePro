@@ -8,12 +8,12 @@ import { mkdirSync } from 'node:fs';
 import { AuthBridge, tokenFrom } from './auth';
 import { UnifiedLedger } from './unified-ledger';
 import { UnifiedController } from './unified-controller';
-export async function createUnifiedApplication(options:{port?:number;identityBaseUrl?:string;database?:string}={}){
+export async function createUnifiedApplication(options:{port?:number;identityBaseUrl?:string;siteIdentityBaseUrl?:string;database?:string}={}){
   const port=options.port??Number(process.env.REMASTER_PORT??8321);
   const origins=(process.env.REMASTER_ALLOWED_ORIGINS??`http://127.0.0.1:${port},http://localhost:${port}`).split(',');
   const root=resolve(__dirname,'../../..');mkdirSync(resolve(root,'data'),{recursive:true});
   const Database=require('better-sqlite3');const db=new Database(options.database??process.env.UNIFIED_COMMAND_DB??resolve(root,'data/formal-commands.sqlite'));db.pragma('journal_mode = WAL');
-  const auth=new AuthBridge({sandbox:false,identityBaseUrl:options.identityBaseUrl??process.env.REMASTER_IDENTITY_URL??'http://127.0.0.1:8000',origin:process.env.REMASTER_SITE_ORIGIN??'https://game.bobbycn.cc',allowedOrigins:origins},new RoleSessions(db,options.database===':memory:'?undefined:resolve(options.database??process.env.UNIFIED_COMMAND_DB??resolve(root,'data/formal-commands.sqlite'))+'.session-key'));
+  const auth=new AuthBridge({sandbox:false,identityBaseUrl:options.identityBaseUrl??process.env.REMASTER_IDENTITY_URL??'http://127.0.0.1:8000',siteIdentityBaseUrl:options.siteIdentityBaseUrl??process.env.REMASTER_SITE_IDENTITY_URL,origin:process.env.REMASTER_SITE_ORIGIN??'https://game.bobbycn.cc',allowedOrigins:origins},new RoleSessions(db,options.database===':memory:'?undefined:resolve(options.database??process.env.UNIFIED_COMMAND_DB??resolve(root,'data/formal-commands.sqlite'))+'.session-key'));
   // Native credentials and linked site identity always point to the same original game user.
   auth.resolveOwner=(subject,market,gameSubject)=>(gameSubject??subject)+':'+market;
   const ledger=new UnifiedLedger(auth,db);

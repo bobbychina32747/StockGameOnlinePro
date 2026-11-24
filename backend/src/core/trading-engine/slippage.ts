@@ -4,7 +4,7 @@
 //   步长 = 0.0008 × 波动率压力(1+min(2,max(0,(vol-0.02)*25))) × OFI 修正（逆风×放大、顺风收窄）
 //   每 500 股一档恶化，步长钳 [0.0002, 0.004]，总滑点上限 2%，触顶后剩余量按触顶价兜底成交（Phase A P0#5）
 
-export function slipStepFor(vol, ofi, side) {
+export function slipStepFor(vol: number, ofi: number, side: string) {
     const v = Number(vol) || 0.02;
     const volMul = 1 + Math.min(2, Math.max(0, (v - 0.02) * 25));
     const dir = (side === 'buy' || side === 'cover') ? 1 : -1;
@@ -17,7 +17,7 @@ export function slipStepFor(vol, ofi, side) {
 // Approximate historical fills when no order book is supplied (not live depth):
 // anchor=最深档价（或现价），limitPrice 为限价约束（缺省=不限价，市价单语义）
 // 返回 { totalCost, totalQty, remaining } —— remaining=0 表示全部成交（含触顶兜底）
-export function liveFillPrice(anchor, qty, side, vol, ofi, limitPrice) {
+export function liveFillPrice(anchor: number, qty: number, side: string, vol: number, ofi: number, limitPrice?: number) {
     const isBuy = side === 'buy' || side === 'cover';
     const dirMul = isBuy ? 1 : -1;
     const step = slipStepFor(vol, ofi, side);

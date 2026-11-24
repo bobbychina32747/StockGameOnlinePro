@@ -10,13 +10,13 @@ import { Account } from '../../infrastructure/database/entities/account.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { IdentityModule } from '../identity/identity.module';
 import { SiteGameAuthService } from './site-game-auth.service';
+import { SiteIdentityClient } from './site-identity.client';
+import { SiteSessionGuard } from './site-session.guard';
 
 @Global()
 @Module({
     imports: [
-        IdentityModule,
         PassportModule.register({ defaultStrategy: 'jwt' }),
         TypeOrmModule.forFeature([User, Account]),
         JwtModule.registerAsync({
@@ -30,7 +30,7 @@ import { SiteGameAuthService } from './site-game-auth.service';
         }),
     ],
     controllers: [AuthController],
-    providers: [AuthService, JwtStrategy, SiteGameAuthService],
-    exports: [AuthService, JwtModule, SiteGameAuthService],
+    providers: [AuthService, JwtStrategy, SiteGameAuthService, SiteIdentityClient, SiteSessionGuard],
+    exports: [AuthService, JwtModule, SiteGameAuthService, SiteIdentityClient, SiteSessionGuard],
 })
 export class AuthModule {}

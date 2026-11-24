@@ -14,17 +14,20 @@ import { DividendSnapshot } from '../../infrastructure/database/entities/dividen
 import { CN_FEES, HK_FEES, RISK, STOCK_POOL, US_FEES, dividendTaxRate, shortMarginRateFor } from '../../common/constants';
 // Phase B: 跨市场校验与涨跌停统一区间
 import { cnPriceLimits, symbolMarket } from '../../common/market-utils';
-import { MatchingEngine, ExecutionOptions } from './matching-engine';
+import { MatchingEngine, ExecutionOptions, ExecutionMetadata, Fill, VirtualFill } from './matching-engine';
 
 // 成交明细入参：撮合引擎输出 / 对手方挂单成交 / 集合竞价成交共用。各调用点字段略有差异
-// （对手方成交无 symbol/side 语义、竞价成交无 totalCost 兜底），故保留索引签名，均价+数量为结算必需字段
+// 对手方/竞价成交的可选字段显式声明；禁止任意动态字段绕过结算契约。
 interface TradeFill {
     symbol?: string;
     side?: string;
     filledQuantity: number;
     avgPrice: number;
     totalCost?: number;
-    [key: string]: any;
+    counterFills?: Fill[];
+    execution?: ExecutionMetadata;
+    orderId?: string;
+    recordMarketImpact?: boolean;
 }
 interface SettlementContext {
     accountRepo: Repository<Account>;
@@ -41,13 +44,13 @@ export class TradingEngineService {
     // P2 撮合引擎独立成类：盘口/撮合/竞价纯逻辑全部在 MatchingEngine（可直接单测）
     private readonly matching: MatchingEngine;
     // maps 别名共享：旧代码（行情引擎/风控/测试）直接访问 this.orderBooks/realBooks/prices 不受影响
-    orderBooks: Map<string, any>;
-    realBooks: Map<string, any>;
-    prices: Map<string, any>;
-    dayOpenPrices: Map<string, any>;
-    volatilities: Map<string, any>;
+    orderBooks: MatchingEngine['orderBooks'];
+    realBooks: MatchingEngine['realBooks'];
+    prices: MatchingEngine['prices'];
+    dayOpenPrices: MatchingEngine['dayOpenPrices'];
+    volatilities: MatchingEngine['volatilities'];
     // Phase B: 昨收同步代理（涨跌停基准）
-    prevCloses: Map<string, any>;
+    prevCloses: MatchingEngine['prevCloses'];
     // Phase B: 新股首日集合代理（委托价带宽）
     ipoFirstDay: Set<string>;
     // 用户限价挂单（真实盘口：进入 orderBooks 深度）
@@ -104,7 +107,7 @@ export class TradingEngineService {
     setVolatilities(vols: Record<string, any>) {
         this.matching.setVolatilities(vols);
     }
-    setVirtualFillHook(fn: (fill: any) => void) {
+    setVirtualFillHook(fn: (fill: VirtualFill) => void) {
         this.matching.setVirtualFillHook(fn);
     }
     refreshOrderBooks(prices: Record<string, any>) {

@@ -13,7 +13,7 @@ import * as market_utils_1 from '../../common/market-utils';
 import * as market_maker_1 from './market-maker';
 import * as fundamentals_1 from './fundamentals';
 import * as ai_opponents_1 from './ai-opponents';
-import { gameTradingTime, tradingMinutesFor, realTradingTime, exchangeTime, exchangeParts } from '../../common/data/trading-calendar';
+import { gameTradingTime, tradingMinutesFor, realTradingTime, exchangeTime, exchangeParts, exchangeSessions, completedTradingDates } from '../../common/data/trading-calendar';
 import { calibratedShock, heavyTail, unifiedInstruments, intrabarRange } from '../../common/unified-market';
 import { HISTORY_CACHE_LIMITS, restoreHistoryCache, persistCandleBatches } from './history-cache';
 import { aiEntryScore, aiPolicyDirection, aiPortfolioRisk } from './ai-risk-policy';
@@ -235,7 +235,7 @@ export class MarketDataService {
         this.macroEvents = [];
         this.macroHistory = [];
     }
-    async init() {
+    async init(options: { calendarNow?: Date } = {}) {
         for (const f of constants_1.FACTOR_NAMES) {
             this.factors[f] = -0.02 + Math.random() * 0.04;
         }
@@ -431,11 +431,15 @@ export class MarketDataService {
             }
             this.logger.log(`[S1] 已恢复行情缓存 ${historyCount} 条, 从第 ${this.gameDay} 个交易日继续（补齐 ${missingDays} 天；完整历史留在数据库）`);
         } else {
+            const dates = options.calendarNow ? completedTradingDates(this.market as any, 30, options.calendarNow) : null;
             for (let d = 0; d < 30; d++) {
-                for (let t = 0; t < tradingMinutesFor(this.market); t++) {
+                if (dates) await this.bindCalendarDate(dates[d]);
+                const minutes = dates ? exchangeSessions(this.market as any, dates[d]).reduce((sum, [start,end]) => sum + end-start, 0) : tradingMinutesFor(this.market);
+                for (let t = 0; t < minutes; t++) {
                     await this.generateTick();
                 }
                 await this.endOfDay(true); // 预热结束后按标的分批持久化。
+                if (dates) this.calendarState.closedDate = dates[d];
             }
             // 注意：不重置 gameDay，历史 30 天用 0..29，实时从 30 开始，避免 K 线时间戳重叠
             this.logger.log(`市场数据已初始化(首次): ${dbStocks.length} 只股票, 30天历史已生成`);
@@ -1743,6 +1747,10 @@ export class MarketDataService {
     // 随机游走 + 漂移校准到既有首根日线开盘价，保证与游戏内历史无缝衔接；只落库一次（存在即跳过）
     async seedUnifiedHistory() {
         const batch = [];
+        const realDates = this.calendarState.date ? completedTradingDates(this.market as any, 120, exchangeTime(this.market as any, this.calendarState.date, 0)) : null;
+        const historicalTime = (day: number, minute: number) => realDates
+            ? realTradingTime(this.market as any, realDates[day - (this.gameDay - 120)], minute)
+            : this.tradingTime(day, minute);
         for (const stock of this.stocks.values()) {
             const instrument = unifiedInstruments.get(stock.symbol);
             if (!instrument || stock.klineDaily.length || !/^(R|NX)/.test(stock.symbol)) continue;
@@ -1751,16 +1759,17 @@ export class MarketDataService {
             for (let day = this.gameDay - 1; day >= this.gameDay - 120; day--) {
                 const move = Math.max(-.08, Math.min(.08, heavyTail(this.randn.bind(this)) * instrument.volatility));
                 const open = close / (1 + move), wick = Math.abs(this.randn()) * instrument.volatility * .15;
-                daily.unshift({ time: this.tradingTime(day, 0), open, close,
+                daily.unshift({ time: historicalTime(day, 0), open, close,
                     high: Math.max(open, close) * (1 + wick), low: Math.min(open, close) * (1 - wick),
                     volume: Math.floor(stock.baseVolume * tradingMinutesFor(this.market)) }); close = open;
             }
             stock.klineDaily = daily;
-            const minutes = []; close = stock.price; const length = tradingMinutesFor(this.market);
+            const minutes = []; close = stock.price;
+            const length = realDates ? exchangeSessions(this.market as any, realDates[realDates.length-1]).reduce((sum,[start,end]) => sum+end-start,0) : tradingMinutesFor(this.market);
             for (let minute = length - 1; minute >= 0; minute--) {
                 const move = heavyTail(this.randn.bind(this)) * instrument.volatility / Math.sqrt(length);
                 const open = close / (1 + move);
-                minutes.unshift({ time: this.tradingTime(this.gameDay - 1, minute), open, close,
+                minutes.unshift({ time: historicalTime(this.gameDay - 1, minute), open, close,
                     high: Math.max(open, close), low: Math.min(open, close), volume: stock.baseVolume }); close = open;
             }
             stock.kline1min = minutes;
@@ -1777,7 +1786,7 @@ export class MarketDataService {
         if (batch.length) this.logger.log(`统一股票池已补齐 ${batch.length} 根合成历史K线；旧行情未改写`);
     }
     async generatePreHistoryForAll() {
-        const BASE = new Date(2024, 0, 1).getTime();
+        const legacyBase = new Date(2024, 0, 1).getTime();
         const batch = [];
         let total = 0;
         for (const stock of this.stocks.values()) {
@@ -1785,25 +1794,27 @@ export class MarketDataService {
             if (!stock.klineDaily || stock.klineDaily.length === 0)
                 continue;
             const oldest = new Date(stock.klineDaily[0].time).getTime();
+            const realCalendar = !!this.calendarState.date;
+            const BASE = realCalendar ? Date.parse(exchangeParts(this.market as any,new Date(oldest)).date+'T12:00:00Z') : legacyBase;
             const listYear = parseInt((stock.listDate || '2010').slice(0, 4), 10) || 2010;
-            // 上市日到 2024-01-01 的交易日数（跳过周末，上限 9000 天≈34 年）
+            // 旧的日线补齐仍按工作日近似；实时模式锚定首根已有日线，虚拟模式沿用 2024 起点。
             let tradingDays = 0;
-            for (let t = new Date(listYear, 0, 1); t.getTime() < BASE; t.setDate(t.getDate() + 1)) {
-                const wd = t.getDay();
+            for (let t = realCalendar ? new Date(Date.UTC(listYear,0,1,12)) : new Date(listYear, 0, 1); t.getTime() < BASE; realCalendar ? t.setUTCDate(t.getUTCDate()+1) : t.setDate(t.getDate() + 1)) {
+                const wd = realCalendar ? t.getUTCDay() : t.getDay();
                 if (wd !== 0 && wd !== 6)
                     tradingDays++;
             }
             if (tradingDays <= 0)
                 continue;
             tradingDays = Math.min(tradingDays, 9000);
-            // 从 2024-01-01 向前回推 tradingDays 个交易日（跳过周末）
+            // 从窗口起点向前回推 tradingDays 个工作日（上限 9000 天≈34 年）。
             const dates = [];
-            const cursor = new Date(2023, 11, 31);
+            const cursor = realCalendar ? new Date(BASE-86400000) : new Date(2023, 11, 31);
             while (dates.length < tradingDays) {
-                const wd = cursor.getDay();
+                const wd = realCalendar ? cursor.getUTCDay() : cursor.getDay();
                 if (wd !== 0 && wd !== 6)
-                    dates.push(new Date(cursor));
-                cursor.setDate(cursor.getDate() - 1);
+                    dates.push(realCalendar ? exchangeTime(this.market as any,cursor.toISOString().slice(0,10),0) : new Date(cursor));
+                if(realCalendar)cursor.setUTCDate(cursor.getUTCDate()-1);else cursor.setDate(cursor.getDate() - 1);
             }
             dates.reverse();
             if (oldest <= dates[0].getTime())
@@ -2412,6 +2423,17 @@ export class MarketDataService {
     applyEventPrice(stock: any, proposedPrice: number) {
         const before = Number(stock.price);
         if (!(before > 0) || !Number.isFinite(proposedPrice)) return;
+        // Daily macro/news processing runs after the closing candles are final.
+        // Accumulate its relative move in the next open, preserving that close.
+        if (this.calendarState?.date && stock.pendingCalendarOpen > 0) {
+            const reference = stock.pendingCalendarPrevClose ?? before;
+            const band = this.cnBandOf({...stock, prevClose: reference});
+            let next = Math.max(0.5, stock.pendingCalendarOpen * proposedPrice / before);
+            if (band) next = this.clamp(next, band.down, band.up);
+            stock.pendingCalendarOpen = next;
+            stock.lastReturn = next / reference - 1;
+            return;
+        }
         const band = this.cnBandOf(stock);
         let next = Math.max(0.5, proposedPrice);
         if (band) next = this.clamp(next, band.down, band.up);

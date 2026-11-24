@@ -3,7 +3,7 @@ import { UnauthorizedException, ServiceUnavailableException, HttpException } fro
 import { RoleSessions, REMEMBER_SECONDS } from './role-sessions';
 import { MarketId, MARKETS } from '../../packages/domain/types';
 export interface Principal {owner:string;name:string;market:MarketId;token?:string;mode:'sandbox'|'site'|'game';rememberMe?:boolean}
-export interface AuthConfig {sandbox:boolean;identityBaseUrl:string;origin:string;allowedOrigins:string[]}
+export interface AuthConfig {sandbox:boolean;identityBaseUrl:string;siteIdentityBaseUrl?:string;origin:string;allowedOrigins:string[]}
 export class AuthBridge {
   resolveOwner:(subject:string,market:MarketId,gameSubject?:string)=>string=(subject,market)=>subject+':'+market;
   private demos=new Map<string,{principal:Principal;expires:number}>();
@@ -69,7 +69,16 @@ export class AuthBridge {
     if(authorization)headers.Authorization='Bearer '+authorization;
     if(clientIp)headers['X-Forwarded-For']=clientIp;
     try {
-      const response=await fetch(new URL(path,this.config.identityBaseUrl),{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(5000),redirect:'error'});
+      let base=this.config.identityBaseUrl;
+      if(path.startsWith('/api/auth/identity/')) {
+        const routes=new Map([['/api/auth/identity/token','POST'],['/api/auth/identity/me','GET'],['/api/auth/identity/introspect','POST'],['/api/auth/identity/.well-known/jwks.json','GET'],['/api/auth/identity/logout','POST']]);
+        if(routes.get(path)!==(body===undefined?'GET':'POST'))throw new ServiceUnavailableException('不支持的站点身份接口');
+        if(!this.config.siteIdentityBaseUrl)throw new ServiceUnavailableException('站点身份服务未配置');
+        base=this.config.siteIdentityBaseUrl;
+      }
+      const target=new URL(base);
+      if(!['http:','https:'].includes(target.protocol)||target.username||target.password||target.search||target.hash||target.pathname!=='/')throw new ServiceUnavailableException('账号服务地址配置无效');
+      const response=await fetch(new URL(path,target),{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(5000),redirect:'error'});
       const result=await response.json().catch(()=>({}));
       if([400,401,409,429].includes(response.status)) throw new HttpException({message:typeof result.message==='string'?result.message:Array.isArray(result.message)?result.message[0]:'账号认证失败'},response.status);
       if(!response.ok) throw new ServiceUnavailableException('账号服务暂不可用');return result;

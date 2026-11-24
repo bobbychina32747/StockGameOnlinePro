@@ -9,7 +9,6 @@ import typeorm_1 = require("typeorm");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 import app_module_1 = require("./app.module");
-import { formBodyMiddleware } from "./modules/identity/oauth-form";
 
 // G-5: 进程级异常兜底（排障用）。
 // 背景：之前既没有 unhandledRejection 也没有 uncaughtException 处理器——一旦某处 async 抛出而没人 await，
@@ -47,10 +46,7 @@ async function autoSeed(ds) {
     }
 }
 async function bootstrap() {
-    // bodyParser: false —— 关掉 Nest 自带的 body 解析器，下面按「json → 表单体」自己装（顺序可控）。
-    // 原因：OAuth 令牌端点必须收 application/x-www-form-urlencoded（RFC 6749 §4.1.3），
-    // 而 Nest 默认那套在本应用里收不到表单体（流被消费、req.body 变空对象，端点表现成"参数全缺"）。
-    // 关掉之后流的归属完全确定，不会再出现这种静默失败。JSON 解析器随后照旧装上，既有端点不受影响。
+    // The game owns its bounded JSON parser. OAuth/form endpoints belong to the external site.
     const app = await core_1.NestFactory.create(app_module_1.AppModule, { bodyParser: false });
     const logger = new common_1.Logger('Bootstrap');
     const config = app.get(config_1.ConfigService);
@@ -88,15 +84,10 @@ async function bootstrap() {
             },
         },
     }));
-    // Central transport policy; keep saves' quota reachable without relaxing other routes.
+    // Game requests use the bounded JSON parser.
     const { installJsonBodies } = require('./infrastructure/http/json-body');
     installJsonBodies(app);
-    // 表单体（application/x-www-form-urlencoded）由自己的解析器收：见 oauth-form.ts 的注释。
-    // json 在前、表单在后，两者类型互斥，顺序不影响既有端点。
-    app.use(formBodyMiddleware);
     // 登录/注册频率限制：每 IP 每分钟最多 10 次
-    // 2026-09-28 收窄：原来挂在 /api/auth 全前缀，会把 identity 模块的 verify（点邮件链接）与
-    // GitHub 回调一起限住——用户在同一个 NAT 下点几下链接就 429。只限"确实要防爆破"的写入口。
     const authLimiter = rateLimit({
         windowMs: 60 * 1000,
         max: 10,
@@ -109,10 +100,6 @@ async function bootstrap() {
         '/api/auth/register',
         '/api/auth/site-link',
         '/api/auth/site-session',
-        '/api/auth/identity/login',
-        '/api/auth/identity/register',
-        '/api/auth/identity/password/reset-request',
-        '/api/auth/identity/password/reset',
     ], authLimiter);
     // Phase D: /market/backtest 为无认证公共计算接口（逐根 K 线跑策略），单 IP 限流防滥用；
     // app.use 匹配原始请求路径（含 /api 前缀），与上方 authLimiter 同款先例

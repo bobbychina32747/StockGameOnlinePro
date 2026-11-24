@@ -1,0 +1,19 @@
+[
+  "accounts",
+  "achievements",
+  "daily_snapshots",
+  "dividend_events",
+  "dividend_snapshots",
+  "fund_holdings",
+  "fund_navs",
+  "klines",
+  "market_runtime_state",
+  "orders",
+  "positions",
+  "reset_audit_logs",
+  "season_entries",
+  "seasons",
+  "stocks",
+  "transactions",
+  "users"
+]

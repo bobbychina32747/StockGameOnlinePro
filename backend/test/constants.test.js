@@ -39,32 +39,37 @@ describe('isTradingTimeNow 交易时段判断', () => {
   });
 
   test('周一上午交易时段 → true', () => {
-    jest.setSystemTime(new Date('2024-01-01T10:00:00+08:00')); // 周一 10:00
+    jest.setSystemTime(new Date('2026-03-02T10:00:00+08:00')); // 已核实的普通周一 10:00
     expect(isTradingTimeNow()).toBe(true);
   });
 
   test('午休时段 → false', () => {
-    jest.setSystemTime(new Date('2024-01-01T12:00:00+08:00'));
+    jest.setSystemTime(new Date('2026-03-02T12:00:00+08:00'));
     expect(isTradingTimeNow()).toBe(false);
   });
 
   test('下午交易时段 → true', () => {
-    jest.setSystemTime(new Date('2024-01-01T14:00:00+08:00'));
+    jest.setSystemTime(new Date('2026-03-02T14:00:00+08:00'));
     expect(isTradingTimeNow()).toBe(true);
   });
 
   test('开盘前 → false', () => {
-    jest.setSystemTime(new Date('2024-01-01T09:00:00+08:00'));
+    jest.setSystemTime(new Date('2026-03-02T09:00:00+08:00'));
     expect(isTradingTimeNow()).toBe(false);
   });
 
   test('收盘后 → false', () => {
-    jest.setSystemTime(new Date('2024-01-01T15:30:00+08:00'));
+    jest.setSystemTime(new Date('2026-03-02T15:30:00+08:00'));
     expect(isTradingTimeNow()).toBe(false);
   });
 
   test('周六 → false', () => {
-    jest.setSystemTime(new Date('2024-01-06T10:00:00+08:00'));
+    jest.setSystemTime(new Date('2026-03-07T10:00:00+08:00'));
+    expect(isTradingTimeNow()).toBe(false);
+  });
+
+  test('元旦即使落在工作日也休市', () => {
+    jest.setSystemTime(new Date('2026-01-01T10:00:00+08:00'));
     expect(isTradingTimeNow()).toBe(false);
   });
 });

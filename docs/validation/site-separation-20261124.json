@@ -1,0 +1,119 @@
+{
+  "checkedAt": "2026-11-24T01:46:27.760Z",
+  "scope": "Local source extraction and synthetic verification",
+  "startingRevision": "f68d767",
+  "externalWrites": {
+    "gitCommit": false,
+    "gitPush": false,
+    "deployed": false,
+    "productionDatabaseOpened": false,
+    "productionMigration": false
+  },
+  "tests": {
+    "game": {
+      "suites": 61,
+      "tests": 744,
+      "passed": true
+    },
+    "site": {
+      "suites": 18,
+      "tests": 163,
+      "passed": true
+    },
+    "legacyFrontend": {
+      "suites": 22,
+      "tests": 133,
+      "passed": true
+    },
+    "go": {
+      "passed": true,
+      "command": "go test ./..."
+    },
+    "nodeAdapters": {
+      "passed": 67,
+      "failed": 0
+    }
+  },
+  "gates": {
+    "gameBuild": true,
+    "siteBuild": true,
+    "frontendBuild": true,
+    "frontendLint": {
+      "errors": 0,
+      "warnings": 108
+    },
+    "strictMatchingTypes": true,
+    "calendarCopies": true,
+    "sourceBoundaries": true,
+    "backendOnlyBuildContext": true,
+    "composeYamlFilesParsed": 4,
+    "whitespace": true
+  },
+  "integration": {
+    "startedAt": "2026-11-24T01:30:33.648Z",
+    "productionTouched": false,
+    "siteSecurityHeaders": true,
+    "gamePid": 24644,
+    "coldBootSeconds": 486,
+    "candleChecks": [
+      {
+        "market": "CN",
+        "1min": 1440,
+        "5min": 1200,
+        "validOhlcv": true
+      },
+      {
+        "market": "HK",
+        "1min": 1440,
+        "5min": 1200,
+        "validOhlcv": true
+      },
+      {
+        "market": "US",
+        "1min": 1440,
+        "5min": 1200,
+        "validOhlcv": true
+      }
+    ],
+    "nativeLoginWithSiteOffline": true,
+    "fullSiteBootstrap": true,
+    "fullGameBootstrap": true,
+    "realIssuerToGame": true,
+    "duplicateMappingPreserved": true,
+    "revocationPropagated": true,
+    "siteRoutesAbsentFromGame": true,
+    "nativeGameLoginAvailable": true,
+    "finishedAt": "2026-11-24T01:38:43.492Z",
+    "success": true,
+    "ownGameProcessStopped": true,
+    "scope": "Full two-application cold boot and HTTP authority/candle checks; post-close event correction separately covered by final game regressions"
+  },
+  "dependencyAudit": {
+    "command": "npm audit --package-lock-only --include=dev --json",
+    "info": 0,
+    "low": 0,
+    "moderate": 13,
+    "high": 0,
+    "critical": 0,
+    "total": 13,
+    "penetrationTest": false
+  },
+  "limits": [
+    "No production routing, credential, database or content migration",
+    "No clean Linux dependency installation or Docker/nginx execution",
+    "No browser rendering acceptance in this source-boundary change",
+    "Existing ignored development databases and keys left untouched",
+    "Existing Git history unchanged",
+    "Existing archived candles not redated; older synthetic daily prehistory remains approximate",
+    "Full empty-database seeding remains expensive; cold-boot result includes concurrent local checks"
+  ],
+  "sourceSha256": {
+    "backend/src/app.module.ts": "84e2703134c49ccc99516e057ed0172ba603069c672f3daebdae8a115986aba5",
+    "backend/src/common/game-boundary.ts": "d7480a9e1633b297e6b12988ff39c0f82a94c4b035ba302002817f6bf9c96fb9",
+    "backend/src/modules/auth/site-identity.client.ts": "8493c69a676ef9a38c3b4d96833b13d880bc50ee4a5229f70ea84b2ccd4ed632",
+    "backend/src/core/market-data/market-data.service.ts": "0f3528b7dac95e8b8cd8eba7187516d2a4b7d857c9f00e059833ac527101da0a",
+    "backend/src/core/trading-engine/matching-engine.ts": "c958b659ac6ed03aea8008054c7bd85652c9a5b97e490715b9af70c092f12e74",
+    "backend/src/common/data/exchange-calendar.json": "02117a8d52ef6490f04cd46f18b954973d9284ffc70d80e915a3fbbb5da9f9a8",
+    "backend-go/Dockerfile.dockerignore": "547e483d63c8087f5845d7c70fff142b1aaa6d48fd607579f0a7f8e2e4301a36"
+  }
+}

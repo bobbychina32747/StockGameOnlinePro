@@ -5,10 +5,7 @@ import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { User, UserRole } from '../../infrastructure/database/entities/user.entity';
 import { Account } from '../../infrastructure/database/entities/account.entity';
-import { Session } from '../../infrastructure/database/entities/session.entity';
-import { IdentityStatus } from '../../infrastructure/database/entities/identity.entity';
-import { IdentityJwtService } from '../identity/jwt.service';
-import { TokenExchangeService } from '../identity/token-exchange.service';
+import { SiteIdentityClient, SiteSession } from './site-identity.client';
 import { AuthService } from './auth.service';
 import { RISK } from '../../common/constants';
 
@@ -25,23 +22,18 @@ export class SiteGameAuthService {
     constructor(
         @InjectDataSource() private readonly dataSource: DataSource,
         @InjectRepository(User) private readonly users: Repository<User>,
-        private readonly jwt: IdentityJwtService,
-        private readonly exchange: TokenExchangeService,
+        private readonly site: SiteIdentityClient,
         private readonly legacy: AuthService,
     ) {}
 
     async authenticate(token: string): Promise<User> {
-        const claims = this.jwt.verify(token);
-        // Third-party grants must not acquire access to the player's trading account.
-        if (claims.client_id) throw new UnauthorizedException('请使用站点登录');
-        const active = await this.exchange.introspect(token);
-        if (!active.active) throw new UnauthorizedException('站点会话已失效');
+        const claims = await this.site.verifyAccessToken(token);
         const user = await this.users.findOne({ where: { identityId: claims.sub } });
         if (!user || !user.isActive || user.isBot) throw new UnauthorizedException('游戏账号不可用');
         return user;
     }
 
-    async session(session: Session, create = false) {
+    async session(session: SiteSession, create = false) {
         this.assertSession(session);
         let user = await this.users.findOne({ where: { identityId: session.identityId } });
         if (!user && !create) {
@@ -75,7 +67,7 @@ export class SiteGameAuthService {
         return this.result(session, user);
     }
 
-    async link(session: Session, username: string, password: string, ip?: string) {
+    async link(session: SiteSession, username: string, password: string, ip?: string) {
         this.assertSession(session);
         // Reuse the old account's password verification and brute-force limits.
         const verified = await this.legacy.login(username, password, ip, true);
@@ -97,8 +89,8 @@ export class SiteGameAuthService {
         return this.result(session, user);
     }
 
-    private assertSession(session: Session) {
-        if (!session?.identity || session.identity.status !== IdentityStatus.ACTIVE || session.identity.id !== session.identityId
+    private assertSession(session: SiteSession) {
+        if (!session?.identity || session.identity.status !== 'active' || session.identity.id !== session.identityId
             || session.revokedAt || !(new Date(session.expiresAt).getTime() > Date.now())) {
             throw new UnauthorizedException('站点会话已失效');
         }
@@ -110,8 +102,8 @@ export class SiteGameAuthService {
         return result;
     }
 
-    private result(session: Session, user: User) {
+    private result(session: SiteSession, user: User) {
         if (!user.isActive || user.isBot) throw new UnauthorizedException('游戏账号不可用');
-        return { ...this.exchange.exchange(session.identityId, session.id), user: this.legacy.toSafeUser(user) };
+        return { ...session.access, user: this.legacy.toSafeUser(user) };
     }
 }

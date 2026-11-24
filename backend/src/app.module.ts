@@ -1,28 +1,13 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { prepareGameDatabase, assertGameEnvironment } from './common/game-boundary';
 
 import { MarketDataModule } from './core/market-data/market-data.module';
 import { TradingEngineModule } from './core/trading-engine/trading-engine.module';
 import { RiskManagerModule } from './core/risk-manager/risk-manager.module';
 
 import { AuthModule } from './modules/auth/auth.module';
-// 2026-09-28：统一身份模块（与既有 auth 并存，端点暂挂 /api/auth/identity/* 以避免路由遮蔽）
-import { IdentityModule } from './modules/identity/identity.module';
-// 2026-09-28：站内写作台（博客）—— /api/admin/blog/*
-import { BlogAdminModule } from './modules/blog-admin/blog-admin.module';
-// 2026-09-29：博客对外能力—— /api/blog/*（浏览量 + 评论；nginx 需把该前缀反代到本机）
-import { BlogPublicModule } from './modules/blog-public/blog-public.module';
-// 2026-09-29：游戏厅凭据桥—— /api/games/*（站点身份登录后免二次登录游戏厅）
-import { ArcadeModule } from './modules/arcade/arcade.module';
-// 2026-09-30：站内发信—— /api/admin/mail/*（站主以 contact@bobbycn.cc 回信）
-import { WebmailModule } from './modules/webmail/webmail.module';
-// 2026-10-21：共享资源—— /api/resources/*（公开）与 /api/admin/resources/*（写作台维护）
-import { ResourceModule } from './modules/resources/resource.module';
-// 2026-10-27：站内私线—— /api/chat/*（站主 ↔ 受邀 subadmin，SSE 实时）
-import { ChatModule } from './modules/chat/chat.module';
-// 2026-10-08：云存档（服务端托管密钥）—— /api/auth/identity/saves/*
-import { GameSavesModule } from './modules/game-saves/game-saves.module';
 import { UserModule } from './modules/user/user.module';
 import { AccountModule } from './modules/account/account.module';
 import { TradingModule } from './modules/trading/trading.module';
@@ -42,12 +27,14 @@ const logger = new Logger('AppModule');
     imports: [
         ConfigModule.forRoot({
             isGlobal: true,
-            envFilePath: '.env',
+            envFilePath: '.env.game',
         }),
         TypeOrmModule.forRootAsync({
             imports: [ConfigModule],
             inject: [ConfigService],
             useFactory: (config: ConfigService) => {
+                const production = config.get('NODE_ENV') === 'production';
+                assertGameEnvironment(process.env, production);
                 const dbType = config.get('DB_TYPE', 'sqlite');
                 // R5-⑩: synchronize 统一由 DB_SYNCHRONIZE 控制（三个分支共用）。原实现三处硬编码
                 // synchronize: true，生产环境会随代码自动改表结构（丢列/改类型的不可逆风险）。
@@ -83,6 +70,8 @@ const logger = new Logger('AppModule');
                     return {
                         type: 'better-sqlite3',
                         database: config.get('SQLITE_PATH', './data/stockgame.db'),
+                        fileMustExist: production,
+                        prepareDatabase: database => prepareGameDatabase(database, production),
                         autoLoadEntities: true,
                         // R5-⑩: 由 DB_SYNCHRONIZE 控制
                         synchronize,
@@ -106,22 +95,6 @@ const logger = new Logger('AppModule');
         TradingEngineModule,
         RiskManagerModule,
         AuthModule,
-        // 统一身份模块：端点挂在 /api/auth/identity/*（避开与既有 AuthController 的路由遮蔽）
-        IdentityModule,
-        // 站内写作台：/api/admin/blog/*
-        BlogAdminModule,
-        // 博客对外：/api/blog/*（浏览量、评论）
-        BlogPublicModule,
-        // 游戏厅凭据桥：/api/games/*（站点身份 → 游戏厅免二次登录）
-        ArcadeModule,
-        // 站内发信：/api/admin/mail/*（以 contact@bobbycn.cc 发信）
-        WebmailModule,
-        // 共享资源：/api/resources/*（公开列表 + 文件下载）、/api/admin/resources/*（后台维护）
-        ResourceModule,
-        // 站内私线：/api/chat/*（站主 ↔ 受邀 subadmin；SSE 推送 + REST 上行）
-        ChatModule,
-        // 云存档：/api/auth/identity/saves/*（站点授权令牌 + saves scope 读写）
-        GameSavesModule,
         UserModule,
         AccountModule,
         TradingModule,

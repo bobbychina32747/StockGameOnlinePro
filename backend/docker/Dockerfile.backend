@@ -8,12 +8,15 @@ COPY package.json package-lock.json tsconfig.json ./
 RUN npm ci
 
 COPY src/ ./src/
-RUN npm run build
+COPY scripts/check-boundaries.cjs scripts/check-core-types.cjs scripts/calendar-data.cjs ./scripts/
+COPY test/types/ ./test/types/
+RUN npm run build:container
 
 # ─── 运行阶段 ───
 FROM node:22-alpine AS runner
 
 WORKDIR /app
+ENV NODE_ENV=production
 
 RUN apk add --no-cache tini
 
@@ -22,6 +25,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
+COPY scripts/export-game-database.cjs ./scripts/
 
 EXPOSE 8000
 

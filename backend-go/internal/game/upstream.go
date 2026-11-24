@@ -7,14 +7,29 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 )
 
 type Upstream struct {
 	base   *url.URL
+	site   *url.URL
 	origin string
 	client *http.Client
+}
+
+func (up *Upstream) setSiteIdentity(base string) error {
+	if base == "" {
+		up.site = nil
+		return nil
+	}
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return errorf(500, "Invalid site identity URL")
+	}
+	up.site = parsed
+	return nil
 }
 
 func NewUpstream(base, origin string) (*Upstream, error) {
@@ -46,7 +61,18 @@ func (up *Upstream) call(ctx context.Context, method, path, token, cookie, ip st
 	if err != nil || target.IsAbs() || target.Host != "" || len(path) == 0 || path[0] != '/' {
 		return nil, errorf(400, "接口路径无效")
 	}
-	req.URL = up.base.ResolveReference(target)
+	base := up.base
+	if strings.HasPrefix(target.Path, "/api/auth/identity/") {
+		allowed := map[string]string{"/api/auth/identity/.well-known/jwks.json": "GET", "/api/auth/identity/introspect": "POST"}
+		if allowed[target.Path] != method {
+			return nil, errorf(400, "Unsupported site identity route")
+		}
+		if up.site == nil {
+			return nil, errorf(503, "Site identity service is not configured")
+		}
+		base = up.site
+	}
+	req.URL = base.ResolveReference(target)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", up.origin)
 	if token != "" {

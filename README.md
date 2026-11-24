@@ -80,13 +80,15 @@ See the [price-volume study](docs/MARKET-MICROSTRUCTURE-20261012.md), [realism a
 
 Historical Level 2 depth, calibrated price-level memory, and sector-specific jump-event rates remain incomplete. Candle shadows are simulated quote ranges, not reconstructed real intrabar trades. This is a market simulation, not a verified replica or a forecasting system.
 
+Calendar data is a versioned snapshot with official source URLs and an update validator. Missing real-time coverage closes the market explicitly. See [calendar maintenance and confidence labels](docs/TRADING-CALENDAR.md).
+
 ## Run locally
 
 Use a maintained Node.js LTS compatible with the lockfiles. Node 22 and 24 remain LTS at this review date; check the [release schedule](https://nodejs.org/en/about/previous-releases) before a later upgrade. SQLite uses native `better-sqlite3` bindings; reinstall dependencies if you change Node versions.
 
 ### 1. Configure and start the backend
 
-From the repository root, copy `backend/.env.example` to `backend/.env` only for a new local setup; preserve an existing configuration. Run backend commands from `backend/`, because its environment file is resolved from the working directory. Set your own `JWT_SECRET`, `JWT_REFRESH_SECRET`, and `ADMIN_PASSWORD`; do not use the example placeholders or production credentials.
+From the repository root, copy `backend/.env.game.example` to `backend/.env.game` only for a new local setup; preserve an existing configuration. Run backend commands from `backend/`, because its environment file is resolved from the working directory. Set your own `JWT_SECRET`, `JWT_REFRESH_SECRET`, and `ADMIN_PASSWORD`; do not use the example placeholders or production credentials.
 
 For local exchange-calendar operation, use these settings:
 
@@ -154,7 +156,9 @@ The built web app uses `/` by default. Set `REMASTER_WEB_BASE` before building i
 ```mermaid
 flowchart LR
     Player[Browser workbench] --> Adapter[Unified API and session adapter]
-    Adapter --> Core[Backend: identity, ledger, matching, markets]
+    Adapter --> Core[Game core: ledger, matching, markets]
+    Adapter --> Identity[External site identity service]
+    Core --> Identity
     Core --> Ledger[(stockgame.db)]
     Adapter --> Commands[(formal-commands.sqlite)]
 ```
@@ -163,13 +167,16 @@ flowchart LR
 | --- | --- |
 | `backend/` | NestJS backend: accounts, authentication, trading, market generation, risk, funds, and seasons |
 | `remaster/apps/web/` | React/Vite/ECharts workbench |
-| `remaster/apps/game-api/` | Production ledger adapter, realm sessions, REST commands, and Socket.IO snapshots |
+| `backend-go/` | Production HTTP/SSE and game-session adapter; delegates financial mutations to the NestJS game core |
+| `remaster/apps/game-api/` | Optional Node compatibility adapters with REST/Socket.IO transport |
 | `remaster/packages/domain/` | Shared types, catalog, and standalone simulation components |
 | `remaster/tooling/` | Build tools, catalog import, and research utilities |
 | `frontend/` | Legacy frontend retained for compatibility; not the unified game's main entry point |
 | `docs/` | Architecture notes, API documentation, research, migration, and verification reports |
 
 The main stack is TypeScript, React, Vite, ECharts, NestJS, TypeORM, SQLite, and Socket.IO. The adapter's command database stores idempotency records; it is not a second asset ledger.
+
+Site identities, OAuth, blog, mail, private messaging, resources, arcade links, and cloud saves belong to an independent site backend. StockGame keeps only an external identity client and a game-account mapping. The two services use separate databases and no shared signing keys. See [the site boundary and cutover requirements](docs/SITE-SEPARATION.md). This local extraction has not changed the live deployment.
 
 ## API and strategy integration
 
@@ -181,7 +188,8 @@ Authenticated realm sessions expose:
 | `GET /api/v2/history/:symbol?interval=1m` | Candle history for the current realm |
 | `GET /api/v2/book/:symbol` | Visible order-book depth |
 | `POST /api/v2/commands` | Trading and account commands with an `Idempotency-Key` |
-| Socket.IO `/v2` | Live snapshots |
+| `GET /api/v2/events?market=CN` | Live SSE snapshots from the Go adapter |
+| Socket.IO `/v2` | Optional Node compatibility transport |
 
 Requests remain subject to authentication, realm boundaries, funds, fees, and trading rules. See the [adapter controller](remaster/apps/game-api/unified-controller.ts) for the v2 contract and [API documentation](docs/API.md) for the backend API. The repository also includes [a bot example](backend/scripts/quant-bot.js) and [a backtest CLI](backend/scripts/backtest.js).
 

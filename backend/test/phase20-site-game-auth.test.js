@@ -21,17 +21,16 @@ const accountSchema = new EntitySchema({ name: 'Account', target: Account, table
   ...Object.fromEntries(['cash', 'totalEquity', 'peakEquity', 'initialEquity', 'dayStartEquity'].map(key => [key, { type: Number, default: 0 }])),
 }, uniques: [{ columns: ['userId', 'marketMode'] }] });
 const session = (identityId = 'site-1', username = 'alice') => ({ id: 'session-1', identityId, revokedAt: null,
-  expiresAt: new Date(Date.now() + 3600000), identity: { id: identityId, username, status: 'active' } });
+  expiresAt: new Date(Date.now() + 3600000), identity: { id: identityId, username, status: 'active' }, access: { token: 'site-token', expiresIn: 600 } });
 
 describe('site identity to game account', () => {
-  let ds, users, accounts, service, exchange, jwt, legacy;
+  let ds, users, accounts, service, site, legacy;
   beforeEach(async () => {
     ds = new DataSource({ type: 'better-sqlite3', database: ':memory:', synchronize: true, entities: [userSchema, accountSchema] });
     await ds.initialize(); users = ds.getRepository(User); accounts = ds.getRepository(Account);
-    exchange = { exchange: jest.fn(() => ({ token: 'site-token', expiresIn: 600 })), introspect: jest.fn(async () => ({ active: true })) };
-    jwt = { verify: jest.fn(() => ({ sub: 'site-1', sid: 'session-1' })) };
+    site = { verifyAccessToken: jest.fn(async () => ({ sub: 'site-1', sid: 'session-1' })) };
     legacy = new AuthService(users, accounts, { sign: () => 'old-token' });
-    service = new SiteGameAuthService(ds, users, jwt, exchange, legacy);
+    service = new SiteGameAuthService(ds, users, site, legacy);
   });
   afterEach(async () => { await ds.destroy(); });
   const oldUser = async (users, overrides = {}) => users.save(users.create({ username: 'alice', password: await bcrypt.hash('old-password', 4), ...overrides }));
@@ -111,11 +110,11 @@ describe('site identity to game account', () => {
   it('maps verified site sub to a distinct local game id', async () => {
     const old = await oldUser(users, { identityId: 'site-1' });
     expect((await service.authenticate('signed-site-token')).id).toBe(old.id);
-    exchange.introspect.mockResolvedValue({ active: false });
+    site.verifyAccessToken.mockRejectedValue(new Error('站点会话已失效'));
     await expect(service.authenticate('signed-site-token')).rejects.toThrow('站点会话');
   });
   it('rejects third-party OAuth grants even when their site JWT is valid', async () => {
-    await oldUser(users, { identityId: 'site-1' }); jwt.verify.mockReturnValue({ sub: 'site-1', client_id: 'third-party' });
+    await oldUser(users, { identityId: 'site-1' }); site.verifyAccessToken.mockRejectedValue(new Error('请使用站点登录'));
     await expect(service.authenticate('oauth-token')).rejects.toThrow('站点登录');
   });
   it('rejects a disabled local user and rejects unbound identities', async () => {

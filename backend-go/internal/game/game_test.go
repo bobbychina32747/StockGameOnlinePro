@@ -46,7 +46,7 @@ func fixtures(t testing.TB) []contractCase {
 }
 func newTestApp(t testing.TB, upstream, database string) *Server {
 	t.Helper()
-	app, err := New(Config{BackendURL: upstream, SiteOrigin: "https://game.bobbycn.cc", Database: database, Catalog: "../../../remaster/packages/domain/catalog.json", WebRoot: "../../../remaster/apps/web/dist", AllowedOrigins: []string{"http://fixture.test"}, StreamInterval: 100 * time.Millisecond})
+	app, err := New(Config{BackendURL: upstream, SiteIdentityURL: upstream, SiteOrigin: "https://game.bobbycn.cc", Database: database, Catalog: "../../../remaster/packages/domain/catalog.json", WebRoot: "../../../remaster/apps/web/dist", AllowedOrigins: []string{"http://fixture.test"}, StreamInterval: 100 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}

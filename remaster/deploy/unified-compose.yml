@@ -16,6 +16,7 @@ services:
       REMASTER_HOST: 0.0.0.0
       REMASTER_PORT: "8320"
       REMASTER_IDENTITY_URL: http://sgp-backend:8000
+      REMASTER_SITE_IDENTITY_URL: ${REMASTER_SITE_IDENTITY_URL:-}
       REMASTER_ALLOWED_ORIGINS: https://game.bobbycn.cc
       REMASTER_SITE_ORIGIN: https://game.bobbycn.cc
       REMASTER_COOKIE_SECURE: "true"

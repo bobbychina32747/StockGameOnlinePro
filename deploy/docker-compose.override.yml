@@ -9,32 +9,18 @@ services:
     # 2核2G 机器：给 Node 设上限，防止 OOM 拖死整机（better-sqlite3 + NestJS 实测 300~500MB）
     mem_limit: 1100m
     environment:
+      - NODE_ENV=production
+      - DB_SYNCHRONIZE=false
       - NODE_OPTIONS=--max-old-space-size=900
       # 容器默认 UTC，A 股开盘/收盘/交易日判断会整体偏 8 小时 → 必须钉死北京时区
       - TZ=Asia/Shanghai
       # Production advances one simulated trading minute per real minute.
       - TICK_INTERVAL_MS=60000
       - SANDBOX_FAST=false
-      # 站内写作台：内容源目录（含 build.mjs 与 content/）与静态产物目录
-      # 用 !override 显式列出全部挂载，避免与基础 compose 的 sgp-data 合并歧义
-      - BLOG_DIR=/blog
-      - BLOG_DIST=/blog-dist
-      # 统一身份：Ed25519 令牌私钥（只读挂载，见 deploy/AUTH-CONTRACT.md §4）
-      - IDENTITY_JWT_KEY_FILE=/keys/identity-ed25519.pem
-      # 邮件里链接的前缀（必须与冻结契约一致）
-      - APP_BASE_URL=https://bobbycn.cc
-      # 主站与游戏子域共用 sid；缺省 host-only Cookie 无法传到 game 子域
-      - COOKIE_DOMAIN=.bobbycn.cc
-      - COOKIE_SECURE=1
+      # External identity service; no signing-key/content mounts in the game.
+      - SITE_IDENTITY_URL=${SITE_IDENTITY_URL:-}
     volumes: !override
-      # 游戏/账号/文章数据（同一个 SQLite 库，每日 .backup 覆盖）
-      - sgp-data:/app/data
-      # 宿主 /opt/stockgame/blog：build.mjs + content/（渲染时把文章导出为 Markdown 再构建）
-      - /opt/stockgame/blog:/blog
-      # 宿主 /opt/stockgame/blog-dist：静态产物（posts/、feed.xml、sitemap.xml、media/），由 nginx 直出
-      - /opt/stockgame/blog-dist:/blog-dist
-      # 宿主 /opt/stockgame/keys：身份令牌私钥（0600，仓库里零副本）
-      - /opt/stockgame/keys:/keys:ro
+      - isolated-game-data:/app/data
     logging:
       driver: json-file
       options:
@@ -45,3 +31,8 @@ services:
   # 省一个容器 + 一份内存（2核2G 上更稳）。挂到未激活的 profile 上 = 起不来。
   frontend:
     profiles: ["prod-disabled"]
+
+volumes:
+  isolated-game-data:
+    external: true
+    name: ${SGP_GAME_DATA_VOLUME:?Set a separately populated game-only volume; never mount the old combined volume}

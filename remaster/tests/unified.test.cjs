@@ -70,7 +70,7 @@ test('formal HTTP + real websocket use the old ledger for both login methods and
    else if(req.url.startsWith('/api/market/klines'))result=[{time:'2024-02-01T02:00:00Z',open:12,high:13,low:11,close:12.34,volume:100}];
    else {res.statusCode=404;result={message:'unexpected fixture route'};}
    res.setHeader('Content-Type','application/json');res.end(JSON.stringify(result));});
- await new Promise(resolve=>fixture.listen(0,'127.0.0.1',resolve));const app=await createUnifiedApplication({port:0,database:':memory:',identityBaseUrl:'http://127.0.0.1:'+fixture.address().port});let socket;
+ await new Promise(resolve=>fixture.listen(0,'127.0.0.1',resolve));const app=await createUnifiedApplication({port:0,database:':memory:',identityBaseUrl:'http://127.0.0.1:'+fixture.address().port,siteIdentityBaseUrl:'http://127.0.0.1:'+fixture.address().port});let socket;
  const call=async(path,body,token,extra={})=>{const res=await fetch(app.url+'/api/v2'+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...extra},body:body?JSON.stringify(body):undefined});return {status:res.status,data:await res.json()};};
  try{
   const native=(await call('/auth/login',{username:'old-player',password:'fixture-password',market:'CN'})).data;

@@ -14,15 +14,18 @@ WORKDIR /app
 COPY backend/package.json backend/package-lock.json backend/tsconfig.json ./
 RUN npm ci --no-audit --no-fund
 COPY backend/src ./src
-RUN npm run build && npm prune --omit=dev
+COPY backend/scripts/check-boundaries.cjs backend/scripts/check-core-types.cjs backend/scripts/calendar-data.cjs ./scripts/
+COPY backend/test/types ./test/types
+RUN npm run build:container && npm prune --omit=dev
 
-# Optional compatible ledger image. It uses the existing ledger volume and core
-# service configuration; no migration or reset is performed by this image.
+# Optional ledger image. Populate a separate game-only volume and .env.game
+# before the coordinated cutover; this image does not migrate the combined DB.
 FROM node:22-alpine AS legacy-core
 WORKDIR /app
 COPY --from=core-build /app/package.json /app/package-lock.json ./
 COPY --from=core-build /app/node_modules ./node_modules
 COPY --from=core-build /app/dist ./dist
+COPY backend/scripts/export-game-database.cjs ./scripts/
 COPY --from=web-build /remaster/dist/packages ./v2-runtime/packages
 ENV NODE_ENV=production V2_BACKTEST_MODULE=/app/v2-runtime/packages/engine/backtest.js
 EXPOSE 8000

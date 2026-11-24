@@ -32,6 +32,21 @@ test('overnight limits use the next session reference while the displayed close 
   await md.bindCalendarDate('2026-10-16');expect(md.getStockList()[0].changePct).toBe(10);
 });
 
+test('post-close news compounds in the next opening without changing completed quotes or candles',async()=>{
+  const {md,stock}=market();await md.endOfDay(true);
+  const closed=md.getStockList()[0];
+  md.applyEventPrice(stock,stock.price*1.5);
+  expect(stock.pendingCalendarOpen).toBeCloseTo(121);
+  expect(md.getStockList()[0]).toEqual(closed);
+  md.applyEventPrice(stock,stock.price*.5);
+  expect(stock.pendingCalendarOpen).toBeCloseTo(99);
+  expect(md.getStockList()[0]).toEqual(closed);
+  expect(stock.dayHigh).toBe(110);expect(stock.dayLow).toBe(101);
+  expect(stock.dayVolume).toBe(500);
+  await md.bindCalendarDate('2026-10-16');
+  expect(stock.price).toBeCloseTo(99);expect(stock.prevClose).toBe(110);
+});
+
 test('runtime snapshots persist both session references for restart recovery',async()=>{
   const {md,stock}=market();let saved;md.runtimeStore={save:async(_market,state)=>{saved=state;}};
   await md.endOfDay(true);await md.persistRuntimeState(0,true);
