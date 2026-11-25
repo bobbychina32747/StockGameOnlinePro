@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>界面流程预览</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #182530;
+      --muted: #495e68;
+      --paper: #f4f6f4;
+      --line: #cfdbd6;
+      --accent: #0b635b;
+      --tint: #e2f2ec;
+      font: 16px/1.55 "Microsoft YaHei UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    [hidden] { display: none !important; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    :focus-visible { outline: 3px solid #a45012; outline-offset: 3px; }
+    h1, h2, h3, p, dl, dd { margin: 0; }
+    h1 { font-size: clamp(1.55rem, 4vw, 2.4rem); line-height: 1.2; }
+    h2 { font-size: 1.25rem; }
+    h3 { font-size: 1.05rem; }
+    main { max-width: 73rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+    header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+    .toggle, .action { border: 1px solid var(--accent); border-radius: .4rem; padding: .5rem .9rem; }
+    .toggle { background: white; color: var(--accent); }
+    .toggle[aria-pressed="true"], .action { color: white; background: var(--accent); }
+    .overview { margin-block: 1.7rem; }
+    .overview h2 { font-size: 1rem; }
+    .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr)); gap: .7rem; margin-top: .55rem; }
+    .thumb { display: grid; align-content: start; gap: .45rem; padding: .65rem; border: 1px solid var(--line); border-radius: .45rem; background: white; text-align: left; }
+    .thumb[aria-current="page"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); color: var(--accent); }
+    .mini { display: grid; gap: 3px; background: #f0f4f2; padding: 4px; border-radius: 2px; }
+    .mini-block { background: #c6d6ce; border: 1px solid #adbfba; border-radius: 2px; min-height: 12px; }
+    .mini-block[data-kind="header"] { background: #7b9690; }
+    .mini-block[data-kind="action"] { background: #96beb1; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 2.3fr) minmax(16rem, 1fr); gap: 1.2rem; align-items: start; }
+    .workspace[data-notes="off"] { grid-template-columns: minmax(0, 1fr); }
+    .canvas, aside { border: 1px solid var(--line); background: white; border-radius: .65rem; }
+    .canvas { padding: clamp(.8rem, 2.5vw, 1.6rem); min-width: 0; }
+    .canvas > p, .block > p { margin-top: .2rem; color: var(--muted); }
+    .screen { display: grid; gap: .7rem; margin-top: 1rem; }
+    .block { position: relative; min-width: 0; padding: 1rem; border: 1px solid var(--line); border-radius: .4rem; overflow-wrap: anywhere; }
+    .block[data-kind="header"] { background: #eff4f1; }
+    .block[data-kind="action"] { align-self: stretch; }
+    [data-notes="on"] .block { cursor: pointer; }
+    .block.selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .block-selector { display: inline-flex; align-items: center; gap: .45rem; border: 0; padding: .15rem .2rem; margin: -.15rem -.2rem; background: transparent; font-weight: inherit; text-align: left; }
+    .block-selector::before { content: ""; width: .7rem; height: .7rem; flex: none; border: 2px solid var(--accent); border-radius: 2px; }
+    .block-selector[aria-pressed="true"]::before { background: var(--accent); }
+    .block ul { margin: .65rem 0 0; padding-left: 1.3rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: .85rem; }
+    aside { padding: 1.15rem; border-top: 4px solid var(--accent); }
+    aside h2 { font-size: .9rem; color: var(--accent); }
+    aside h3 { margin: .4rem 0 .9rem; }
+    dt { color: var(--muted); font-size: .85rem; font-weight: 700; }
+    dd { margin: .12rem 0 .75rem; font-size: .94rem; overflow-wrap: anywhere; }
+    dd:last-child { margin-bottom: 0; }
+    @media (max-width: 50rem) { .workspace { grid-template-columns: 1fr; } }
+    @media (max-width: 34rem) {
+      .thumbs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .screen, .mini { display: flex; flex-direction: column; }
+      .mini { gap: 2px; }
+      .mini-block { min-height: 7px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="title">界面流程预览</h1>
+    <button id="toggle" class="toggle" type="button" aria-pressed="true" aria-controls="notes screen">区块标注</button>
+  </header>
+  <nav class="overview" aria-labelledby="overview-title">
+    <h2 id="overview-title">页面与状态总览</h2>
+    <div class="thumbs" id="thumbs"></div>
+  </nav>
+  <div class="workspace" id="workspace" data-notes="on">
+    <section class="canvas" aria-labelledby="page-title">
+      <h2 id="page-title" tabindex="-1"></h2>
+      <p id="description"></p>
+      <div id="screen" class="screen"></div>
+    </section>
+    <aside id="notes" aria-labelledby="notes-title">
+      <h2 id="notes-title">区块备注</h2>
+      <div id="note-content" aria-live="polite"></div>
+    </aside>
+  </div>
+  <noscript>请启用 JavaScript 以查看页面与区块。</noscript>
+</main>
+<!-- Replace this JSON. Escape any literal "<" inside strings as \u003c. -->
+<script type="application/json" id="preview-data">
+{
+  "title": "模拟股市 · 换股、委托与回测",
+  "pages": [
+    {
+      "id": "first",
+      "title": "交易大厅 · 芯澜半导体",
+      "description": "从股票列表切换到星语智能。",
+      "layout": [
+        [
+          "list",
+          "chart",
+          "book"
+        ],
+        [
+          "list",
+          "chart",
+          "ticket"
+        ]
+      ],
+      "blocks": [
+        {
+          "id": "list",
+          "area": "list",
+          "title": "标的列表",
+          "text": "芯澜半导体　36.41\n星语智能　103.20",
+          "actions": [
+            {
+              "label": "切换至星语智能",
+              "to": "waiting"
+            }
+          ],
+          "kind": "panel",
+          "note": {
+            "role": "选股的玩家",
+            "purpose": "保持工作台，切换所分析的公司。",
+            "baseline": "沿用列表及手机标的选择器。",
+            "impact": "持平，一次选股。",
+            "tradeoff": "让报价重取期间有显式等待。",
+            "evidence": "点星语智能，观察接收盘口前的状态。"
+          }
+        },
+        {
+          "id": "chart",
+          "area": "chart",
+          "title": "芯澜半导体　36.41",
+          "text": "行情及公司资料，与当前标的一起更新。",
+          "actions": [],
+          "kind": "panel",
+          "note": {
+            "role": "查行情的玩家",
+            "purpose": "比较价格后可直接回测此股。",
+            "baseline": "原来从全局研究页再寻找策略实验。",
+            "impact": "预计降低查找成本，标的随入口带入。",
+            "tradeoff": "图表边多一个入口。",
+            "evidence": "点击后检查回测标的、首屏位置和返回对象。"
+          }
+        },
+        {
+          "id": "book",
+          "area": "book",
+          "title": "盘口",
+          "text": "芯澜半导体　卖三 36.56",
+          "actions": [],
+          "kind": "panel",
+          "note": {
+            "role": "点报价的玩家",
+            "purpose": "仅允许将当前标的的报价带入草稿。",
+            "baseline": "旧报价曾能写入下一只股票的限价。",
+            "impact": "降低串价风险；正确报价到达前必须等候。",
+            "tradeoff": "加载失败需明确提示，保留手动输入。",
+            "evidence": "人为延迟新盘口，尝试点旧价；新报价返回后再点。"
+          }
+        },
+        {
+          "id": "ticket",
+          "area": "ticket",
+          "title": "委托草稿",
+          "text": "市价单　100 股 · 可查看费用和提交动作。",
+          "actions": [],
+          "kind": "panel",
+          "note": {
+            "role": "准备委托的玩家",
+            "purpose": "核对数量、费用和提交动作。",
+            "baseline": "桌面原布局初始只露出约 4 px 的提交按钮。",
+            "impact": "预计降低寻找动作的成本。",
+            "tradeoff": "留给盘口与可滚动输入的空间变小。",
+            "evidence": "1440×900 检查整枚按钮可见；限价和触发价仍可滚动到。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "waiting",
+      "title": "同页 · 等待新盘口",
+      "description": "新标题和现价已到，盘口尚在路上。",
+      "layout": [
+        [
+          "list",
+          "chart",
+          "book"
+        ],
+        [
+          "list",
+          "chart",
+          "ticket"
+        ]
+      ],
+      "blocks": [
+        {
+          "id": "list",
+          "area": "list",
+          "title": "标的列表",
+          "text": "芯澜半导体　36.41\n星语智能　103.20",
+          "actions": [
+            {
+              "label": "切换至星语智能",
+              "to": "waiting"
+            }
+          ],
+          "kind": "panel",
+          "note": {
+            "role": "选股的玩家",
+            "purpose": "保持工作台，切换所分析的公司。",
+            "baseline": "沿用列表及手机标的选择器。",
+            "impact": "持平，一次选股。",
+            "tradeoff": "让报价重取期间有显式等待。",
+            "evidence": "点星语智能，观察接收盘口前的状态。"
+          }
+        },
+        {
+          "id": "chart",
+          "area": "chart",
+          "title": "星语智能　103.20",
+          "text": "行情及公司资料，与当前标的一起更新。",
+          "actions": [],
+          "kind": "panel",
+          "note": {
+            "role": "查行情的玩家",
+            "purpose": "比较价格后可直接回测此股。",
+            "baseline": "原来从全局研究页再寻找策略实验。",
+            "impact": "预计降低查找成本，标的随入口带入。",
+            "tradeoff": "图表边多一个入口。",
+            "evidence": "点击后检查回测标的、首屏位置和返回对象。"
+          }
+        },
+        {
+          "id": "book",
+          "area": "book",
+          "title": "盘口",
+          "text": "正在加载盘口 · 星语智能。旧报价已经撤下。",
+          "actions": [
+            {
+              "label": "模拟盘口到达",
+              "to": "ready"
+            },
+            {
+              "label": "模拟网络失败",
+              "to": "failed"
+            }
+          ],
+          "kind": "panel",
+          "note": {
+            "role": "点报价的玩家",
+            "purpose": "仅允许将当前标的的报价带入草稿。",
+            "baseline": "旧报价曾能写入下一只股票的限价。",
+            "impact": "降低串价风险；正确报价到达前必须等候。",
+            "tradeoff": "加载失败需明确提示，保留手动输入。",
+            "evidence": "人为延迟新盘口，尝试点旧价；新报价返回后再点。"
+          }
+        },
+        {
+          "id": "ticket",
+          "area": "ticket",
+          "title": "委托草稿",
+          "text": "星语智能　限价草稿为空，接受手动输入。",
+          "actions": [],
+          "kind": "panel",
+          "note": {
+            "role": "准备委托的玩家",
+            "purpose": "核对数量、费用和提交动作。",
+            "baseline": "桌面原布局初始只露出约 4 px 的提交按钮。",
+            "impact": "预计降低寻找动作的成本。",
+            "tradeoff": "留给盘口与可滚动输入的空间变小。",
+            "evidence": "1440×900 检查整枚按钮可见；限价和触发价仍可滚动到。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "failed",
+      "title": "同页 · 盘口加载失败",
+      "description": "暂时无法取得星语智能的盘口。",
+      "layout": [
+        [
+          "list",
+          "chart",
+          "book"
+        ],
+        [
+          "list",
+          "chart",
+          "ticket"
+        ]
+      ],
+      "blocks": [
+        {
+          "id": "list",
+          "area": "list",
+          "title": "标的列表",
+          "text": "芯澜半导体　36.41\n星语智能　103.20",
+          "actions": [
+            {
+              "label": "切换至星语智能",
+              "to": "waiting"
+            }
+          ],
+          "kind": "panel",
+          "note": {
+            "role": "选股的玩家",
+            "purpose": "保持工作台，切换所分析的公司。",
+            "baseline": "沿用列表及手机标的选择器。",
+            "impact": "持平，一次选股。",
+            "tradeoff": "让报价重取期间有显式等待。",
+            "evidence": "点星语智能，观察接收盘口前的状态。"
+          }
+        },
+        {
+          "id": "chart",
+          "area": "chart",
+          "title": "星语智能　103.20",
+          "text": "行情及公司资料，与当前标的一起更新。",
+          "actions": [],
+          "kind": "panel",
+          "note": {
+            "role": "查行情的玩家",
+            "purpose": "比较价格后可直接回测此股。",
+            "baseline": "原来从全局研究页再寻找策略实验。",
+            "impact": "预计降低查找成本，标的随入口带入。",
+            "tradeoff": "图表边多一个入口。",
+            "evidence": "点击后检查回测标的、首屏位置和返回对象。"
+          }
+        },
+        {
+          "id": "book",
+          "area": "book",
+          "title": "盘口",
+          "text": "盘口暂不可用。继续自动刷新。",
+          "actions": [
+            {
+              "label": "模拟刷新成功",
+              "to": "ready"
+            }
+          ],
+          "kind": "panel",
+          "note": {
+            "role": "点报价的玩家",
+            "purpose": "仅允许将当前标的的报价带入草稿。",
+            "baseline": "旧报价曾能写入下一只股票的限价。",
+            "impact": "降低串价风险；正确报价到达前必须等候。",
+            "tradeoff": "加载失败需明确提示，保留手动输入。",
+            "evidence": "人为延迟新盘口，尝试点旧价；新报价返回后再点。"
+          }
+        },
+        {
+          "id": "ticket",
+          "area": "ticket",
+          "title": "委托草稿",
+          "text": "原有草稿保留，旧股票报价不可选。",
+          "actions": [],
+          "kind": "panel",
+          "note": {
+            "role": "准备委托的玩家",
+            "purpose": "核对数量、费用和提交动作。",
+            "baseline": "桌面原布局初始只露出约 4 px 的提交按钮。",
+            "impact": "预计降低寻找动作的成本。",
+            "tradeoff": "留给盘口与可滚动输入的空间变小。",
+            "evidence": "1440×900 检查整枚按钮可见；限价和触发价仍可滚动到。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ready",
+      "title": "同页 · 当前盘口就绪",
+      "description": "现在可从星语智能报价带入限价。",
+      "layout": [
+        [
+          "list",
+          "chart",
+          "book"
+        ],
+        [
+          "list",
+          "chart",
+          "ticket"
+        ]
+      ],
+      "blocks": [
+        {
+          "id": "list",
+          "area": "list",
+          "title": "标的列表",
+          "text": "芯澜半导体　36.41\n星语智能　103.20",
+          "actions": [
+            {
+              "label": "切换至星语智能",
+              "to": "waiting"
+            }
+          ],
+          "kind": "panel",
+          "note": {
+            "role": "选股的玩家",
+            "purpose": "保持工作台，切换所分析的公司。",
+            "baseline": "沿用列表及手机标的选择器。",
+            "impact": "持平，一次选股。",
+            "tradeoff": "让报价重取期间有显式等待。",
+            "evidence": "点星语智能，观察接收盘口前的状态。"
+          }
+        },
+        {
+          "id": "chart",
+          "area": "chart",
+          "title": "星语智能　103.20",
+          "text": "行情及公司资料，与当前标的一起更新。",
+          "actions": [
+            {
+              "label": "回测此股",
+              "to": "research"
+            }
+          ],
+          "kind": "panel",
+          "note": {
+            "role": "查行情的玩家",
+            "purpose": "比较价格后可直接回测此股。",
+            "baseline": "原来从全局研究页再寻找策略实验。",
+            "impact": "预计降低查找成本，标的随入口带入。",
+            "tradeoff": "图表边多一个入口。",
+            "evidence": "点击后检查回测标的、首屏位置和返回对象。"
+          }
+        },
+        {
+          "id": "book",
+          "area": "book",
+          "title": "盘口",
+          "text": "星语智能　卖三 103.47",
+          "actions": [
+            {
+              "label": "点卖三 103.47",
+              "to": "draft"
+            }
+          ],
+          "kind": "panel",
+          "note": {
+            "role": "点报价的玩家",
+            "purpose": "仅允许将当前标的的报价带入草稿。",
+            "baseline": "旧报价曾能写入下一只股票的限价。",
+            "impact": "降低串价风险；正确报价到达前必须等候。",
+            "tradeoff": "加载失败需明确提示，保留手动输入。",
+            "evidence": "人为延迟新盘口，尝试点旧价；新报价返回后再点。"
+          }
+        },
+        {
+          "id": "ticket",
+          "area": "ticket",
+          "title": "委托草稿",
+          "text": "星语智能　尚未从盘口选择限价。",
+          "actions": [],
+          "kind": "panel",
+          "note": {
+            "role": "准备委托的玩家",
+            "purpose": "核对数量、费用和提交动作。",
+            "baseline": "桌面原布局初始只露出约 4 px 的提交按钮。",
+            "impact": "预计降低寻找动作的成本。",
+            "tradeoff": "留给盘口与可滚动输入的空间变小。",
+            "evidence": "1440×900 检查整枚按钮可见；限价和触发价仍可滚动到。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "draft",
+      "title": "同页 · 已填限价",
+      "description": "核对草稿；预览不会发单。",
+      "layout": [
+        [
+          "list",
+          "chart",
+          "book"
+        ],
+        [
+          "list",
+          "chart",
+          "ticket"
+        ]
+      ],
+      "blocks": [
+        {
+          "id": "list",
+          "area": "list",
+          "title": "标的列表",
+          "text": "芯澜半导体　36.41\n星语智能　103.20",
+          "actions": [
+            {
+              "label": "切换至星语智能",
+              "to": "waiting"
+            }
+          ],
+          "kind": "panel",
+          "note": {
+            "role": "选股的玩家",
+            "purpose": "保持工作台，切换所分析的公司。",
+            "baseline": "沿用列表及手机标的选择器。",
+            "impact": "持平，一次选股。",
+            "tradeoff": "让报价重取期间有显式等待。",
+            "evidence": "点星语智能，观察接收盘口前的状态。"
+          }
+        },
+        {
+          "id": "chart",
+          "area": "chart",
+          "title": "星语智能　103.20",
+          "text": "行情及公司资料，与当前标的一起更新。",
+          "actions": [
+            {
+              "label": "回测此股",
+              "to": "research"
+            }
+          ],
+          "kind": "panel",
+          "note": {
+            "role": "查行情的玩家",
+            "purpose": "比较价格后可直接回测此股。",
+            "baseline": "原来从全局研究页再寻找策略实验。",
+            "impact": "预计降低查找成本，标的随入口带入。",
+            "tradeoff": "图表边多一个入口。",
+            "evidence": "点击后检查回测标的、首屏位置和返回对象。"
+          }
+        },
+        {
+          "id": "book",
+          "area": "book",
+          "title": "盘口",
+          "text": "星语智能　卖三 103.47",
+          "actions": [],
+          "kind": "panel",
+          "note": {
+            "role": "点报价的玩家",
+            "purpose": "仅允许将当前标的的报价带入草稿。",
+            "baseline": "旧报价曾能写入下一只股票的限价。",
+            "impact": "降低串价风险；正确报价到达前必须等候。",
+            "tradeoff": "加载失败需明确提示，保留手动输入。",
+            "evidence": "人为延迟新盘口，尝试点旧价；新报价返回后再点。"
+          }
+        },
+        {
+          "id": "ticket",
+          "area": "ticket",
+          "title": "委托草稿",
+          "text": "星语智能　限价 103.47　数量 100　费用摘要和提交动作可见。",
+          "actions": [],
+          "kind": "panel",
+          "note": {
+            "role": "准备委托的玩家",
+            "purpose": "核对数量、费用和提交动作。",
+            "baseline": "桌面原布局初始只露出约 4 px 的提交按钮。",
+            "impact": "预计降低寻找动作的成本。",
+            "tradeoff": "留给盘口与可滚动输入的空间变小。",
+            "evidence": "1440×900 检查整枚按钮可见；限价和触发价仍可滚动到。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "research",
+      "title": "策略研究 · 回测此股",
+      "description": "从交易大厅直达当前标的回测。",
+      "layout": [
+        [
+          "experiment"
+        ],
+        [
+          "back"
+        ]
+      ],
+      "blocks": [
+        {
+          "id": "experiment",
+          "area": "experiment",
+          "title": "策略实验",
+          "text": "回测标的　CN · 星语智能\n策略　MA 10 / 30 交叉",
+          "actions": [],
+          "kind": "panel",
+          "note": {
+            "role": "针对特定股票的玩家",
+            "purpose": "直接选择策略并开始回测。",
+            "baseline": "从全局研究页进入，先经过市场微观结构实验室。",
+            "impact": "少一次寻找目标表单。",
+            "tradeoff": "保留原研究总览供主动做对照实验者使用。",
+            "evidence": "手机上直接进入此股回测，检查目标表单是否在视口内。"
+          }
+        },
+        {
+          "id": "back",
+          "area": "back",
+          "title": "交易大厅",
+          "text": "返回已选择的星语智能。",
+          "actions": [
+            {
+              "label": "返回交易大厅",
+              "to": "ready"
+            }
+          ],
+          "kind": "panel",
+          "note": {
+            "role": "结束研究的玩家",
+            "purpose": "回到同一只股票。",
+            "baseline": "程序已有保持选股的行为。",
+            "impact": "持平，保留上下文。",
+            "tradeoff": "只演示此次涉及的研究和交易入口。",
+            "evidence": "返回后核对股票名称。"
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
+<script>
+  "use strict";
+  const find = id => document.getElementById(id);
+  const data = JSON.parse(find("preview-data").textContent);
+  const pages = new Map(data.pages.map(page => [page.id, page]));
+  const noteFields = {
+    role: "角色", purpose: "实际作用", baseline: "比较基线",
+    impact: "复杂度影响", tradeoff: "权衡", evidence: "证据与待验项"
+  };
+  let current = data.pages[0];
+  let selected = current.blocks[0];
+  let annotations = true;
+
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  // Both renderings share the same area map. Use simple CSS identifiers for areas.
+  function applyLayout(grid, page) {
+    grid.style.gridTemplateColumns = "repeat(" + page.layout[0].length + ", minmax(0,1fr))";
+    grid.style.gridTemplateAreas = page.layout.map(row => '"' + row.join(" ") + '"').join(" ");
+  }
+
+  function makeThumb(page) {
+    const button = element("button", "thumb");
+    button.type = "button";
+    button.dataset.page = page.id;
+    const mini = element("span", "mini");
+    mini.setAttribute("aria-hidden", "true");
+    applyLayout(mini, page);
+    for (const block of page.blocks) {
+      const tile = element("span", "mini-block");
+      tile.style.gridArea = block.area;
+      tile.dataset.kind = block.kind;
+      mini.append(tile);
+    }
+    button.append(mini, element("strong", "", page.title));
+    button.addEventListener("click", () => showPage(page));
+    return button;
+  }
+
+  function selectBlock(block) {
+    selected = block;
+    for (const region of find("screen").children) {
+      const active = region.dataset.block === block.id;
+      region.classList.toggle("selected", active);
+      region.querySelector(".block-selector").setAttribute("aria-pressed", String(active));
+    }
+    const list = element("dl");
+    for (const [key, label] of Object.entries(noteFields)) {
+      list.append(element("dt", "", label), element("dd", "", block.note[key]));
+    }
+    find("note-content").replaceChildren(element("h3", "", block.title), list);
+  }
+
+  function makeBlock(block) {
+    const region = element("section", "block");
+    region.dataset.block = block.id;
+    region.dataset.kind = block.kind;
+    region.style.gridArea = block.area;
+    const heading = element("h3");
+    if (annotations) {
+      const selector = element("button", "block-selector", block.title);
+      selector.type = "button";
+      selector.setAttribute("aria-controls", "note-content");
+      heading.append(selector);
+      region.addEventListener("click", event => {
+        if (!event.target.closest(".action")) selectBlock(block);
+      });
+    } else {
+      heading.textContent = block.title;
+    }
+    region.append(heading);
+    if (block.text) region.append(element("p", "", block.text));
+    if (block.items?.length) {
+      const list = element("ul");
+      for (const item of block.items) list.append(element("li", "", item));
+      region.append(list);
+    }
+    if (block.actions?.length) {
+      const actions = element("div", "actions");
+      for (const action of block.actions) {
+        const target = pages.get(action.to);
+        if (!target) throw new Error("Unknown destination: " + action.to);
+        const button = element("button", "action", action.label);
+        button.type = "button";
+        button.addEventListener("click", () => {
+          showPage(target);
+          find("page-title").focus();
+        });
+        actions.append(button);
+      }
+      region.append(actions);
+    }
+    return region;
+  }
+
+  function render() {
+    find("page-title").textContent = current.title;
+    find("description").textContent = current.description || "";
+    find("workspace").dataset.notes = annotations ? "on" : "off";
+    find("notes").hidden = !annotations;
+    find("toggle").setAttribute("aria-pressed", String(annotations));
+    for (const thumb of find("thumbs").children) {
+      if (thumb.dataset.page === current.id) thumb.setAttribute("aria-current", "page");
+      else thumb.removeAttribute("aria-current");
+    }
+    const grid = find("screen");
+    applyLayout(grid, current);
+    grid.replaceChildren(...current.blocks.map(makeBlock));
+    if (annotations) selectBlock(selected);
+  }
+
+  function showPage(page) {
+    current = page;
+    selected = page.blocks[0];
+    render();
+  }
+
+  document.title = data.title;
+  find("title").textContent = data.title;
+  find("thumbs").append(...data.pages.map(makeThumb));
+  find("toggle").addEventListener("click", () => {
+    annotations = !annotations;
+    render();
+  });
+  render();
+</script>
+</body>
+</html>
