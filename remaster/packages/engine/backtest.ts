@@ -1,11 +1,16 @@
-import { Candle, RuleError } from '../domain/types';
+import { Candle, Instrument, RuleError } from '../domain/types';
 import { createWorld, account, addAccount, equity, longQuantity } from './world';
 import { refreshLiquidity } from './participants';
 import { placeOrder } from './matching';
 import { performance } from './analytics';
-export function backtest(symbol: string, bars: Candle[], strategy: string, seed: number): unknown {
+export function backtest(symbol: string, bars: Candle[], strategy: string, seed: number, instrumentMetadata?: Instrument): unknown {
   if(!['ma','rsi','momentum'].includes(strategy)) throw new RuleError('INVALID_STRATEGY','回测策略必须为 MA、RSI 或动量');
-  const world=createWorld(seed);const instrument=world.instruments[symbol];if(!instrument) throw new RuleError('INVALID_SYMBOL','回测标的不存在');
+  const world = createWorld(seed, 'sandbox', {
+    includeHistory: false,
+    additionalInstrument: instrumentMetadata?.symbol === symbol ? instrumentMetadata : undefined
+  });
+  const instrument = Object.hasOwn(world.instruments, symbol) ? world.instruments[symbol] : undefined;
+  if (!instrument) throw new RuleError('INVALID_SYMBOL', '回测标的不存在');
   world.instruments={[symbol]:instrument};world.quotes={[symbol]:world.quotes[symbol]};world.orders={};world.trades=[];world.ledger=[];
   for(const actor of Object.values(world.accounts)) {actor.positions=Object.fromEntries(Object.entries(actor.positions).filter(([heldSymbol])=>heldSymbol===symbol));}
   const player=addAccount(world,'backtest','回测账户',instrument.market,'player',100_000_000);

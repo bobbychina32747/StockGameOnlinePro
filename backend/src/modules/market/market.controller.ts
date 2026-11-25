@@ -73,7 +73,7 @@ export class MarketController {
         }
         // The Go API retains the exact existing pure engine for numerical compatibility.
         // Load only a deployment-owned module path, never a request-controlled path.
-        const modulePath = process.env.V2_BACKTEST_MODULE || resolve(process.cwd(), '../remaster/dist/packages/engine/backtest.js');
+        const modulePath = process.env.V2_BACKTEST_MODULE || resolve(process.cwd(), 'scripts/formal-backtest.cjs');
         let backtest: any;
         try { ({ backtest } = require(modulePath)); }
         catch { throw new ServiceUnavailableException('兼容回测模块未安装'); }

@@ -18,6 +18,7 @@
 !backend/scripts/check-core-types.cjs
 !backend/scripts/calendar-data.cjs
 !backend/scripts/export-game-database.cjs
+!backend/scripts/formal-backtest.cjs
 !backend/test/
 !backend/test/types/
 !backend/test/types/matching.ts

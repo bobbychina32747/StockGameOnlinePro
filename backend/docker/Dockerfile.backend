@@ -25,7 +25,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
-COPY scripts/export-game-database.cjs ./scripts/
+COPY scripts/export-game-database.cjs scripts/formal-backtest.cjs ./scripts/
 
 EXPOSE 8000
 

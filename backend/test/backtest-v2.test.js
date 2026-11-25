@@ -23,3 +23,28 @@ test('a missing compatibility module fails explicitly instead of using a differe
   try{await expect(new MarketController({}).backtestV2({symbol:'X1',strategy:'ma'})).rejects.toMatchObject({status:503});}
   finally{if(previous===undefined)delete process.env.V2_BACKTEST_MODULE;else process.env.V2_BACKTEST_MODULE=previous;}
 });
+
+test('the default formal entry passes native IPO metadata and leaves existing instruments to the engine', async () => {
+  const enginePath = path.resolve(__dirname, '../../remaster/dist/packages/engine/backtest.js');
+  const compute = jest.fn().mockReturnValue({valid: true});
+  jest.doMock(enginePath, () => ({backtest: compute}), {virtual: true});
+  const previous = process.env.V2_BACKTEST_MODULE;
+  delete process.env.V2_BACKTEST_MODULE;
+  try {
+    const controller = new MarketController({getKlines: async () => []});
+    const {IPO_POOL} = require('../dist/src/common/constants');
+    for (const stock of IPO_POOL) {
+      await expect(controller.backtestV2({symbol: stock.symbol, strategy: 'ma'})).resolves.toEqual({valid: true});
+      expect(compute).toHaveBeenLastCalledWith(stock.symbol, [], 'ma', 20261010, {
+        symbol: stock.symbol, code: stock.code, name: stock.name, industry: stock.industry, market: 'CN',
+        listedAt: stock.listDate || '', description: stock.description,
+        initialPrice: Math.round(stock.initialPrice * 100), volatility: stock.sigma,
+      });
+    }
+    await controller.backtestV2({symbol: 'T1', strategy: 'ma'});
+    expect(compute).toHaveBeenLastCalledWith('T1', [], 'ma', 20261010);
+  } finally {
+    if (previous !== undefined) process.env.V2_BACKTEST_MODULE = previous;
+    jest.dontMock(enginePath);
+  }
+});

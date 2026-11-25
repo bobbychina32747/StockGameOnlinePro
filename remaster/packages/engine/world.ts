@@ -48,18 +48,25 @@ export function addAccount(world: World, owner: string, name: string, market: Ma
 export function emit(world: World, market: MarketId, kind: string, title: string, detail: string, impact=0, symbol?: string): void {
   world.events.push({id:id(world,'event'),sequence:world.sequence,market,day:world.markets[market].clock.day,kind,title,detail,impact,symbol,time:candleTime(market,world.markets[market].clock)});
 }
-export function createWorld(seed=20261010, mode: World['mode']='sandbox'): World {
+export function createWorld(seed=20261010, mode: World['mode']='sandbox', options: {
+  additionalInstrument?: Instrument;
+  includeHistory?: boolean;
+} = {}): World {
   const world: World={schemaVersion:2,version:0,sequence:0,seed,random:{},mode,instruments:{},quotes:{},markets:{} as World['markets'],accounts:{},orders:{},trades:[],ledger:[],events:[],seasons:[],nextId:0};
   for (const market of MARKETS) {
     const date = tradingDate(market,'2026-10-08')?'2026-10-08':nextTradingDate(market,'2026-10-07');
     world.markets[market]={clock:{day:1,date,minute:0,phase:'continuous',settledDay:0,lastRealMinute:''},sentiment:0,rate:0.025,inflation:0.02,growth:0.03,sectors:{},lastNavDay:0,fundNav:{money:10000,etf:10000,basket:0,dividend:0}};
     for(const purpose of ['treasury','fees','bank','fx','fund','issuer']) addAccount(world,`system-${purpose}`,purpose,market,'system',0);
   }
-  for (const item of catalog.instruments) {
-    const instrument = item as Instrument; world.instruments[item.symbol]=instrument;
-    const price=item.initialPrice;
-    world.quotes[item.symbol]={symbol:item.symbol,price,previousClose:price,fairValue:price,open:price,high:price,low:price,volume:0,turnover:0,momentum:0,bubble:0,earningsGrowth:0.06,pe:20,dividendFactor:1,history:[],daily:[]};
-    world.markets[instrument.market].sectors[item.industry]??={cycle:0,trend:0,heat:0};
+  const instruments = catalog.instruments as Instrument[];
+  const extra = options.additionalInstrument;
+  const activeInstruments = extra && !instruments.some(item => item.symbol === extra.symbol)
+    ? [...instruments, extra] : instruments;
+  for (const instrument of activeInstruments) {
+    const {symbol, initialPrice:price, market, industry} = instrument;
+    world.instruments[symbol]=instrument;
+    world.quotes[symbol]={symbol,price,previousClose:price,fairValue:price,open:price,high:price,low:price,volume:0,turnover:0,momentum:0,bubble:0,earningsGrowth:0.06,pe:20,dividendFactor:1,history:[],daily:[]};
+    world.markets[market].sectors[industry]??={cycle:0,trend:0,heat:0};
   }
   for(const market of MARKETS) {
     const maker=addAccount(world,`maker-${market}`,'流动性做市商',market,'maker',50_000_000_000,'maker');
@@ -69,7 +76,7 @@ export function createWorld(seed=20261010, mode: World['mode']='sandbox'): World
     strategies.forEach((strategy,index)=>addAccount(world,`ai-${index}-${market}`,names[index],market,'ai',INITIAL_CASH,strategy));
     world.markets[market].fundNav.basket=basketValue(world,market);
   }
-  initializeHistory(world);
+  if (options.includeHistory !== false) initializeHistory(world);
   for(const market of MARKETS) emit(world,market,'welcome','交易所已开市','所有交易均为模拟；市场、AI、账本与订单来自同一版本。');
   return world;
 }

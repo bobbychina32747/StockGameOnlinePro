@@ -41,7 +41,7 @@ Go 服务不实现 `/v2` Socket.IO。独立订阅客户端需要改用 SSE（脚
 
 幂等键先持久化，再发送唯一写入；上游报错或网络中断留下 pending，后续重试查询原结果，不自动再次扣款。命令记录不自动过期。`reset` 等现有写入规则仍由原账本执行，不会在迁移启动时触发。
 
-回测通过原后端新增的 `POST /api/market/backtest-v2` 调用同一份纯计算模块，保留数值与成交细节。原后端本地默认加载 `../remaster/dist/packages/engine/backtest.js`，容器通过 `V2_BACKTEST_MODULE` 指定部署文件；缺失时明确返回 503，不换用另一套回测算法。
+回测通过 `POST /api/market/backtest-v2` 使用已收盘的真实游戏日线。原后端默认加载 `scripts/formal-backtest.cjs`，从后端的原生 IPO 池补充标的信息，再调用同一撮合引擎。容器内引擎位于 `/app/v2-runtime/packages/engine/backtest.js`，本地开发使用 `remaster/dist/packages/engine/backtest.js`。`V2_BACKTEST_MODULE` 可覆盖正式入口，缺少入口或其依赖时返回 503。
 
 `tooling/compat-fixtures.cjs` 从原 TypeScript 生成合成账号契约、三市场快照及加密会话测试数据。它不读取真实玩家数据库或凭证。跨语言契约测试比较实际 JSON 输出。
 

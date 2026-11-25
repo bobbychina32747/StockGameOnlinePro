@@ -14,6 +14,7 @@ scripts/*
 !scripts/check-core-types.cjs
 !scripts/calendar-data.cjs
 !scripts/export-game-database.cjs
+!scripts/formal-backtest.cjs
 .env
 .env.game
 .env.site

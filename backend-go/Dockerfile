@@ -25,9 +25,9 @@ WORKDIR /app
 COPY --from=core-build /app/package.json /app/package-lock.json ./
 COPY --from=core-build /app/node_modules ./node_modules
 COPY --from=core-build /app/dist ./dist
-COPY backend/scripts/export-game-database.cjs ./scripts/
+COPY backend/scripts/export-game-database.cjs backend/scripts/formal-backtest.cjs ./scripts/
 COPY --from=web-build /remaster/dist/packages ./v2-runtime/packages
-ENV NODE_ENV=production V2_BACKTEST_MODULE=/app/v2-runtime/packages/engine/backtest.js
+ENV NODE_ENV=production V2_BACKTEST_MODULE=/app/scripts/formal-backtest.cjs
 EXPOSE 8000
 CMD ["node", "dist/src/main.js"]
 
