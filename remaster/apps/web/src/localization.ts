@@ -21,6 +21,7 @@ Object.assign(english,{
  '泡沫破灭的教训：板块连续暴涨（涨幅远超基本面）时，任何细小抛售都可能引发连锁崩盘。识别泡沫：关注涨幅是否离谱、回调时是否放量下跌。破灭期不要抄底，等价格回归价值企稳后再介入':'Bubble risk: prices far above fundamentals can unwind together. Compare valuation and selling volume; do not assume a falling price has stabilized.',
 });
 Object.assign(english, {
+ '回测此股':'Backtest this stock', '正在加载盘口':'Loading order book', '盘口暂不可用，正在重试':'Order book unavailable, retrying',
  '预计均价':'Estimated average price', '逐档冲击':'Depth impact', '按盘口预估，成交以提交时为准':'Current-depth estimate; execution uses the book at submission',
  '事件 OFI（股）':'Event OFI (shares)', '标准化事件 OFI':'Normalized event OFI',
  '历史行情暂未更新':'Historical data has not refreshed', '更新中…':'Updating…',

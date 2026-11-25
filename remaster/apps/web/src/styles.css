@@ -58,3 +58,23 @@ html,body,#root{height:100%;overflow:hidden;overscroll-behavior:none}
 @media(max-width:700px){.exchange-clock{font-size:10px}}
 .laboratory{min-width:0}.laboratory .lab-fields{grid-template-columns:repeat(4,minmax(0,1fr))}.lab-note{margin:8px 0 12px}.lab-settings{margin:12px 0}.lab-settings summary{cursor:pointer;color:var(--muted);padding:5px 0}.lab-settings[open] summary{margin-bottom:12px;color:var(--text)}.lab-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}.lab-assumptions{padding-left:20px;color:var(--muted);font-size:12px;max-width:1100px}.lab-assumptions li+li{margin-top:7px}.lab-chart{height:340px;width:100%;min-width:0}.lab-selectors{display:flex;gap:8px;flex-wrap:wrap}.lab-selectors select{max-width:220px;padding:5px 8px}.lab-stats{display:flex;gap:24px;flex-wrap:wrap;margin:18px 0}.lab-stats div{display:flex;flex-direction:column;gap:5px}.lab-stats span{color:var(--muted);font-size:11px}.lab-stats strong{font-weight:500;font-size:16px}.lab-digests p{display:flex;flex-wrap:wrap;gap:12px;margin:8px 0}.lab-digests code{overflow-wrap:anywhere;color:var(--muted);font-size:11px}.laboratory .panel-heading{flex-wrap:wrap;gap:12px}.laboratory .table-scroll table{min-width:600px}.laboratory .table-scroll th{white-space:nowrap}@media(max-width:800px){.laboratory .lab-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.lab-chart{height:300px}.lab-actions button{padding:9px 11px}.lab-selectors select{max-width:180px}.lab-stats{gap:18px}}
 .laboratory>.panel{margin-bottom:20px}
+
+
+/* Keep the order review visible while the book and order inputs scroll. */
+.ticket-panel { display: flex; flex-direction: column; overflow: hidden; }
+.ticket-panel > .panel-heading { flex: none; }
+.order-ticket { display: flex; flex: 1; flex-direction: column; min-height: 0; padding: 0; }
+.ticket-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.ticket-fields, .ticket-review { padding: 8px 12px; }
+.ticket-review { flex: none; border-top: 1px solid var(--line); background: var(--panel); }
+.ticket-review .ticket-summary { padding: 0 0 4px; border: 0; }
+.book-status { margin: 6px 0; color: var(--muted); font-size: 12px; }
+@media (max-width: 768px) {
+  .ticket-panel { display: none; }
+  .ticket-panel.mobile-open { overflow: hidden; }
+  .ticket-fields, .ticket-review { padding: 10px 20px; }
+}
+@media (max-height: 650px) {
+  .ticket-summary { max-height: 16vh; overflow: auto; }
+  .ticket-review .ticket-footnote { margin-block: 4px; }
+}

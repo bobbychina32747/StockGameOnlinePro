@@ -2,13 +2,18 @@ import { useSyncExternalStore } from 'react';
 import { MarketId, OrderType, Side } from '../../../packages/domain/types';
 export interface Draft{type:OrderType;side:Side;quantity:string;price:string;trigger:string;display:string}
 export type Page='trade'|'portfolio'|'competition'|'research'|'profile';
-interface Workspace{market:MarketId;symbol:string;page:Page;ticketOpen:boolean;search:string;industry:string;watchOnly:boolean;watch:string[];theme:'dark'|'light';language:'zh-CN'|'en'|'zh-Hant';upIsRed:boolean;reducedMotion:boolean;drafts:Record<string,Draft>}
+interface Workspace{market:MarketId;symbol:string;page:Page;focusBacktest?:boolean;ticketOpen:boolean;search:string;industry:string;watchOnly:boolean;watch:string[];theme:'dark'|'light';language:'zh-CN'|'en'|'zh-Hant';upIsRed:boolean;reducedMotion:boolean;drafts:Record<string,Draft>}
 function stored<T>(key:string,fallback:T):T{try{return JSON.parse(localStorage.getItem(key)??'null')??fallback;}catch{return fallback;}}
 let workspace:Workspace={market:'CN',symbol:'T1',page:'trade',ticketOpen:false,search:'',industry:'',watchOnly:false,watch:[],theme:stored('rgp.theme','dark'),language:stored('rgp.language','zh-CN'),upIsRed:stored('rgp.up-red',true),reducedMotion:stored('rgp.motion',false),drafts:{}};
 const listeners=new Set<()=>void>();let owner='';
 export function useWorkspace(){return useSyncExternalStore(listener=>{listeners.add(listener);return()=>{listeners.delete(listener);};},()=>workspace);}
 export function currentLanguage(){return workspace.language;}
-export function setWorkspace(patch:Partial<Workspace>){workspace={...workspace,...patch};for(const listener of listeners)listener();}
+export function setWorkspace(patch:Partial<Workspace>){
+  // Selecting Research in the navigation opens its overview, even from inside the page.
+  if (patch.page === 'research') patch = {focusBacktest:false, ...patch};
+  workspace={...workspace,...patch};
+  for(const listener of listeners)listener();
+}
 export function changeOwner(identity:string){if(owner===identity)return;owner=identity;setWorkspace({watch:stored('rgp.watch:'+owner,[]),drafts:stored('rgp.drafts:'+owner,{})});}
 export function chooseMarket(market:MarketId,symbol:string){setWorkspace({market,symbol,search:'',industry:'',watchOnly:false});}
 export function toggleWatch(symbol:string){const watch=workspace.watch.includes(symbol)?workspace.watch.filter(item=>item!==symbol):[...workspace.watch,symbol];setWorkspace({watch});if(owner)localStorage.setItem('rgp.watch:'+owner,JSON.stringify(watch));}
